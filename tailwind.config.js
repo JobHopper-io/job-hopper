@@ -7,24 +7,26 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Manrope', 'sans-serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        heading: ['Poppins', 'sans-serif'],
       },
       colors: {
         brand: {
-          primary: '#007AFF',
-          'primary-dark': '#0038D6',
-          dark: '#031130',
-          light: '#FAFBFF',
+          primary: '#2F6ECC',
+          'rabbit-start': '#FFD75A',
+          'rabbit-end': '#FF8A34',
+          charcoal: '#111827',
+          success: '#16A34A',
         },
-        gray: {
-          cloud: '#EDEFF7',
-          smoke: '#D3D6E0',
-          steel: '#BCBFCC',
-          space: '#9DA2B3',
-          graphite: '#6E7180',
-          arsenic: '#40424D',
-          phantom: '#1E1E24',
+        neutral: {
+          bg: '#F9FAFB',
+          card: '#FFFFFF',
+          border: '#E5E7EB',
+          body: '#374151',
         }
+      },
+      borderRadius: {
+        'brand': '12px',
       }
     },
   },

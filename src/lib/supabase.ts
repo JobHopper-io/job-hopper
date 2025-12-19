@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { getOrganizationUrl } from '@/utils/domain'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -24,21 +23,37 @@ export interface User {
   last_name: string
   email: string
   phone_number?: string
-  role: 'office' | 'tc' | 'doctor'
+  role: 'office' | 'tc' | 'doctor' | 'subscriber'
   organization_id?: string
+  current_job_title?: string
+  years_of_experience?: number
+  current_industry?: string
+  target_role_categories?: string[]
+  desired_salary_min?: number
+  desired_salary_max?: number
+  preferred_locations?: string[]
+  open_to_relocation?: boolean
+  open_to_remote?: boolean
+  resume_bucket_key?: string
+  onboarding_completed?: boolean
   created_at: string
   updated_at: string
 }
 
-export interface Organization {
+export interface Subscription {
   id: string
   name: string
-  domain: string
-  logo_bucket_key?: string
-  primary_color?: string
-  secondary_color?: string
-  booking_link?: string
-  is_onboarded?: boolean
+  subscription_tier?: 'entry_mid' | 'senior_management' | 'director_vp_c_level'
+  subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
+  trial_ends_at?: string
+  current_period_start?: string
+  current_period_end?: string
+  premium_insights_enabled?: boolean
+  interview_prep_enabled?: boolean
+  resume_upgrade_purchased?: boolean
+  stripe_customer_id?: string
+  stripe_subscription_id?: string
+  stripe_subscription_status?: string
   created_at: string
   updated_at: string
 }
@@ -50,53 +65,41 @@ export const authAPI = {
     password: string,
     firstName: string,
     lastName: string,
-    phoneNumber: string,
-    organizationName: string,
-    organizationDomain: string,
-    bookingLink?: string,
+    phoneNumber?: string,
     emailRedirectTo?: string
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: emailRedirectTo ?? `${getOrganizationUrl(organizationDomain)}/dashboard`,
+        emailRedirectTo: emailRedirectTo ?? `${window.location.origin}/dashboard`,
         data: {
           first_name: firstName,
           last_name: lastName,
-          phone_number: phoneNumber,
-          organization_name: organizationName,
-          organization_domain: organizationDomain,
-          booking_link: bookingLink
+          phone_number: phoneNumber || null
         }
       }
     })
 
-    // If signup succeeded and we have a user id, immediately create the org and link the user
-    let organizationId: string | undefined
+    // Create user profile (subscription will be created during onboarding)
     if (!error && data?.user) {
       try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('create_user_profile_and_organization', {
+        await supabase.rpc('create_user_profile_and_organization', {
           user_id: data.user.id,
           user_email: data.user.email,
           first_name: firstName,
           last_name: lastName,
           phone_number: phoneNumber || null,
-          org_name: organizationName || null,
-          org_domain: organizationDomain || null,
-          booking_link: bookingLink || null
+          org_name: null,
+          org_domain: null,
+          booking_link: null
         })
-        
-        if (!rpcError && rpcData?.organization_id) {
-          organizationId = rpcData.organization_id
-        }
       } catch (e) {
-        // Non-blocking: log and proceed to email confirmation UI
         console.warn('create_user_profile_and_organization failed post-signup', e)
       }
     }
 
-    return { data: { ...data, organizationId }, error }
+    return { data, error }
   },
 
   async signIn(email: string, password: string) {
@@ -139,16 +142,16 @@ export const authAPI = {
         .single()
 
       if (!existingUser) {
-        // Create user profile with organization data from metadata
+        // Create user profile
         const { data, error } = await supabase.rpc('create_user_profile_and_organization', {
           user_id: user.id,
           user_email: user.email,
           first_name: user.user_metadata?.first_name || '',
           last_name: user.user_metadata?.last_name || '',
           phone_number: user.user_metadata?.phone_number || null,
-          org_name: user.user_metadata?.organization_name || null,
-          org_domain: user.user_metadata?.organization_domain || null,
-          booking_link: user.user_metadata?.booking_link || null
+          org_name: null,
+          org_domain: null,
+          booking_link: null
         })
 
         if (error) {
@@ -165,120 +168,220 @@ export const authAPI = {
       console.error('Error ensuring user profile:', error)
       return { success: false, error }
     }
-  },
-
-  async updateUserOrganizationFromSubdomain(userId: string, subdomain: string) {
-    try {
-      // Get organization by subdomain
-      const { data: orgData, error: orgError } = await organizationAPI.getOrganizationByDomain(subdomain)
-
-      if (orgError || !orgData || orgData.error) {
-        console.error('Organization not found for subdomain:', subdomain, orgError)
-        return { success: false, error: 'Organization not found' }
-      }
-
-      // Update user's organization_id
-      const { data, error } = await supabase
-        .from('users')
-        .update({ organization_id: orgData.id })
-        .eq('auth_user_id', userId)
-        .select()
-
-      if (error) {
-        console.error('Error updating user organization:', error)
-        return { success: false, error }
-      }
-
-      console.log('User organization updated:', data)
-      return { success: true, data }
-    } catch (error) {
-      console.error('Error updating user organization from subdomain:', error)
-      return { success: false, error }
-    }
   }
 }
 
-export const organizationAPI = {
-  async createOrganization(orgData: {
-    name: string
-    domain: string
-    logo_bucket_key?: string
-    primary_color?: string
-    secondary_color?: string
-  }) {
-    const { data, error } = await supabase.rpc('create_organization_and_link_doctor', orgData)
-    return { data, error }
-  },
-
-  async getCurrentOrganization() {
-    const { data, error } = await supabase.rpc('get_current_user_organization')
-    return { data, error }
-  },
-
-  async userNeedsOnboarding() {
-    const { data, error } = await supabase.rpc('user_needs_onboarding')
-    return { data, error }
-  },
-
-  async getOrganizationByDomain(domain: string) {
-    const { data, error } = await supabase.rpc('get_organization_by_domain_public', { domain_name: domain })
-    return { data, error }
-  },
-
-  async checkUserBelongsToOrganization(email: string, domain: string) {
-    const { data, error } = await supabase.rpc('check_user_belongs_to_organization', {
-      user_email: email,
-      org_domain: domain
-    })
-    return { data, error }
-  },
-
-  async markOrganizationOnboarded() {
-    const { data, error } = await supabase.rpc('mark_organization_onboarded')
-    return { data, error }
-  },
-
-  async updateOrganization(orgData: {
-    name?: string
-    domain?: string
-    logo_bucket_key?: string
-    primary_color?: string
-    secondary_color?: string
-    booking_link?: string
-  }) {
+export const subscriptionAPI = {
+  async createSubscription(tier: 'entry_mid' | 'senior_management' | 'director_vp_c_level', trialDays: number = 7) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
-    // Remove undefined/empty-string fields to avoid violating constraints
-    const updates = Object.fromEntries(
-      Object.entries(orgData).filter((entry) => entry[1] !== undefined && entry[1] !== '')
-    ) as typeof orgData
+    const { data, error } = await supabase.rpc('create_subscription_for_user', {
+      user_id: user.id,
+      tier,
+      trial_days: trialDays
+    })
 
-    const { data: userData, error: userError } = await supabase
+    return { data, error }
+  },
+
+  async createCheckoutSession(
+    tier: 'entry_mid' | 'senior_management' | 'director_vp_c_level',
+    addons?: {
+      premium_insights?: boolean
+      interview_prep?: boolean
+      resume_upgrade?: boolean
+    },
+    successUrl?: string,
+    cancelUrl?: string
+  ) {
+    const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      body: {
+        tier,
+        addons: addons || {},
+        successUrl: successUrl || `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl || `${window.location.origin}/billing`,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
+  async createBillingPortalSession(returnUrl?: string) {
+    const { data, error } = await supabase.functions.invoke('create-billing-portal', {
+      body: {
+        returnUrl: returnUrl || `${window.location.origin}/billing`,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
+  async getCurrentSubscription() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data: userData } = await supabase
       .from('users')
       .select('organization_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (userError || !userData) throw new Error('User organization not found')
+    if (!userData?.organization_id) {
+      return { data: null, error: null }
+    }
 
     const { data, error } = await supabase
       .from('organizations')
-      .update(updates)
+      .select('*')
+      .eq('id', userData.organization_id)
+      .single()
+
+    return { data, error }
+  },
+
+  async updateSubscriptionTier(newTier: 'entry_mid' | 'senior_management' | 'director_vp_c_level') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.rpc('update_subscription_tier', {
+      user_id: user.id,
+      new_tier: newTier
+    })
+
+    return { data, error }
+  },
+
+  async enableAddon(addonType: 'premium_insights' | 'interview_prep' | 'resume_upgrade') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.rpc('enable_premium_addon', {
+      user_id: user.id,
+      addon_type: addonType
+    })
+
+    return { data, error }
+  },
+
+  async cancelSubscription() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!userData?.organization_id) {
+      return { error: new Error('Subscription not found') }
+    }
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ subscription_status: 'cancelled' })
       .eq('id', userData.organization_id)
       .select()
       .single()
+
+    return { data, error }
+  }
+}
+
+export const profileAPI = {
+  async updateProfile(profileData: {
+    current_job_title?: string
+    years_of_experience?: number
+    current_industry?: string
+    target_role_categories?: string[]
+    desired_salary_min?: number
+    desired_salary_max?: number
+    preferred_locations?: string[]
+    open_to_relocation?: boolean
+    open_to_remote?: boolean
+  }) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return { data: null, error: new Error('Not authenticated') }
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(profileData)
+      .eq('auth_user_id', user.id)
+      .select()
+      .single()
+
+    return { data, error }
+  },
+
+  async uploadResume(file: File) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    const filePath = `resumes/${fileName}`
+
+    // Upload file to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('resumes')
+      .upload(filePath, file)
+
+    if (uploadError) {
+      return { data: null, error: uploadError }
+    }
+
+    // Update user profile with resume bucket key
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .update({ resume_bucket_key: filePath })
+      .eq('auth_user_id', user.id)
+      .select()
+      .single()
+
+    if (userError) {
+      return { data: null, error: userError }
+    }
+
+    return { data: { ...userData, resume_url: uploadData.path }, error: null }
+  },
+
+  async markOnboardingComplete() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase
+      .from('users')
+      .update({ onboarding_completed: true })
+      .eq('auth_user_id', user.id)
+      .select()
+      .single()
+
     return { data, error }
   }
 }
 
 export const userAPI = {
   async getCurrentUserProfile() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: new Error('Not authenticated') }
+
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('auth_user_id', (await supabase.auth.getUser()).data.user?.id)
+      .eq('auth_user_id', user.id)
       .single()
+
     return { data, error }
   },
 
@@ -323,4 +426,3 @@ export const userAPI = {
     return { data, error }
   }
 }
-
