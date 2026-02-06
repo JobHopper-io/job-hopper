@@ -71,6 +71,14 @@ const router = createRouter({
       component: () => import('../views/BillingView.vue'),
     },
   ],
+  scrollBehavior(_to, _from, savedPosition) {
+    // Back/forward: restore browser's saved position
+    if (savedPosition) {
+      return savedPosition
+    }
+    // New navigation: scroll to top
+    return { left: 0, top: 0 }
+  },
 })
 
 // Router guard to enforce authentication
