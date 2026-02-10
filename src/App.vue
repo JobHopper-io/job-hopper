@@ -70,11 +70,7 @@ const handleSignOut = async () => {
             <!-- Logo -->
             <div class="flex items-center">
               <router-link :to="isAuthenticated ? '/dashboard' : '/'" class="flex items-center space-x-2">
-                <div class="w-8 h-8 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-lg flex items-center justify-center">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                  </svg>
-                </div>
+                <img src="/icon-512.png" alt="Job-Hopper" class="w-8 h-8 rounded-lg object-contain" />
                 <span class="text-lg sm:text-xl font-heading font-bold text-brand-primary">Job-Hopper</span>
               </router-link>
             </div>
@@ -214,11 +210,7 @@ const handleSignOut = async () => {
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">
               <router-link to="/" class="flex items-center space-x-2 mb-4">
-                <div class="w-8 h-8 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-lg flex items-center justify-center">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                  </svg>
-                </div>
+                <img src="/icon-512.png" alt="Job-Hopper" class="w-8 h-8 rounded-lg object-contain" />
                 <span class="text-lg font-heading font-bold text-brand-primary">Job-Hopper</span>
               </router-link>
               <p class="text-sm text-neutral-body">
