@@ -22,7 +22,7 @@ const particlesRef = ref<HTMLElement>()
 const scrollProgressRef = ref<HTMLElement>()
 
 const currentTestimonial = ref(0)
-const testimonialInterval = ref<NodeJS.Timeout | null>(null)
+const testimonialInterval = ref<ReturnType<typeof setTimeout> | null>(null)
 
 const testimonials = [
   {
@@ -138,32 +138,38 @@ onMounted(() => {
     parallaxScroll(heroCardRef.value, -0.3)
     
     // 3D tilt on mouse move
-    heroCardRef.value.addEventListener('mousemove', (e: MouseEvent) => {
-      const rect = heroCardRef.value!.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const centerX = rect.width / 2
-      const centerY = rect.height / 2
-      const rotateX = (y - centerY) / 20
-      const rotateY = (centerX - x) / 20
+    if (heroCardRef.value) {
+      heroCardRef.value.addEventListener('mousemove', (e: MouseEvent) => {
+        const rect = heroCardRef.value!.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+        const centerX = rect.width / 2
+        const centerY = rect.height / 2
+        const rotateX = (y - centerY) / 20
+        const rotateY = (centerX - x) / 20
+        
+        if (heroCardRef.value) {
+          gsap.to(heroCardRef.value, {
+            rotationX: rotateX,
+            rotationY: rotateY,
+            transformPerspective: 1000,
+            duration: 0.3,
+            ease: 'power2.out'
+          })
+        }
+      })
       
-      gsap.to(heroCardRef.value, {
-        rotationX: rotateX,
-        rotationY: rotateY,
-        transformPerspective: 1000,
-        duration: 0.3,
-        ease: 'power2.out'
+      heroCardRef.value.addEventListener('mouseleave', () => {
+        if (heroCardRef.value) {
+          gsap.to(heroCardRef.value, {
+            rotationX: 0,
+            rotationY: 0,
+            duration: 0.5,
+            ease: 'power2.out'
+          })
+        }
       })
-    })
-    
-    heroCardRef.value.addEventListener('mouseleave', () => {
-      gsap.to(heroCardRef.value, {
-        rotationX: 0,
-        rotationY: 0,
-        duration: 0.5,
-        ease: 'power2.out'
-      })
-    })
+    }
   }
   
   // Problem section animations
@@ -240,8 +246,9 @@ onMounted(() => {
     }
     
     // 3D hover effect
-    card.addEventListener('mousemove', (e: MouseEvent) => {
-      const rect = (card as HTMLElement).getBoundingClientRect()
+    const cardElement = card as HTMLElement
+    cardElement.addEventListener('mousemove', (e: MouseEvent) => {
+      const rect = cardElement.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       const centerX = rect.width / 2
@@ -249,7 +256,7 @@ onMounted(() => {
       const rotateX = (y - centerY) / 15
       const rotateY = (centerX - x) / 15
       
-      gsap.to(card, {
+      gsap.to(cardElement, {
         rotationX: rotateX,
         rotationY: rotateY,
         z: 20,
@@ -259,8 +266,8 @@ onMounted(() => {
       })
     })
     
-    card.addEventListener('mouseleave', () => {
-      gsap.to(card, {
+    cardElement.addEventListener('mouseleave', () => {
+      gsap.to(cardElement, {
         rotationX: 0,
         rotationY: 0,
         z: 0,

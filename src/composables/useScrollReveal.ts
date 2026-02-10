@@ -37,7 +37,7 @@ export function useScrollReveal() {
       delay,
       ease: 'power3.out',
       scrollTrigger: {
-        trigger: element,
+        trigger: element as gsap.DOMTarget,
         start,
         toggleActions: 'play none none none'
       }
@@ -93,11 +93,11 @@ export function useScrollReveal() {
       duration: 0.8,
       stagger,
       ease: 'power3.out',
-      scrollTrigger: {
-        trigger: parent,
-        start,
-        toggleActions: 'play none none none'
-      }
+        scrollTrigger: {
+          trigger: parent as gsap.DOMTarget,
+          start,
+          toggleActions: 'play none none none'
+        }
     }
 
     switch (direction) {
@@ -138,7 +138,7 @@ export function useScrollReveal() {
       yPercent: speed * 100,
       ease: 'none',
       scrollTrigger: {
-        trigger: element,
+        trigger: element as gsap.DOMTarget,
         start,
         end,
         scrub: true
@@ -174,7 +174,7 @@ export function useScrollReveal() {
         scale: scaleTo,
         ease: 'power2.out',
         scrollTrigger: {
-          trigger: element,
+          trigger: element as gsap.DOMTarget,
           start,
           end,
           scrub: true
@@ -199,7 +199,7 @@ export function useScrollReveal() {
       rotation,
       ease: 'none',
       scrollTrigger: {
-        trigger: element,
+        trigger: element as gsap.DOMTarget,
         start,
         end,
         scrub: true
@@ -224,7 +224,7 @@ export function useScrollReveal() {
     } = options
 
     return ScrollTrigger.create({
-      trigger: element,
+      trigger: element as gsap.DOMTarget,
       start,
       end,
       pin: true,
