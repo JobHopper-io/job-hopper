@@ -94,7 +94,7 @@ export function useAnimations() {
         stagger: delay,
         ease: 'power3.out',
         scrollTrigger: {
-          trigger: parent,
+          trigger: parent as gsap.DOMTarget,
           start: 'top 80%',
           toggleActions: 'play none none none'
         }
@@ -108,7 +108,7 @@ export function useAnimations() {
       yPercent: speed * 100,
       ease: 'none',
       scrollTrigger: {
-        trigger: element,
+        trigger: element as gsap.DOMTarget,
         start: 'top bottom',
         end: 'bottom top',
         scrub: true
