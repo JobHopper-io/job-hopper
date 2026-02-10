@@ -372,7 +372,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen overflow-x-hidden">
+  <div class="min-h-screen overflow-x-clip">
     <!-- Scroll Progress Indicator -->
     <div ref="scrollProgressRef" class="fixed top-0 left-0 h-1 bg-brand-primary z-50" style="width: 0%;"></div>
     
