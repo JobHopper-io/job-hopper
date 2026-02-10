@@ -57,6 +57,15 @@ const isLoading = ref(false)
 const error = ref('')
 
 // Validation
+const validateEmail = (value: string) => {
+  if (!value.trim()) return null
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!re.test(value.trim())) {
+    return 'Please enter a valid email address'
+  }
+  return null
+}
+
 const validatePassword = (password: string) => {
   const minLength = 8
   if (password.length < minLength) {
@@ -65,12 +74,31 @@ const validatePassword = (password: string) => {
   return null
 }
 
+const emailValidationError = computed(() => validateEmail(email.value))
+const passwordValidationError = computed(() => validatePassword(password.value))
+
+const passwordsMatch = computed(() => password.value === confirmPassword.value)
+
 const canProceedStep1 = computed(() => {
-  return email.value && password.value && confirmPassword.value && password.value === confirmPassword.value
+  return (
+    email.value &&
+    !emailValidationError.value &&
+    password.value &&
+    !passwordValidationError.value &&
+    confirmPassword.value &&
+    passwordsMatch.value
+  )
 })
 
 const canProceedStep2 = computed(() => {
-  return firstName.value && lastName.value && currentJobTitle.value && yearsOfExperience.value !== null && currentIndustry.value
+  const hasYears = yearsOfExperience.value !== null && yearsOfExperience.value >= 0
+  return (
+    firstName.value &&
+    lastName.value &&
+    currentJobTitle.value &&
+    hasYears &&
+    currentIndustry.value
+  )
 })
 
 const canProceedStep3 = computed(() => {
@@ -80,6 +108,32 @@ const canProceedStep3 = computed(() => {
 const canProceedStep5 = computed(() => {
   return selectedTier.value !== null
 })
+
+// Single check for Continue button (steps 1–3)
+const canProceedCurrentStep = computed(() => {
+  if (currentStep.value === 1) return canProceedStep1.value
+  if (currentStep.value === 2) return canProceedStep2.value
+  if (currentStep.value === 3) return canProceedStep3.value
+  return true
+})
+
+const YEARS_MIN = 0
+const YEARS_MAX = 50
+const YEARS_MAX_DIGITS = 2
+
+function handleYearsInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  const digits = input.value.replace(/\D/g, '').slice(0, YEARS_MAX_DIGITS)
+  if (!digits) {
+    yearsOfExperience.value = null
+    input.value = ''
+    return
+  }
+  const num = parseInt(digits, 10)
+  const clamped = Math.min(YEARS_MAX, Math.max(YEARS_MIN, num))
+  yearsOfExperience.value = clamped
+  input.value = String(clamped)
+}
 
 // File handling
 const handleResumeUpload = (event: Event) => {
@@ -214,8 +268,8 @@ const handleCompleteOnboarding = async () => {
 
     // Redirect to dashboard
     router.push('/dashboard')
-  } catch (err: any) {
-    error.value = err.message || 'An unexpected error occurred'
+  } catch (err) {
+    error.value = (err as Error).message || 'An unexpected error occurred'
     console.error('Onboarding error:', err)
   } finally {
     isLoading.value = false
@@ -262,6 +316,9 @@ const handleCompleteOnboarding = async () => {
                 class="input"
                 placeholder="your.email@example.com"
               />
+              <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
+                {{ emailValidationError }}
+              </div>
             </div>
 
             <div>
@@ -318,7 +375,10 @@ const handleCompleteOnboarding = async () => {
               </div>
             </div>
 
-            <div v-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
+            <div v-if="passwordValidationError" class="text-red-600 text-sm">
+              {{ passwordValidationError }}
+            </div>
+            <div v-else-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
               Passwords do not match
             </div>
           </div>
@@ -374,13 +434,15 @@ const handleCompleteOnboarding = async () => {
               <label for="yearsOfExperience" class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>
               <input
                 id="yearsOfExperience"
-                v-model.number="yearsOfExperience"
-                type="number"
-                min="0"
-                max="50"
+                :value="yearsOfExperience ?? ''"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="2"
                 required
                 class="input"
                 placeholder="0"
+                @input="handleYearsInput"
               />
             </div>
 
@@ -647,11 +709,7 @@ const handleCompleteOnboarding = async () => {
             v-if="currentStep < totalSteps"
             @click="nextStep"
             type="button"
-            :disabled="
-              (currentStep === 1 && !canProceedStep1) ||
-              (currentStep === 2 && !canProceedStep2) ||
-              (currentStep === 3 && !canProceedStep3)
-            "
+            :disabled="!canProceedCurrentStep"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Continue
