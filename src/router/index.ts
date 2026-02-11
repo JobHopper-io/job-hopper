@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import { authAPI } from '@/lib/supabase'
 
 const router = createRouter({
@@ -51,6 +52,11 @@ const router = createRouter({
       component: RegisterView,
     },
     {
+      path: '/confirm-email',
+      name: 'confirm-email',
+      component: ConfirmEmailView,
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
@@ -93,9 +99,10 @@ router.beforeEach(async (to) => {
     '/support',
     '/contact',
     '/login',
-    '/register'
+    '/register',
+    '/confirm-email'
   ]
-  
+
   if (publicRoutes.includes(to.path)) {
     return true
   }
@@ -105,6 +112,12 @@ router.beforeEach(async (to) => {
     const { user } = await authAPI.getCurrentUser()
     if (!user) {
       return '/login'
+    }
+
+    // Require email confirmation for dashboard and other protected routes
+    const emailConfirmed = !!(user as { email_confirmed_at?: string }).email_confirmed_at
+    if (!emailConfirmed) {
+      return '/confirm-email'
     }
 
     return true
