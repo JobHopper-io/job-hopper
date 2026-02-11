@@ -43,6 +43,10 @@ const handleLogin = async () => {
     const { error: authError } = await authAPI.signIn(email.value, password.value)
 
     if (authError) {
+      if (authError.message?.toLowerCase().includes('email not confirmed')) {
+        router.push('/confirm-email')
+        return
+      }
       error.value = authError.message
       return
     }
