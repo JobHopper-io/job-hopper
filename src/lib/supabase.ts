@@ -99,6 +99,9 @@ export const authAPI = {
       }
     }
 
+    if (error) {
+      console.error('Auth signUp error:', error.message, error)
+    }
     return { data, error }
   },
 

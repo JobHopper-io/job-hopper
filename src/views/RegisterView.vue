@@ -183,18 +183,19 @@ const handleCompleteOnboarding = async () => {
     )
 
     if (signUpError) {
-      error.value = signUpError.message
+      const msg = signUpError.message
+      const details = (signUpError as { details?: string; code?: string }).details ?? (signUpError as { error_description?: string }).error_description
+      error.value = details ? `${msg} (${details})` : msg
+      console.error('Signup error:', signUpError)
       return
     }
 
     // Check if email confirmation is required
     // If session is null but user exists, email confirmation is required
     if (!signUpData.session && signUpData.user) {
-      // Email confirmation required - user profile will be created via trigger
-      // Show success message and redirect to login
+      // Email confirmation required - redirect to confirmation page
       error.value = ''
-      alert('Account created! Please check your email to confirm your account. After confirmation, you can log in and complete your profile setup.')
-      router.push('/login')
+      router.push('/confirm-email')
       return
     }
 
