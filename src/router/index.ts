@@ -4,6 +4,22 @@ import RegisterView from '../views/RegisterView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import { authAPI } from '@/lib/supabase'
 
+/** Single source of truth for routes that don't require authentication. */
+export const publicPaths = [
+  '/',
+  '/how-it-works',
+  '/pricing',
+  '/faq',
+  '/about',
+  '/support',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/login',
+  '/register',
+  '/confirm-email'
+]
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -40,6 +56,16 @@ const router = createRouter({
     {
       path: '/contact',
       redirect: '/support',
+    },
+    {
+      path: '/privacy',
+      name: 'privacy',
+      component: () => import('../views/PrivacyView.vue'),
+    },
+    {
+      path: '/terms',
+      name: 'terms',
+      component: () => import('../views/TermsView.vue'),
     },
     {
       path: '/login',
@@ -89,21 +115,7 @@ const router = createRouter({
 
 // Router guard to enforce authentication
 router.beforeEach(async (to) => {
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    '/',
-    '/how-it-works',
-    '/pricing',
-    '/faq',
-    '/about',
-    '/support',
-    '/contact',
-    '/login',
-    '/register',
-    '/confirm-email'
-  ]
-
-  if (publicRoutes.includes(to.path)) {
+  if (publicPaths.includes(to.path)) {
     return true
   }
 

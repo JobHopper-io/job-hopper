@@ -7,13 +7,13 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig(async ({ command, mode }) => {
   const plugins: any[] = [vue()]
   
-  // Only enable devtools in dev mode to avoid localStorage errors during build
+  // Dev-only: avoid build errors if optional Vue DevTools plugin is missing.
   if (command === 'serve') {
     try {
       const vueDevTools = (await import('vite-plugin-vue-devtools')).default
       plugins.push(vueDevTools())
-    } catch {
-      // Devtools not available, continue without it
+    } catch (e) {
+      console.warn('Vue DevTools plugin skipped', e)
     }
   }
   

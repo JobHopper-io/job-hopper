@@ -11,13 +11,8 @@ const isAuthenticated = ref(false)
 const isLoading = ref(true)
 const mobileMenuOpen = ref(false)
 
-const isHomePage = computed(() => route.path === '/')
 const isLoginPage = computed(() => route.path === '/login')
 const isRegisterPage = computed(() => route.path === '/register')
-const isPublicPage = computed(() => {
-  const publicRoutes = ['/', '/how-it-works', '/pricing', '/faq', '/about', '/support', '/contact']
-  return publicRoutes.includes(route.path)
-})
 
 onMounted(async () => {
   try {
@@ -52,6 +47,11 @@ const handleSignOut = async () => {
   } catch (error) {
     console.error('Error signing out:', error)
   }
+}
+
+const handleSignOutAndCloseMenu = async () => {
+  await handleSignOut()
+  mobileMenuOpen.value = false
 }
 </script>
 
@@ -199,7 +199,7 @@ const handleSignOut = async () => {
                   Dashboard
                 </router-link>
                 <button
-                  @click="handleSignOut; mobileMenuOpen = false"
+                  @click="handleSignOutAndCloseMenu"
                   class="px-3 py-2 text-left text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
                 >
                   Sign Out
@@ -216,7 +216,7 @@ const handleSignOut = async () => {
       </main>
 
       <!-- Footer -->
-      <footer v-if="isPublicPage || isAuthenticated" class="bg-white border-t border-neutral-border mt-16">
+      <footer class="bg-white border-t border-neutral-border mt-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">
@@ -245,8 +245,8 @@ const handleSignOut = async () => {
               <ul class="space-y-2">
                 <li><router-link to="/about" class="text-sm text-neutral-body hover:text-brand-primary">About</router-link></li>
                 <li><router-link to="/support" class="text-sm text-neutral-body hover:text-brand-primary">Support</router-link></li>
-                <li><a href="#" class="text-sm text-neutral-body hover:text-brand-primary">Privacy Policy</a></li>
-                <li><a href="#" class="text-sm text-neutral-body hover:text-brand-primary">Terms of Service</a></li>
+                <li><router-link to="/privacy" class="text-sm text-neutral-body hover:text-brand-primary">Privacy Policy</router-link></li>
+                <li><router-link to="/terms" class="text-sm text-neutral-body hover:text-brand-primary">Terms of Service</router-link></li>
               </ul>
             </div>
           </div>

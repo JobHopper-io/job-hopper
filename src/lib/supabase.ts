@@ -81,23 +81,6 @@ export const authAPI = {
       }
     })
 
-    // Create user profile (subscription will be created during onboarding)
-    if (!error && data?.user) {
-      try {
-        await supabase.rpc('create_user_profile_and_organization', {
-          user_id: data.user.id,
-          user_email: data.user.email,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phoneNumber || null,
-          org_name: null,
-          org_domain: null,
-          booking_link: null
-        })
-      } catch (e) {
-        console.warn('create_user_profile_and_organization failed post-signup', e)
-      }
-    }
 
     if (error) {
       console.error('Auth signUp error:', error.message, error)
@@ -111,11 +94,6 @@ export const authAPI = {
       password
     })
 
-    // If sign in successful, ensure user profile exists
-    if (data.user && !error) {
-      await authAPI.ensureUserProfile(data.user)
-    }
-
     return { data, error }
   },
 
@@ -127,50 +105,7 @@ export const authAPI = {
   async getCurrentUser() {
     const { data: { user }, error } = await supabase.auth.getUser()
 
-    // If user exists, ensure profile exists
-    if (user && !error) {
-      await authAPI.ensureUserProfile(user)
-    }
-
     return { user, error }
-  },
-
-  async ensureUserProfile(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
-    try {
-      // Check if user profile exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id, organization_id')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      if (!existingUser) {
-        // Create user profile
-        const { data, error } = await supabase.rpc('create_user_profile_and_organization', {
-          user_id: user.id,
-          user_email: user.email,
-          first_name: user.user_metadata?.first_name || '',
-          last_name: user.user_metadata?.last_name || '',
-          phone_number: user.user_metadata?.phone_number || null,
-          org_name: null,
-          org_domain: null,
-          booking_link: null
-        })
-
-        if (error) {
-          console.error('Error creating user profile:', error)
-          return { success: false, error }
-        } else {
-          console.log('User profile created:', data)
-          return { success: true, data }
-        }
-      }
-
-      return { success: true, data: existingUser }
-    } catch (error) {
-      console.error('Error ensuring user profile:', error)
-      return { success: false, error }
-    }
   }
 }
 
