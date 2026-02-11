@@ -30,6 +30,13 @@ onMounted(async () => {
         router.push('/dashboard')
       }
     }
+
+    // Strip auth tokens from URL after Supabase has consumed them (e.g. after email confirmation).
+    // Tokens in the hash are not sent to the server but should not remain in address bar or history.
+    const hash = window.location.hash
+    if (hash && (hash.includes('access_token=') || hash.includes('refresh_token='))) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
   } catch (error) {
     console.error('Error checking authentication:', error)
   } finally {
