@@ -126,6 +126,13 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   isGlobalLoading.value = true
 
+  const targetPath = to.path
+
+  // Public paths don't require authentication - allow immediately
+  if (publicPaths.includes(targetPath)) {
+    return true
+  }
+
   // Check authentication status
   let user = null
   try {
@@ -135,26 +142,46 @@ router.beforeEach(async (to) => {
     console.error('Router guard error:', error)
   }
 
-  // If user is authenticated and trying to access login/register, redirect based on onboarding status
-  if (user && (to.path === '/login' || to.path === '/register')) {
-    try {
-      const { data: profile } = await userAPI.getCurrentUserProfile()
-      return profile?.onboarding_completed ? '/dashboard' : '/onboarding'
-    } catch (error) {
-      console.error('Error fetching user profile:', error)
-      // Fallback to dashboard if profile fetch fails
-      return '/dashboard'
-    }
-  }
-
-  // Public paths don't require authentication
-  if (publicPaths.includes(to.path)) {
-    return true
-  }
-
   // Protected paths require authentication
   if (!user) {
     return '/login'
+  }
+
+  // Helper to fetch user profile (cached within this guard execution to avoid duplicate API calls)
+  let profile: { onboarding_completed?: boolean } | null = null
+  const getProfile = async () => {
+    if (profile === null) {
+      try {
+        const { data } = await userAPI.getCurrentUserProfile()
+        profile = data
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+      }
+    }
+    return profile
+  }
+
+  // Handle authenticated user redirects based on onboarding status
+  const authRedirectPaths = ['/login', '/register']
+  const onboardingPaths = ['/onboarding', '/dashboard']
+
+  if (authRedirectPaths.includes(targetPath)) {
+    // Authenticated users shouldn't access login/register - redirect based on onboarding status
+    const userProfile = await getProfile()
+    return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
+  }
+
+  if (onboardingPaths.includes(targetPath)) {
+    // Enforce onboarding flow: completed users go to dashboard, incomplete users go to onboarding
+    const userProfile = await getProfile()
+    
+    if (targetPath === '/onboarding' && userProfile?.onboarding_completed) {
+      return '/dashboard'
+    }
+    
+    if (targetPath === '/dashboard' && !userProfile?.onboarding_completed) {
+      return '/onboarding'
+    }
   }
 
   return true

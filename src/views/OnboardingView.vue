@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI, subscriptionAPI, profileAPI, userAPI } from '@/lib/supabase'
+import { subscriptionAPI, profileAPI } from '@/lib/supabase'
 
 const router = useRouter()
 
@@ -120,17 +120,7 @@ const toggleRoleCategory = (category: string) => {
   }
 }
 
-onMounted(async () => {
-  const { user } = await authAPI.getCurrentUser()
-  if (!user) {
-    router.push('/login')
-    return
-  }
-  const { data: profile } = await userAPI.getCurrentUserProfile()
-  if (profile?.onboarding_completed) {
-    router.push('/dashboard')
-  }
-})
+// Note: Authentication and onboarding redirects are handled in router guard
 
 const handleCompleteOnboarding = async () => {
   try {
