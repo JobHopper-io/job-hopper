@@ -1,16 +1,26 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { authAPI, userAPI } from '@/lib/supabase'
 
 const router = useRouter()
 
-const goToLogin = () => {
-  router.push('/login')
-}
+onMounted(async () => {
+  const { user } = await authAPI.getCurrentUser()
+  if (user) {
+    const { data: profile } = await userAPI.getCurrentUserProfile()
+    if (profile?.onboarding_completed) {
+      router.push('/dashboard')
+    } else {
+      router.push('/onboarding')
+    }
+  }
+})
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full">
+  <div class="bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md mx-auto">
       <div class="card p-8 text-center">
         <div class="w-14 h-14 mx-auto mb-6 rounded-full bg-brand-primary/10 flex items-center justify-center">
           <svg class="w-7 h-7 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,7 +31,7 @@ const goToLogin = () => {
           Check your email
         </h1>
         <p class="text-neutral-body mb-6">
-          We've sent you a confirmation link. Click the link in that email to verify your address and activate your account.
+          We've sent you a confirmation link. Click the link in that email to verify your address and continue to set up your profile.
         </p>
         <ul class="text-left text-sm text-neutral-body space-y-2 mb-8 bg-neutral-bg/50 rounded-[12px] p-4">
           <li class="flex items-start gap-2">
@@ -34,19 +44,15 @@ const goToLogin = () => {
           </li>
           <li class="flex items-start gap-2">
             <span class="text-brand-primary mt-0.5">•</span>
-            <span>After confirming, you can sign in and access your dashboard.</span>
+            <span>You'll be taken to finish your profile and choose your plan.</span>
           </li>
         </ul>
         <p class="text-sm text-neutral-body mb-6">
           Didn't get the email? Wait a few minutes and check again, or contact support if the problem continues.
         </p>
-        <button
-          type="button"
-          @click="goToLogin"
-          class="btn-primary w-full"
-        >
-          Go to sign in
-        </button>
+        <router-link to="/login" class="btn-primary w-full inline-block text-center">
+          Back to sign in
+        </router-link>
       </div>
     </div>
   </div>

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
+import OnboardingView from '../views/OnboardingView.vue'
 import { authAPI } from '@/lib/supabase'
 
 /** Single source of truth for routes that don't require authentication. */
@@ -17,7 +18,7 @@ export const publicPaths = [
   '/terms',
   '/login',
   '/register',
-  '/confirm-email'
+  '/confirm-email',
 ]
 
 const router = createRouter({
@@ -83,6 +84,11 @@ const router = createRouter({
       component: ConfirmEmailView,
     },
     {
+      path: '/onboarding',
+      name: 'onboarding',
+      component: OnboardingView,
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
@@ -119,19 +125,11 @@ router.beforeEach(async (to) => {
     return true
   }
 
-  // Check authentication for protected routes
   try {
     const { user } = await authAPI.getCurrentUser()
     if (!user) {
       return '/login'
     }
-
-    // Require email confirmation for dashboard and other protected routes
-    const emailConfirmed = !!(user as { email_confirmed_at?: string }).email_confirmed_at
-    if (!emailConfirmed) {
-      return '/confirm-email'
-    }
-
     return true
   } catch (error) {
     console.error('Router guard error:', error)

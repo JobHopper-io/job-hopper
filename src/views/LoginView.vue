@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI } from '@/lib/supabase'
+import { authAPI, userAPI } from '@/lib/supabase'
 
 const router = useRouter()
 
@@ -24,7 +24,8 @@ const validatePassword = (password: string) => {
 onMounted(async () => {
   const { user } = await authAPI.getCurrentUser()
   if (user) {
-    router.push('/dashboard')
+    const { data: profile } = await userAPI.getCurrentUserProfile()
+    router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
   }
 })
 
@@ -51,7 +52,8 @@ const handleLogin = async () => {
       return
     }
 
-    router.push('/dashboard')
+    const { data: profile } = await userAPI.getCurrentUserProfile()
+    router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
   } catch (err) {
     error.value = 'An unexpected error occurred'
     console.error('Login error:', err)

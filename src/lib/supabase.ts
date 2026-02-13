@@ -237,6 +237,8 @@ export const subscriptionAPI = {
 
 export const profileAPI = {
   async updateProfile(profileData: {
+    first_name?: string
+    last_name?: string
     current_job_title?: string
     years_of_experience?: number
     current_industry?: string
