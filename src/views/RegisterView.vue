@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI, userAPI } from '@/lib/supabase'
+import { authAPI } from '@/lib/supabase'
 
 const router = useRouter()
 
@@ -46,17 +46,6 @@ const canProceedStep1 = computed(() => {
   )
 })
 
-onMounted(async () => {
-  const { user } = await authAPI.getCurrentUser()
-  if (user) {
-    const { data: profile } = await userAPI.getCurrentUserProfile()
-    if (profile?.onboarding_completed) {
-      router.push('/dashboard')
-    } else {
-      router.push('/onboarding')
-    }
-  }
-})
 
 const handleCreateAccount = async () => {
   if (!canProceedStep1.value) return

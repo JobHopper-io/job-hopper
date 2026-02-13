@@ -3,7 +3,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import OnboardingView from '../views/OnboardingView.vue'
-import { authAPI } from '@/lib/supabase'
+import { authAPI, userAPI } from '@/lib/supabase'
 
 /** Single source of truth for routes that don't require authentication. */
 export const publicPaths = [
@@ -119,22 +119,40 @@ const router = createRouter({
   },
 })
 
-// Router guard to enforce authentication
+// Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
+  // Check authentication status
+  let user = null
+  try {
+    const { user: currentUser } = await authAPI.getCurrentUser()
+    user = currentUser
+  } catch (error) {
+    console.error('Router guard error:', error)
+  }
+
+  // If user is authenticated and trying to access login/register, redirect based on onboarding status
+  if (user && (to.path === '/login' || to.path === '/register')) {
+    try {
+      const { data: profile } = await userAPI.getCurrentUserProfile()
+      return profile?.onboarding_completed ? '/dashboard' : '/onboarding'
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+      // Fallback to dashboard if profile fetch fails
+      return '/dashboard'
+    }
+  }
+
+  // Public paths don't require authentication
   if (publicPaths.includes(to.path)) {
     return true
   }
 
-  try {
-    const { user } = await authAPI.getCurrentUser()
-    if (!user) {
-      return '/login'
-    }
-    return true
-  } catch (error) {
-    console.error('Router guard error:', error)
+  // Protected paths require authentication
+  if (!user) {
     return '/login'
   }
+
+  return true
 })
 
 export default router

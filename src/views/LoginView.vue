@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authAPI, userAPI } from '@/lib/supabase'
 
@@ -20,14 +20,6 @@ const validatePassword = (password: string) => {
   return null
 }
 
-// Check if user is already authenticated on mount
-onMounted(async () => {
-  const { user } = await authAPI.getCurrentUser()
-  if (user) {
-    const { data: profile } = await userAPI.getCurrentUserProfile()
-    router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
-  }
-})
 
 const handleLogin = async () => {
   try {
@@ -52,6 +44,7 @@ const handleLogin = async () => {
       return
     }
 
+    // Immediately redirect based on onboarding status to avoid dashboard flash
     const { data: profile } = await userAPI.getCurrentUserProfile()
     router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
   } catch (err) {

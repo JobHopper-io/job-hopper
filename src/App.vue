@@ -1,30 +1,30 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { authAPI } from '@/lib/supabase'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { authAPI, supabase } from '@/lib/supabase'
 
-const route = useRoute()
 const router = useRouter()
 
 const isAuthenticated = ref(false)
 const isLoading = ref(true)
 const mobileMenuOpen = ref(false)
 
-const isLoginPage = computed(() => route.path === '/login')
-const isRegisterPage = computed(() => route.path === '/register')
+// Listen to auth state changes to update isAuthenticated reactively
+// Use a distinct name to avoid confusion with domain \"Subscription\" model
+const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((event, session) => {
+  isAuthenticated.value = !!session?.user
+  // Note: Redirects for authenticated users on login/register pages are handled in router guard
+})
+
+// Cleanup auth listener on unmount
+onUnmounted(() => {
+  authListener.unsubscribe()
+})
 
 onMounted(async () => {
   try {
     const { user } = await authAPI.getCurrentUser()
     isAuthenticated.value = !!user
-
-    if (isAuthenticated.value) {
-      // Redirect authenticated users away from login/register
-      if (isLoginPage.value || isRegisterPage.value) {
-        router.push('/dashboard')
-      }
-    }
 
     // Strip auth tokens from URL after Supabase has consumed them (e.g. after email confirmation).
     // Tokens in the hash are not sent to the server but should not remain in address bar or history.
@@ -43,6 +43,7 @@ const handleSignOut = async () => {
   try {
     const { error } = await authAPI.signOut()
     if (error) throw error
+    // isAuthenticated will be updated automatically by the auth state change listener
     router.push('/')
   } catch (error) {
     console.error('Error signing out:', error)
