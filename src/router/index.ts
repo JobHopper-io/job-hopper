@@ -128,23 +128,13 @@ router.beforeEach(async (to) => {
 
   const targetPath = to.path
 
-  // Public paths don't require authentication - allow immediately
-  if (publicPaths.includes(targetPath)) {
-    return true
-  }
-
-  // Check authentication status
+  // Check authentication status (needed for both public redirects and protected paths)
   let user = null
   try {
     const { user: currentUser } = await authAPI.getCurrentUser()
     user = currentUser
   } catch (error) {
     console.error('Router guard error:', error)
-  }
-
-  // Protected paths require authentication
-  if (!user) {
-    return '/login'
   }
 
   // Helper to fetch user profile (cached within this guard execution to avoid duplicate API calls)
@@ -161,16 +151,24 @@ router.beforeEach(async (to) => {
     return profile
   }
 
-  // Handle authenticated user redirects based on onboarding status
-  const authRedirectPaths = ['/login', '/register']
-  const onboardingPaths = ['/onboarding', '/dashboard']
-
-  if (authRedirectPaths.includes(targetPath)) {
-    // Authenticated users shouldn't access login/register - redirect based on onboarding status
+  const publicRedirectPaths = ['/login', '/register']
+  if (user && publicRedirectPaths.includes(targetPath)) {
     const userProfile = await getProfile()
     return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
   }
 
+  // Public paths don't require authentication - allow after handling public redirect above
+  if (publicPaths.includes(targetPath)) {
+    return true
+  }
+
+  // Protected paths require authentication
+  if (!user) {
+    return '/login'
+  }
+
+  // Enforce onboarding flow for onboarding and dashboard
+  const onboardingPaths = ['/onboarding', '/dashboard']
   if (onboardingPaths.includes(targetPath)) {
     // Enforce onboarding flow: completed users go to dashboard, incomplete users go to onboarding
     const userProfile = await getProfile()
