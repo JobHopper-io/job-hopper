@@ -4,6 +4,7 @@ import RegisterView from '../views/RegisterView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import OnboardingView from '../views/OnboardingView.vue'
 import { authAPI, userAPI } from '@/lib/supabase'
+import { useGlobalLoading } from '@/composables/useGlobalLoading'
 
 /** Single source of truth for routes that don't require authentication. */
 export const publicPaths = [
@@ -20,6 +21,8 @@ export const publicPaths = [
   '/register',
   '/confirm-email',
 ]
+
+const { isGlobalLoading } = useGlobalLoading()
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -121,6 +124,8 @@ const router = createRouter({
 
 // Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
+  isGlobalLoading.value = true
+
   // Check authentication status
   let user = null
   try {
@@ -153,6 +158,10 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+router.afterEach(() => {
+  isGlobalLoading.value = false
 })
 
 export default router

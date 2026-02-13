@@ -2,12 +2,13 @@
 import { RouterView, useRouter } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { authAPI, supabase } from '@/lib/supabase'
+import { useGlobalLoading } from '@/composables/useGlobalLoading'
 
 const router = useRouter()
 
 const isAuthenticated = ref(false)
-const isLoading = ref(true)
 const mobileMenuOpen = ref(false)
+const { isGlobalLoading } = useGlobalLoading()
 
 // Listen to auth state changes to update isAuthenticated reactively
 // Use a distinct name to avoid confusion with domain \"Subscription\" model
@@ -34,9 +35,8 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('Error checking authentication:', error)
-  } finally {
-    isLoading.value = false
   }
+  // Note: isRouting is managed by router guard - no need to set it here
 })
 
 const handleSignOut = async () => {
@@ -58,8 +58,8 @@ const handleSignOutAndCloseMenu = async () => {
 
 <template>
   <div class="min-h-screen bg-neutral-bg">
-    <!-- Loading State -->
-    <div v-if="isLoading" class="min-h-screen flex items-center justify-center">
+    <!-- Global Loading State (initial auth check + route transitions) -->
+    <div v-if="isGlobalLoading" class="min-h-screen flex items-center justify-center">
       <div class="text-center">
         <svg class="animate-spin h-8 w-8 text-brand-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
