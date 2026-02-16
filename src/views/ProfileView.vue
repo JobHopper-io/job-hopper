@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { userAPI, subscriptionAPI, profileAPI, type User } from '@/lib/supabase'
 import { getTierDisplayName, type Subscription } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -7,6 +7,7 @@ import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 const user = ref<User | null>(null)
 const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
+const initialLoadDone = ref(false)
 const isSaving = ref(false)
 const saveSuccess = ref(false)
 
@@ -38,11 +39,11 @@ onMounted(async () => {
     if (!userResult.error && userResult.data) {
       user.value = userResult.data
       currentJobTitle.value = userResult.data.current_job_title || ''
-      yearsOfExperience.value = userResult.data.years_of_experience || null
+      yearsOfExperience.value = userResult.data.years_of_experience ?? null
       currentIndustry.value = userResult.data.current_industry || ''
       targetRoleCategories.value = (userResult.data.target_role_categories ?? []) as RoleCategoryValue[]
-      desiredSalaryMin.value = userResult.data.desired_salary_min || null
-      desiredSalaryMax.value = userResult.data.desired_salary_max || null
+      desiredSalaryMin.value = userResult.data.desired_salary_min ?? null
+      desiredSalaryMax.value = userResult.data.desired_salary_max ?? null
       preferredLocations.value = userResult.data.preferred_locations || []
       openToRelocation.value = userResult.data.open_to_relocation || false
       openToRemote.value = userResult.data.open_to_remote || false
@@ -61,6 +62,10 @@ onMounted(async () => {
     console.error('Error loading profile:', error)
   } finally {
     isLoading.value = false
+    // Enable auto-save only after the watch has run for the initial load (so we don't save on load)
+    nextTick(() => {
+      initialLoadDone.value = true
+    })
   }
 })
 
@@ -102,18 +107,20 @@ const handleResumeFileChange = async (event: Event) => {
   }
 }
 
-const handleSave = async () => {
+let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+const saveProfile = async () => {
   try {
     isSaving.value = true
     saveSuccess.value = false
 
     await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
-      years_of_experience: yearsOfExperience.value || undefined,
+      years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
-      desired_salary_min: desiredSalaryMin.value || undefined,
-      desired_salary_max: desiredSalaryMax.value || undefined,
+      desired_salary_min: desiredSalaryMin.value ?? undefined,
+      desired_salary_max: desiredSalaryMax.value ?? undefined,
       preferred_locations: preferredLocations.value,
       open_to_relocation: openToRelocation.value,
       open_to_remote: openToRemote.value
@@ -122,13 +129,37 @@ const handleSave = async () => {
     saveSuccess.value = true
     setTimeout(() => {
       saveSuccess.value = false
-    }, 3000)
+    }, 2000)
   } catch (error) {
     console.error('Error saving profile:', error)
   } finally {
     isSaving.value = false
   }
 }
+
+const debouncedSave = () => {
+  if (saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(saveProfile, 1000)
+}
+
+// Auto-save when any profile field changes (after initial load)
+watch(
+  () => ({
+    currentJobTitle: currentJobTitle.value,
+    yearsOfExperience: yearsOfExperience.value,
+    currentIndustry: currentIndustry.value,
+    targetRoleCategories: [...(targetRoleCategories.value ?? [])],
+    desiredSalaryMin: desiredSalaryMin.value,
+    desiredSalaryMax: desiredSalaryMax.value,
+    preferredLocations: [...(preferredLocations.value ?? [])],
+    openToRelocation: openToRelocation.value,
+    openToRemote: openToRemote.value
+  }),
+  () => {
+    if (initialLoadDone.value) debouncedSave()
+  },
+  { deep: true }
+)
 </script>
 
 <template>
@@ -274,17 +305,9 @@ const handleSave = async () => {
           </div>
         </div>
 
-        <!-- Save Button -->
-        <div class="flex justify-end">
-          <button
-            @click="handleSave"
-            :disabled="isSaving"
-            class="btn-primary disabled:opacity-50"
-          >
-            <span v-if="isSaving">Saving...</span>
-            <span v-else-if="saveSuccess">Saved!</span>
-            <span v-else>Save Changes</span>
-          </button>
+        <div class="flex justify-end items-center gap-2 text-sm text-neutral-body min-h-[1.5rem]">
+          <span v-if="isSaving">Saving...</span>
+          <span v-else-if="saveSuccess" class="text-green-600">Saved</span>
         </div>
       </div>
     </div>
