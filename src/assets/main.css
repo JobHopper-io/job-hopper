@@ -64,6 +64,22 @@
     @apply w-full px-4 py-3 border border-neutral-border rounded-[12px] focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent;
   }
 
+  /* Grid that fills the row with as many equal columns as fit (min 16rem each) */
+  .grid-auto-fill {
+    @apply grid gap-4;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .grid-auto-fill {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 1024px) {
+    .grid-auto-fill {
+      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    }
+  }
+
   .glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20;
   }

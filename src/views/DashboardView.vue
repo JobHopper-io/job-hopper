@@ -7,8 +7,22 @@ import { getTierDisplayName, getStatusLabel, getActiveAddons } from '@/lib/subsc
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 
+const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
+
 const userStore = useUserStore()
 const { profile, subscription, isLoading } = storeToRefs(userStore)
+
+const profileCompletionDismissed = ref(
+  typeof localStorage !== 'undefined' && localStorage.getItem(PROFILE_COMPLETION_DISMISSED_KEY) === '1'
+)
+function dismissProfileCompletion() {
+  profileCompletionDismissed.value = true
+  try {
+    localStorage.setItem(PROFILE_COMPLETION_DISMISSED_KEY, '1')
+  } catch {
+    // ignore localStorage errors (e.g. private mode)
+  }
+}
 
 const jobs = ref<JobFeedItem[]>([]) // Placeholder for job feed
 
@@ -50,6 +64,10 @@ const profileCompletion = computed(() => {
   const filled = fields.filter(Boolean).length
   return { filled, total: fields.length, percent: Math.round((filled / fields.length) * 100) }
 })
+
+const showProfileCompletionCard = computed(
+  () => profileCompletion.value.percent < 100 && !profileCompletionDismissed.value
+)
 
 // Matching statistics (placeholder until API exists)
 const matchingStats = ref({
@@ -94,7 +112,7 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
       </div>
 
       <!-- Summary cards: Subscription, Add-ons, Profile completion, Matching stats -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="grid-auto-fill mb-8">
         <!-- Subscription status and tier -->
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
@@ -124,8 +142,8 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
           </router-link>
         </div>
 
-        <!-- Profile completion status -->
-        <div class="card p-5">
+        <!-- Profile completion status (hidden when 100% or dismissed) -->
+        <div v-if="showProfileCompletionCard" class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Profile completion</h3>
           <div class="flex items-center gap-3">
             <div class="flex-1 h-2.5 bg-neutral-bg rounded-full overflow-hidden">
@@ -137,10 +155,22 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
             </div>
             <span class="text-sm font-semibold text-brand-charcoal tabular-nums">{{ profileCompletion.percent }}%</span>
           </div>
-          <p class="text-xs text-neutral-body mt-2">{{ profileCompletion.filled }} of {{ profileCompletion.total }} key fields</p>
-          <router-link to="/profile" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Complete profile →
-          </router-link>
+          <p class="text-xs text-neutral-body mt-2">
+            {{ profileCompletion.filled }} of {{ profileCompletion.total }} key fields
+          </p>
+          <div class="mt-2 flex flex-col items-start gap-0.5">
+            <router-link to="/profile" class="text-sm text-brand-primary font-medium hover:underline">
+              Complete profile →
+            </router-link>
+            <button
+              type="button"
+              class="text-xs text-neutral-body hover:text-brand-charcoal hover:underline transition-colors focus:outline-none"
+              aria-label="Dismiss this card"
+              @click="dismissProfileCompletion"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
 
         <!-- Matching statistics -->
