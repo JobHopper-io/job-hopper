@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { SubscriptionTier, AddonType } from '@/composables/useSubscription'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -40,22 +41,50 @@ export interface User {
   updated_at: string
 }
 
-export interface Subscription {
+/** Job list item (dashboard feed / JobCard). */
+export interface JobFeedItem {
   id: string
+  title: string
+  company: string
+  location: string
+  salary_min?: number
+  salary_max?: number
+  brief?: string
+  tags?: string[]
+  status?: 'new' | 'updated' | 'closing_soon'
+}
+
+/** Hiring contact shown on job detail. */
+export interface JobHiringContact {
   name: string
-  subscription_tier?: 'entry_mid' | 'senior_management' | 'director_vp_c_level'
-  subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
-  trial_ends_at?: string
-  current_period_start?: string
-  current_period_end?: string
-  premium_insights_enabled?: boolean
-  interview_prep_enabled?: boolean
-  resume_upgrade_purchased?: boolean
-  stripe_customer_id?: string
-  stripe_subscription_id?: string
-  stripe_subscription_status?: string
-  created_at: string
-  updated_at: string
+  title: string
+  location: string
+  note: string
+}
+
+/** Interview prep content on job detail. */
+export interface JobInterviewPrep {
+  themes: string[]
+  questions_they_might_ask: string[]
+  questions_to_ask: string[]
+}
+
+/** Job detail (detail page). */
+export interface JobDetail {
+  id: string
+  title: string
+  company: string
+  location: string
+  salary_min?: number
+  salary_max?: number
+  overview?: string
+  shift?: string
+  company_size?: string
+  employment_type?: string
+  posted_date?: string
+  match_reasons?: string[]
+  hiring_contacts?: JobHiringContact[]
+  interview_prep?: JobInterviewPrep
 }
 
 // API functions
@@ -110,7 +139,7 @@ export const authAPI = {
 }
 
 export const subscriptionAPI = {
-  async createSubscription(tier: 'entry_mid' | 'senior_management' | 'director_vp_c_level', trialDays: number = 7) {
+  async createSubscription(tier: SubscriptionTier, trialDays: number = 7) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
@@ -124,7 +153,7 @@ export const subscriptionAPI = {
   },
 
   async createCheckoutSession(
-    tier: 'entry_mid' | 'senior_management' | 'director_vp_c_level',
+    tier: SubscriptionTier,
     addons?: {
       premium_insights?: boolean
       interview_prep?: boolean
@@ -186,7 +215,7 @@ export const subscriptionAPI = {
     return { data, error }
   },
 
-  async updateSubscriptionTier(newTier: 'entry_mid' | 'senior_management' | 'director_vp_c_level') {
+  async updateSubscriptionTier(newTier: SubscriptionTier) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
@@ -198,7 +227,7 @@ export const subscriptionAPI = {
     return { data, error }
   },
 
-  async enableAddon(addonType: 'premium_insights' | 'interview_prep' | 'resume_upgrade') {
+  async enableAddon(addonType: AddonType) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
@@ -268,6 +297,19 @@ export const profileAPI = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
+    // If user already has a resume, delete it from storage first
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('resume_bucket_key')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (existingUser?.resume_bucket_key) {
+      await supabase.storage
+        .from('resumes')
+        .remove([existingUser.resume_bucket_key])
+    }
+
     const fileExt = file.name.split('.').pop()
     const fileName = `${user.id}-${Date.now()}.${fileExt}`
     const filePath = `resumes/${fileName}`
@@ -294,6 +336,14 @@ export const profileAPI = {
     }
 
     return { data: { ...userData, resume_url: uploadData.path }, error: null }
+  },
+
+  async getResumeDownloadUrl(bucketKey: string, expiresInSeconds = 3600) {
+    const { data, error } = await supabase.storage
+      .from('resumes')
+      .createSignedUrl(bucketKey, expiresInSeconds)
+    if (error) return { data: null, error }
+    return { data: data.signedUrl, error: null }
   },
 
   async markOnboardingComplete() {

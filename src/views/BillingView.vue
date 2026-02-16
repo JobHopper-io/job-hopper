@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI } from '@/lib/supabase'
+import { type Subscription } from '@/composables/useSubscription'
+import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/composables/useSubscription'
 
-const subscription = ref<any>(null)
+const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
 const showCancelConfirm = ref(false)
+
+const activeAddonsWithLabels = computed(() => getActiveAddons(subscription.value, true))
 
 onMounted(async () => {
   try {
@@ -18,24 +22,6 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
-
-const getTierDisplayName = (tier?: string) => {
-  const tierMap: Record<string, string> = {
-    entry_mid: 'Entry & Mid Level Roles',
-    senior_management: 'Senior & Management Level Roles',
-    director_vp_c_level: 'Director, VP & C-Level Roles'
-  }
-  return tierMap[tier || ''] || 'Not set'
-}
-
-const getTierPrice = (tier?: string) => {
-  const priceMap: Record<string, number> = {
-    entry_mid: 19,
-    senior_management: 29,
-    director_vp_c_level: 49
-  }
-  return priceMap[tier || ''] || 0
-}
 
 const handleCancel = async () => {
   try {
@@ -94,7 +80,7 @@ const handleManageBilling = async () => {
             <p v-if="subscription?.current_period_end" class="text-neutral-body">
               <span class="font-semibold">Next billing date:</span> {{ new Date(subscription.current_period_end).toLocaleDateString() }}
             </p>
-            <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-brand-primary font-medium">
+            <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 font-medium">
               You're on a free trial. Your first charge will occur on {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }} unless you cancel.
             </p>
           </div>
@@ -103,15 +89,9 @@ const handleManageBilling = async () => {
         <!-- Active Add-ons -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Active Add-ons</h2>
-          <div v-if="subscription?.premium_insights_enabled || subscription?.interview_prep_enabled || subscription?.resume_upgrade_purchased" class="space-y-2">
-            <p v-if="subscription?.premium_insights_enabled" class="text-neutral-body">
-              ✓ Premium Insights & Contact Access (+$30/month)
-            </p>
-            <p v-if="subscription?.interview_prep_enabled" class="text-neutral-body">
-              ✓ Interview Prep & Strategy (+$30/month)
-            </p>
-            <p v-if="subscription?.resume_upgrade_purchased" class="text-neutral-body">
-              ✓ Resume Upgrade (one-time purchase)
+          <div v-if="activeAddonsWithLabels.length" class="space-y-2">
+            <p v-for="item in activeAddonsWithLabels" :key="item.key" class="text-neutral-body">
+              ✓ {{ item.label }}
             </p>
           </div>
           <p v-else class="text-neutral-body">No active add-ons</p>

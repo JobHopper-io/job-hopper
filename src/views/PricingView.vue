@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { getTierDisplayName, getTierPrice } from '@/composables/useSubscription'
 
 const faqOpen = ref<number | null>(null)
 
@@ -59,8 +60,8 @@ const pricingFaq = [
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <!-- Entry & Mid Level -->
           <div class="card p-8">
-            <h3 class="text-xl font-heading font-semibold mb-2">Entry & Mid Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From $19<span class="text-lg font-normal text-neutral-body">/month</span></p>
+            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('entry_mid') }}</h3>
+            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('entry_mid') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
             <p class="text-sm text-neutral-body mb-6">For hourly, administrative, and early-career salaried roles.</p>
             <div class="border-t border-neutral-border pt-6 mb-6">
               <p class="text-sm font-semibold text-brand-charcoal mb-4">What's included:</p>
@@ -111,8 +112,8 @@ const pricingFaq = [
           <!-- Senior & Management -->
           <div class="card p-8 border-2 border-brand-primary">
             <div class="inline-block bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">Most popular</div>
-            <h3 class="text-xl font-heading font-semibold mb-2">Senior & Management Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From $29<span class="text-lg font-normal text-neutral-body">/month</span></p>
+            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('senior_management') }}</h3>
+            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('senior_management') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
             <p class="text-sm text-neutral-body mb-6">For experienced professionals, supervisors, and managers.</p>
             <div class="border-t border-neutral-border pt-6 mb-6">
               <p class="text-sm font-semibold text-brand-charcoal mb-4">Everything in Entry & Mid Level, plus:</p>
@@ -144,8 +145,8 @@ const pricingFaq = [
 
           <!-- Director, VP & C-Level -->
           <div class="card p-8">
-            <h3 class="text-xl font-heading font-semibold mb-2">Director, VP & C-Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From $49<span class="text-lg font-normal text-neutral-body">/month</span></p>
+            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('director_vp_c_level') }}</h3>
+            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('director_vp_c_level') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
             <p class="text-sm text-neutral-body mb-6">For executives and senior leaders.</p>
             <div class="border-t border-neutral-border pt-6 mb-6">
               <p class="text-sm font-semibold text-brand-charcoal mb-4">Everything in Senior & Management, plus:</p>

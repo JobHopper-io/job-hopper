@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { userAPI, subscriptionAPI, profileAPI } from '@/lib/supabase'
+import { userAPI, subscriptionAPI, profileAPI, type User } from '@/lib/supabase'
+import { getTierDisplayName, type Subscription } from '@/composables/useSubscription'
+import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
+import type { RoleCategoryValue } from '@/composables/useRoleCategories'
 
-const user = ref<any>(null)
-const subscription = ref<any>(null)
+const user = ref<User | null>(null)
+const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
 const isSaving = ref(false)
 const saveSuccess = ref(false)
@@ -12,21 +15,19 @@ const saveSuccess = ref(false)
 const currentJobTitle = ref('')
 const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
-const targetRoleCategories = ref<string[]>([])
+const targetRoleCategories = ref<RoleCategoryValue[]>([])
 const desiredSalaryMin = ref<number | null>(null)
 const desiredSalaryMax = ref<number | null>(null)
 const preferredLocations = ref<string[]>([])
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
 
-const roleCategoryOptions = [
-  'Operations / Production',
-  'Maintenance / Technical',
-  'Engineering',
-  'Supervisory / Management',
-  'Director / VP / Executive',
-  'Other'
-]
+// Resume
+const resumeViewUrl = ref<string | null>(null)
+const resumeFile = ref<File | null>(null)
+const resumeFileName = ref('')
+const resumeUploading = ref(false)
+const resumeError = ref('')
 
 onMounted(async () => {
   try {
@@ -40,12 +41,18 @@ onMounted(async () => {
       currentJobTitle.value = userResult.data.current_job_title || ''
       yearsOfExperience.value = userResult.data.years_of_experience || null
       currentIndustry.value = userResult.data.current_industry || ''
-      targetRoleCategories.value = userResult.data.target_role_categories || []
+      targetRoleCategories.value = (userResult.data.target_role_categories ?? []) as RoleCategoryValue[]
       desiredSalaryMin.value = userResult.data.desired_salary_min || null
       desiredSalaryMax.value = userResult.data.desired_salary_max || null
       preferredLocations.value = userResult.data.preferred_locations || []
       openToRelocation.value = userResult.data.open_to_relocation || false
       openToRemote.value = userResult.data.open_to_remote || false
+      // Fetch signed URL for current resume if present
+      const key = userResult.data.resume_bucket_key
+      if (key) {
+        const { data: url } = await profileAPI.getResumeDownloadUrl(key)
+        resumeViewUrl.value = url || null
+      }
     }
     
     if (!subscriptionResult.error) {
@@ -58,12 +65,41 @@ onMounted(async () => {
   }
 })
 
-const toggleRoleCategory = (category: string) => {
-  const index = targetRoleCategories.value.indexOf(category)
+const toggleRoleCategory = (value: RoleCategoryValue) => {
+  const index = targetRoleCategories.value.indexOf(value)
   if (index > -1) {
     targetRoleCategories.value.splice(index, 1)
   } else {
-    targetRoleCategories.value.push(category)
+    targetRoleCategories.value.push(value)
+  }
+}
+
+const handleResumeFileChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  resumeFile.value = file
+  resumeFileName.value = file.name
+  resumeError.value = ''
+  try {
+    resumeUploading.value = true
+    const { data, error } = await profileAPI.uploadResume(file)
+    if (error) {
+      resumeError.value = error.message || 'Upload failed'
+      return
+    }
+    if (data?.resume_bucket_key && user.value) {
+      user.value = { ...user.value, resume_bucket_key: data.resume_bucket_key }
+      const { data: url } = await profileAPI.getResumeDownloadUrl(data.resume_bucket_key)
+      resumeViewUrl.value = url || null
+      resumeFile.value = null
+      resumeFileName.value = ''
+      target.value = ''
+    }
+  } catch (e) {
+    resumeError.value = e instanceof Error ? e.message : 'Upload failed'
+  } finally {
+    resumeUploading.value = false
   }
 }
 
@@ -94,15 +130,6 @@ const handleSave = async () => {
     isSaving.value = false
   }
 }
-
-const getTierDisplayName = (tier?: string) => {
-  const tierMap: Record<string, string> = {
-    entry_mid: 'Entry & Mid Level Roles',
-    senior_management: 'Senior & Management Level Roles',
-    director_vp_c_level: 'Director, VP & C-Level Roles'
-  }
-  return tierMap[tier || ''] || 'Not set'
-}
 </script>
 
 <template>
@@ -125,7 +152,7 @@ const getTierDisplayName = (tier?: string) => {
           <p class="text-neutral-body">
             <span class="font-semibold">Plan:</span> {{ getTierDisplayName(subscription?.subscription_tier) }}
           </p>
-          <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-neutral-body mt-2">
+          <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 mt-2">
             Trial ends: {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }}
           </p>
         </div>
@@ -149,6 +176,50 @@ const getTierDisplayName = (tier?: string) => {
           </div>
         </div>
 
+        <!-- Resume -->
+        <div class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Resume</h2>
+          <p class="text-sm text-neutral-body mb-4">
+            A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
+          </p>
+          <div v-if="user?.resume_bucket_key" class="mb-4">
+            <p class="text-sm font-medium text-brand-charcoal mb-2">Your current resume</p>
+            <a
+              :href="resumeViewUrl || '#'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-brand-primary font-medium hover:underline inline-flex items-center gap-2"
+              :class="{ 'pointer-events-none opacity-50': !resumeViewUrl }"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {{ resumeViewUrl ? 'View resume' : 'Loading...' }}
+            </a>
+          </div>
+          <div class="space-y-3">
+            <input
+              id="profile-resume-upload"
+              type="file"
+              accept=".pdf,.doc,.docx"
+              class="hidden"
+              :disabled="resumeUploading"
+              @change="handleResumeFileChange"
+            />
+            <label
+              for="profile-resume-upload"
+              class="btn-secondary cursor-pointer inline-block"
+              :class="{ 'opacity-50 pointer-events-none': resumeUploading }"
+            >
+              {{ resumeUploading ? 'Uploading...' : (user?.resume_bucket_key ? 'Choose new file to replace' : 'Choose file to upload') }}
+            </label>
+            <p v-if="resumeFileName && !resumeUploading" class="text-sm text-neutral-body">
+              Selected: {{ resumeFileName }}
+            </p>
+            <p v-if="resumeError" class="text-sm text-red-600">{{ resumeError }}</p>
+          </div>
+        </div>
+
         <!-- Target Preferences -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Target Preferences</h2>
@@ -157,18 +228,18 @@ const getTierDisplayName = (tier?: string) => {
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
-                  v-for="category in roleCategoryOptions"
-                  :key="category"
+                  v-for="opt in ROLE_CATEGORIES"
+                  :key="opt.value"
                   type="button"
-                  @click="toggleRoleCategory(category)"
+                  @click="toggleRoleCategory(opt.value)"
                   :class="[
                     'p-3 rounded-[12px] border-2 text-left transition-colors',
-                    targetRoleCategories.includes(category)
+                    targetRoleCategories.includes(opt.value)
                       ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
                       : 'border-neutral-border hover:border-brand-primary/50'
                   ]"
                 >
-                  {{ category }}
+                  {{ opt.label }}
                 </button>
               </div>
             </div>

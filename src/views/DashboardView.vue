@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { userAPI, subscriptionAPI } from '@/lib/supabase'
+import { userAPI, subscriptionAPI, type User, type JobFeedItem } from '@/lib/supabase'
 import JobCard from '@/components/JobCard.vue'
+import { getTierDisplayName, getStatusLabel, getActiveAddons, type Subscription } from '@/composables/useSubscription'
+import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
+import type { RoleCategoryValue } from '@/composables/useRoleCategories'
 
-const user = ref<any>(null)
-const subscription = ref<any>(null)
+const user = ref<User | null>(null)
+const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
-const jobs = ref<any[]>([]) // Placeholder for job feed
+const jobs = ref<JobFeedItem[]>([]) // Placeholder for job feed
 
 // Filters
 const selectedRoleTypes = ref<string[]>([])
@@ -26,6 +29,53 @@ const userName = computed(() => {
   return user.value?.first_name || 'there'
 })
 
+const activeAddonsForDisplay = computed(() =>
+  getActiveAddons(subscription.value).map((item) => item.label)
+)
+
+// Profile completion: key fields that improve matching
+const profileCompletion = computed(() => {
+  const u = user.value
+  if (!u) return { filled: 0, total: 7, percent: 0 }
+  const fields = [
+    !!u.first_name?.trim(),
+    !!u.last_name?.trim(),
+    !!u.current_job_title?.trim(),
+    (u.target_role_categories?.length ?? 0) > 0,
+    (u.desired_salary_min != null || u.desired_salary_max != null) || (u.preferred_locations?.length ?? 0) > 0,
+    u.years_of_experience != null,
+    !!u.resume_bucket_key
+  ]
+  const filled = fields.filter(Boolean).length
+  return { filled, total: fields.length, percent: Math.round((filled / fields.length) * 100) }
+})
+
+// Matching statistics (placeholder until API exists)
+const matchingStats = ref({
+  thisWeek: null as number | null,
+  totalDelivered: null as number | null,
+  avgMatchScore: null as number | null
+})
+
+function applyProfileToFilters(profile: User | null | undefined) {
+  if (!profile) return
+  // Role types: stored as slugs; normalize in case of legacy label data
+  const values = profile.target_role_categories ?? []
+  if (values.length) selectedRoleTypes.value = values as RoleCategoryValue[]
+  // Location: profile has preferred_locations array, use first or join
+  const locations = profile.preferred_locations ?? []
+  if (locations.length) selectedLocation.value = locations.join(', ')
+  // Salary: profile has desired_salary_min / desired_salary_max
+  const min = profile.desired_salary_min
+  const max = profile.desired_salary_max
+  if (min != null || max != null) {
+    salaryRange.value = [
+      min != null ? min : 0,
+      max != null ? max : 200000
+    ]
+  }
+}
+
 onMounted(async () => {
   try {
     const [userResult, subscriptionResult] = await Promise.all([
@@ -35,6 +85,7 @@ onMounted(async () => {
     
     if (!userResult.error) {
       user.value = userResult.data
+      applyProfileToFilters(userResult.data)
     }
     
     if (!subscriptionResult.error) {
@@ -67,18 +118,87 @@ onMounted(async () => {
         </p>
       </div>
 
-      <!-- Filters Panel -->
+      <!-- Summary cards: Subscription, Add-ons, Profile completion, Matching stats -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Subscription status and tier -->
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
+          <p class="font-heading font-semibold text-brand-charcoal">
+            {{ getTierDisplayName(subscription?.subscription_tier) }}
+          </p>
+          <p class="text-sm text-neutral-body mt-1">
+            {{ getStatusLabel(subscription?.subscription_status) }}
+          </p>
+          <p v-if="subscription?.subscription_status === 'trial' && subscription?.trial_ends_at" class="text-xs text-red-600 mt-2">
+            Trial ends {{ new Date(subscription.trial_ends_at).toLocaleDateString() }}
+          </p>
+          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Manage plan →
+          </router-link>
+        </div>
+
+        <!-- Active add-ons -->
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Active add-ons</h3>
+          <div v-if="activeAddonsForDisplay.length" class="space-y-1.5">
+            <p v-for="label in activeAddonsForDisplay" :key="label" class="text-sm text-neutral-body">✓ {{ label }}</p>
+          </div>
+          <p v-else class="text-sm text-neutral-body">None</p>
+          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Add-ons →
+          </router-link>
+        </div>
+
+        <!-- Profile completion status -->
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Profile completion</h3>
+          <div class="flex items-center gap-3">
+            <div class="flex-1 h-2.5 bg-neutral-bg rounded-full overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="profileCompletion.percent === 100 ? 'bg-green-500' : profileCompletion.percent >= 50 ? 'bg-brand-primary' : 'bg-amber-500'"
+                :style="{ width: `${profileCompletion.percent}%` }"
+              />
+            </div>
+            <span class="text-sm font-semibold text-brand-charcoal tabular-nums">{{ profileCompletion.percent }}%</span>
+          </div>
+          <p class="text-xs text-neutral-body mt-2">{{ profileCompletion.filled }} of {{ profileCompletion.total }} key fields</p>
+          <router-link to="/profile" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Complete profile →
+          </router-link>
+        </div>
+
+        <!-- Matching statistics -->
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Matching statistics</h3>
+          <div class="space-y-2 text-sm">
+            <p class="text-neutral-body">
+              <span class="font-medium text-brand-charcoal">This week:</span>
+              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }}
+            </p>
+            <p class="text-neutral-body">
+              <span class="font-medium text-brand-charcoal">Total delivered:</span>
+              {{ matchingStats.totalDelivered != null ? matchingStats.totalDelivered : '—' }}
+            </p>
+            <p class="text-neutral-body">
+              <span class="font-medium text-brand-charcoal">Avg. match score:</span>
+              {{ matchingStats.avgMatchScore != null ? `${matchingStats.avgMatchScore}%` : '—' }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent job matches -->
+      <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Recent job matches</h2>
       <div class="card p-6 mb-8">
-        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">Filters</h2>
+        <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">Filters</h3>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-sm font-medium text-brand-charcoal mb-2">Role type</label>
             <select v-model="selectedRoleTypes" multiple class="input">
-              <option value="operations">Operations / Production</option>
-              <option value="maintenance">Maintenance / Technical</option>
-              <option value="engineering">Engineering</option>
-              <option value="management">Supervisory / Management</option>
-              <option value="executive">Director / VP / Executive</option>
+              <option v-for="opt in ROLE_CATEGORIES" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </div>
           <div>

@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { subscriptionAPI, profileAPI } from '@/lib/supabase'
+import type { SubscriptionTier } from '@/composables/useSubscription'
+import { getTierDisplayName, getTierPrice } from '@/composables/useSubscription'
+import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
+import type { RoleCategoryValue } from '@/composables/useRoleCategories'
 
 const router = useRouter()
 
@@ -17,7 +21,7 @@ const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
 
 // Step 2: Targets
-const targetRoleCategories = ref<string[]>([])
+const targetRoleCategories = ref<RoleCategoryValue[]>([])
 const desiredSalaryMin = ref<number | null>(null)
 const desiredSalaryMax = ref<number | null>(null)
 const preferredLocation = ref('')
@@ -25,21 +29,12 @@ const locationRadius = ref(25)
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
 
-const roleCategoryOptions = [
-  'Operations / Production',
-  'Maintenance / Technical',
-  'Engineering',
-  'Supervisory / Management',
-  'Director / VP / Executive',
-  'Other'
-]
-
 // Step 3: Resume Upload
 const resumeFile = ref<File | null>(null)
 const resumeFileName = ref('')
 
 // Step 4: Plan Selection
-const selectedTier = ref<'entry_mid' | 'senior_management' | 'director_vp_c_level' | null>(null)
+const selectedTier = ref<SubscriptionTier | null>(null)
 const premiumInsights = ref(false)
 const interviewPrep = ref(false)
 const resumeUpgrade = ref(false)
@@ -111,12 +106,12 @@ const prevStep = () => {
   }
 }
 
-const toggleRoleCategory = (category: string) => {
-  const index = targetRoleCategories.value.indexOf(category)
+const toggleRoleCategory = (value: RoleCategoryValue) => {
+  const index = targetRoleCategories.value.indexOf(value)
   if (index > -1) {
     targetRoleCategories.value.splice(index, 1)
   } else {
-    targetRoleCategories.value.push(category)
+    targetRoleCategories.value.push(value)
   }
 }
 
@@ -297,18 +292,18 @@ const handleCompleteOnboarding = async () => {
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories (select all that apply)</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
-                  v-for="category in roleCategoryOptions"
-                  :key="category"
+                  v-for="opt in ROLE_CATEGORIES"
+                  :key="opt.value"
                   type="button"
-                  @click="toggleRoleCategory(category)"
+                  @click="toggleRoleCategory(opt.value)"
                   :class="[
                     'p-3 rounded-[12px] border-2 text-left transition-colors',
-                    targetRoleCategories.includes(category)
+                    targetRoleCategories.includes(opt.value)
                       ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
                       : 'border-neutral-border hover:border-brand-primary/50'
                   ]"
                 >
-                  {{ category }}
+                  {{ opt.label }}
                 </button>
               </div>
             </div>
@@ -432,8 +427,8 @@ const handleCompleteOnboarding = async () => {
                   selectedTier === 'entry_mid' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
-                <h3 class="font-semibold mb-2">Entry & Mid Level</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">$19<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <h3 class="font-semibold mb-2">{{ getTierDisplayName('entry_mid') }}</h3>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('entry_mid') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
                 <p class="text-sm text-neutral-body mb-4">For hourly, administrative, and early-career roles</p>
                 <button
                   type="button"
@@ -450,8 +445,8 @@ const handleCompleteOnboarding = async () => {
                   selectedTier === 'senior_management' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
-                <h3 class="font-semibold mb-2">Senior & Management</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">$29<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <h3 class="font-semibold mb-2">{{ getTierDisplayName('senior_management') }}</h3>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('senior_management') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
                 <p class="text-sm text-neutral-body mb-4">For experienced professionals and managers</p>
                 <button
                   type="button"
@@ -468,8 +463,8 @@ const handleCompleteOnboarding = async () => {
                   selectedTier === 'director_vp_c_level' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
-                <h3 class="font-semibold mb-2">Director, VP & C-Level</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">$49<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <h3 class="font-semibold mb-2">{{ getTierDisplayName('director_vp_c_level') }}</h3>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('director_vp_c_level') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
                 <p class="text-sm text-neutral-body mb-4">For executives and senior leaders</p>
                 <button
                   type="button"

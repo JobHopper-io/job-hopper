@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { subscriptionAPI } from '@/lib/supabase'
+import { subscriptionAPI, type JobDetail } from '@/lib/supabase'
+import { type Subscription } from '@/composables/useSubscription'
 
 const route = useRoute()
 const router = useRouter()
 
 const jobId = route.params.id as string
-const job = ref<any>(null)
-const subscription = ref<any>(null)
+const job = ref<JobDetail | null>(null)
+const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
 
 onMounted(async () => {
