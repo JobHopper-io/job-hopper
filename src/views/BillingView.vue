@@ -6,7 +6,7 @@ import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/lib/subscri
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const { subscription, loading: isLoading } = storeToRefs(userStore)
+const { subscription, isLoading } = storeToRefs(userStore)
 
 const showCancelConfirm = ref(false)
 
