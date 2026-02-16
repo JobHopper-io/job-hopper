@@ -12,6 +12,8 @@ const { profile, subscription, isLoading } = storeToRefs(userStore)
 const initialLoadDone = ref(false)
 const isSaving = ref(false)
 const saveSuccess = ref(false)
+/** When true, form refs are being updated from profile (e.g. after save); skip triggering another save. */
+const isSyncingFromProfile = ref(false)
 
 // Profile fields
 const currentJobTitle = ref('')
@@ -47,7 +49,11 @@ function syncFormFromProfile() {
 
 watch(profile, (p) => {
   if (p) {
+    isSyncingFromProfile.value = true
     syncFormFromProfile()
+    nextTick(() => {
+      isSyncingFromProfile.value = false
+    })
     const key = p.resume_bucket_key
     if (key) {
       profileAPI.getResumeDownloadUrl(key).then(({ data: url }) => {
@@ -105,6 +111,10 @@ const handleResumeFileChange = async (event: Event) => {
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
 const saveProfile = async () => {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
+  }
   try {
     isSaving.value = true
     saveSuccess.value = false
@@ -135,7 +145,7 @@ const saveProfile = async () => {
 
 const debouncedSave = () => {
   if (saveTimeout) clearTimeout(saveTimeout)
-  saveTimeout = setTimeout(saveProfile, 1000)
+  saveTimeout = setTimeout(saveProfile, 600)
 }
 
 // Auto-save when any profile field changes (after initial load)
@@ -152,7 +162,7 @@ watch(
     openToRemote: openToRemote.value
   }),
   () => {
-    if (initialLoadDone.value) debouncedSave()
+    if (initialLoadDone.value && !isSyncingFromProfile.value) debouncedSave()
   },
   { deep: true }
 )
