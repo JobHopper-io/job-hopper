@@ -128,6 +128,18 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Dashboard
                 </router-link>
+                <router-link
+                  to="/profile"
+                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Profile
+                </router-link>
+                <router-link
+                  to="/billing"
+                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Billing
+                </router-link>
                 <button
                   @click="handleSignOut"
                   class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -198,6 +210,20 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Dashboard
+                </router-link>
+                <router-link
+                  to="/profile"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Profile
+                </router-link>
+                <router-link
+                  to="/billing"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Billing
                 </router-link>
                 <button
                   @click="handleSignOutAndCloseMenu"
