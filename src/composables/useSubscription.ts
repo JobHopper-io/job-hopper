@@ -28,36 +28,36 @@ export interface Subscription {
   updated_at: string
 }
 
-// --- Display maps ---
+// --- Display maps (internal; used by getters below) ---
 
-export const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
+const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
   entry_mid: 'Entry & Mid Level Roles',
   senior_management: 'Senior & Management Level Roles',
   director_vp_c_level: 'Director, VP & C-Level Roles'
 }
 
-export const STATUS_LABELS: Record<SubscriptionStatus, string> = {
+const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   trial: 'Free trial',
   active: 'Active',
   cancelled: 'Cancelled',
   expired: 'Expired'
 }
 
-export const TIER_PRICES: Record<SubscriptionTier, number> = {
+const TIER_PRICES: Record<SubscriptionTier, number> = {
   entry_mid: 19,
   senior_management: 29,
   director_vp_c_level: 49
 }
 
 /** Add-on display labels (short form for lists). */
-export const ADDON_DISPLAY_NAMES: Record<AddonType, string> = {
+const ADDON_DISPLAY_NAMES: Record<AddonType, string> = {
   premium_insights: 'Premium Insights',
   interview_prep: 'Interview Prep',
   resume_upgrade: 'Resume Upgrade'
 }
 
 /** Add-on labels with price (for billing detail). */
-export const ADDON_DISPLAY_WITH_PRICE: Record<AddonType, string> = {
+const ADDON_DISPLAY_WITH_PRICE: Record<AddonType, string> = {
   premium_insights: 'Premium Insights & Contact Access (+$30/month)',
   interview_prep: 'Interview Prep & Strategy (+$30/month)',
   resume_upgrade: 'Resume Upgrade (one-time purchase)'
@@ -83,14 +83,14 @@ export function getTierPrice(tier?: string | null): number {
   return TIER_PRICES[tier as SubscriptionTier] ?? 0
 }
 
-export function getAddonDisplayName(addon: AddonType, withPrice = false): string {
+function getAddonDisplayName(addon: AddonType, withPrice = false): string {
   return withPrice ? ADDON_DISPLAY_WITH_PRICE[addon] : ADDON_DISPLAY_NAMES[addon]
 }
 
 /** List of addon keys in display order. */
-export const ADDON_KEYS: AddonType[] = ['premium_insights', 'interview_prep', 'resume_upgrade']
+const ADDON_KEYS: AddonType[] = ['premium_insights', 'interview_prep', 'resume_upgrade']
 
-export function hasAddon(
+function hasAddon(
   subscription: Subscription | null | undefined,
   addonKey: AddonType
 ): boolean {
@@ -118,7 +118,7 @@ export function getActiveAddons(
 }
 
 /**
- * Composable: returns all subscription display helpers.
+ * Composable: returns subscription display helpers used by the app.
  * Components can use this or import the named functions directly.
  */
 export function useSubscription() {
@@ -126,14 +126,6 @@ export function useSubscription() {
     getTierDisplayName,
     getStatusLabel,
     getTierPrice,
-    getAddonDisplayName,
-    hasAddon,
-    getActiveAddonsWithLabels: getActiveAddons,
-    TIER_DISPLAY_NAMES,
-    STATUS_LABELS,
-    TIER_PRICES,
-    ADDON_DISPLAY_NAMES,
-    ADDON_DISPLAY_WITH_PRICE,
-    ADDON_KEYS
+    getActiveAddons
   }
 }

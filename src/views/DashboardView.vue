@@ -59,7 +59,6 @@ const matchingStats = ref({
 
 function applyProfileToFilters(profile: User | null | undefined) {
   if (!profile) return
-  // Role types: stored as slugs; normalize in case of legacy label data
   const values = profile.target_role_categories ?? []
   if (values.length) selectedRoleTypes.value = values as RoleCategoryValue[]
   // Location: profile has preferred_locations array, use first or join
