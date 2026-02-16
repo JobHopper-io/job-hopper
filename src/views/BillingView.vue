@@ -1,34 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { subscriptionAPI } from '@/lib/supabase'
-import { getTierDisplayName, getTierPrice, getActiveAddons, type Subscription } from '@/lib/subscription'
+import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/lib/subscription'
+import { useUserStore } from '@/stores/user'
 
-const subscription = ref<Subscription | null>(null)
-const isLoading = ref(true)
+const userStore = useUserStore()
+const { subscription, loading: isLoading } = storeToRefs(userStore)
+
 const showCancelConfirm = ref(false)
 
 const activeAddonsWithLabels = computed(() => getActiveAddons(subscription.value, true))
-
-onMounted(async () => {
-  try {
-    const { data, error } = await subscriptionAPI.getCurrentSubscription()
-    if (!error) {
-      subscription.value = data
-    }
-  } catch (error) {
-    console.error('Error loading subscription:', error)
-  } finally {
-    isLoading.value = false
-  }
-})
 
 const handleCancel = async () => {
   try {
     await subscriptionAPI.cancelSubscription()
     showCancelConfirm.value = false
-    // Reload subscription data
-    const { data } = await subscriptionAPI.getCurrentSubscription()
-    subscription.value = data
+    await userStore.refreshSubscription()
   } catch (error) {
     console.error('Error cancelling subscription:', error)
   }

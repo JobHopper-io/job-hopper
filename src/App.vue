@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, supabase } from '@/lib/supabase'
-import { useGlobalLoading } from '@/composables/useGlobalLoading'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
-const { isGlobalLoading } = useGlobalLoading()
+
+// Load profile + subscription once when user becomes authenticated
+watch(isAuthenticated, (authenticated) => {
+  if (authenticated) userStore.loadUserData()
+  else userStore.clear()
+})
 
 // Listen to auth state changes to update isAuthenticated reactively
 // Use a distinct name to avoid confusion with domain \"Subscription\" model
-const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((event, session) => {
+const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
   isAuthenticated.value = !!session?.user
-  // Note: Redirects for authenticated users on login/register pages are handled in router guard
 })
 
 // Cleanup auth listener on unmount
@@ -26,9 +31,9 @@ onMounted(async () => {
   try {
     const { user } = await authAPI.getCurrentUser()
     isAuthenticated.value = !!user
+    // watch(isAuthenticated) above handles loadUserData() / clear() when this changes
 
     // Strip auth tokens from URL after Supabase has consumed them (e.g. after email confirmation).
-    // Tokens in the hash are not sent to the server but should not remain in address bar or history.
     const hash = window.location.hash
     if (hash && (hash.includes('access_token=') || hash.includes('refresh_token='))) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
@@ -36,14 +41,13 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error checking authentication:', error)
   }
-  // Note: isRouting is managed by router guard - no need to set it here
 })
 
 const handleSignOut = async () => {
   try {
     const { error } = await authAPI.signOut()
     if (error) throw error
-    // isAuthenticated will be updated automatically by the auth state change listener
+    userStore.clear()
     router.push('/')
   } catch (error) {
     console.error('Error signing out:', error)
@@ -58,19 +62,6 @@ const handleSignOutAndCloseMenu = async () => {
 
 <template>
   <div class="min-h-screen bg-neutral-bg">
-    <!-- Global Loading State (initial auth check + route transitions) -->
-    <div v-if="isGlobalLoading" class="min-h-screen flex items-center justify-center">
-      <div class="text-center">
-        <svg class="animate-spin h-8 w-8 text-brand-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="text-neutral-body">Loading...</p>
-      </div>
-    </div>
-
-    <!-- Main App Content -->
-    <div v-else>
       <!-- Navigation Header -->
       <nav class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -284,7 +275,6 @@ const handleSignOutAndCloseMenu = async () => {
           </div>
         </div>
       </footer>
-    </div>
   </div>
 </template>
 

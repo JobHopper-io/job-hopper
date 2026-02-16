@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
-import { userAPI, subscriptionAPI, profileAPI, type User } from '@/lib/supabase'
-import { getTierDisplayName, type Subscription } from '@/lib/subscription'
+import { storeToRefs } from 'pinia'
+import { profileAPI } from '@/lib/supabase'
+import { getTierDisplayName } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import { useUserStore } from '@/stores/user'
 
-const user = ref<User | null>(null)
-const subscription = ref<Subscription | null>(null)
-const isLoading = ref(true)
+const userStore = useUserStore()
+const { profile, subscription, isLoading } = storeToRefs(userStore)
+
 const initialLoadDone = ref(false)
 const isSaving = ref(false)
 const saveSuccess = ref(false)
@@ -29,44 +31,37 @@ const resumeFileName = ref('')
 const resumeUploading = ref(false)
 const resumeError = ref('')
 
-onMounted(async () => {
-  try {
-    const [userResult, subscriptionResult] = await Promise.all([
-      userAPI.getCurrentUserProfile(),
-      subscriptionAPI.getCurrentSubscription()
-    ])
-    
-    if (!userResult.error && userResult.data) {
-      user.value = userResult.data
-      currentJobTitle.value = userResult.data.current_job_title || ''
-      yearsOfExperience.value = userResult.data.years_of_experience ?? null
-      currentIndustry.value = userResult.data.current_industry || ''
-      targetRoleCategories.value = (userResult.data.target_role_categories ?? []) as RoleCategoryValue[]
-      desiredSalaryMin.value = userResult.data.desired_salary_min ?? null
-      desiredSalaryMax.value = userResult.data.desired_salary_max ?? null
-      preferredLocations.value = userResult.data.preferred_locations || []
-      openToRelocation.value = userResult.data.open_to_relocation || false
-      openToRemote.value = userResult.data.open_to_remote || false
-      // Fetch signed URL for current resume if present
-      const key = userResult.data.resume_bucket_key
-      if (key) {
-        const { data: url } = await profileAPI.getResumeDownloadUrl(key)
+function syncFormFromProfile() {
+  const p = profile.value
+  if (!p) return
+  currentJobTitle.value = p.current_job_title || ''
+  yearsOfExperience.value = p.years_of_experience ?? null
+  currentIndustry.value = p.current_industry || ''
+  targetRoleCategories.value = (p.target_role_categories ?? []) as RoleCategoryValue[]
+  desiredSalaryMin.value = p.desired_salary_min ?? null
+  desiredSalaryMax.value = p.desired_salary_max ?? null
+  preferredLocations.value = p.preferred_locations || []
+  openToRelocation.value = p.open_to_relocation || false
+  openToRemote.value = p.open_to_remote || false
+}
+
+watch(profile, (p) => {
+  if (p) {
+    syncFormFromProfile()
+    const key = p.resume_bucket_key
+    if (key) {
+      profileAPI.getResumeDownloadUrl(key).then(({ data: url }) => {
         resumeViewUrl.value = url || null
-      }
+      })
     }
-    
-    if (!subscriptionResult.error) {
-      subscription.value = subscriptionResult.data
-    }
-  } catch (error) {
-    console.error('Error loading profile:', error)
-  } finally {
-    isLoading.value = false
-    // Enable auto-save only after the watch has run for the initial load (so we don't save on load)
-    nextTick(() => {
-      initialLoadDone.value = true
-    })
   }
+}, { immediate: true })
+
+onMounted(() => {
+  // This boolean is used to determine if the auto-save feature should be enabled.
+  nextTick(() => {
+    initialLoadDone.value = true
+  })
 })
 
 const toggleRoleCategory = (value: RoleCategoryValue) => {
@@ -92,8 +87,8 @@ const handleResumeFileChange = async (event: Event) => {
       resumeError.value = error.message || 'Upload failed'
       return
     }
-    if (data?.resume_bucket_key && user.value) {
-      user.value = { ...user.value, resume_bucket_key: data.resume_bucket_key }
+    if (data?.resume_bucket_key) {
+      await userStore.refreshProfile()
       const { data: url } = await profileAPI.getResumeDownloadUrl(data.resume_bucket_key)
       resumeViewUrl.value = url || null
       resumeFile.value = null
@@ -130,6 +125,7 @@ const saveProfile = async () => {
     setTimeout(() => {
       saveSuccess.value = false
     }, 2000)
+    await userStore.refreshProfile()
   } catch (error) {
     console.error('Error saving profile:', error)
   } finally {
@@ -215,7 +211,7 @@ watch(
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
-          <div v-if="user?.resume_bucket_key" class="mb-4">
+          <div v-if="profile?.resume_bucket_key" class="mb-4">
             <p class="text-sm font-medium text-brand-charcoal mb-2">Your current resume</p>
             <a
               :href="resumeViewUrl || '#'"
@@ -244,7 +240,7 @@ watch(
               class="btn-secondary cursor-pointer inline-block"
               :class="{ 'opacity-50 pointer-events-none': resumeUploading }"
             >
-              {{ resumeUploading ? 'Uploading...' : (user?.resume_bucket_key ? 'Choose new file to replace' : 'Choose file to upload') }}
+              {{ resumeUploading ? 'Uploading...' : (profile?.resume_bucket_key ? 'Choose new file to replace' : 'Choose file to upload') }}
             </label>
             <p v-if="resumeFileName && !resumeUploading" class="text-sm text-neutral-body">
               Selected: {{ resumeFileName }}

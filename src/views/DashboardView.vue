@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { userAPI, subscriptionAPI, type User, type JobFeedItem } from '@/lib/supabase'
+import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import type { Profile, JobFeedItem } from '@/lib/supabase'
 import JobCard from '@/components/JobCard.vue'
-import { getTierDisplayName, getStatusLabel, getActiveAddons, type Subscription } from '@/lib/subscription'
+import { getTierDisplayName, getStatusLabel, getActiveAddons } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import { useUserStore } from '@/stores/user'
 
-const user = ref<User | null>(null)
-const subscription = ref<Subscription | null>(null)
-const isLoading = ref(true)
+const userStore = useUserStore()
+const { profile, subscription, isLoading } = storeToRefs(userStore)
+
 const jobs = ref<JobFeedItem[]>([]) // Placeholder for job feed
 
 // Filters
@@ -25,7 +27,7 @@ const greeting = computed(() => {
 })
 
 const userName = computed(() => {
-  return user.value?.first_name || 'there'
+  return profile.value?.first_name || ''
 })
 
 const activeAddonsForDisplay = computed(() =>
@@ -34,16 +36,16 @@ const activeAddonsForDisplay = computed(() =>
 
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
-  const u = user.value
-  if (!u) return { filled: 0, total: 7, percent: 0 }
+  const p = profile.value
+  if (!p) return { filled: 0, total: 7, percent: 0 }
   const fields = [
-    !!u.first_name?.trim(),
-    !!u.last_name?.trim(),
-    !!u.current_job_title?.trim(),
-    (u.target_role_categories?.length ?? 0) > 0,
-    (u.desired_salary_min != null || u.desired_salary_max != null) || (u.preferred_locations?.length ?? 0) > 0,
-    u.years_of_experience != null,
-    !!u.resume_bucket_key
+    !!p.first_name?.trim(),
+    !!p.last_name?.trim(),
+    !!p.current_job_title?.trim(),
+    (p.target_role_categories?.length ?? 0) > 0,
+    (p.desired_salary_min != null || p.desired_salary_max != null) || (p.preferred_locations?.length ?? 0) > 0,
+    p.years_of_experience != null,
+    !!p.resume_bucket_key
   ]
   const filled = fields.filter(Boolean).length
   return { filled, total: fields.length, percent: Math.round((filled / fields.length) * 100) }
@@ -56,16 +58,14 @@ const matchingStats = ref({
   avgMatchScore: null as number | null
 })
 
-function applyProfileToFilters(profile: User | null | undefined) {
-  if (!profile) return
-  const values = profile.target_role_categories ?? []
+function applyProfileToFilters(p: Profile | null | undefined) {
+  if (!p) return
+  const values = p.target_role_categories ?? []
   if (values.length) selectedRoleTypes.value = values as RoleCategoryValue[]
-  // Location: profile has preferred_locations array, use first or join
-  const locations = profile.preferred_locations ?? []
+  const locations = p.preferred_locations ?? []
   if (locations.length) selectedLocation.value = locations.join(', ')
-  // Salary: profile has desired_salary_min / desired_salary_max
-  const min = profile.desired_salary_min
-  const max = profile.desired_salary_max
+  const min = p.desired_salary_min
+  const max = p.desired_salary_max
   if (min != null || max != null) {
     salaryRange.value = [
       min != null ? min : 0,
@@ -74,30 +74,7 @@ function applyProfileToFilters(profile: User | null | undefined) {
   }
 }
 
-onMounted(async () => {
-  try {
-    const [userResult, subscriptionResult] = await Promise.all([
-      userAPI.getCurrentUserProfile(),
-      subscriptionAPI.getCurrentSubscription()
-    ])
-    
-    if (!userResult.error) {
-      user.value = userResult.data
-      applyProfileToFilters(userResult.data)
-    }
-    
-    if (!subscriptionResult.error) {
-      subscription.value = subscriptionResult.data
-    }
-
-    // TODO: Fetch actual jobs from API
-    // For now, empty array shows "Hopper is warming up" state
-  } catch (error) {
-    console.error('Error loading dashboard data:', error)
-  } finally {
-    isLoading.value = false
-  }
-})
+watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
 </script>
 
 <template>
