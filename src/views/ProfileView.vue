@@ -185,6 +185,9 @@ watch(
           <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 mt-2">
             Trial ends: {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }}
           </p>
+          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Manage Subscription
+          </router-link>
         </div>
 
         <!-- About You -->
