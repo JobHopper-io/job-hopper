@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getTierDisplayName, getTierPrice } from '@/composables/useSubscription'
+import { getTierDisplayName, getTierPrice } from '@/lib/subscription'
 
 const faqOpen = ref<number | null>(null)
 

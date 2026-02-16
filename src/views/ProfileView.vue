@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { userAPI, subscriptionAPI, profileAPI, type User } from '@/lib/supabase'
-import { getTierDisplayName, type Subscription } from '@/composables/useSubscription'
-import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
-import type { RoleCategoryValue } from '@/composables/useRoleCategories'
+import { getTierDisplayName, type Subscription } from '@/lib/subscription'
+import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const user = ref<User | null>(null)
 const subscription = ref<Subscription | null>(null)

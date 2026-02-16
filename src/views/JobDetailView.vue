@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscriptionAPI, type JobDetail } from '@/lib/supabase'
-import { type Subscription } from '@/composables/useSubscription'
+import { type Subscription } from '@/lib/subscription'
 
 const route = useRoute()
 const router = useRouter()

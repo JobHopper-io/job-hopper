@@ -2,9 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { userAPI, subscriptionAPI, type User, type JobFeedItem } from '@/lib/supabase'
 import JobCard from '@/components/JobCard.vue'
-import { getTierDisplayName, getStatusLabel, getActiveAddons, type Subscription } from '@/composables/useSubscription'
-import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
-import type { RoleCategoryValue } from '@/composables/useRoleCategories'
+import { getTierDisplayName, getStatusLabel, getActiveAddons, type Subscription } from '@/lib/subscription'
+import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const user = ref<User | null>(null)
 const subscription = ref<Subscription | null>(null)

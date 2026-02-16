@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI } from '@/lib/supabase'
-import { type Subscription } from '@/composables/useSubscription'
-import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/composables/useSubscription'
+import { getTierDisplayName, getTierPrice, getActiveAddons, type Subscription } from '@/lib/subscription'
 
 const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)

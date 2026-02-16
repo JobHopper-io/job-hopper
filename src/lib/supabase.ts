@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { SubscriptionTier, AddonType } from '@/composables/useSubscription'
+import type { SubscriptionTier, AddonType } from '@/lib/subscription'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY

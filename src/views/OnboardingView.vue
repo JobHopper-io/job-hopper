@@ -2,10 +2,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { subscriptionAPI, profileAPI } from '@/lib/supabase'
-import type { SubscriptionTier } from '@/composables/useSubscription'
-import { getTierDisplayName, getTierPrice } from '@/composables/useSubscription'
-import { ROLE_CATEGORIES } from '@/composables/useRoleCategories'
-import type { RoleCategoryValue } from '@/composables/useRoleCategories'
+import { getTierDisplayName, getTierPrice, type SubscriptionTier } from '@/lib/subscription'
+import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const router = useRouter()
 

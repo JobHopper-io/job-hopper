@@ -18,10 +18,3 @@ const valueToLabel = Object.fromEntries(ROLE_CATEGORIES.map((r) => [r.value, r.l
 export function getRoleCategoryLabel(value: string): string {
   return valueToLabel[value] ?? value
 }
-
-export function useRoleCategories() {
-  return {
-    roleCategories: ROLE_CATEGORIES,
-    getRoleCategoryLabel
-  }
-}

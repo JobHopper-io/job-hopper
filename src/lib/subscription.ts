@@ -116,16 +116,3 @@ export function getActiveAddons(
     label: getAddonDisplayName(key, withPrice)
   }))
 }
-
-/**
- * Composable: returns subscription display helpers used by the app.
- * Components can use this or import the named functions directly.
- */
-export function useSubscription() {
-  return {
-    getTierDisplayName,
-    getStatusLabel,
-    getTierPrice,
-    getActiveAddons
-  }
-}
