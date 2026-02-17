@@ -22,7 +22,7 @@ watch(isAuthenticated, (authenticated) => {
 // Use a distinct name to avoid confusion with domain "Subscription" model
 const {
   data: { subscription: authListener },
-} = onAuthStateChange((_event, session) => {
+} = onAuthStateChange(async (_event, session) => {
   isAuthenticated.value = !!session?.user
 })
 
