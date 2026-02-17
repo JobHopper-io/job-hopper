@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscriptionAPI } from '@/lib/subscription'
-import type { Organization } from '@/types/database'
+import type { Subscription } from '@/types/database'
 
 interface JobHiringContact {
   name: string
@@ -39,7 +39,7 @@ const router = useRouter()
 
 const jobId = route.params.id as string
 const job = ref<JobDetail | null>(null)
-const subscription = ref<Organization | null>(null)
+const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
 
 onMounted(async () => {

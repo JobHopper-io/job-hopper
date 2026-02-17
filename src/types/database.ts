@@ -4,8 +4,7 @@ import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
 // Convenience type aliases for common database types
 export type Profile = Tables<"profiles">
-/** Subscription/billing row (table name "organizations" is legacy; may be renamed to subscriptions in a follow-up). */
-export type Organization = Tables<"organizations">
+export type Subscription = Tables<"subscriptions">
 
 // Operation types for common entities
 export type ProfileInsert = TablesInsert<"profiles">

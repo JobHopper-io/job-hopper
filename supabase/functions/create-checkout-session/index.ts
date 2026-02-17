@@ -47,8 +47,8 @@ serve(async (req) => {
 
     // Get user's subscription
     const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select('organization_id, email, first_name, last_name')
+      .from('profiles')
+      .select('subscription_id, email, first_name, last_name')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -58,9 +58,9 @@ serve(async (req) => {
 
     // Get subscription details
     const { data: subscription, error: subError } = await supabaseClient
-      .from('organizations')
+      .from('subscriptions')
       .select('*')
-      .eq('id', userData.organization_id)
+      .eq('id', userData.subscription_id)
       .single()
 
     if (subError || !subscription) {
@@ -158,7 +158,7 @@ serve(async (req) => {
 
       // Update subscription with customer ID
       await supabaseClient
-        .from('organizations')
+        .from('subscriptions')
         .update({ stripe_customer_id: customerId })
         .eq('id', subscription.id)
     }

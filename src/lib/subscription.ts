@@ -3,7 +3,7 @@
  * Single source of truth for tier/status enums and their labels/prices.
  */
 
-import type { SubscriptionTier, SubscriptionStatus, AddonType, Organization, Addon } from '@/types/database'
+import type { SubscriptionTier, SubscriptionStatus, AddonType, Subscription, Addon } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 
 // --- Display maps (internal; used by getters below) ---
@@ -69,7 +69,7 @@ function getAddonDisplayName(addon: AddonType, withPrice = false): string {
 const ADDON_KEYS: AddonType[] = ['premium_insights', 'interview_prep', 'resume_upgrade']
 
 function hasAddon(
-  subscription: Organization | null | undefined,
+  subscription: Subscription | null | undefined,
   addonKey: AddonType
 ): boolean {
   if (!subscription) return false
@@ -80,7 +80,7 @@ function hasAddon(
 }
 
 export function getActiveAddons(
-  subscription: Organization | null | undefined,
+  subscription: Subscription | null | undefined,
   withPrice = false
 ): Addon[] {
   if (!subscription) return []
@@ -155,19 +155,19 @@ export const subscriptionAPI = {
 
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('organization_id')
+      .select('subscription_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!profileData?.organization_id) {
+    if (!profileData?.subscription_id) {
       return { data: null, error: null }
     }
 
     const { data, error } = await supabase
-      .from('organizations')
+      .from('subscriptions')
       .select('*')
-      .eq('id', profileData.organization_id)
-      .single<Organization>()
+      .eq('id', profileData.subscription_id)
+      .single<Subscription>()
 
     return { data, error }
   },
@@ -208,20 +208,20 @@ export const subscriptionAPI = {
 
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('organization_id')
+      .select('subscription_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!profileData?.organization_id) {
+    if (!profileData?.subscription_id) {
       return { error: new Error('Subscription not found') }
     }
 
     const { data, error } = await supabase
-      .from('organizations')
-      .update({ subscription_status: 'cancelled' as Organization['subscription_status'] })
-      .eq('id', profileData.organization_id)
+      .from('subscriptions')
+      .update({ subscription_status: 'cancelled' as Subscription['subscription_status'] })
+      .eq('id', profileData.subscription_id)
       .select()
-      .single<Organization>()
+      .single<Subscription>()
 
     return { data, error }
   },

@@ -73,7 +73,7 @@ serve(async (req) => {
         }
 
         await supabaseAdmin
-          .from('organizations')
+          .from('subscriptions')
           .update(updates)
           .eq('id', subscriptionId)
 
@@ -86,7 +86,7 @@ serve(async (req) => {
         
         // Find subscription by Stripe subscription ID
         const { data: orgData } = await supabaseAdmin
-          .from('organizations')
+          .from('subscriptions')
           .select('id')
           .eq('stripe_subscription_id', subscription.id)
           .single()
@@ -108,7 +108,7 @@ serve(async (req) => {
           }
 
           await supabaseAdmin
-            .from('organizations')
+            .from('subscriptions')
             .update(updates)
             .eq('id', orgData.id)
         }
@@ -121,14 +121,14 @@ serve(async (req) => {
         
         if (invoice.subscription) {
           const { data: orgData } = await supabaseAdmin
-            .from('organizations')
+            .from('subscriptions')
             .select('id')
             .eq('stripe_subscription_id', invoice.subscription as string)
             .single()
 
           if (orgData) {
             await supabaseAdmin
-              .from('organizations')
+              .from('subscriptions')
               .update({
                 subscription_status: 'active',
                 stripe_subscription_status: 'active',
@@ -147,14 +147,14 @@ serve(async (req) => {
         
         if (invoice.subscription) {
           const { data: orgData } = await supabaseAdmin
-            .from('organizations')
+            .from('subscriptions')
             .select('id')
             .eq('stripe_subscription_id', invoice.subscription as string)
             .single()
 
           if (orgData) {
             await supabaseAdmin
-              .from('organizations')
+              .from('subscriptions')
               .update({
                 stripe_subscription_status: 'past_due',
               })
