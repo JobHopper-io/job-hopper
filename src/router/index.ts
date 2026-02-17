@@ -182,19 +182,20 @@ router.beforeEach(async (to) => {
     return '/login'
   }
 
-  // Enforce onboarding flow for onboarding and dashboard
-  const onboardingPaths = ['/onboarding', '/dashboard']
-  if (onboardingPaths.includes(targetPath)) {
-    // Enforce onboarding flow: completed users go to dashboard, incomplete users go to onboarding
-    const userProfile = await getProfile()
+  const userProfile = await getProfile()
 
-    if (targetPath === '/onboarding' && userProfile?.onboarding_completed) {
-      return '/dashboard'
-    }
-
-    if (targetPath === '/dashboard' && !userProfile?.onboarding_completed) {
+  // If onboarding is not complete, force ANY protected path (including `/dashboard`, `/profile`, `/billing`, etc.)
+  // to `/onboarding`. The only allowed authenticated route in this state is `/onboarding` itself.
+  if (!userProfile?.onboarding_completed) {
+    if (targetPath !== '/onboarding') {
       return '/onboarding'
     }
+    return true
+  }
+
+  // If onboarding is complete, prevent access back to `/onboarding`
+  if (targetPath === '/onboarding') {
+    return '/dashboard'
   }
 
   return true

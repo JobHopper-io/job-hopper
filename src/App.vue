@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, supabase } from '@/lib/supabase'
 import { useUserStore } from '@/stores/user'
 
@@ -10,6 +10,8 @@ const userStore = useUserStore()
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
 
+const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
+
 // Load profile + subscription once when user becomes authenticated
 watch(isAuthenticated, (authenticated) => {
   if (authenticated) userStore.loadUserData()
@@ -17,7 +19,7 @@ watch(isAuthenticated, (authenticated) => {
 })
 
 // Listen to auth state changes to update isAuthenticated reactively
-// Use a distinct name to avoid confusion with domain \"Subscription\" model
+// Use a distinct name to avoid confusion with domain "Subscription" model
 const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
   isAuthenticated.value = !!session?.user
 })
@@ -68,7 +70,10 @@ const handleSignOutAndCloseMenu = async () => {
           <div class="flex justify-between items-center h-16">
             <!-- Logo -->
             <div class="flex items-center">
-              <router-link :to="isAuthenticated ? '/dashboard' : '/'" class="flex items-center space-x-2">
+              <router-link
+                :to="isAuthenticated ? (isOnboarded ? '/dashboard' : '/onboarding') : '/'"
+                class="flex items-center space-x-2"
+              >
                 <div class="w-8 h-8 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-lg flex items-center justify-center">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -112,7 +117,7 @@ const handleSignOutAndCloseMenu = async () => {
                   Get Started
                 </router-link>
               </template>
-              <template v-else>
+              <template v-else-if="isOnboarded">
                 <router-link
                   to="/dashboard"
                   class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -131,6 +136,14 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Billing
                 </router-link>
+                <button
+                  @click="handleSignOut"
+                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Sign Out
+                </button>
+              </template>
+              <template v-else>
                 <button
                   @click="handleSignOut"
                   class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -194,7 +207,7 @@ const handleSignOutAndCloseMenu = async () => {
                   Get Started
                 </router-link>
               </template>
-              <template v-else>
+              <template v-else-if="isOnboarded">
                 <router-link
                   to="/dashboard"
                   class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
@@ -216,6 +229,14 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Billing
                 </router-link>
+                <button
+                  @click="handleSignOutAndCloseMenu"
+                  class="px-3 py-2 text-left text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                >
+                  Sign Out
+                </button>
+              </template>
+              <template v-else>
                 <button
                   @click="handleSignOutAndCloseMenu"
                   class="px-3 py-2 text-left text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
