@@ -119,45 +119,65 @@ const router = createRouter({
   },
 })
 
+// Helper to avoid hanging the entire app if Supabase is slow/unreachable.
+// Returns the current user or null if unavailable/timeout.
+async function getUserWithTimeout(timeoutMs = 2000) {
+  try {
+    const authPromise = authAPI.getCurrentUser().then(({ user }) => user ?? null)
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), timeoutMs)
+    })
+
+    const result = await Promise.race([authPromise, timeoutPromise])
+    return result
+  } catch (error) {
+    console.error('Router guard auth timeout/failure:', error)
+    return null
+  }
+}
+
 // Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
   const targetPath = to.path
+  const isPublicPath = publicPaths.includes(targetPath)
+  const publicRedirectPaths = ['/login', '/register']
 
-  // Check authentication status (needed for both public redirects and protected paths)
-  let user = null
-  try {
-    const { user: currentUser } = await authAPI.getCurrentUser()
-    user = currentUser
-  } catch (error) {
-    console.error('Router guard error:', error)
+  let user: unknown = null
+
+  // Only attempt Supabase auth lookup when it's actually needed:
+  // - for protected paths, or
+  // - for login/register redirect logic.
+  if (!isPublicPath || publicRedirectPaths.includes(targetPath)) {
+    user = await getUserWithTimeout()
   }
 
   // Helper to fetch user profile (cached within this guard execution to avoid duplicate API calls)
   let profile: { onboarding_completed?: boolean } | null = null
   const getProfile = async () => {
-    if (profile === null) {
-      try {
-        const { data } = await userAPI.getCurrentUserProfile()
-        profile = data
-      } catch (error) {
-        console.error('Error fetching user profile:', error)
-      }
+    if (!user || profile !== null) return profile
+
+    try {
+      const { data } = await userAPI.getCurrentUserProfile()
+      profile = data
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
     }
+
     return profile
   }
 
-  const publicRedirectPaths = ['/login', '/register']
+  // Authenticated users should not see login/register; gracefully skip if Supabase is unavailable.
   if (user && publicRedirectPaths.includes(targetPath)) {
     const userProfile = await getProfile()
     return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
   }
 
-  // Public paths don't require authentication - allow after handling public redirect above
-  if (publicPaths.includes(targetPath)) {
+  // Public paths don't require authentication; never block these on Supabase.
+  if (isPublicPath) {
     return true
   }
 
-  // Protected paths require authentication
+  // Protected paths require authentication; if we couldn't confirm a user (including timeout), send to login.
   if (!user) {
     return '/login'
   }
@@ -167,11 +187,11 @@ router.beforeEach(async (to) => {
   if (onboardingPaths.includes(targetPath)) {
     // Enforce onboarding flow: completed users go to dashboard, incomplete users go to onboarding
     const userProfile = await getProfile()
-    
+
     if (targetPath === '/onboarding' && userProfile?.onboarding_completed) {
       return '/dashboard'
     }
-    
+
     if (targetPath === '/dashboard' && !userProfile?.onboarding_completed) {
       return '/onboarding'
     }

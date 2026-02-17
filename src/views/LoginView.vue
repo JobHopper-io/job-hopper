@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import type { AuthError } from '@supabase/supabase-js'
 import { authAPI, userAPI } from '@/lib/supabase'
 
 const router = useRouter()
@@ -11,36 +12,40 @@ const isLoading = ref(false)
 const error = ref('')
 const showPassword = ref(false)
 
-// Password validation function
-const validatePassword = (password: string) => {
-  const minLength = 8
-  if (password.length < minLength) {
-    return `Password must be at least ${minLength} characters long`
-  }
-  return null
-}
-
-
 const handleLogin = async () => {
   try {
     isLoading.value = true
     error.value = ''
 
-    // Validate password format
-    const passwordError = validatePassword(password.value)
-    if (passwordError) {
-      error.value = passwordError
-      return
-    }
-
     const { error: authError } = await authAPI.signIn(email.value, password.value)
 
     if (authError) {
-      if (authError.message?.toLowerCase().includes('email not confirmed')) {
+      const authErr = authError as AuthError & { code?: string }
+      const status = authErr.status
+      const code = authErr.code
+      const message = authErr.message || ''
+
+      // Unconfirmed email: prefer structured code over message text
+      if (code === 'email_not_confirmed' || message.toLowerCase().includes('email not confirmed')) {
         router.push('/confirm-email')
         return
       }
-      error.value = authError.message
+
+      // Network / connectivity issues: Supabase never got a valid HTTP response
+      if (typeof status !== 'number' || status === 0) {
+        error.value =
+          'We couldn’t reach our servers. Please check your internet connection and try again in a moment.'
+        return
+      }
+
+      // Invalid credentials / bad input
+      if (status === 400 || status === 401) {
+        error.value = 'The email or password you entered is incorrect.'
+        return
+      }
+
+      // Fallback for other cases
+      error.value = message || 'Unable to sign in right now. Please try again, or contact support if this continues.'
       return
     }
 

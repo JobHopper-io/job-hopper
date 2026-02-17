@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import type { AuthError } from '@supabase/supabase-js'
 import { authAPI } from '@/lib/supabase'
 
 const router = useRouter()
@@ -62,9 +63,37 @@ const handleCreateAccount = async () => {
       redirectTo
     )
     if (signUpError) {
-      const msg = signUpError.message
-      const details = (signUpError as { details?: string; code?: string }).details ?? (signUpError as { error_description?: string }).error_description
-      error.value = details ? `${msg} (${details})` : msg
+      const authErr = signUpError as AuthError & {
+        details?: string
+        error_description?: string
+        code?: string
+      }
+      const status = authErr.status
+      const msg = authErr.message || ''
+      const details = authErr.details ?? authErr.error_description
+
+      // Network / connectivity issues: no real HTTP status
+      if (typeof status !== 'number' || status === 0) {
+        error.value =
+          'We couldn’t reach our servers. Please check your internet connection and try again in a moment.'
+        return
+      }
+
+      // Common auth/validation cases
+      if (status === 400 || status === 422) {
+        // Supabase often returns helpful messages for these; surface them but keep wording friendly.
+        error.value =
+          details ||
+          msg ||
+          'There was a problem creating your account. Please check your details and try again.'
+        return
+      }
+
+      // Fallback for everything else
+      error.value =
+        details ||
+        msg ||
+        'We couldn’t create your account right now. Please try again, or contact support if this continues.'
       return
     }
     if (!signUpData.user) {
