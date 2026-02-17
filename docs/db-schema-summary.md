@@ -1,7 +1,7 @@
 ## Database overview (Supabase)
 
 - **Primary schema source**: `src/types/supabase.ts` (Supabase‑generated `Database` type, regenerated via `npm run db:types`).
-- **Convenience type aliases**: `src/types/database.ts` provides shorter type names (`Profile`, `Organization`, `Client`, etc.) and globally-used custom types (`AddonType`, `Addon`). This file imports from `supabase.ts` and is safe to edit (won't be overwritten when regenerating types).
+- **Convenience type aliases**: `src/types/database.ts` provides shorter type names (`Profile`, `Organization`, etc.) and globally-used custom types (`AddonType`, `Addon`). This file imports from `supabase.ts` and is safe to edit (won't be overwritten when regenerating types).
 - **This document** only captures high‑level entities, relationships, and business rules that are not obvious from raw types.
 - For exact columns, types, and enums, always refer to `src/types/supabase.ts`. When writing code, prefer importing convenience aliases from `@/types/database`.
 
@@ -11,7 +11,6 @@
 - **Meaning**: The table is used only for **subscription and billing** (one row per subscription).
 - **Key relationships**:
   - One row can have many `profiles` (via `profiles.organization_id`).
-  - One row can have many `clients` (via `clients.organization_id`).
 - **Non‑obvious rules**:
   - Subscription state is tracked via `subscription_status` and `subscription_tier` enums (see `Database["public"]["Enums"]` in `supabase.ts`).
   - Stripe‑related fields (`stripe_*`) and `trial_ends_at` coordinate billing and trial periods; app logic should keep these consistent.
@@ -23,14 +22,6 @@
 - **Non‑obvious rules**:
   - `role` is an enum (`user_role`) which gates behavior/permissions (office, tc, doctor, subscriber).
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
-
-### clients
-- **Meaning**: Client records linked to a subscription (billing) row.
-- **Key relationships**:
-  - Each client belongs to exactly one subscription row (`clients.organization_id` → `organizations.id`; the column name is legacy).
-- **Non‑obvious rules**:
-  - `status` is an enum (`client_status`) encoding the lifecycle: `prospect → lead → review → proposal → client`.
-  - Email is the primary identifier used in the app to contact a client; avoid creating multiple active clients with the same email under a single subscription unless explicitly intended.
 
 ### job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
 - **Meaning**: Various tables representing job postings, lead enrichment, and exclusions for outreach/processing pipelines.
