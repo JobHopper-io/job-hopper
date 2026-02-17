@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { subscriptionAPI } from '@/lib/supabase'
+import { subscriptionAPI } from '@/lib/subscription'
 import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
 

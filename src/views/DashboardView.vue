@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Profile, JobFeedItem } from '@/lib/supabase'
+import type { User } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import { getTierDisplayName, getStatusLabel, getActiveAddons } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
+
+interface JobFeedItem {
+  id: string
+  title: string
+  company: string
+  location: string
+  salary_min?: number
+  salary_max?: number
+  brief?: string
+  tags?: string[]
+  status?: 'new' | 'updated' | 'closing_soon'
+}
 
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
 
@@ -76,7 +88,7 @@ const matchingStats = ref({
   avgMatchScore: null as number | null
 })
 
-function applyProfileToFilters(p: Profile | null | undefined) {
+function applyProfileToFilters(p: User | null | undefined) {
   if (!p) return
   const values = p.target_role_categories ?? []
   if (values.length) selectedRoleTypes.value = values as RoleCategoryValue[]

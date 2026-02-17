@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import { profileAPI } from '@/lib/supabase'
+import { profileAPI } from '@/lib/profile'
 import { getTierDisplayName } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'

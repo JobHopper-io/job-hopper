@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI, userAPI } from '@/lib/supabase'
+import { authAPI } from '@/lib/auth'
+import { profileAPI } from '@/lib/profile'
 
 const router = useRouter()
 
 onMounted(async () => {
   const { user } = await authAPI.getCurrentUser()
   if (user) {
-    const { data: profile } = await userAPI.getCurrentUserProfile()
+    const { data: profile } = await profileAPI.getCurrentUserProfile()
     if (profile?.onboarding_completed) {
       router.push('/dashboard')
     } else {

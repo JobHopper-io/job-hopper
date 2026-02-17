@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { authAPI, supabase } from '@/lib/supabase'
+import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -20,7 +20,9 @@ watch(isAuthenticated, (authenticated) => {
 
 // Listen to auth state changes to update isAuthenticated reactively
 // Use a distinct name to avoid confusion with domain "Subscription" model
-const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
+const {
+  data: { subscription: authListener },
+} = onAuthStateChange((_event, session) => {
   isAuthenticated.value = !!session?.user
 })
 

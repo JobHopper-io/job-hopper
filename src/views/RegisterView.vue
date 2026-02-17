@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
-import { authAPI } from '@/lib/supabase'
+import { authAPI } from '@/lib/auth'
 
 const router = useRouter()
 

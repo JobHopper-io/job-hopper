@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
-import { authAPI, userAPI } from '@/lib/supabase'
+import { authAPI } from '@/lib/auth'
+import { profileAPI } from '@/lib/profile'
 
 const router = useRouter()
 
@@ -50,7 +51,7 @@ const handleLogin = async () => {
     }
 
     // Immediately redirect based on onboarding status to avoid dashboard flash
-    const { data: profile } = await userAPI.getCurrentUserProfile()
+    const { data: profile } = await profileAPI.getCurrentUserProfile()
     router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
   } catch (err) {
     error.value = 'An unexpected error occurred'

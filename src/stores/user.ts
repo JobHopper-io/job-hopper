@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { userAPI, subscriptionAPI } from '@/lib/supabase'
-import type { Profile } from '@/lib/supabase'
-import type { Subscription } from '@/lib/subscription'
+import { profileAPI } from '@/lib/profile'
+import { subscriptionAPI } from '@/lib/subscription'
+import type { User, Organization } from '@/types/database'
 
 export const useUserStore = defineStore('user', () => {
-  const profile = ref<Profile | null>(null)
-  const subscription = ref<Subscription | null>(null)
+  const profile = ref<User | null>(null)
+  const subscription = ref<Organization | null>(null)
   const isLoading = ref(false)
 
   async function loadUserData() {
@@ -14,8 +14,8 @@ export const useUserStore = defineStore('user', () => {
     isLoading.value = true
     try {
       const [profileResult, subscriptionResult] = await Promise.all([
-        userAPI.getCurrentUserProfile(),
-        subscriptionAPI.getCurrentSubscription()
+        profileAPI.getCurrentUserProfile(),
+        subscriptionAPI.getCurrentSubscription(),
       ])
       if (!profileResult.error) profile.value = profileResult.data
       if (!subscriptionResult.error) subscription.value = subscriptionResult.data
@@ -27,7 +27,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function refreshProfile() {
-    const { data, error } = await userAPI.getCurrentUserProfile()
+    const { data, error } = await profileAPI.getCurrentUserProfile()
     if (!error) profile.value = data
   }
 

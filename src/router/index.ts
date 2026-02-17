@@ -3,7 +3,9 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import OnboardingView from '../views/OnboardingView.vue'
-import { authAPI, userAPI } from '@/lib/supabase'
+import { authAPI } from '@/lib/auth'
+import { profileAPI } from '@/lib/profile'
+import type { User } from '@/types/database'
 
 /** Single source of truth for routes that don't require authentication. */
 export const publicPaths = [
@@ -152,12 +154,12 @@ router.beforeEach(async (to) => {
   }
 
   // Helper to fetch user profile (cached within this guard execution to avoid duplicate API calls)
-  let profile: { onboarding_completed?: boolean } | null = null
+  let profile: User | null = null
   const getProfile = async () => {
     if (!user || profile !== null) return profile
 
     try {
-      const { data } = await userAPI.getCurrentUserProfile()
+      const { data } = await profileAPI.getCurrentUserProfile()
       profile = data
     } catch (error) {
       console.error('Error fetching user profile:', error)

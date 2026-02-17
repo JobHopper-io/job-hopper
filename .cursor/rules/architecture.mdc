@@ -1,0 +1,8 @@
+---
+description: Always read and follow docs/architecture.md
+alwaysApply: true
+---
+
+## Architecture – meta rule
+
+- Before making architecture-impacting changes (e.g., data access patterns, module boundaries, or service responsibilities), **read and comply with** `docs/architecture.md`.

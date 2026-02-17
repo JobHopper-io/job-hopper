@@ -1,15 +1,45 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { subscriptionAPI, type JobDetail } from '@/lib/supabase'
-import { type Subscription } from '@/lib/subscription'
+import { subscriptionAPI } from '@/lib/subscription'
+import type { Organization } from '@/types/database'
+
+interface JobHiringContact {
+  name: string
+  title: string
+  location: string
+  note: string
+}
+
+interface JobInterviewPrep {
+  themes: string[]
+  questions_they_might_ask: string[]
+  questions_to_ask: string[]
+}
+
+interface JobDetail {
+  id: string
+  title: string
+  company: string
+  location: string
+  salary_min?: number
+  salary_max?: number
+  overview?: string
+  shift?: string
+  company_size?: string
+  employment_type?: string
+  posted_date?: string
+  match_reasons?: string[]
+  hiring_contacts?: JobHiringContact[]
+  interview_prep?: JobInterviewPrep
+}
 
 const route = useRoute()
 const router = useRouter()
 
 const jobId = route.params.id as string
 const job = ref<JobDetail | null>(null)
-const subscription = ref<Subscription | null>(null)
+const subscription = ref<Organization | null>(null)
 const isLoading = ref(true)
 
 onMounted(async () => {

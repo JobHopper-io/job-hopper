@@ -1,8 +1,9 @@
 ## Database overview (Supabase)
 
-- **Primary schema source**: `src/types/supabase.ts` (Supabase‑generated `Database` type).
+- **Primary schema source**: `src/types/supabase.ts` (Supabase‑generated `Database` type, regenerated via `npm run db:types`).
+- **Convenience type aliases**: `src/types/database.ts` provides shorter type names (`User`, `Organization`, `Client`, etc.) and globally-used custom types (`AddonType`, `Addon`). This file imports from `supabase.ts` and is safe to edit (won't be overwritten when regenerating types).
 - **This document** only captures high‑level entities, relationships, and business rules that are not obvious from raw types.
-- For exact columns, types, and enums, always refer to `src/types/supabase.ts`.
+- For exact columns, types, and enums, always refer to `src/types/supabase.ts`. When writing code, prefer importing convenience aliases from `@/types/database`.
 
 ## Core entities
 

@@ -3,30 +3,8 @@
  * Single source of truth for tier/status enums and their labels/prices.
  */
 
-// --- Types (align with DB enums) ---
-
-export type SubscriptionTier = 'entry_mid' | 'senior_management' | 'director_vp_c_level'
-export type SubscriptionStatus = 'trial' | 'active' | 'cancelled' | 'expired'
-export type AddonType = 'premium_insights' | 'interview_prep' | 'resume_upgrade'
-
-/** Subscription (organizations row / API response). Single source of truth. */
-export interface Subscription {
-  id: string
-  name: string
-  subscription_tier?: SubscriptionTier
-  subscription_status?: SubscriptionStatus
-  trial_ends_at?: string
-  current_period_start?: string
-  current_period_end?: string
-  premium_insights_enabled?: boolean
-  interview_prep_enabled?: boolean
-  resume_upgrade_purchased?: boolean
-  stripe_customer_id?: string
-  stripe_subscription_id?: string
-  stripe_subscription_status?: string
-  created_at: string
-  updated_at: string
-}
+import type { SubscriptionTier, SubscriptionStatus, AddonType, Organization, Addon } from '@/types/database'
+import { supabase } from '@/lib/supabase'
 
 // --- Display maps (internal; used by getters below) ---
 
@@ -91,7 +69,7 @@ function getAddonDisplayName(addon: AddonType, withPrice = false): string {
 const ADDON_KEYS: AddonType[] = ['premium_insights', 'interview_prep', 'resume_upgrade']
 
 function hasAddon(
-  subscription: Subscription | null | undefined,
+  subscription: Organization | null | undefined,
   addonKey: AddonType
 ): boolean {
   if (!subscription) return false
@@ -101,13 +79,8 @@ function hasAddon(
   return false
 }
 
-export interface Addon {
-  key: AddonType
-  label: string
-}
-
 export function getActiveAddons(
-  subscription: Subscription | null | undefined,
+  subscription: Organization | null | undefined,
   withPrice = false
 ): Addon[] {
   if (!subscription) return []
@@ -116,3 +89,141 @@ export function getActiveAddons(
     label: getAddonDisplayName(key, withPrice)
   }))
 }
+
+export const subscriptionAPI = {
+  async createSubscription(tier: SubscriptionTier, trialDays: number = 7) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.rpc('create_subscription_for_user', {
+      user_id: user.id,
+      tier,
+      trial_days: trialDays,
+    })
+
+    return { data, error }
+  },
+
+  async createCheckoutSession(
+    tier: SubscriptionTier,
+    addons?: {
+      premium_insights?: boolean
+      interview_prep?: boolean
+      resume_upgrade?: boolean
+    },
+    successUrl?: string,
+    cancelUrl?: string,
+  ) {
+    const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      body: {
+        tier,
+        addons: addons || {},
+        successUrl:
+          successUrl || `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl || `${window.location.origin}/billing`,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
+  async createBillingPortalSession(returnUrl?: string) {
+    const { data, error } = await supabase.functions.invoke('create-billing-portal', {
+      body: {
+        returnUrl: returnUrl || `${window.location.origin}/billing`,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
+  async getCurrentSubscription() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!userData?.organization_id) {
+      return { data: null, error: null }
+    }
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', userData.organization_id)
+      .single<Organization>()
+
+    return { data, error }
+  },
+
+  async updateSubscriptionTier(newTier: SubscriptionTier) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.rpc('update_subscription_tier', {
+      user_id: user.id,
+      new_tier: newTier,
+    })
+
+    return { data, error }
+  },
+
+  async enableAddon(addonType: AddonType) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.rpc('enable_premium_addon', {
+      user_id: user.id,
+      addon_type: addonType,
+    })
+
+    return { data, error }
+  },
+
+  async cancelSubscription() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!userData?.organization_id) {
+      return { error: new Error('Subscription not found') }
+    }
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ subscription_status: 'cancelled' as Organization['subscription_status'] })
+      .eq('id', userData.organization_id)
+      .select()
+      .single<Organization>()
+
+    return { data, error }
+  },
+}
+

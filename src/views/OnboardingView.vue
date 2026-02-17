@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { subscriptionAPI, profileAPI } from '@/lib/supabase'
-import { getTierDisplayName, getTierPrice, type SubscriptionTier } from '@/lib/subscription'
+import { subscriptionAPI, getTierDisplayName, getTierPrice } from '@/lib/subscription'
+import { profileAPI } from '@/lib/profile'
+import type { SubscriptionTier } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const router = useRouter()
