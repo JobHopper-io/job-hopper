@@ -29,7 +29,6 @@ export type ProfileUserEditable = Pick<
 >
 
 // Re-export commonly used enums with clearer names
-export type UserRole = Enums<"user_role">
 export type SubscriptionTier = Enums<"subscription_tier">
 export type SubscriptionStatus = Enums<"subscription_status">
 export type BdLeadsStatus = Enums<"bd_leads_status">

@@ -71,53 +71,6 @@ export type Database = {
         }
         Relationships: []
       }
-      clients: {
-        Row: {
-          created_at: string | null
-          email: string
-          first_name: string
-          id: string
-          image_bucket_key: string | null
-          last_name: string
-          organization_id: string
-          phone: string | null
-          status: Database["public"]["Enums"]["client_status"]
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          first_name: string
-          id?: string
-          image_bucket_key?: string | null
-          last_name: string
-          organization_id: string
-          phone?: string | null
-          status?: Database["public"]["Enums"]["client_status"]
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          first_name?: string
-          id?: string
-          image_bucket_key?: string | null
-          last_name?: string
-          organization_id?: string
-          phone?: string | null
-          status?: Database["public"]["Enums"]["client_status"]
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "clients_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       enriched_lead: {
         Row: {
           address: string | null
@@ -398,7 +351,6 @@ export type Database = {
           phone_number: string | null
           preferred_locations: string[] | null
           resume_bucket_key: string | null
-          role: Database["public"]["Enums"]["user_role"]
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -421,7 +373,6 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           resume_bucket_key?: string | null
-          role: Database["public"]["Enums"]["user_role"]
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -444,7 +395,6 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           resume_bucket_key?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -589,13 +539,11 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
-      client_status: "prospect" | "lead" | "review" | "proposal" | "client"
       subscription_status: "trial" | "active" | "cancelled" | "expired"
       subscription_tier:
         | "entry_mid"
         | "senior_management"
         | "director_vp_c_level"
-      user_role: "office" | "tc" | "doctor" | "subscriber"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -731,14 +679,12 @@ export const Constants = {
         "Ready for AI Personalization",
         "Invalid Email",
       ],
-      client_status: ["prospect", "lead", "review", "proposal", "client"],
       subscription_status: ["trial", "active", "cancelled", "expired"],
       subscription_tier: [
         "entry_mid",
         "senior_management",
         "director_vp_c_level",
       ],
-      user_role: ["office", "tc", "doctor", "subscriber"],
     },
   },
 } as const

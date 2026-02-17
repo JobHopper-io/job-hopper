@@ -20,7 +20,6 @@
 - **Key relationships**:
   - Many profiles can belong to a single subscription row (`profiles.organization_id` → `organizations.id`; the column name is legacy).
 - **Non‑obvious rules**:
-  - `role` is an enum (`user_role`) which gates behavior/permissions (office, tc, doctor, subscriber).
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
 
 ### job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
