@@ -309,16 +309,10 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           current_period_start: string | null
-          domain: string | null
           id: string
           interview_prep_enabled: boolean | null
-          is_onboarded: boolean | null
-          logo_bucket_key: string | null
-          name: string
           premium_insights_enabled: boolean | null
-          primary_color: string | null
           resume_upgrade_purchased: boolean | null
-          secondary_color: string | null
           stripe_current_period_end: string | null
           stripe_current_period_start: string | null
           stripe_customer_id: string | null
@@ -339,16 +333,10 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
-          domain?: string | null
           id?: string
           interview_prep_enabled?: boolean | null
-          is_onboarded?: boolean | null
-          logo_bucket_key?: string | null
-          name: string
           premium_insights_enabled?: boolean | null
-          primary_color?: string | null
           resume_upgrade_purchased?: boolean | null
-          secondary_color?: string | null
           stripe_current_period_end?: string | null
           stripe_current_period_start?: string | null
           stripe_customer_id?: string | null
@@ -369,16 +357,10 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
-          domain?: string | null
           id?: string
           interview_prep_enabled?: boolean | null
-          is_onboarded?: boolean | null
-          logo_bucket_key?: string | null
-          name?: string
           premium_insights_enabled?: boolean | null
-          primary_color?: string | null
           resume_upgrade_purchased?: boolean | null
-          secondary_color?: string | null
           stripe_current_period_end?: string | null
           stripe_current_period_start?: string | null
           stripe_customer_id?: string | null
@@ -394,81 +376,6 @@ export type Database = {
             | null
           trial_ends_at?: string | null
           updated_at?: string | null
-        }
-        Relationships: []
-      }
-      raw_jobs: {
-        Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
-          created_at: string
-          Description: string | null
-          Extras: string | null
-          id: number
-          Industry: string | null
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
-          "Reason for Apollo": string | null
-        }
-        Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-        }
-        Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-        }
-        Relationships: []
-      }
-      sic_codes: {
-        Row: {
-          csv_industry_code: string | null
-          ewb_industry_code: string | null
-          industry_title: string | null
-        }
-        Insert: {
-          csv_industry_code?: string | null
-          ewb_industry_code?: string | null
-          industry_title?: string | null
-        }
-        Update: {
-          csv_industry_code?: string | null
-          ewb_industry_code?: string | null
-          industry_title?: string | null
         }
         Relationships: []
       }
@@ -552,49 +459,86 @@ export type Database = {
           },
         ]
       }
+      raw_jobs: {
+        Row: {
+          "Apify Actor": string | null
+          "Apify Employee Count": string | null
+          "apollo data": Json | null
+          "Apollo Employee Count": string | null
+          "Apply Link": string | null
+          "Company Name": string | null
+          created_at: string
+          Description: string | null
+          Extras: string | null
+          id: number
+          Industry: string | null
+          "Job Highlights": string | null
+          "Job Title": string | null
+          Location: string | null
+          "Meta Data": string | null
+          "Reason for Apollo": string | null
+        }
+        Insert: {
+          "Apify Actor"?: string | null
+          "Apify Employee Count"?: string | null
+          "apollo data"?: Json | null
+          "Apollo Employee Count"?: string | null
+          "Apply Link"?: string | null
+          "Company Name"?: string | null
+          created_at?: string
+          Description?: string | null
+          Extras?: string | null
+          id?: number
+          Industry?: string | null
+          "Job Highlights"?: string | null
+          "Job Title"?: string | null
+          Location?: string | null
+          "Meta Data"?: string | null
+          "Reason for Apollo"?: string | null
+        }
+        Update: {
+          "Apify Actor"?: string | null
+          "Apify Employee Count"?: string | null
+          "apollo data"?: Json | null
+          "Apollo Employee Count"?: string | null
+          "Apply Link"?: string | null
+          "Company Name"?: string | null
+          created_at?: string
+          Description?: string | null
+          Extras?: string | null
+          id?: number
+          Industry?: string | null
+          "Job Highlights"?: string | null
+          "Job Title"?: string | null
+          Location?: string | null
+          "Meta Data"?: string | null
+          "Reason for Apollo"?: string | null
+        }
+        Relationships: []
+      }
+      sic_codes: {
+        Row: {
+          csv_industry_code: string | null
+          ewb_industry_code: string | null
+          industry_title: string | null
+        }
+        Insert: {
+          csv_industry_code?: string | null
+          ewb_industry_code?: string | null
+          industry_title?: string | null
+        }
+        Update: {
+          csv_industry_code?: string | null
+          ewb_industry_code?: string | null
+          industry_title?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      check_domain_availability: {
-        Args: { domain_to_check: string }
-        Returns: boolean
-      }
-      check_user_belongs_to_organization: {
-        Args: { org_domain: string; user_email: string }
-        Returns: boolean
-      }
-      create_organization_and_link_doctor:
-        | {
-            Args: {
-              logo_bucket_key?: string
-              org_name: string
-              primary_color?: string
-              secondary_color?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              org_domain: string
-              org_logo_bucket_key?: string
-              org_name: string
-              org_primary_color?: string
-              org_secondary_color?: string
-            }
-            Returns: Json
-          }
-      create_organization_and_link_doctor_v2: {
-        Args: {
-          logo_bucket_key?: string
-          org_domain: string
-          org_name: string
-          primary_color?: string
-          secondary_color?: string
-        }
-        Returns: Json
-      }
       create_subscription_for_user: {
         Args: {
           tier: Database["public"]["Enums"]["subscription_tier"]
@@ -603,47 +547,32 @@ export type Database = {
         }
         Returns: string
       }
-      create_user_profile_and_organization:
-        | {
-            Args: {
-              booking_link?: string
-              first_name: string
-              last_name: string
-              org_domain?: string
-              org_name?: string
-              user_email: string
-              user_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              booking_link?: string
-              first_name: string
-              last_name: string
-              org_domain?: string
-              org_name?: string
-              phone_number?: string
-              user_email: string
-              user_id: string
-            }
-            Returns: Json
-          }
+      create_user_profile: {
+        Args: {
+          first_name: string
+          last_name: string
+          phone_number?: string
+          user_email: string
+          user_id: string
+        }
+        Returns: Json
+      }
+      create_user_profile_and_organization: {
+        Args: {
+          booking_link?: string
+          first_name: string
+          last_name: string
+          org_domain?: string
+          org_name?: string
+          user_email: string
+          user_id: string
+        }
+        Returns: Json
+      }
       enable_premium_addon: {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
-      get_current_user_organization: { Args: never; Returns: Json }
-      get_current_user_organization_id: { Args: never; Returns: string }
-      get_organization_by_domain: {
-        Args: { domain_name: string }
-        Returns: Json
-      }
-      get_organization_by_domain_public: {
-        Args: { domain_name: string }
-        Returns: Json
-      }
-      mark_organization_onboarded: { Args: never; Returns: Json }
       update_subscription_tier: {
         Args: {
           new_tier: Database["public"]["Enums"]["subscription_tier"]
@@ -651,11 +580,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      user_belongs_to_organization: {
-        Args: { org_id: string }
-        Returns: boolean
-      }
-      user_needs_onboarding: { Args: never; Returns: boolean }
     }
     Enums: {
       bd_leads_status:

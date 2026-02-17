@@ -8,29 +8,29 @@
 ## Core entities
 
 ### organizations
-- **Meaning**: A customer organization (e.g. clinic/company) that subscribes to the product.
+- **Meaning**: The table is used only for **subscription and billing** (one row per subscription).
 - **Key relationships**:
-  - One organization can have many `profiles` (via `profiles.organization_id`).
-  - One organization can have many `clients` (via `clients.organization_id`).
+  - One row can have many `profiles` (via `profiles.organization_id`).
+  - One row can have many `clients` (via `clients.organization_id`).
 - **Non‑obvious rules**:
   - Subscription state is tracked via `subscription_status` and `subscription_tier` enums (see `Database["public"]["Enums"]` in `supabase.ts`).
   - Stripe‑related fields (`stripe_*`) and `trial_ends_at` coordinate billing and trial periods; app logic should keep these consistent.
 
 ### profiles
-- **Meaning**: End-user profiles for the app; each profile belongs to an organization and uses job‑hopping features.
+- **Meaning**: End-user profiles for the app; each profile is linked to a subscription (billing) row and uses job‑hopping features.
 - **Key relationships**:
-  - Many profiles can belong to a single `organization` (`profiles.organization_id` → `organizations.id`).
+  - Many profiles can belong to a single subscription row (`profiles.organization_id` → `organizations.id`; the column name is legacy).
 - **Non‑obvious rules**:
   - `role` is an enum (`user_role`) which gates behavior/permissions (office, tc, doctor, subscriber).
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
 
 ### clients
-- **Meaning**: Client records owned by an organization (e.g. patients/customers).
+- **Meaning**: Client records linked to a subscription (billing) row.
 - **Key relationships**:
-  - Each client belongs to exactly one `organization` (`clients.organization_id` → `organizations.id`).
+  - Each client belongs to exactly one subscription row (`clients.organization_id` → `organizations.id`; the column name is legacy).
 - **Non‑obvious rules**:
   - `status` is an enum (`client_status`) encoding the lifecycle: `prospect → lead → review → proposal → client`.
-  - Email is the primary identifier used in the app to contact a client; avoid creating multiple active clients with the same email under a single organization unless explicitly intended.
+  - Email is the primary identifier used in the app to contact a client; avoid creating multiple active clients with the same email under a single subscription unless explicitly intended.
 
 ### job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
 - **Meaning**: Various tables representing job postings, lead enrichment, and exclusions for outreach/processing pipelines.
