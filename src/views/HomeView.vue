@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useAnimations } from '@/composables/useAnimations'
@@ -8,9 +7,8 @@ import { useScrollReveal } from '@/composables/useScrollReveal'
 
 gsap.registerPlugin(ScrollTrigger)
 
-const router = useRouter()
-const { textReveal, fadeInUp, scaleIn, float, pulse, parallax, rotate3D, counterAnimation } = useAnimations()
-const { revealOnScroll, staggerReveal, parallaxScroll, scaleOnScroll } = useScrollReveal()
+const { textReveal, fadeInUp, float, pulse, counterAnimation } = useAnimations()
+const { revealOnScroll, staggerReveal, parallaxScroll } = useScrollReveal()
 
 const heroRef = ref<HTMLElement>()
 const heroTitleRef = ref<HTMLElement>()
@@ -321,7 +319,6 @@ onMounted(() => {
   
   // Testimonials
   startTestimonialCarousel()
-  const testimonialCards = document.querySelectorAll('.testimonial-card')
   staggerReveal('.testimonials-grid', '.testimonial-card', {
     direction: 'up',
     distance: 50,

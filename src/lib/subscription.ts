@@ -153,20 +153,20 @@ export const subscriptionAPI = {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
-    const { data: userData } = await supabase
-      .from('users')
+    const { data: profileData } = await supabase
+      .from('profiles')
       .select('organization_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!userData?.organization_id) {
+    if (!profileData?.organization_id) {
       return { data: null, error: null }
     }
 
     const { data, error } = await supabase
       .from('organizations')
       .select('*')
-      .eq('id', userData.organization_id)
+      .eq('id', profileData.organization_id)
       .single<Organization>()
 
     return { data, error }
@@ -206,20 +206,20 @@ export const subscriptionAPI = {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
-    const { data: userData } = await supabase
-      .from('users')
+    const { data: profileData } = await supabase
+      .from('profiles')
       .select('organization_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!userData?.organization_id) {
+    if (!profileData?.organization_id) {
       return { error: new Error('Subscription not found') }
     }
 
     const { data, error } = await supabase
       .from('organizations')
       .update({ subscription_status: 'cancelled' as Organization['subscription_status'] })
-      .eq('id', userData.organization_id)
+      .eq('id', profileData.organization_id)
       .select()
       .single<Organization>()
 

@@ -472,7 +472,7 @@ export type Database = {
         }
         Relationships: []
       }
-      users: {
+      profiles: {
         Row: {
           auth_user_id: string | null
           created_at: string | null
@@ -544,7 +544,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "users_organization_id_fkey"
+            foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

@@ -1,23 +1,8 @@
 import { supabase } from '@/lib/supabase'
-import type { User, UserUpdate } from '@/types/database'
-
-type ProfileUpdate = Pick<
-  UserUpdate,
-  | 'first_name'
-  | 'last_name'
-  | 'current_job_title'
-  | 'years_of_experience'
-  | 'current_industry'
-  | 'target_role_categories'
-  | 'desired_salary_min'
-  | 'desired_salary_max'
-  | 'preferred_locations'
-  | 'open_to_relocation'
-  | 'open_to_remote'
->
+import type { Profile, ProfileUpdate, ProfileUserEditable } from '@/types/database'
 
 export const profileAPI = {
-  async getCurrentUserProfile(): Promise<{ data: User | null; error: Error | null }> {
+  async getCurrentUserProfile(): Promise<{ data: Profile | null; error: Error | null }> {
     const {
       data: { user },
       error: authError,
@@ -28,15 +13,15 @@ export const profileAPI = {
     }
 
     const { data, error } = await supabase
-      .from('users')
+      .from('profiles')
       .select('*')
       .eq('auth_user_id', user.id)
-      .single<User>()
+      .single<Profile>()
 
     return { data: data ?? null, error }
   },
 
-  async updateProfile(profileData: ProfileUpdate) {
+  async updateProfile(profileData: ProfileUserEditable) {
     const {
       data: { user },
       error: authError,
@@ -46,11 +31,11 @@ export const profileAPI = {
     }
 
     const { data, error } = await supabase
-      .from('users')
+      .from('profiles')
       .update(profileData)
       .eq('auth_user_id', user.id)
       .select()
-      .single<User>()
+      .single<Profile>()
 
     return { data, error }
   },
@@ -61,14 +46,14 @@ export const profileAPI = {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('Not authenticated')
 
-    const { data: existingUser } = await supabase
-      .from('users')
+    const { data: existingProfile } = await supabase
+      .from('profiles')
       .select('resume_bucket_key')
       .eq('auth_user_id', user.id)
       .single<{ resume_bucket_key: string | null }>()
 
-    if (existingUser?.resume_bucket_key) {
-      await supabase.storage.from('resumes').remove([existingUser.resume_bucket_key])
+    if (existingProfile?.resume_bucket_key) {
+      await supabase.storage.from('resumes').remove([existingProfile.resume_bucket_key])
     }
 
     const fileExt = file.name.split('.').pop()
@@ -84,19 +69,19 @@ export const profileAPI = {
       return { data: null, error: uploadError }
     }
 
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .update({ resume_bucket_key: filePath } satisfies Pick<UserUpdate, 'resume_bucket_key'>)
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .update({ resume_bucket_key: filePath } satisfies Pick<ProfileUpdate, 'resume_bucket_key'>)
       .eq('auth_user_id', user.id)
       .select()
-      .single<User>()
+      .single<Profile>()
 
-    if (userError) {
-      return { data: null, error: userError }
+    if (profileError || !profileData) {
+      return { data: null, error: profileError ?? new Error('Profile update returned no data') }
     }
 
     return {
-      data: { ...userData, resume_url: uploadData.path },
+      data: { ...profileData, resume_url: uploadData.path },
       error: null as Error | null,
     }
   },
@@ -116,11 +101,11 @@ export const profileAPI = {
     if (!user) throw new Error('Not authenticated')
 
     const { data, error } = await supabase
-      .from('users')
-      .update({ onboarding_completed: true } satisfies Pick<UserUpdate, 'onboarding_completed'>)
+      .from('profiles')
+      .update({ onboarding_completed: true } satisfies Pick<ProfileUpdate, 'onboarding_completed'>)
       .eq('auth_user_id', user.id)
       .select()
-      .single<User>()
+      .single<Profile>()
 
     return { data, error }
   },
@@ -132,12 +117,12 @@ export const profileAPI = {
 
     if (!error && data.user) {
       const { error: updateError } = await supabase
-        .from('users')
-        .update({ email: newEmail } satisfies Pick<UserUpdate, 'email'>)
+        .from('profiles')
+        .update({ email: newEmail } satisfies Pick<ProfileUpdate, 'email'>)
         .eq('auth_user_id', data.user.id)
 
       if (updateError) {
-        console.error('Error updating email in users table:', updateError)
+        console.error('Error updating email in profiles table:', updateError)
       }
     }
 
@@ -151,11 +136,11 @@ export const profileAPI = {
     if (!user) throw new Error('Not authenticated')
 
     const { data, error } = await supabase
-      .from('users')
-      .update({ phone_number: phoneNumber } satisfies Pick<UserUpdate, 'phone_number'>)
+      .from('profiles')
+      .update({ phone_number: phoneNumber } satisfies Pick<ProfileUpdate, 'phone_number'>)
       .eq('auth_user_id', user.id)
       .select()
-      .single<User>()
+      .single<Profile>()
 
     return { data, error }
   },

@@ -1,4 +1,3 @@
-import { onMounted, onUnmounted, type Ref } from 'vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 

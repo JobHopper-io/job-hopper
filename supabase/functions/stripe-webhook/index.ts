@@ -43,10 +43,18 @@ serve(async (req) => {
         }
 
         // Update subscription status
-        const updates: any = {
+        const updates: {
+          subscription_status: string
+          stripe_subscription_id: string | null
+          stripe_subscription_status: string
+          subscription_tier?: string
+          premium_insights_enabled?: boolean
+          interview_prep_enabled?: boolean
+          resume_upgrade_purchased?: boolean
+        } = {
           subscription_status: 'active',
-          stripe_subscription_id: session.subscription as string || null,
-          stripe_subscription_status: session.payment_status,
+          stripe_subscription_id: (session.subscription as string) ?? null,
+          stripe_subscription_status: session.payment_status ?? 'unknown',
         }
 
         if (tier) {
@@ -84,7 +92,12 @@ serve(async (req) => {
           .single()
 
         if (orgData) {
-          const updates: any = {
+          const updates: {
+            stripe_subscription_status: string
+            current_period_start: string
+            current_period_end: string
+            subscription_status?: string
+          } = {
             stripe_subscription_status: subscription.status,
             current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),

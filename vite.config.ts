@@ -1,17 +1,18 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 // https://vite.dev/config/
-export default defineConfig(async ({ command, mode }) => {
-  const plugins: any[] = [vue()]
+export default defineConfig(async ({ command }) => {
+  const plugins: PluginOption[] = [vue()]
   
   // Dev-only: avoid build errors if optional Vue DevTools plugin is missing.
   if (command === 'serve') {
     try {
       const vueDevTools = (await import('vite-plugin-vue-devtools')).default
-      plugins.push(vueDevTools())
+      const devToolsPlugin = vueDevTools()
+      if (devToolsPlugin) plugins.push(devToolsPlugin)
     } catch (e) {
       console.warn('Vue DevTools plugin skipped', e)
     }
