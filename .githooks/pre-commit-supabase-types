@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] Regenerating Supabase types (src/types/supabase.ts)..."
+
+supabase gen types typescript --schema public > src/types/supabase.ts
+
+if ! git diff --quiet -- src/types/supabase.ts; then
+  echo
+  echo "src/types/supabase.ts was updated by the Supabase types generator."
+  echo "Please add the updated file to your commit:"
+  echo "  git add src/types/supabase.ts"
+  echo
+  exit 1
+fi
+
+echo "[pre-commit] Supabase types are up to date."
+

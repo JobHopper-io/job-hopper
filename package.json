@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "lint": "eslint . --fix"
+    "lint": "eslint . --fix",
+    "db:types": "supabase gen types typescript --schema public > src/types/supabase.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

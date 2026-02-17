@@ -1,0 +1,58 @@
+---
+description: How to understand and use the database schema with Supabase-generated types
+alwaysApply: true
+---
+
+## Database schema & Supabase types
+
+This project uses Supabase as its primary database. The **canonical description of the schema** for AI assistance and for most developer workflows comes from **generated TypeScript types**, not from scanning migrations.
+
+### Primary source – Supabase-generated types
+
+- **File**: `src/types/supabase.ts`
+- **What it contains**:
+  - The `Database` type for the `public` schema, including:
+    - All tables, views, and their columns
+    - Column types and nullability
+    - Enums such as `user_role`, `subscription_status`, `subscription_tier`, `client_status`, `bd_leads_status`
+  - Helper utility types (`Tables`, `TablesInsert`, `TablesUpdate`, `Enums`, etc.).
+- **How to use it**:
+  - When you need to know **what tables/columns exist**, or **what types they have**, **read this file first**.
+  - When generating queries or Supabase client calls, prefer using these types (e.g. `Tables<"users">`) as the source of truth.
+
+### Secondary source – business-level overview
+
+- **File**: `docs/db-schema-summary.md`
+- **What it contains**:
+  - High-level explanations of **core entities** (for example `organizations`, `users`, `clients`, and job/lead tables).
+  - Important **relationships** between entities (one-to-many, many-to-one).
+  - **Business rules and invariants** that are not obvious from raw column types (e.g. lifecycle enums, subscription semantics, meaning of “exclusion” rows).
+- **How to use it**:
+  - Read this document to understand **conceptual relationships** and **business meaning** of the tables described in `src/types/supabase.ts`.
+  - Do **not** repeat column-level details here; those are already available in the generated types.
+
+### Migrations and historical changes
+
+- Migrations are **not** the primary source for understanding the current schema.
+- Do **not** scan all migrations just to infer table shapes or columns; instead:
+  - Use `src/types/supabase.ts` for the up-to-date schema.
+  - Use `docs/db-schema-summary.md` for conceptual relationships and business rules.
+- Only read migrations when:
+  - The user specifically asks about **historical changes**, or
+  - You need to explain a particular migration or schema evolution step.
+
+### Expected behavior for AI assistants
+
+When you need to reason about the database, follow this order:
+
+1. Open `src/types/supabase.ts`:
+   - Locate the relevant table(s) under `Database["public"]["Tables"]`.
+   - Use the `Row`, `Insert`, and `Update` types to understand available fields and types.
+   - Check enums under `Database["public"]["Enums"]` or `Constants.public.Enums`.
+2. Open `docs/db-schema-summary.md`:
+   - Read the `Core entities` section for the tables you are using.
+   - Capture the business meaning and relationships that must be respected when reading/writing data.
+3. Only if needed, scan migrations:
+   - For historical questions or specific migration logic, inspect migrations as requested.
+   - Otherwise, assume the generated types represent the effective, current schema.
+
