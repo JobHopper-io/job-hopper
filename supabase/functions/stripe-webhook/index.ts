@@ -77,6 +77,12 @@ serve(async (req) => {
           .update(updates)
           .eq('id', subscriptionId)
 
+        // Mark onboarding complete so user is considered onboarded even if they close the tab before the success URL loads
+        await supabaseAdmin
+          .from('profiles')
+          .update({ onboarding_completed: true })
+          .eq('auth_user_id', userId)
+
         break
       }
 

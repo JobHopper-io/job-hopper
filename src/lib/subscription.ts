@@ -116,6 +116,8 @@ export const subscriptionAPI = {
     successUrl?: string,
     cancelUrl?: string,
   ) {
+    // Supabase automatically includes the auth header when using an authenticated client
+    // No need to manually pass Authorization header
     const { data, error } = await supabase.functions.invoke('create-checkout-session', {
       body: {
         tier,

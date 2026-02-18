@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { subscriptionAPI, getTierDisplayName, getTierPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
 import type { SubscriptionTier } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
-
-const router = useRouter()
 
 // Steps: 1=About, 2=Targets, 3=Resume, 4=Plan
 const currentStep = ref(1)
@@ -116,7 +113,7 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 
 // Note: Authentication and onboarding redirects are handled in router guard
 
-const handleCompleteOnboarding = async () => {
+const handleProceedToCheckout = async () => {
   try {
     isLoading.value = true
     error.value = ''
@@ -129,7 +126,7 @@ const handleCompleteOnboarding = async () => {
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
       desired_salary_min: desiredSalaryMin.value ?? undefined,
-      desired_salary_max: desiredSalaryMax.value || undefined,
+      desired_salary_max: desiredSalaryMax.value ?? undefined,
       preferred_locations: preferredLocation.value ? [preferredLocation.value] : undefined,
       open_to_relocation: openToRelocation.value,
       open_to_remote: openToRemote.value
@@ -147,32 +144,53 @@ const handleCompleteOnboarding = async () => {
       }
     }
 
-    if (selectedTier.value) {
-      try {
-        await subscriptionAPI.createSubscription(selectedTier.value, 7)
-        if (premiumInsights.value) {
-          await subscriptionAPI.enableAddon('premium_insights')
-        }
-        if (interviewPrep.value) {
-          await subscriptionAPI.enableAddon('interview_prep')
-        }
-        if (resumeUpgrade.value) {
-          await subscriptionAPI.enableAddon('resume_upgrade')
-        }
-      } catch (subError) {
-        console.error('Error creating subscription:', subError)
-        error.value = 'Account created but subscription setup failed. Please contact support.'
-        return
-      }
+    if (!selectedTier.value) {
+      error.value = 'Please select a plan to continue.'
+      return
     }
 
     try {
-      await profileAPI.markOnboardingComplete()
-    } catch (onboardError) {
-      console.error('Error marking onboarding complete:', onboardError)
+      await subscriptionAPI.createSubscription(selectedTier.value, 7)
+      if (premiumInsights.value) {
+        await subscriptionAPI.enableAddon('premium_insights')
+      }
+      if (interviewPrep.value) {
+        await subscriptionAPI.enableAddon('interview_prep')
+      }
+      if (resumeUpgrade.value) {
+        await subscriptionAPI.enableAddon('resume_upgrade')
+      }
+    } catch (subError) {
+      console.error('Error creating subscription:', subError)
+      error.value = 'Account created but subscription setup failed. Please contact support.'
+      return
     }
 
-    router.push('/dashboard')
+    const successUrl = `${window.location.origin}/onboarding/complete?session_id={CHECKOUT_SESSION_ID}`
+    const cancelUrl = `${window.location.origin}/onboarding`
+
+    const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
+      selectedTier.value,
+      {
+        premium_insights: premiumInsights.value,
+        interview_prep: interviewPrep.value,
+        resume_upgrade: resumeUpgrade.value
+      },
+      successUrl,
+      cancelUrl
+    )
+
+    if (checkoutError) {
+      error.value = 'Unable to start checkout. Please try again.'
+      console.error('Checkout session error:', checkoutError)
+      return
+    }
+
+    if (data?.url) {
+      window.location.href = data.url
+    } else {
+      error.value = 'Unable to start checkout. Please try again.'
+    }
   } catch (err) {
     error.value = (err as Error).message || 'An unexpected error occurred'
     console.error('Onboarding error:', err)
@@ -543,13 +561,13 @@ const handleCompleteOnboarding = async () => {
           </button>
           <button
             v-else
-            @click="handleCompleteOnboarding"
+            @click="handleProceedToCheckout"
             type="button"
             :disabled="!canProceedStep4 || isLoading"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span v-if="isLoading">Starting trial...</span>
-            <span v-else>Start my free trial</span>
+            <span v-if="isLoading">Redirecting to checkout...</span>
+            <span v-else>Proceed to checkout</span>
           </button>
         </div>
       </div>

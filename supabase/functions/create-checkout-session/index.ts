@@ -77,7 +77,11 @@ serve(async (req) => {
       director_vp_c_level: 4900, // $49/month
     }
 
-    const basePrice = priceMap[tier] || 1900
+    const basePrice = priceMap[tier]
+    
+    if (!basePrice) {
+      throw new Error('Invalid tier')
+    }
 
     // Build line items
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
@@ -164,11 +168,12 @@ serve(async (req) => {
     }
 
     // Create checkout session
+    // Stripe Checkout supports both recurring and one-time line items in subscription mode.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: lineItems,
-      mode: addons?.resume_upgrade ? 'payment' : 'subscription',
+      mode: 'subscription',
       success_url: successUrl || `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing`,
       metadata: {
@@ -177,7 +182,7 @@ serve(async (req) => {
         tier,
         addons: JSON.stringify(addons || {}),
       },
-      subscription_data: addons?.resume_upgrade ? undefined : {
+      subscription_data: {
         metadata: {
           user_id: user.id,
           subscription_id: subscription.id,
