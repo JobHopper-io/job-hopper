@@ -14,6 +14,7 @@ const showConfirmPassword = ref(false)
 
 const isLoading = ref(false)
 const error = ref('')
+const emailAlreadyUsed = ref(false)
 
 const validateEmail = (value: string) => {
   if (!value.trim()) return null
@@ -40,12 +41,20 @@ const canProceedStep1 = computed(() => {
   return (
     email.value &&
     !emailValidationError.value &&
+    !emailAlreadyUsed.value &&
     password.value &&
     !passwordValidationError.value &&
     confirmPassword.value &&
     passwordsMatch.value
   )
 })
+
+function clearEmailAlreadyUsed() {
+  if (emailAlreadyUsed.value) {
+    emailAlreadyUsed.value = false
+    error.value = ''
+  }
+}
 
 
 const handleCreateAccount = async () => {
@@ -79,9 +88,20 @@ const handleCreateAccount = async () => {
         return
       }
 
-      // Common auth/validation cases
-      if (status === 400 || status === 422) {
-        // Supabase often returns helpful messages for these; surface them but keep wording friendly.
+      // Email already registered: show friendly message and block continue until email is changed
+      const isAlreadyRegistered =
+        msg.toLowerCase().includes('already registered') ||
+        msg.toLowerCase().includes('already been registered') ||
+        (typeof authErr.code === 'string' && authErr.code.toLowerCase().includes('already'))
+      if (isAlreadyRegistered || status === 422) {
+        emailAlreadyUsed.value = true
+        error.value =
+          'This email is already registered. Please sign in or use a different email address.'
+        return
+      }
+
+      // Other auth/validation cases (e.g. 400)
+      if (status === 400) {
         error.value =
           details ||
           msg ||
@@ -98,6 +118,14 @@ const handleCreateAccount = async () => {
     }
     if (!signUpData.user) {
       error.value = 'Account creation failed. Please try again.'
+      return
+    }
+    // Supabase often returns success for duplicate email but with empty identities
+    const identities = signUpData.user.identities ?? []
+    if (identities.length === 0) {
+      emailAlreadyUsed.value = true
+      error.value =
+        'This email is already registered. Please sign in or use a different email address.'
       return
     }
     if (!signUpData.session && signUpData.user) {
@@ -134,6 +162,7 @@ const handleCreateAccount = async () => {
               required
               class="input"
               placeholder="your.email@example.com"
+              @input="clearEmailAlreadyUsed"
             />
             <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
               {{ emailValidationError }}
