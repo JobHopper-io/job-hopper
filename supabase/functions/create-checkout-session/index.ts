@@ -183,6 +183,7 @@ serve(async (req) => {
         addons: JSON.stringify(addons || {}),
       },
       subscription_data: {
+        trial_period_days: 7,
         metadata: {
           user_id: user.id,
           subscription_id: subscription.id,
