@@ -28,6 +28,33 @@ const resumeFile = ref<File | null>(null)
 const resumeFileName = ref('')
 const resumeUploading = ref(false)
 const resumeError = ref('')
+const resumeLoadError = ref<string | null>(null)
+const resumeUrlLoading = ref(false)
+
+async function fetchResumeUrl(key: string): Promise<void> {
+  resumeLoadError.value = null
+  resumeUrlLoading.value = true
+  try {
+    const { data: url, error } = await profileAPI.getResumeDownloadUrl(key)
+    if (props.resumeBucketKey !== key) return
+    if (error) {
+      console.error('Resume load error:', error)
+      resumeLoadError.value = "We couldn't load your resume. Try again or upload a new file."
+      resumeViewUrl.value = null
+    } else {
+      resumeViewUrl.value = url || null
+    }
+  } finally {
+    if (props.resumeBucketKey === key) {
+      resumeUrlLoading.value = false
+    }
+  }
+}
+
+function retryLoadResume() {
+  const key = props.resumeBucketKey
+  if (key) fetchResumeUrl(key)
+}
 
 // Load resume view URL when resumeBucketKey changes (only set URL if key unchanged after fetch)
 watch(
@@ -35,12 +62,11 @@ watch(
   async (key) => {
     if (!key) {
       resumeViewUrl.value = null
+      resumeLoadError.value = null
+      resumeUrlLoading.value = false
       return
     }
-    const { data: url } = await profileAPI.getResumeDownloadUrl(key)
-    if (props.resumeBucketKey === key) {
-      resumeViewUrl.value = url || null
-    }
+    await fetchResumeUrl(key)
   },
   { immediate: true }
 )
@@ -62,25 +88,24 @@ const handleResumeFileChange = async (event: Event) => {
       resumeUploading.value = true
       const { data, error } = await profileAPI.uploadResume(file)
       if (error) {
-        resumeError.value = error.message || 'Upload failed'
-        emit('error', resumeError.value)
+        console.error('Resume upload error:', error)
+        resumeError.value = "We couldn't upload your resume. Please try again."
+        emit('error', error.message ?? String(error))
         return
       }
       if (data) {
         await userStore.refreshProfile()
         const bucketKey = data.resume_bucket_key
-        if (bucketKey) {
-          const { data: url } = await profileAPI.getResumeDownloadUrl(bucketKey)
-          resumeViewUrl.value = url || null
-        }
+        if (bucketKey) await fetchResumeUrl(bucketKey)
         resumeFile.value = null
         resumeFileName.value = ''
         target.value = ''
         emit('uploaded')
       }
     } catch (e) {
-      resumeError.value = e instanceof Error ? e.message : 'Upload failed'
-      emit('error', resumeError.value)
+      console.error('Resume upload error:', e)
+      resumeError.value = "We couldn't upload your resume. Please try again."
+      emit('error', e instanceof Error ? e.message : String(e))
     } finally {
       resumeUploading.value = false
     }
@@ -95,7 +120,18 @@ const handleResumeFileChange = async (event: Event) => {
   <div class="space-y-4">
     <div v-if="hasResume" class="mb-4">
       <p class="text-sm font-medium text-brand-charcoal mb-2">Your current resume</p>
+      <template v-if="resumeLoadError">
+        <p class="text-sm text-red-600 mb-2">{{ resumeLoadError }}</p>
+        <button
+          type="button"
+          class="text-brand-primary font-medium hover:underline text-sm"
+          @click="retryLoadResume"
+        >
+          Try again
+        </button>
+      </template>
       <a
+        v-else
         :href="resumeViewUrl || '#'"
         target="_blank"
         rel="noopener noreferrer"

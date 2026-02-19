@@ -31,6 +31,14 @@ function populateFromProfile() {
   openToRelocation.value = p.open_to_relocation ?? false
   openToRemote.value = p.open_to_remote ?? false
 
+  currentStep.value = getFirstIncompleteStep()
+}
+
+function getFirstIncompleteStep(): number {
+  if (!canProceedStep1.value) return 1
+  if (!canProceedStep2.value) return 2
+  if (!userStore.profile?.resume_bucket_key) return 3
+  return 4
 }
 
 onMounted(() => {
