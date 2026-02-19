@@ -8,6 +8,8 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 })
 
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
+// Use Web Crypto in Deno so constructEventAsync runs without Node-style microtasks.
+const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
 serve(async (req) => {
   const signature = req.headers.get('stripe-signature')
@@ -18,7 +20,13 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    const event = await stripe.webhooks.constructEventAsync(
+      body,
+      signature,
+      webhookSecret,
+      undefined,
+      cryptoProvider
+    )
 
     // Create Supabase admin client
     const supabaseAdmin = createClient(
@@ -100,13 +108,21 @@ serve(async (req) => {
         if (orgData) {
           const updates: {
             stripe_subscription_status: string
-            current_period_start: string
-            current_period_end: string
+            current_period_start?: string
+            current_period_end?: string
             subscription_status?: string
           } = {
             stripe_subscription_status: subscription.status,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          }
+
+          // Period may be missing on subscription root in some events; fall back to first item's period
+          const periodStart = subscription.current_period_start ?? subscription.items?.data?.[0]?.current_period_start
+          const periodEnd = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end
+          if (typeof periodStart === 'number' && Number.isFinite(periodStart)) {
+            updates.current_period_start = new Date(periodStart * 1000).toISOString()
+          }
+          if (typeof periodEnd === 'number' && Number.isFinite(periodEnd)) {
+            updates.current_period_end = new Date(periodEnd * 1000).toISOString()
           }
 
           if (event.type === 'customer.subscription.deleted' || subscription.status === 'canceled') {
