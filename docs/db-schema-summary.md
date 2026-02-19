@@ -21,6 +21,7 @@
   - Many profiles can belong to a single subscription row (`profiles.subscription_id` → `subscriptions.id`).
 - **Non‑obvious rules**:
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
+  - Phone number is stored on profiles and must be unique (normalized to digits for comparison).
 
 ### job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
 - **Meaning**: Various tables representing job postings, lead enrichment, and exclusions for outreach/processing pipelines.

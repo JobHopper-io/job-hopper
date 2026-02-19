@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { onClickOutside } from '@vueuse/core'
 import type { AuthError } from '@supabase/supabase-js'
-import { authAPI } from '@/lib/auth'
+import { authAPI, DEFAULT_PHONE_COUNTRY, getPhoneCountryOptions, validatePhoneNumber } from '@/lib/auth'
+import type { CountryCode } from 'libphonenumber-js'
 
 const router = useRouter()
 
+const phoneCountryOptions = getPhoneCountryOptions()
 const email = ref('')
+const phone = ref('')
+const phoneCountry = ref<CountryCode>(DEFAULT_PHONE_COUNTRY)
+const phoneCountryOpen = ref(false)
+const phoneCountryDropdownRef = ref<HTMLElement | null>(null)
+
+const selectedPhoneCountryOption = computed(
+  () => phoneCountryOptions.find((o) => o.value === phoneCountry.value) ?? phoneCountryOptions[0],
+)
+const selectedCountryCodeDisplay = computed(() => `+${selectedPhoneCountryOption.value.callingCode}`)
+
+onClickOutside(phoneCountryDropdownRef, () => {
+  phoneCountryOpen.value = false
+})
 const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
@@ -15,6 +31,7 @@ const showConfirmPassword = ref(false)
 const isLoading = ref(false)
 const error = ref('')
 const emailAlreadyUsed = ref(false)
+const phoneAlreadyUsed = ref(false)
 
 const validateEmail = (value: string) => {
   if (!value.trim()) return null
@@ -23,6 +40,11 @@ const validateEmail = (value: string) => {
     return 'Please enter a valid email address'
   }
   return null
+}
+
+const validatePhone = (value: string) => {
+  const result = validatePhoneNumber(value, phoneCountry.value)
+  return result.valid ? null : result.error ?? 'Please enter a valid phone number'
 }
 
 const validatePassword = (password: string) => {
@@ -34,6 +56,7 @@ const validatePassword = (password: string) => {
 }
 
 const emailValidationError = computed(() => validateEmail(email.value))
+const phoneValidationError = computed(() => validatePhone(phone.value))
 const passwordValidationError = computed(() => validatePassword(password.value))
 const passwordsMatch = computed(() => password.value === confirmPassword.value)
 
@@ -42,6 +65,9 @@ const canProceedStep1 = computed(() => {
     email.value &&
     !emailValidationError.value &&
     !emailAlreadyUsed.value &&
+    phone.value &&
+    !phoneValidationError.value &&
+    !phoneAlreadyUsed.value &&
     password.value &&
     !passwordValidationError.value &&
     confirmPassword.value &&
@@ -56,19 +82,45 @@ function clearEmailAlreadyUsed() {
   }
 }
 
+function clearPhoneAlreadyUsed() {
+  if (phoneAlreadyUsed.value) {
+    phoneAlreadyUsed.value = false
+    error.value = ''
+  }
+}
+
 
 const handleCreateAccount = async () => {
   if (!canProceedStep1.value) return
   try {
     isLoading.value = true
     error.value = ''
+    const phoneValidation = validatePhoneNumber(phone.value, phoneCountry.value)
+    if (!phoneValidation.valid || !phoneValidation.normalized) {
+      error.value = phoneValidation.error ?? 'Please enter a valid phone number'
+      return
+    }
+    const normalizedPhone = phoneValidation.normalized
+
+    const { available, error: checkError } = await authAPI.checkPhoneAvailable(normalizedPhone)
+    if (checkError) {
+      error.value = 'We couldn’t check phone availability. Please try again.'
+      return
+    }
+    if (!available) {
+      phoneAlreadyUsed.value = true
+      error.value =
+        'This phone number is already registered. Please sign in or use a different phone number.'
+      return
+    }
+
     const redirectTo = `${window.location.origin}/onboarding`
     const { data: signUpData, error: signUpError } = await authAPI.signUp(
       email.value,
       password.value,
       '',
       '',
-      undefined,
+      normalizedPhone,
       redirectTo
     )
     if (signUpError) {
@@ -166,6 +218,60 @@ const handleCreateAccount = async () => {
             />
             <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
               {{ emailValidationError }}
+            </div>
+          </div>
+
+          <div>
+            <label for="phone" class="block text-sm font-medium text-brand-charcoal mb-2">Phone number</label>
+            <div class="flex gap-2" ref="phoneCountryDropdownRef">
+              <div class="relative shrink-0">
+                <button
+                  type="button"
+                  :aria-label="`Country code: ${selectedCountryCodeDisplay}`"
+                  aria-haspopup="listbox"
+                  :aria-expanded="phoneCountryOpen"
+                  aria-controls="phone-country-listbox"
+                  id="phone-country"
+                  class="input flex items-center gap-1 min-w-[4.5rem] pr-8"
+                  @click="phoneCountryOpen = !phoneCountryOpen"
+                >
+                  <span>{{ selectedCountryCodeDisplay }}</span>
+                  <svg class="absolute right-2.5 h-4 w-4 text-neutral-body pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <ul
+                  v-show="phoneCountryOpen"
+                  id="phone-country-listbox"
+                  role="listbox"
+                  aria-label="Country"
+                  class="absolute left-0 top-full z-10 mt-1 max-h-60 w-56 overflow-auto rounded-[12px] border border-neutral-border bg-white py-1 shadow-lg"
+                >
+                  <li
+                    v-for="opt in phoneCountryOptions"
+                    :key="opt.value"
+                    role="option"
+                    :aria-selected="opt.value === phoneCountry"
+                    class="cursor-pointer px-3 py-2 text-sm text-brand-charcoal hover:bg-neutral-100"
+                    :class="{ 'bg-neutral-100': opt.value === phoneCountry }"
+                    @click="phoneCountry = opt.value; phoneCountryOpen = false; clearPhoneAlreadyUsed()"
+                  >
+                    {{ opt.label }}
+                  </li>
+                </ul>
+              </div>
+              <input
+                id="phone"
+                v-model="phone"
+                type="tel"
+                required
+                class="input flex-1 min-w-0"
+                :placeholder="phoneCountry === 'US' ? 'e.g. (555) 123-4567' : 'e.g. 20 7946 0958'"
+                @input="clearPhoneAlreadyUsed"
+              />
+            </div>
+            <div v-if="phoneValidationError" class="text-red-600 text-sm mt-1">
+              {{ phoneValidationError }}
             </div>
           </div>
 
