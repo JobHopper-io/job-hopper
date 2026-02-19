@@ -10,49 +10,6 @@ import ResumeUploader from '@/components/ResumeUploader.vue'
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
 
-function populateFromProfile() {
-  const p = userStore.profile
-  if (!p || hasPopulatedFromProfile.value) return
-  hasPopulatedFromProfile.value = true
-
-  firstName.value = p.first_name ?? ''
-  lastName.value = p.last_name ?? ''
-  currentJobTitle.value = p.current_job_title ?? ''
-  yearsOfExperience.value = p.years_of_experience ?? null
-  currentIndustry.value = p.current_industry ?? ''
-
-  const validCategories = (p.target_role_categories ?? []).filter(
-    (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
-  )
-  targetRoleCategories.value = validCategories
-  desiredSalaryMin.value = p.desired_salary_min ?? null
-  desiredSalaryMax.value = p.desired_salary_max ?? null
-  preferredLocation.value = p.preferred_locations?.[0] ?? ''
-  openToRelocation.value = p.open_to_relocation ?? false
-  openToRemote.value = p.open_to_remote ?? false
-
-  currentStep.value = getFirstIncompleteStep()
-}
-
-function getFirstIncompleteStep(): number {
-  if (!canProceedStep1.value) return 1
-  if (!canProceedStep2.value) return 2
-  if (!userStore.profile?.resume_bucket_key) return 3
-  return 4
-}
-
-onMounted(() => {
-  userStore.loadUserData()
-})
-
-watch(
-  () => userStore.profile,
-  (profile) => {
-    if (profile) populateFromProfile()
-  },
-  { immediate: true }
-)
-
 // Steps: 1=About, 2=Targets, 3=Resume, 4=Plan
 const currentStep = ref(1)
 const totalSteps = 4
@@ -110,6 +67,49 @@ const canProceedCurrentStep = computed(() => {
   if (currentStep.value === 3) return true
   return true
 })
+
+function getFirstIncompleteStep(): number {
+  if (!canProceedStep1.value) return 1
+  if (!canProceedStep2.value) return 2
+  if (!userStore.profile?.resume_bucket_key) return 3
+  return 4
+}
+
+function populateFromProfile() {
+  const p = userStore.profile
+  if (!p || hasPopulatedFromProfile.value) return
+  hasPopulatedFromProfile.value = true
+
+  firstName.value = p.first_name ?? ''
+  lastName.value = p.last_name ?? ''
+  currentJobTitle.value = p.current_job_title ?? ''
+  yearsOfExperience.value = p.years_of_experience ?? null
+  currentIndustry.value = p.current_industry ?? ''
+
+  const validCategories = (p.target_role_categories ?? []).filter(
+    (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
+  )
+  targetRoleCategories.value = validCategories
+  desiredSalaryMin.value = p.desired_salary_min ?? null
+  desiredSalaryMax.value = p.desired_salary_max ?? null
+  preferredLocation.value = p.preferred_locations?.[0] ?? ''
+  openToRelocation.value = p.open_to_relocation ?? false
+  openToRemote.value = p.open_to_remote ?? false
+
+  currentStep.value = getFirstIncompleteStep()
+}
+
+onMounted(() => {
+  userStore.loadUserData()
+})
+
+watch(
+  () => userStore.profile,
+  (profile) => {
+    if (profile) populateFromProfile()
+  },
+  { immediate: true }
+)
 
 const YEARS_MIN = 0
 const YEARS_MAX = 50
