@@ -1,9 +1,49 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { subscriptionAPI, getTierDisplayName, getTierPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
+import { useUserStore } from '@/stores/user'
 import type { SubscriptionTier } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import ResumeUploader from '@/components/ResumeUploader.vue'
+
+const userStore = useUserStore()
+const hasPopulatedFromProfile = ref(false)
+
+function populateFromProfile() {
+  const p = userStore.profile
+  if (!p || hasPopulatedFromProfile.value) return
+  hasPopulatedFromProfile.value = true
+
+  firstName.value = p.first_name ?? ''
+  lastName.value = p.last_name ?? ''
+  currentJobTitle.value = p.current_job_title ?? ''
+  yearsOfExperience.value = p.years_of_experience ?? null
+  currentIndustry.value = p.current_industry ?? ''
+
+  const validCategories = (p.target_role_categories ?? []).filter(
+    (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
+  )
+  targetRoleCategories.value = validCategories
+  desiredSalaryMin.value = p.desired_salary_min ?? null
+  desiredSalaryMax.value = p.desired_salary_max ?? null
+  preferredLocation.value = p.preferred_locations?.[0] ?? ''
+  openToRelocation.value = p.open_to_relocation ?? false
+  openToRemote.value = p.open_to_remote ?? false
+
+}
+
+onMounted(() => {
+  userStore.loadUserData()
+})
+
+watch(
+  () => userStore.profile,
+  (profile) => {
+    if (profile) populateFromProfile()
+  },
+  { immediate: true }
+)
 
 // Steps: 1=About, 2=Targets, 3=Resume, 4=Plan
 const currentStep = ref(1)
@@ -27,7 +67,6 @@ const openToRemote = ref(false)
 
 // Step 3: Resume Upload
 const resumeFile = ref<File | null>(null)
-const resumeFileName = ref('')
 
 // Step 4: Plan Selection
 const selectedTier = ref<SubscriptionTier | null>(null)
@@ -82,12 +121,8 @@ function handleYearsInput(e: Event) {
   input.value = String(clamped)
 }
 
-const handleResumeUpload = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    resumeFile.value = target.files[0]
-    resumeFileName.value = target.files[0].name
-  }
+const handleResumeFileSelected = (file: File) => {
+  resumeFile.value = file
 }
 
 const nextStep = () => {
@@ -407,24 +442,12 @@ const handleProceedToCheckout = async () => {
             A resume gives our matching engine more context: your skills, equipment or systems you've worked with, and the progression of your career. You can skip this step and come back later if you'd like.
           </p>
 
-          <div class="space-y-4">
-            <div class="space-y-2">
-              <label class="block text-sm font-medium text-brand-charcoal">Resume file</label>
-              <input
-                id="resume-upload"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                class="hidden"
-                @change="handleResumeUpload"
-              />
-              <label for="resume-upload" class="btn-secondary cursor-pointer inline-block">
-                Upload resume
-              </label>
-              <p v-if="resumeFileName" class="text-sm text-neutral-body mt-2">
-                Selected: {{ resumeFileName }}
-              </p>
-            </div>
-          </div>
+          <ResumeUploader
+            :resume-bucket-key="userStore.profile?.resume_bucket_key ?? null"
+            :auto-upload="false"
+            input-id="onboarding-resume-upload"
+            @file-selected="handleResumeFileSelected"
+          />
         </div>
 
         <!-- Step 4: Plan Selection -->
@@ -557,7 +580,7 @@ const handleProceedToCheckout = async () => {
             :disabled="!canProceedCurrentStep"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {{ currentStep === 3 && !resumeFile ? 'Skip for now' : 'Continue' }}
+            {{ currentStep === 3 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
           </button>
           <button
             v-else

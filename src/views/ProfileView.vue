@@ -5,6 +5,7 @@ import { profileAPI } from '@/lib/profile'
 import { getTierDisplayName } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
+import ResumeUploader from '@/components/ResumeUploader.vue'
 
 const userStore = useUserStore()
 const { profile, subscription, isLoading } = storeToRefs(userStore)
@@ -26,12 +27,6 @@ const preferredLocations = ref<string[]>([])
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
 
-// Resume
-const resumeViewUrl = ref<string | null>(null)
-const resumeFile = ref<File | null>(null)
-const resumeFileName = ref('')
-const resumeUploading = ref(false)
-const resumeError = ref('')
 
 function syncFormFromProfile() {
   const p = profile.value
@@ -39,7 +34,9 @@ function syncFormFromProfile() {
   currentJobTitle.value = p.current_job_title || ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry || ''
-  targetRoleCategories.value = (p.target_role_categories ?? []) as RoleCategoryValue[]
+  targetRoleCategories.value = (p.target_role_categories ?? []).filter(
+    (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
+  )
   desiredSalaryMin.value = p.desired_salary_min ?? null
   desiredSalaryMax.value = p.desired_salary_max ?? null
   preferredLocations.value = p.preferred_locations || []
@@ -54,12 +51,6 @@ watch(profile, (p) => {
     nextTick(() => {
       isSyncingFromProfile.value = false
     })
-    const key = p.resume_bucket_key
-    if (key) {
-      profileAPI.getResumeDownloadUrl(key).then(({ data: url }) => {
-        resumeViewUrl.value = url || null
-      })
-    }
   }
 }, { immediate: true })
 
@@ -76,35 +67,6 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
     targetRoleCategories.value.splice(index, 1)
   } else {
     targetRoleCategories.value.push(value)
-  }
-}
-
-const handleResumeFileChange = async (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-  resumeFile.value = file
-  resumeFileName.value = file.name
-  resumeError.value = ''
-  try {
-    resumeUploading.value = true
-    const { data, error } = await profileAPI.uploadResume(file)
-    if (error) {
-      resumeError.value = error.message || 'Upload failed'
-      return
-    }
-    if (data?.resume_bucket_key) {
-      await userStore.refreshProfile()
-      const { data: url } = await profileAPI.getResumeDownloadUrl(data.resume_bucket_key)
-      resumeViewUrl.value = url || null
-      resumeFile.value = null
-      resumeFileName.value = ''
-      target.value = ''
-    }
-  } catch (e) {
-    resumeError.value = e instanceof Error ? e.message : 'Upload failed'
-  } finally {
-    resumeUploading.value = false
   }
 }
 
@@ -221,42 +183,11 @@ watch(
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
-          <div v-if="profile?.resume_bucket_key" class="mb-4">
-            <p class="text-sm font-medium text-brand-charcoal mb-2">Your current resume</p>
-            <a
-              :href="resumeViewUrl || '#'"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-brand-primary font-medium hover:underline inline-flex items-center gap-2"
-              :class="{ 'pointer-events-none opacity-50': !resumeViewUrl }"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {{ resumeViewUrl ? 'View resume' : 'Loading...' }}
-            </a>
-          </div>
-          <div class="space-y-3">
-            <input
-              id="profile-resume-upload"
-              type="file"
-              accept=".pdf,.doc,.docx"
-              class="hidden"
-              :disabled="resumeUploading"
-              @change="handleResumeFileChange"
-            />
-            <label
-              for="profile-resume-upload"
-              class="btn-secondary cursor-pointer inline-block"
-              :class="{ 'opacity-50 pointer-events-none': resumeUploading }"
-            >
-              {{ resumeUploading ? 'Uploading...' : (profile?.resume_bucket_key ? 'Choose new file to replace' : 'Choose file to upload') }}
-            </label>
-            <p v-if="resumeFileName && !resumeUploading" class="text-sm text-neutral-body">
-              Selected: {{ resumeFileName }}
-            </p>
-            <p v-if="resumeError" class="text-sm text-red-600">{{ resumeError }}</p>
-          </div>
+          <ResumeUploader
+            :resume-bucket-key="profile?.resume_bucket_key ?? null"
+            :auto-upload="true"
+            input-id="profile-resume-upload"
+          />
         </div>
 
         <!-- Target Preferences -->
