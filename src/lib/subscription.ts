@@ -201,31 +201,5 @@ export const subscriptionAPI = {
 
     return { data, error }
   },
-
-  async cancelSubscription() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('subscription_id')
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (!profileData?.subscription_id) {
-      return { error: new Error('Subscription not found') }
-    }
-
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .update({ subscription_status: 'cancelled' as Subscription['subscription_status'] })
-      .eq('id', profileData.subscription_id)
-      .select()
-      .single<Subscription>()
-
-    return { data, error }
-  },
 }
 

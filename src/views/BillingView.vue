@@ -8,21 +8,10 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const { subscription, isLoading } = storeToRefs(userStore)
 
-const showCancelConfirm = ref(false)
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
 
 const activeAddonsWithLabels = computed(() => getActiveAddons(subscription.value, true))
-
-const handleCancel = async () => {
-  try {
-    await subscriptionAPI.cancelSubscription()
-    showCancelConfirm.value = false
-    await userStore.refreshSubscription()
-  } catch (error) {
-    console.error('Error cancelling subscription:', error)
-  }
-}
 
 const BILLING_PORTAL_ERROR_MSG = 'Unable to open billing portal. Please try again later.'
 
@@ -123,39 +112,6 @@ const handleManageBilling = async () => {
             <p v-if="billingPortalError" class="text-sm text-red-600" role="alert">
               {{ billingPortalError }}
             </p>
-          </div>
-        </div>
-
-        <!-- Cancel Subscription -->
-        <div class="card p-6 border-red-200">
-          <h2 class="text-xl font-heading font-semibold text-red-800 mb-4">Cancel Subscription</h2>
-          <p class="text-neutral-body mb-4">
-            We're sorry to see you go. You'll keep access to your job feed until the end of your current billing period. You can reactivate your account anytime if you decide to come back.
-          </p>
-          <div v-if="!showCancelConfirm">
-            <button
-              @click="showCancelConfirm = true"
-              class="text-red-600 hover:text-red-800 font-medium"
-            >
-              Cancel subscription
-            </button>
-          </div>
-          <div v-else class="space-y-4">
-            <p class="text-neutral-body font-medium">Are you sure you want to cancel?</p>
-            <div class="flex gap-3">
-              <button
-                @click="handleCancel"
-                class="bg-red-600 text-white px-4 py-2 rounded-[12px] hover:bg-red-700"
-              >
-                Yes, cancel
-              </button>
-              <button
-                @click="showCancelConfirm = false"
-                class="btn-secondary"
-              >
-                Keep subscription
-              </button>
-            </div>
           </div>
         </div>
       </div>
