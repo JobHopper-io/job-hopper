@@ -55,9 +55,16 @@ const validatePassword = (password: string) => {
   return null
 }
 
-const emailValidationError = computed(() => validateEmail(email.value))
-const phoneValidationError = computed(() => validatePhone(phone.value))
-const passwordValidationError = computed(() => validatePassword(password.value))
+// Only show validation errors when the user has entered something (not on mount / empty)
+const emailValidationError = computed(() =>
+  email.value.trim() ? validateEmail(email.value) : null,
+)
+const phoneValidationError = computed(() =>
+  phone.value.trim() ? validatePhone(phone.value) : null,
+)
+const passwordValidationError = computed(() =>
+  password.value ? validatePassword(password.value) : null,
+)
 const passwordsMatch = computed(() => password.value === confirmPassword.value)
 
 const canProceedStep1 = computed(() => {
