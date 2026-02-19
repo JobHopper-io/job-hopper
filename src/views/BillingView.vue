@@ -9,6 +9,8 @@ const userStore = useUserStore()
 const { subscription, isLoading } = storeToRefs(userStore)
 
 const showCancelConfirm = ref(false)
+const billingPortalLoading = ref(false)
+const billingPortalError = ref<string | null>(null)
 
 const activeAddonsWithLabels = computed(() => getActiveAddons(subscription.value, true))
 
@@ -22,12 +24,16 @@ const handleCancel = async () => {
   }
 }
 
+const BILLING_PORTAL_ERROR_MSG = 'Unable to open billing portal. Please try again later.'
+
 const handleManageBilling = async () => {
+  billingPortalError.value = null
+  billingPortalLoading.value = true
   try {
     const { data, error } = await subscriptionAPI.createBillingPortalSession()
     if (error) {
       console.error('Error creating billing portal session:', error)
-      alert('Unable to open billing portal. Please try again.')
+      billingPortalError.value = BILLING_PORTAL_ERROR_MSG
       return
     }
     if (data?.url) {
@@ -35,7 +41,9 @@ const handleManageBilling = async () => {
     }
   } catch (error) {
     console.error('Error opening billing portal:', error)
-    alert('Unable to open billing portal. Please try again.')
+    billingPortalError.value = BILLING_PORTAL_ERROR_MSG
+  } finally {
+    billingPortalLoading.value = false
   }
 }
 </script>
@@ -90,13 +98,31 @@ const handleManageBilling = async () => {
           <p class="text-sm text-neutral-body mb-4">
             Use the billing portal to update your payment method, view invoices, change your plan, manage add-ons, or update your billing address.
           </p>
-          <div class="flex flex-col sm:flex-row gap-4">
-            <button
-              @click="handleManageBilling"
-              class="btn-primary"
-            >
-              Open Billing Portal
-            </button>
+          <div class="flex flex-col gap-2">
+            <div class="flex flex-col sm:flex-row gap-4">
+              <button
+                type="button"
+                :disabled="billingPortalLoading"
+                @click="handleManageBilling"
+                class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                <svg
+                  v-if="billingPortalLoading"
+                  class="animate-spin h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {{ billingPortalLoading ? 'Opening...' : 'Open Billing Portal' }}
+              </button>
+            </div>
+            <p v-if="billingPortalError" class="text-sm text-red-600" role="alert">
+              {{ billingPortalError }}
+            </p>
           </div>
         </div>
 
