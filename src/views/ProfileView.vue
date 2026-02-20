@@ -148,10 +148,10 @@ watch(
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Subscription</h2>
           <p class="text-neutral-body">
-            <span class="font-semibold">Plan:</span> {{ getTierDisplayName(subscription?.subscription_tier) }}
+            <span class="font-semibold">Plan:</span> {{ getTierDisplayName(subscription?.tier) }}
           </p>
-          <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 mt-2">
-            Trial ends: {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }}
+          <p v-if="subscription?.subscription?.subscription_status === 'trial'" class="text-sm text-red-600 mt-2">
+            Trial ends: {{ subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString() : 'N/A' }}
           </p>
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage Subscription

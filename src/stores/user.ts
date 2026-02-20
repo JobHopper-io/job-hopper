@@ -2,11 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { profileAPI } from '@/lib/profile'
 import { subscriptionAPI } from '@/lib/subscription'
-import type { Profile, Subscription } from '@/types/database'
+import type { Profile, CurrentSubscription } from '@/types/database'
 
 export const useUserStore = defineStore('user', () => {
   const profile = ref<Profile | null>(null)
-  const subscription = ref<Subscription | null>(null)
+  const subscription = ref<CurrentSubscription | null>(null)
   const isLoading = ref(false)
 
   async function loadUserData() {

@@ -192,23 +192,6 @@ const handleProceedToCheckout = async () => {
       return
     }
 
-    try {
-      await subscriptionAPI.createSubscription(selectedTier.value, 7)
-      if (premiumInsights.value) {
-        await subscriptionAPI.enableAddon('premium_insights')
-      }
-      if (interviewPrep.value) {
-        await subscriptionAPI.enableAddon('interview_prep')
-      }
-      if (resumeUpgrade.value) {
-        await subscriptionAPI.enableAddon('resume_upgrade')
-      }
-    } catch (subError) {
-      console.error('Error creating subscription:', subError)
-      error.value = 'Account created but subscription setup failed. Please contact support.'
-      return
-    }
-
     const successUrl = `${window.location.origin}/onboarding/complete?session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${window.location.origin}/onboarding`
 

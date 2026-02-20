@@ -4,7 +4,6 @@ import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
 // Convenience type aliases for common database types
 export type Profile = Tables<"profiles">
-export type Subscription = Tables<"subscriptions">
 
 // Operation types for common entities
 export type ProfileInsert = TablesInsert<"profiles">
@@ -28,14 +27,47 @@ export type ProfileUserEditable = Pick<
 >
 
 // Re-export commonly used enums with clearer names
-export type SubscriptionTier = Enums<"subscription_tier">
-export type SubscriptionStatus = Enums<"subscription_status">
 export type BdLeadsStatus = Enums<"bd_leads_status">
+
+// New subscription schema (subscription, products, subscription_product, profile_product)
+// Use these until supabase.ts is regenerated; then can switch to Tables<"subscription"> etc.
+export type BillingSubscriptionStatus = 'trial' | 'active' | 'canceled'
+
+export interface SubscriptionRow {
+  id: string
+  stripe_subscription_id: string
+  profile_id: string
+  subscription_status: BillingSubscriptionStatus
+  current_period_ends_at: string | null
+}
+
+export interface Product {
+  id: string
+  stripe_product_id: string
+  key: string
+  display_name: string
+  is_addon: boolean
+}
+
+/** Composite returned by getCurrentSubscription(); tier and addons derived from products. */
+export interface CurrentSubscription {
+  subscription: SubscriptionRow | null
+  products: Product[]
+  tier: string | null
+  addons: Addon[]
+  trialEndsAt: string | null
+}
+
+// Tier slug for UI (base plan product key)
+export type SubscriptionTier = 'entry_mid' | 'senior_management' | 'director_vp_c_level'
+
+// Status for display (new schema uses billing_subscription_status)
+export type SubscriptionStatus = BillingSubscriptionStatus
 
 // Globally-used custom types (not in database)
 export type AddonType = 'premium_insights' | 'interview_prep' | 'resume_upgrade'
 
 export interface Addon {
-  key: AddonType
+  key: AddonType | string
   label: string
 }

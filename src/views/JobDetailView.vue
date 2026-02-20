@@ -2,7 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { subscriptionAPI } from '@/lib/subscription'
-import type { Subscription } from '@/types/database'
+import type { CurrentSubscription } from '@/types/database'
+import { hasAddonByKey } from '@/lib/subscription'
 
 interface JobHiringContact {
   name: string
@@ -39,7 +40,7 @@ const router = useRouter()
 
 const jobId = route.params.id as string
 const job = ref<JobDetail | null>(null)
-const subscription = ref<Subscription | null>(null)
+const subscription = ref<CurrentSubscription | null>(null)
 const isLoading = ref(true)
 
 onMounted(async () => {
@@ -93,13 +94,9 @@ onMounted(async () => {
   }
 })
 
-const hasPremiumInsights = () => {
-  return subscription.value?.premium_insights_enabled
-}
+const hasPremiumInsights = () => hasAddonByKey(subscription.value, 'premium_insights')
 
-const hasInterviewPrep = () => {
-  return subscription.value?.interview_prep_enabled
-}
+const hasInterviewPrep = () => hasAddonByKey(subscription.value, 'interview_prep')
 </script>
 
 <template>

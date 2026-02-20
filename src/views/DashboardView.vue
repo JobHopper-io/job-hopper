@@ -129,13 +129,13 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
           <p class="font-heading font-semibold text-brand-charcoal">
-            {{ getTierDisplayName(subscription?.subscription_tier) }}
+            {{ getTierDisplayName(subscription?.tier) }}
           </p>
           <p class="text-sm text-neutral-body mt-1">
-            {{ getStatusLabel(subscription?.subscription_status) }}
+            {{ getStatusLabel(subscription?.subscription?.subscription_status) }}
           </p>
-          <p v-if="subscription?.subscription_status === 'trial' && subscription?.trial_ends_at" class="text-xs text-red-600 mt-2">
-            Trial ends {{ new Date(subscription.trial_ends_at).toLocaleDateString() }}
+          <p v-if="subscription?.subscription?.subscription_status === 'trial' && subscription?.trialEndsAt" class="text-xs text-red-600 mt-2">
+            Trial ends {{ new Date(subscription.trialEndsAt).toLocaleDateString() }}
           </p>
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage plan →

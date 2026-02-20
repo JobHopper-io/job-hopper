@@ -12,20 +12,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const defaultSiteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
     }
 
-    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -36,7 +35,6 @@ serve(async (req) => {
       }
     )
 
-    // Get the user
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
@@ -45,45 +43,51 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    // Get user's subscription
-    const { data: userData, error: userError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('subscription_id, email, first_name, last_name')
+      .select('id, email, first_name, last_name, stripe_customer_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (userError || !userData) {
+    if (profileError || !profile) {
       throw new Error('User not found')
     }
 
-    // Get subscription details
-    const { data: subscription, error: subError } = await supabaseClient
-      .from('subscriptions')
-      .select('*')
-      .eq('id', userData.subscription_id)
-      .single()
+    let customerId = profile.stripe_customer_id
 
-    if (subError || !subscription) {
-      throw new Error('Subscription not found')
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: profile.email,
+        name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || undefined,
+        metadata: {
+          supabase_user_id: user.id,
+          supabase_profile_id: profile.id,
+        },
+      })
+      customerId = customer.id
+
+      const { error: updateError } = await supabaseClient
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', profile.id)
+
+      if (updateError) {
+        console.error('Failed to update profile.stripe_customer_id:', updateError)
+      }
     }
 
-    // Parse request body
-    const { tier, addons, successUrl, cancelUrl } = await req.json()
+    const { tier, addons = {}, successUrl, cancelUrl } = await req.json()
 
-    // Price mapping (in cents)
     const priceMap: Record<string, number> = {
-      entry_mid: 1900, // $19/month
-      senior_management: 2900, // $29/month
-      director_vp_c_level: 4900, // $49/month
+      entry_mid: 1900,
+      senior_management: 2900,
+      director_vp_c_level: 4900,
     }
-
     const basePrice = priceMap[tier]
-    
     if (!basePrice) {
       throw new Error('Invalid tier')
     }
 
-    // Build line items
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       {
         price_data: {
@@ -91,103 +95,60 @@ serve(async (req) => {
           product_data: {
             name: `Job-Hopper ${tier === 'entry_mid' ? 'Entry & Mid Level' : tier === 'senior_management' ? 'Senior & Management' : 'Director, VP & C-Level'} Plan`,
           },
-          recurring: {
-            interval: 'month',
-          },
+          recurring: { interval: 'month' },
           unit_amount: basePrice,
         },
         quantity: 1,
       },
     ]
 
-    // Add premium addons
-    if (addons?.premium_insights) {
+    if (addons.premium_insights) {
       lineItems.push({
         price_data: {
           currency: 'usd',
-          product_data: {
-            name: 'Premium Insights & Contact Access',
-          },
-          recurring: {
-            interval: 'month',
-          },
-          unit_amount: 3000, // $30/month
+          product_data: { name: 'Premium Insights & Contact Access' },
+          recurring: { interval: 'month' },
+          unit_amount: 3000,
+        },
+        quantity: 1,
+      })
+    }
+    if (addons.interview_prep) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Interview Prep & Strategy' },
+          recurring: { interval: 'month' },
+          unit_amount: 3000,
+        },
+        quantity: 1,
+      })
+    }
+    if (addons.resume_upgrade) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Resume Upgrade' },
+          unit_amount: 1995,
         },
         quantity: 1,
       })
     }
 
-    if (addons?.interview_prep) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Interview Prep & Strategy',
-          },
-          recurring: {
-            interval: 'month',
-          },
-          unit_amount: 3000, // $30/month
-        },
-        quantity: 1,
-      })
-    }
-
-    if (addons?.resume_upgrade) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Resume Upgrade',
-          },
-          unit_amount: 1995, // $19.95 one-time
-        },
-        quantity: 1,
-      })
-    }
-
-    // Create or retrieve Stripe customer
-    let customerId = subscription.stripe_customer_id
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: userData.email,
-        name: `${userData.first_name} ${userData.last_name}`,
-        metadata: {
-          supabase_user_id: user.id,
-          subscription_id: subscription.id,
-        },
-      })
-      customerId = customer.id
-
-      // Update subscription with customer ID
-      await supabaseClient
-        .from('subscriptions')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', subscription.id)
-    }
-
-    // Create checkout session
-    // Stripe Checkout supports both recurring and one-time line items in subscription mode.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'subscription',
-      success_url: successUrl || `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing`,
+      success_url: successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
       metadata: {
-        user_id: user.id,
-        subscription_id: subscription.id,
-        tier,
-        addons: JSON.stringify(addons || {}),
+        profile_id: profile.id,
       },
       subscription_data: {
         trial_period_days: 7,
         metadata: {
-          user_id: user.id,
-          subscription_id: subscription.id,
-          tier,
+          profile_id: profile.id,
         },
       },
     })
@@ -200,8 +161,9 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -209,4 +171,3 @@ serve(async (req) => {
     )
   }
 })
-

@@ -56,16 +56,16 @@ const handleManageBilling = async () => {
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Plan</h2>
           <div class="space-y-2">
             <p class="text-neutral-body">
-              <span class="font-semibold">Base plan:</span> {{ getTierDisplayName(subscription?.subscription_tier) }}
+              <span class="font-semibold">Base plan:</span> {{ getTierDisplayName(subscription?.tier) }}
             </p>
             <p class="text-neutral-body">
-              <span class="font-semibold">Monthly price:</span> ${{ getTierPrice(subscription?.subscription_tier) }}/month
+              <span class="font-semibold">Monthly price:</span> ${{ getTierPrice(subscription?.tier) }}/month
             </p>
-            <p v-if="subscription?.current_period_end" class="text-neutral-body">
-              <span class="font-semibold">Next billing date:</span> {{ new Date(subscription.current_period_end).toLocaleDateString() }}
+            <p v-if="subscription?.subscription?.current_period_ends_at" class="text-neutral-body">
+              <span class="font-semibold">Next billing date:</span> {{ new Date(subscription.subscription.current_period_ends_at).toLocaleDateString() }}
             </p>
-            <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 font-medium">
-              You're on a free trial. Your first charge will occur on {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }} unless you cancel.
+            <p v-if="subscription?.subscription?.subscription_status === 'trial'" class="text-sm text-red-600 font-medium">
+              You're on a free trial. Your first charge will occur on {{ subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString() : 'N/A' }} unless you cancel.
             </p>
           </div>
         </div>
