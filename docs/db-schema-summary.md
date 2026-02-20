@@ -12,7 +12,7 @@
 - **Key relationships**:
   - One subscription row can have many `profiles` (via `profiles.subscription_id`).
 - **Non‑obvious rules**:
-  - Subscription state is tracked via `subscription_status` and `subscription_tier` enums (see `Database["public"]["Enums"]` in `supabase.ts`).
+  - Subscription state is tracked via `subscription_status` and `subscription_tier` enums (see `Database["public"]["Enums"]` in `supabase.ts`). `subscription_status` may be `trial`, `active`, `cancelled`, `expired`, or `paused`; `paused` is a first-class status (Stripe subscription paused, same as other statuses for display and gating).
   - Stripe‑related fields (`stripe_*`) and `trial_ends_at` coordinate billing and trial periods; app logic should keep these consistent.
 
 ### profiles

@@ -18,7 +18,8 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   trial: 'Free trial',
   active: 'Active',
   cancelled: 'Cancelled',
-  expired: 'Expired'
+  expired: 'Expired',
+  paused: 'Paused'
 }
 
 const TIER_PRICES: Record<SubscriptionTier, number> = {

@@ -489,6 +489,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_phone_available: { Args: { phone_input: string }; Returns: boolean }
       create_subscription_for_user: {
         Args: {
           tier: Database["public"]["Enums"]["subscription_tier"]
@@ -539,7 +540,12 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
-      subscription_status: "trial" | "active" | "cancelled" | "expired"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "cancelled"
+        | "expired"
+        | "paused"
       subscription_tier:
         | "entry_mid"
         | "senior_management"
@@ -679,7 +685,13 @@ export const Constants = {
         "Ready for AI Personalization",
         "Invalid Email",
       ],
-      subscription_status: ["trial", "active", "cancelled", "expired"],
+      subscription_status: [
+        "trial",
+        "active",
+        "cancelled",
+        "expired",
+        "paused",
+      ],
       subscription_tier: [
         "entry_mid",
         "senior_management",
