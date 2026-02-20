@@ -49,8 +49,11 @@ export interface Product {
   is_addon: boolean
 }
 
-/** Composite returned by getCurrentSubscription(); tier and addons derived from products. */
+/** Composite returned by getCurrentSubscription(); tier and addons derived from all active subscriptions + profile_product. */
 export interface CurrentSubscription {
+  /** All active subscriptions (trial or active) for the profile. */
+  subscriptions: SubscriptionRow[]
+  /** Primary subscription for display (first of subscriptions); null if none. */
   subscription: SubscriptionRow | null
   products: Product[]
   tier: string | null

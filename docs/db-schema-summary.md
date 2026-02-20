@@ -11,7 +11,7 @@
 - **Meaning**: End-user profiles for the app; each profile may have a Stripe customer and uses job‑hopping features.
 - **Key relationships**:
   - Each profile has at most one `stripe_customer_id` (set when the user completes checkout or is created by the checkout flow).
-  - **Subscription relationship is reversed**: `subscription` rows reference `profile_id`; there is no `profiles.subscription_id`. The “current” subscription for a profile is the row in `subscription` where `profile_id` = profile and `subscription_status IN ('trial','active')`, typically the latest by `current_period_ends_at`.
+  - **Subscription relationship is reversed (multiple active allowed)**: `subscription` rows reference `profile_id`; there is no `profiles.subscription_id`. A profile can have **multiple active subscriptions**: all such rows are considered active; the app uses every active subscription when deriving products, tier, and addons—it does not pick a single "current" one.
 - **Non‑obvious rules**:
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
   - Phone number is stored on profiles and must be unique (normalized to digits for comparison).
@@ -24,7 +24,7 @@
   - Subscription items (recurring products) are stored in `subscription_product` (subscription_id + product_id → `products`).
 - **Non‑obvious rules**:
   - `subscription_status` uses enum `billing_subscription_status`: `trial` | `active` | `canceled`. Map Stripe `trialing` → `trial`, `active`/`past_due` → `active`, `canceled`/`unpaid`/`expired` → `canceled`.
-  - “Current” subscription = row with `subscription_status IN ('trial','active')`; if multiple exist, use latest by `current_period_ends_at`.
+  - **Active subscriptions**: any row with `subscription_status IN ('trial','active')` is active. A profile can have multiple active subscriptions; the app does not choose a single “current” one—it considers all active rows when deriving products and entitlements.
   - Rows are not deleted when Stripe cancels; status is set to `canceled` for history.
 
 ### products

@@ -8,6 +8,7 @@ import type {
   SubscriptionStatus,
   AddonType,
   CurrentSubscription,
+  SubscriptionRow,
   Addon,
 } from '@/types/database'
 import { supabase } from '@/lib/supabase'
@@ -136,14 +137,12 @@ export const subscriptionAPI = {
       return { data: null, error: profileError ? new Error(profileError.message) : null }
     }
 
-    const { data: subRow, error: subError } = await supabase
+    const { data: subRows, error: subError } = await supabase
       .from('subscription')
       .select('id, stripe_subscription_id, profile_id, subscription_status, current_period_ends_at')
       .eq('profile_id', profile.id)
       .in('subscription_status', ['trial', 'active'])
       .order('current_period_ends_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
     if (subError) {
       return { data: null, error: new Error(subError.message) }
@@ -154,7 +153,7 @@ export const subscriptionAPI = {
       { id: string; stripe_product_id: string; key: string; display_name: string; is_addon: boolean }
     >()
 
-    if (subRow) {
+    for (const subRow of subRows ?? []) {
       const { data: subProducts } = await supabase
         .from('subscription_product')
         .select('product_id')
@@ -205,21 +204,21 @@ export const subscriptionAPI = {
       .filter((p) => p.is_addon)
       .map((p) => ({ key: p.key, label: p.display_name }))
 
-    const subscription = subRow
-      ? {
-          id: subRow.id,
-          stripe_subscription_id: subRow.stripe_subscription_id,
-          profile_id: subRow.profile_id,
-          subscription_status: subRow.subscription_status,
-          current_period_ends_at: subRow.current_period_ends_at,
-        }
-      : null
+    const subscriptions: SubscriptionRow[] = (subRows ?? []).map((row) => ({
+      id: row.id,
+      stripe_subscription_id: row.stripe_subscription_id,
+      profile_id: row.profile_id,
+      subscription_status: row.subscription_status,
+      current_period_ends_at: row.current_period_ends_at,
+    }))
+    const subscription = subscriptions[0] ?? null
 
     const trialEndsAt =
-      subscription?.subscription_status === 'trial' ? subscription.current_period_ends_at : null
+      subscriptions.find((s) => s.subscription_status === 'trial')?.current_period_ends_at ?? null
 
     return {
       data: {
+        subscriptions,
         subscription,
         products,
         tier,
