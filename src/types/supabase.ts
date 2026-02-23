@@ -257,6 +257,69 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          description: string
+          display_name: string
+          id: string
+          is_addon: boolean
+          key: string
+          price_cents: number
+          type: Database["public"]["Enums"]["product_type"]
+        }
+        Insert: {
+          description?: string
+          display_name: string
+          id?: string
+          is_addon: boolean
+          key: string
+          price_cents: number
+          type: Database["public"]["Enums"]["product_type"]
+        }
+        Update: {
+          description?: string
+          display_name?: string
+          id?: string
+          is_addon?: boolean
+          key?: string
+          price_cents?: number
+          type?: Database["public"]["Enums"]["product_type"]
+        }
+        Relationships: []
+      }
+      profile_product: {
+        Row: {
+          id: string
+          product_id: string
+          profile_id: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          profile_id: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_product_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_product_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           auth_user_id: string | null
@@ -275,7 +338,7 @@ export type Database = {
           phone_number: string | null
           preferred_locations: string[] | null
           resume_bucket_key: string | null
-          subscription_id: string | null
+          stripe_customer_id: string | null
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -297,7 +360,7 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           resume_bucket_key?: string | null
-          subscription_id?: string | null
+          stripe_customer_id?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -319,20 +382,12 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           resume_bucket_key?: string | null
-          subscription_id?: string | null
+          stripe_customer_id?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       raw_jobs: {
         Row: {
@@ -409,80 +464,70 @@ export type Database = {
         }
         Relationships: []
       }
-      subscriptions: {
+      subscription_product: {
         Row: {
-          created_at: string | null
-          current_period_end: string | null
-          current_period_start: string | null
           id: string
-          interview_prep_enabled: boolean | null
-          premium_insights_enabled: boolean | null
-          resume_upgrade_purchased: boolean | null
-          stripe_current_period_end: string | null
-          stripe_current_period_start: string | null
-          stripe_customer_id: string | null
-          stripe_plan_id: string | null
-          stripe_plan_name: string | null
-          stripe_subscription_id: string | null
-          stripe_subscription_status: string | null
-          subscription_status:
-            | Database["public"]["Enums"]["subscription_status"]
-            | null
-          subscription_tier:
-            | Database["public"]["Enums"]["subscription_tier"]
-            | null
-          trial_ends_at: string | null
-          updated_at: string | null
+          product_id: string
+          subscription_id: string
         }
         Insert: {
-          created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          interview_prep_enabled?: boolean | null
-          premium_insights_enabled?: boolean | null
-          resume_upgrade_purchased?: boolean | null
-          stripe_current_period_end?: string | null
-          stripe_current_period_start?: string | null
-          stripe_customer_id?: string | null
-          stripe_plan_id?: string | null
-          stripe_plan_name?: string | null
-          stripe_subscription_id?: string | null
-          stripe_subscription_status?: string | null
-          subscription_status?:
-            | Database["public"]["Enums"]["subscription_status"]
-            | null
-          subscription_tier?:
-            | Database["public"]["Enums"]["subscription_tier"]
-            | null
-          trial_ends_at?: string | null
-          updated_at?: string | null
+          product_id: string
+          subscription_id: string
         }
         Update: {
-          created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          interview_prep_enabled?: boolean | null
-          premium_insights_enabled?: boolean | null
-          resume_upgrade_purchased?: boolean | null
-          stripe_current_period_end?: string | null
-          stripe_current_period_start?: string | null
-          stripe_customer_id?: string | null
-          stripe_plan_id?: string | null
-          stripe_plan_name?: string | null
-          stripe_subscription_id?: string | null
-          stripe_subscription_status?: string | null
-          subscription_status?:
-            | Database["public"]["Enums"]["subscription_status"]
-            | null
-          subscription_tier?:
-            | Database["public"]["Enums"]["subscription_tier"]
-            | null
-          trial_ends_at?: string | null
-          updated_at?: string | null
+          product_id?: string
+          subscription_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscription_product_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_product_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          current_period_ends_at: string | null
+          id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id: string
+        }
+        Insert: {
+          current_period_ends_at?: string | null
+          id?: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id: string
+        }
+        Update: {
+          current_period_ends_at?: string | null
+          id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -490,14 +535,6 @@ export type Database = {
     }
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
-      create_subscription_for_user: {
-        Args: {
-          tier: Database["public"]["Enums"]["subscription_tier"]
-          trial_days?: number
-          user_id: string
-        }
-        Returns: string
-      }
       create_user_profile: {
         Args: {
           first_name: string
@@ -524,13 +561,6 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
-      update_subscription_tier: {
-        Args: {
-          new_tier: Database["public"]["Enums"]["subscription_tier"]
-          user_id: string
-        }
-        Returns: boolean
-      }
     }
     Enums: {
       bd_leads_status:
@@ -540,16 +570,8 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
-      subscription_status:
-        | "trial"
-        | "active"
-        | "cancelled"
-        | "expired"
-        | "paused"
-      subscription_tier:
-        | "entry_mid"
-        | "senior_management"
-        | "director_vp_c_level"
+      product_type: "subscription" | "payment"
+      subscription_status: "trial" | "active" | "canceled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -685,18 +707,8 @@ export const Constants = {
         "Ready for AI Personalization",
         "Invalid Email",
       ],
-      subscription_status: [
-        "trial",
-        "active",
-        "cancelled",
-        "expired",
-        "paused",
-      ],
-      subscription_tier: [
-        "entry_mid",
-        "senior_management",
-        "director_vp_c_level",
-      ],
+      product_type: ["subscription", "payment"],
+      subscription_status: ["trial", "active", "canceled"],
     },
   },
 } as const

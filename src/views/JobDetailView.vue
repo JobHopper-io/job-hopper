@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { subscriptionAPI } from '@/lib/subscription'
-import type { Subscription } from '@/types/database'
+import { useUserStore } from '@/stores/user'
 
 interface JobHiringContact {
   name: string
@@ -39,8 +38,9 @@ const router = useRouter()
 
 const jobId = route.params.id as string
 const job = ref<JobDetail | null>(null)
-const subscription = ref<Subscription | null>(null)
 const isLoading = ref(true)
+
+const userStore = useUserStore()
 
 onMounted(async () => {
   try {
@@ -84,8 +84,6 @@ onMounted(async () => {
       }
     }
 
-    const { data: subscriptionData } = await subscriptionAPI.getCurrentSubscription()
-    subscription.value = subscriptionData
   } catch (error) {
     console.error('Error loading job details:', error)
   } finally {
@@ -93,13 +91,9 @@ onMounted(async () => {
   }
 })
 
-const hasPremiumInsights = () => {
-  return subscription.value?.premium_insights_enabled
-}
+const hasPremiumInsights = computed(() => userStore.hasAddon('premium_insights'))
 
-const hasInterviewPrep = () => {
-  return subscription.value?.interview_prep_enabled
-}
+const hasInterviewPrep = computed(() => userStore.hasAddon('interview_prep'))
 </script>
 
 <template>
@@ -164,7 +158,7 @@ const hasInterviewPrep = () => {
         </div>
 
         <!-- Premium: Hiring Insights -->
-        <div v-if="hasPremiumInsights() && job.hiring_contacts" class="card p-6 border-2 border-brand-primary">
+        <div v-if="hasPremiumInsights && job.hiring_contacts" class="card p-6 border-2 border-brand-primary">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Hiring insights & contacts</h2>
           <p class="text-neutral-body mb-4">Based on our research, hiring decisions for this role may involve:</p>
           <div class="space-y-4">
@@ -181,7 +175,7 @@ const hasInterviewPrep = () => {
         </div>
 
         <!-- Premium: Interview Prep -->
-        <div v-if="hasInterviewPrep() && job.interview_prep" class="card p-6 border-2 border-brand-primary">
+        <div v-if="hasInterviewPrep && job.interview_prep" class="card p-6 border-2 border-brand-primary">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Interview prep tips for this role</h2>
           <div class="space-y-6">
             <div>

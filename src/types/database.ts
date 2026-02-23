@@ -3,12 +3,11 @@
 import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
 // Convenience type aliases for common database types
-export type Profile = Tables<"profiles">
-export type Subscription = Tables<"subscriptions">
+export type Profile = Tables<'profiles'>
 
 // Operation types for common entities
-export type ProfileInsert = TablesInsert<"profiles">
-export type ProfileUpdate = TablesUpdate<"profiles">
+export type ProfileInsert = TablesInsert<'profiles'>
+export type ProfileUpdate = TablesUpdate<'profiles'>
 
 // Subset of profile fields that the current user is allowed to edit (self-service). Use this for
 // updateProfile and forms; use ProfileUpdate only where the full table update shape is needed.
@@ -27,15 +26,9 @@ export type ProfileUserEditable = Pick<
   | 'open_to_remote'
 >
 
-// Re-export commonly used enums with clearer names
-export type SubscriptionTier = Enums<"subscription_tier">
-export type SubscriptionStatus = Enums<"subscription_status">
-export type BdLeadsStatus = Enums<"bd_leads_status">
-
-// Globally-used custom types (not in database)
-export type AddonType = 'premium_insights' | 'interview_prep' | 'resume_upgrade'
-
-export interface Addon {
-  key: AddonType
-  label: string
-}
+// Subscription and product types from DB schema
+export type Subscription = Tables<'subscriptions'>
+export type SubscriptionStatus = Enums<'subscription_status'>
+export type Product = Tables<'products'>
+export type ProductType = Enums<'product_type'>
+export type SubscriptionProduct = Tables<'subscription_product'>

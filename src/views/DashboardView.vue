@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Profile } from '@/types/database'
+import type { Product, Profile } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
-import { getTierDisplayName, getStatusLabel, getActiveAddons } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 
@@ -22,7 +21,13 @@ interface JobFeedItem {
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
 
 const userStore = useUserStore()
-const { profile, subscription, isLoading } = storeToRefs(userStore)
+const {
+  profile,
+  isLoading,
+  basePlan,
+  subscriptionStatusLabel,
+  addonProducts,
+} = storeToRefs(userStore)
 
 const profileCompletionDismissed = ref(
   typeof localStorage !== 'undefined' && localStorage.getItem(PROFILE_COMPLETION_DISMISSED_KEY) === '1'
@@ -57,7 +62,7 @@ const userName = computed(() => {
 })
 
 const activeAddonsForDisplay = computed(() =>
-  getActiveAddons(subscription.value).map((item) => item.label)
+  addonProducts.value.map((p: Product) => p.display_name),
 )
 
 // Profile completion: key fields that improve matching
@@ -128,15 +133,17 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
         <!-- Subscription status and tier -->
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ getTierDisplayName(subscription?.subscription_tier) }}
+          <div v-if="basePlan">
+            <p class="font-heading font-semibold text-brand-charcoal">
+            {{ basePlan?.display_name }}
           </p>
           <p class="text-sm text-neutral-body mt-1">
-            {{ getStatusLabel(subscription?.subscription_status) }}
+            {{ subscriptionStatusLabel }}
           </p>
-          <p v-if="subscription?.subscription_status === 'trial' && subscription?.trial_ends_at" class="text-xs text-red-600 mt-2">
-            Trial ends {{ new Date(subscription.trial_ends_at).toLocaleDateString() }}
-          </p>
+          </div>
+          <div v-else>
+            <p class="text-sm text-neutral-body">No active plan</p>
+          </div>          
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage plan →
           </router-link>

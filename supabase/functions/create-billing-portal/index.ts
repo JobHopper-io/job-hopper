@@ -12,20 +12,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const defaultBillingUrl = `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing`
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
     }
 
-    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -36,7 +35,6 @@ serve(async (req) => {
       }
     )
 
-    // Get the user
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
@@ -45,39 +43,26 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    // Get user's subscription
-    const { data: userData, error: userError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('subscription_id')
+      .select('stripe_customer_id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (userError || !userData) {
+    if (profileError || !profile) {
       throw new Error('User not found')
     }
 
-    // Get subscription details
-    const { data: subscription, error: subError } = await supabaseClient
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('id', userData.subscription_id)
-      .single()
-
-    if (subError || !subscription) {
-      throw new Error('Subscription not found')
+    if (!profile.stripe_customer_id) {
+      throw new Error('Complete a purchase first to access the billing portal.')
     }
 
-    if (!subscription.stripe_customer_id) {
-      throw new Error('No Stripe customer ID found. Please complete a purchase first.')
-    }
+    const body = await req.json().catch(() => ({}))
+    const returnUrl = body.returnUrl ?? defaultBillingUrl
 
-    // Parse request body for return URL
-    const { returnUrl } = await req.json().catch(() => ({ returnUrl: null }))
-
-    // Create billing portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: subscription.stripe_customer_id,
-      return_url: returnUrl || `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/billing`,
+      customer: profile.stripe_customer_id,
+      return_url: returnUrl,
     })
 
     return new Response(
@@ -88,8 +73,9 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -97,4 +83,3 @@ serve(async (req) => {
     )
   }
 })
-

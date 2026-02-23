@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { subscriptionAPI } from '@/lib/subscription'
-import { getTierDisplayName, getTierPrice, getActiveAddons } from '@/lib/subscription'
+import { subscriptionAPI, formatProductLineLabel, getProductPrice } from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const { subscription, isLoading } = storeToRefs(userStore)
+const { basePlan, addonProducts, nextBillingAt, trialEndsAt, isLoading } =
+  storeToRefs(userStore)
 
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
-
-const activeAddonsWithLabels = computed(() => getActiveAddons(subscription.value, true))
 
 const BILLING_PORTAL_ERROR_MSG = 'Unable to open billing portal. Please try again later.'
 
@@ -50,22 +48,24 @@ const handleManageBilling = async () => {
         <p class="text-neutral-body">Loading...</p>
       </div>
 
-      <div v-else class="space-y-6">
+      <div v-else-if="basePlan" class="space-y-6">
         <!-- Current Plan -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Plan</h2>
           <div class="space-y-2">
             <p class="text-neutral-body">
-              <span class="font-semibold">Base plan:</span> {{ getTierDisplayName(subscription?.subscription_tier) }}
+              <span class="font-semibold">Base plan:</span> {{ basePlan?.display_name }}
             </p>
             <p class="text-neutral-body">
-              <span class="font-semibold">Monthly price:</span> ${{ getTierPrice(subscription?.subscription_tier) }}/month
+              <span class="font-semibold">Monthly price:</span>
+              <span v-if="basePlan">${{ getProductPrice(basePlan) }}/month</span>
+              <span v-else>—</span>
             </p>
-            <p v-if="subscription?.current_period_end" class="text-neutral-body">
-              <span class="font-semibold">Next billing date:</span> {{ new Date(subscription.current_period_end).toLocaleDateString() }}
+            <p v-if="nextBillingAt" class="text-neutral-body">
+              <span class="font-semibold">Next billing date:</span> {{ new Date(nextBillingAt).toLocaleDateString() }}
             </p>
-            <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 font-medium">
-              You're on a free trial. Your first charge will occur on {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }} unless you cancel.
+            <p v-if="trialEndsAt" class="text-sm text-red-600 font-medium">
+              You're on a free trial. Your first charge will occur on {{ new Date(trialEndsAt).toLocaleDateString() }} unless you cancel.
             </p>
           </div>
         </div>
@@ -73,9 +73,9 @@ const handleManageBilling = async () => {
         <!-- Active Add-ons -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Active Add-ons</h2>
-          <div v-if="activeAddonsWithLabels.length" class="space-y-2">
-            <p v-for="item in activeAddonsWithLabels" :key="item.key" class="text-neutral-body">
-              ✓ {{ item.label }}
+          <div v-if="addonProducts.length" class="space-y-2">
+            <p v-for="product in addonProducts" :key="product.id" class="text-neutral-body">
+              ✓ {{ formatProductLineLabel(product) }}
             </p>
           </div>
           <p v-else class="text-neutral-body">No active add-ons</p>
@@ -114,6 +114,9 @@ const handleManageBilling = async () => {
             </p>
           </div>
         </div>
+      </div>
+      <div v-else class="space-y-6">
+        <p class="text-neutral-body">No active plan</p>
       </div>
     </div>
   </div>

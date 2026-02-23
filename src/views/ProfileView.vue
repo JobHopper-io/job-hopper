@@ -2,13 +2,12 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { profileAPI } from '@/lib/profile'
-import { getTierDisplayName } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 
 const userStore = useUserStore()
-const { profile, subscription, isLoading } = storeToRefs(userStore)
+const { profile, basePlan, isLoading } = storeToRefs(userStore)
 
 const initialLoadDone = ref(false)
 const isSaving = ref(false)
@@ -147,12 +146,14 @@ watch(
         <!-- Subscription Info -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Subscription</h2>
-          <p class="text-neutral-body">
-            <span class="font-semibold">Plan:</span> {{ getTierDisplayName(subscription?.subscription_tier) }}
-          </p>
-          <p v-if="subscription?.subscription_status === 'trial'" class="text-sm text-red-600 mt-2">
-            Trial ends: {{ subscription?.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'N/A' }}
-          </p>
+          <div v-if="basePlan">
+            <p class="text-neutral-body">
+              <span class="font-semibold">Plan:</span> {{ basePlan?.display_name }}
+            </p>
+          </div>
+          <div v-else>
+            <p class="text-neutral-body">No active plan</p>
+          </div>
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage Subscription
           </router-link>

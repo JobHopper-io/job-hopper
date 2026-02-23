@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { subscriptionAPI, getTierDisplayName, getTierPrice } from '@/lib/subscription'
+import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
 import { useUserStore } from '@/stores/user'
-import type { SubscriptionTier } from '@/types/database'
+import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 
@@ -33,11 +33,11 @@ const openToRemote = ref(false)
 // Step 3: Resume Upload
 const resumeFile = ref<File | null>(null)
 
-// Step 4: Plan Selection
-const selectedTier = ref<SubscriptionTier | null>(null)
-const premiumInsights = ref(false)
-const interviewPrep = ref(false)
-const resumeUpgrade = ref(false)
+// Step 4: Plan Selection (product ids from DB)
+const basePlanProducts = ref<Product[]>([])
+const addonProducts = ref<Product[]>([])
+const selectedBasePlanId = ref<string | null>(null)
+const selectedAddonIds = ref<string[]>([])
 
 const isLoading = ref(false)
 const error = ref('')
@@ -58,7 +58,7 @@ const canProceedStep2 = computed(() => {
 })
 
 const canProceedStep4 = computed(() => {
-  return selectedTier.value !== null
+  return selectedBasePlanId.value !== null
 })
 
 const canProceedCurrentStep = computed(() => {
@@ -99,8 +99,14 @@ function populateFromProfile() {
   currentStep.value = getFirstIncompleteStep()
 }
 
-onMounted(() => {
-  userStore.loadUserData()
+onMounted(async () => {
+  userStore.refreshProfile()
+  const [baseRes, addonRes] = await Promise.all([
+    subscriptionAPI.getBasePlanProducts(),
+    subscriptionAPI.getAddonProducts()
+  ])
+  if (baseRes.data) basePlanProducts.value = baseRes.data
+  if (addonRes.data) addonProducts.value = addonRes.data
 })
 
 watch(
@@ -131,6 +137,14 @@ function handleYearsInput(e: Event) {
 
 const handleResumeFileSelected = (file: File) => {
   resumeFile.value = file
+}
+
+function toggleAddon(productId: string, checked: boolean) {
+  if (checked) {
+    selectedAddonIds.value = [...selectedAddonIds.value, productId]
+  } else {
+    selectedAddonIds.value = selectedAddonIds.value.filter((id) => id !== productId)
+  }
 }
 
 const nextStep = () => {
@@ -187,38 +201,17 @@ const handleProceedToCheckout = async () => {
       }
     }
 
-    if (!selectedTier.value) {
+    if (!selectedBasePlanId.value) {
       error.value = 'Please select a plan to continue.'
-      return
-    }
-
-    try {
-      await subscriptionAPI.createSubscription(selectedTier.value, 7)
-      if (premiumInsights.value) {
-        await subscriptionAPI.enableAddon('premium_insights')
-      }
-      if (interviewPrep.value) {
-        await subscriptionAPI.enableAddon('interview_prep')
-      }
-      if (resumeUpgrade.value) {
-        await subscriptionAPI.enableAddon('resume_upgrade')
-      }
-    } catch (subError) {
-      console.error('Error creating subscription:', subError)
-      error.value = 'Account created but subscription setup failed. Please contact support.'
       return
     }
 
     const successUrl = `${window.location.origin}/onboarding/complete?session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${window.location.origin}/onboarding`
+    const productIds = [selectedBasePlanId.value, ...selectedAddonIds.value]
 
     const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
-      selectedTier.value,
-      {
-        premium_insights: premiumInsights.value,
-        interview_prep: interviewPrep.value,
-        resume_upgrade: resumeUpgrade.value
-      },
+      productIds,
       successUrl,
       cancelUrl
     )
@@ -470,53 +463,19 @@ const handleProceedToCheckout = async () => {
           <div class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div
+                v-for="product in basePlanProducts"
+                :key="product.id"
                 :class="[
                   'card p-6 text-left transition-all',
-                  selectedTier === 'entry_mid' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
+                  selectedBasePlanId === product.id ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
-                <h3 class="font-semibold mb-2">{{ getTierDisplayName('entry_mid') }}</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('entry_mid') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
-                <p class="text-sm text-neutral-body mb-4">For hourly, administrative, and early-career roles</p>
+                <h3 class="font-semibold mb-2">{{ product.display_name }}</h3>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <p class="text-sm text-neutral-body mb-4">{{ product.description || '' }}</p>
                 <button
                   type="button"
-                  @click="selectedTier = 'entry_mid'"
-                  class="btn-primary w-full"
-                >
-                  Select plan
-                </button>
-              </div>
-
-              <div
-                :class="[
-                  'card p-6 text-left transition-all',
-                  selectedTier === 'senior_management' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
-                ]"
-              >
-                <h3 class="font-semibold mb-2">{{ getTierDisplayName('senior_management') }}</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('senior_management') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
-                <p class="text-sm text-neutral-body mb-4">For experienced professionals and managers</p>
-                <button
-                  type="button"
-                  @click="selectedTier = 'senior_management'"
-                  class="btn-primary w-full"
-                >
-                  Select plan
-                </button>
-              </div>
-
-              <div
-                :class="[
-                  'card p-6 text-left transition-all',
-                  selectedTier === 'director_vp_c_level' ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
-                ]"
-              >
-                <h3 class="font-semibold mb-2">{{ getTierDisplayName('director_vp_c_level') }}</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getTierPrice('director_vp_c_level') }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
-                <p class="text-sm text-neutral-body mb-4">For executives and senior leaders</p>
-                <button
-                  type="button"
-                  @click="selectedTier = 'director_vp_c_level'"
+                  @click="selectedBasePlanId = product.id"
                   class="btn-primary w-full"
                 >
                   Select plan
@@ -528,37 +487,22 @@ const handleProceedToCheckout = async () => {
               <h3 class="font-semibold text-brand-charcoal mb-2">Optional add-ons</h3>
               <p class="text-sm text-neutral-body mb-4">Separately priced; add any you'd like.</p>
               <div class="space-y-3">
-                <label class="flex items-start">
+                <label
+                  v-for="product in addonProducts"
+                  :key="product.id"
+                  class="flex items-start"
+                >
                   <input
-                    v-model="premiumInsights"
+                    :checked="selectedAddonIds.includes(product.id)"
                     type="checkbox"
                     class="mr-3 mt-1 w-4 h-4"
+                    @change="(e) => toggleAddon(product.id, (e.target as HTMLInputElement).checked)"
                   />
                   <div>
-                    <span class="font-medium text-brand-charcoal">Premium Insights & Contact Access</span>
-                    <span class="text-sm text-neutral-body block">+$30/month — Hiring contact details and outreach messages</span>
-                  </div>
-                </label>
-                <label class="flex items-start">
-                  <input
-                    v-model="interviewPrep"
-                    type="checkbox"
-                    class="mr-3 mt-1 w-4 h-4"
-                  />
-                  <div>
-                    <span class="font-medium text-brand-charcoal">Interview Prep & Strategy</span>
-                    <span class="text-sm text-neutral-body block">+$30/month — Role-specific talking points and interview guidance</span>
-                  </div>
-                </label>
-                <label class="flex items-start">
-                  <input
-                    v-model="resumeUpgrade"
-                    type="checkbox"
-                    class="mr-3 mt-1 w-4 h-4"
-                  />
-                  <div>
-                    <span class="font-medium text-brand-charcoal">Resume Upgrade</span>
-                    <span class="text-sm text-neutral-body block">$19.95 one-time — Professional resume refresh</span>
+                    <span class="font-medium text-brand-charcoal">{{ product.display_name }}</span>
+                    <span class="text-sm text-neutral-body block">
+                      {{ product.type === 'payment' ? `$${getProductPrice(product).toFixed(2)} one-time` : `+$${getProductPrice(product)}/month` }} — {{ product.description || '' }}
+                    </span>
                   </div>
                 </label>
               </div>

@@ -1,131 +1,58 @@
 /**
- * Subscription data structures and display helpers.
- * Single source of truth for tier/status enums and their labels/prices.
+ * Subscription utility functions AND the subscription API for DB operations.
+ * Stripe is source of truth; subscription entitlements are derived from subscriptions + products + subscription_product rows.
  */
 
-import type { SubscriptionTier, SubscriptionStatus, AddonType, Subscription, Addon } from '@/types/database'
+import type {
+  Subscription,
+  SubscriptionStatus,
+  SubscriptionProduct,
+  Product,
+} from '@/types/database'
 import { supabase } from '@/lib/supabase'
-
-// --- Display maps (internal; used by getters below) ---
-
-const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
-  entry_mid: 'Entry & Mid Level Roles',
-  senior_management: 'Senior & Management Level Roles',
-  director_vp_c_level: 'Director, VP & C-Level Roles'
-}
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   trial: 'Free trial',
   active: 'Active',
-  cancelled: 'Cancelled',
-  expired: 'Expired',
-  paused: 'Paused'
+  canceled: 'Cancelled',
 }
 
-const TIER_PRICES: Record<SubscriptionTier, number> = {
-  entry_mid: 19,
-  senior_management: 29,
-  director_vp_c_level: 49
-}
-
-/** Add-on display labels (short form for lists). */
-const ADDON_DISPLAY_NAMES: Record<AddonType, string> = {
-  premium_insights: 'Premium Insights',
-  interview_prep: 'Interview Prep',
-  resume_upgrade: 'Resume Upgrade'
-}
-
-/** Add-on labels with price (for billing detail). */
-const ADDON_DISPLAY_WITH_PRICE: Record<AddonType, string> = {
-  premium_insights: 'Premium Insights & Contact Access (+$30/month)',
-  interview_prep: 'Interview Prep & Strategy (+$30/month)',
-  resume_upgrade: 'Resume Upgrade (one-time purchase)'
-}
-
-// --- Helpers ---
-
-const DEFAULT_TIER_LABEL = 'Not set'
 const DEFAULT_STATUS_LABEL = '—'
 
-export function getTierDisplayName(tier?: string | null): string {
-  if (!tier) return DEFAULT_TIER_LABEL
-  return TIER_DISPLAY_NAMES[tier as SubscriptionTier] ?? DEFAULT_TIER_LABEL
-}
-
-export function getStatusLabel(status?: string | null): string {
+export function getStatusLabel(status?: SubscriptionStatus | null): string {
   if (!status) return DEFAULT_STATUS_LABEL
-  return STATUS_LABELS[status as SubscriptionStatus] ?? DEFAULT_STATUS_LABEL
+  return STATUS_LABELS[status] ?? DEFAULT_STATUS_LABEL
 }
 
-export function getTierPrice(tier?: string | null): number {
-  if (!tier) return 0
-  return TIER_PRICES[tier as SubscriptionTier] ?? 0
+export function getProductPrice(basePlan: Product | null | undefined): number {
+  if (!basePlan) return 0
+  return basePlan.price_cents / 100
 }
 
-function getAddonDisplayName(addon: AddonType, withPrice = false): string {
-  return withPrice ? ADDON_DISPLAY_WITH_PRICE[addon] : ADDON_DISPLAY_NAMES[addon]
+/** Display name plus price suffix for a product line (e.g. billing add-on list). */
+export function formatProductLineLabel(product: Product): string {
+  const base = product.display_name
+  const price = getProductPrice(product)
+  if (product.type === 'payment') {
+    return `${base} ($${price.toFixed(2)} one-time)`
+  }
+  return `${base} (+$${price}/month)`
 }
 
-/** List of addon keys in display order. */
-const ADDON_KEYS: AddonType[] = ['premium_insights', 'interview_prep', 'resume_upgrade']
-
-function hasAddon(
-  subscription: Subscription | null | undefined,
-  addonKey: AddonType
-): boolean {
-  if (!subscription) return false
-  if (addonKey === 'premium_insights') return !!subscription.premium_insights_enabled
-  if (addonKey === 'interview_prep') return !!subscription.interview_prep_enabled
-  if (addonKey === 'resume_upgrade') return !!subscription.resume_upgrade_purchased
-  return false
-}
-
-export function getActiveAddons(
-  subscription: Subscription | null | undefined,
-  withPrice = false
-): Addon[] {
-  if (!subscription) return []
-  return ADDON_KEYS.filter((key) => hasAddon(subscription, key)).map((key) => ({
-    key,
-    label: getAddonDisplayName(key, withPrice)
-  }))
-}
+const productColumns = 'id, key, display_name, description, is_addon, price_cents, type'
 
 export const subscriptionAPI = {
-  async createSubscription(tier: SubscriptionTier, trialDays: number = 7) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
-
-    const { data, error } = await supabase.rpc('create_subscription_for_user', {
-      user_id: user.id,
-      tier,
-      trial_days: trialDays,
-    })
-
-    return { data, error }
-  },
-
   async createCheckoutSession(
-    tier: SubscriptionTier,
-    addons?: {
-      premium_insights?: boolean
-      interview_prep?: boolean
-      resume_upgrade?: boolean
-    },
+    productIds: string[],
     successUrl?: string,
     cancelUrl?: string,
   ) {
-    // Supabase automatically includes the auth header when using an authenticated client
-    // No need to manually pass Authorization header
     const { data, error } = await supabase.functions.invoke('create-checkout-session', {
       body: {
-        tier,
-        addons: addons || {},
+        productIds,
         successUrl:
-          successUrl || `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: cancelUrl || `${window.location.origin}/billing`,
+          successUrl ?? `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl ?? `${window.location.origin}/billing`,
       },
     })
 
@@ -134,12 +61,31 @@ export const subscriptionAPI = {
     }
 
     return { data, error: null }
+  },
+
+  /** Fetch products where is_addon = true */
+  async getAddonProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('products')
+      .select(productColumns)
+      .eq('is_addon', true)
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data: (data ?? []) as Product[], error: null }
+  },
+
+  async getBasePlanProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('products')
+      .select(productColumns)
+      .eq('is_addon', false)
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data: (data ?? []) as Product[], error: null }
   },
 
   async createBillingPortalSession(returnUrl?: string) {
     const { data, error } = await supabase.functions.invoke('create-billing-portal', {
       body: {
-        returnUrl: returnUrl || `${window.location.origin}/billing`,
+        returnUrl: returnUrl ?? `${window.location.origin}/billing`,
       },
     })
 
@@ -150,57 +96,96 @@ export const subscriptionAPI = {
     return { data, error: null }
   },
 
-  async getCurrentSubscription() {
+  async getProfileSubscriptionData(): Promise<{
+    data: {
+      subscriptions: Subscription[]
+      products: Product[]
+      subscriptionProducts: SubscriptionProduct[]
+    } | null
+    error: Error | null
+  }> {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    if (!user) {
+      return { data: null, error: new Error('Not authenticated') }
+    }
 
-    const { data: profileData } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('subscription_id')
+      .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!profileData?.subscription_id) {
-      return { data: null, error: null }
+    if (profileError || !profile) {
+      return { data: null, error: profileError ? new Error(profileError.message) : null }
     }
 
-    const { data, error } = await supabase
+    const { data: subRows, error: subError } = await supabase
       .from('subscriptions')
-      .select('*')
-      .eq('id', profileData.subscription_id)
-      .single<Subscription>()
+      .select('id, stripe_subscription_id, profile_id, status, current_period_ends_at')
+      .eq('profile_id', profile.id)
+      .in('status', ['trial', 'active'])
+      .order('current_period_ends_at', { ascending: false })
 
-    return { data, error }
-  },
+    if (subError) {
+      return { data: null, error: new Error(subError.message) }
+    }
 
-  async updateSubscriptionTier(newTier: SubscriptionTier) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    const subscriptions: Subscription[] = (subRows ?? []) as Subscription[]
 
-    const { data, error } = await supabase.rpc('update_subscription_tier', {
-      user_id: user.id,
-      new_tier: newTier,
-    })
+    const { data: subscriptionProductRows, error: subProdError } = await supabase
+      .from('subscription_product')
+      .select('id, subscription_id, product_id')
+      .in(
+        'subscription_id',
+        subscriptions.map((s) => s.id),
+      )
 
-    return { data, error }
-  },
+    if (subProdError) {
+      return { data: null, error: new Error(subProdError.message) }
+    }
 
-  async enableAddon(addonType: AddonType) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    const subscriptionProducts: SubscriptionProduct[] =
+      (subscriptionProductRows ?? []) as SubscriptionProduct[]
 
-    const { data, error } = await supabase.rpc('enable_premium_addon', {
-      user_id: user.id,
-      addon_type: addonType,
-    })
+    const productIdsFromSubs = new Set<string>(
+      subscriptionProducts.map((sp) => sp.product_id),
+    )
 
-    return { data, error }
+    const { data: profileProducts } = await supabase
+      .from('profile_product')
+      .select('product_id')
+      .eq('profile_id', profile.id)
+    const profileProductIds = new Set<string>(
+      (profileProducts ?? []).map((r) => r.product_id),
+    )
+
+    const allProductIds = Array.from(
+      new Set<string>([...productIdsFromSubs, ...profileProductIds]),
+    )
+
+    let products: Product[] = []
+    if (allProductIds.length > 0) {
+      const { data: productRows, error: productError } = await supabase
+        .from('products')
+        .select(productColumns)
+        .in('id', allProductIds)
+
+      if (productError) {
+        return { data: null, error: new Error(productError.message) }
+      }
+
+      products = (productRows ?? []) as Product[]
+    }
+
+    return {
+      data: {
+        subscriptions,
+        products,
+        subscriptionProducts,
+      },
+      error: null,
+    }
   },
 }
-

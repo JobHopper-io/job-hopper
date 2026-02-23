@@ -1,8 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { getTierDisplayName, getTierPrice } from '@/lib/subscription'
+import { ref, computed, onMounted } from 'vue'
+import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
+import type { Product } from '@/types/database'
 
 const faqOpen = ref<number | null>(null)
+const basePlanProducts = ref<Product[]>([])
+
+/** Base plans in display order (by price from DB; no hardcoded tier keys). */
+const orderedBasePlans = computed(() =>
+  [...basePlanProducts.value].sort((a, b) => a.price_cents - b.price_cents)
+)
+
+onMounted(async () => {
+  const res = await subscriptionAPI.getBasePlanProducts()
+  if (res.data) basePlanProducts.value = res.data
+})
 
 const toggleFaq = (index: number) => {
   faqOpen.value = faqOpen.value === index ? null : index
@@ -58,123 +70,63 @@ const pricingFaq = [
       <!-- Base Plans -->
       <section class="mb-16">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <!-- Entry & Mid Level -->
-          <div class="card p-8">
-            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('entry_mid') }}</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('entry_mid') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
-            <p class="text-sm text-neutral-body mb-6">For hourly, administrative, and early-career salaried roles.</p>
-            <div class="border-t border-neutral-border pt-6 mb-6">
-              <p class="text-sm font-semibold text-brand-charcoal mb-4">What's included:</p>
-              <ul class="space-y-2 text-sm text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Curated job matches aligned with your experience level</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Matching by role type, pay range, and location</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Active, vetted postings filtered for recency</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>AI-assisted job briefings</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Personal job feed in dashboard</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Email delivery of new matches</span>
-                </li>
-              </ul>
+          <template v-for="(product, index) in orderedBasePlans" :key="product.id">
+            <div
+              :class="[
+                'card p-8 text-left',
+                index === 1 ? 'border-2 border-brand-primary' : ''
+              ]"
+            >
+              <div v-if="index === 1" class="inline-block bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">Most popular</div>
+              <h3 class="text-xl font-heading font-semibold mb-2">{{ product.display_name }}</h3>
+              <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getProductPrice(product) }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
+              <p class="text-sm text-neutral-body mb-6">{{ product.description || '' }}</p>
+              <div class="border-t border-neutral-border pt-6 mb-6">
+                <p class="text-sm font-semibold text-brand-charcoal mb-4">What's included:</p>
+                <ul class="space-y-2 text-sm text-neutral-body">
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Curated job matches aligned with your experience level</span>
+                  </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Matching by role type, pay range, and location</span>
+                  </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Active, vetted postings filtered for recency</span>
+                  </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>AI-assisted job briefings</span>
+                  </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Personal job feed in dashboard</span>
+                  </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Email delivery of new matches</span>
+                  </li>
+                </ul>
+              </div>
+              <router-link to="/register" class="btn-primary w-full text-center block">
+                Start free trial
+              </router-link>
             </div>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
-            </router-link>
-          </div>
-
-          <!-- Senior & Management -->
-          <div class="card p-8 border-2 border-brand-primary">
-            <div class="inline-block bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">Most popular</div>
-            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('senior_management') }}</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('senior_management') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
-            <p class="text-sm text-neutral-body mb-6">For experienced professionals, supervisors, and managers.</p>
-            <div class="border-t border-neutral-border pt-6 mb-6">
-              <p class="text-sm font-semibold text-brand-charcoal mb-4">Everything in Entry & Mid Level, plus:</p>
-              <ul class="space-y-2 text-sm text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Matching tuned for senior individual contributor roles</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Supervisory and management positions</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Broader scope and stronger compensation alignment</span>
-                </li>
-              </ul>
-            </div>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
-            </router-link>
-          </div>
-
-          <!-- Director, VP & C-Level -->
-          <div class="card p-8">
-            <h3 class="text-xl font-heading font-semibold mb-2">{{ getTierDisplayName('director_vp_c_level') }}</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getTierPrice('director_vp_c_level') }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
-            <p class="text-sm text-neutral-body mb-6">For executives and senior leaders.</p>
-            <div class="border-t border-neutral-border pt-6 mb-6">
-              <p class="text-sm font-semibold text-brand-charcoal mb-4">Everything in Senior & Management, plus:</p>
-              <ul class="space-y-2 text-sm text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Matching optimized for Director, VP, and C-level opportunities</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Emphasis on strategic responsibility</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Organizational impact and long-term fit</span>
-                </li>
-              </ul>
-            </div>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
-            </router-link>
-          </div>
+          </template>
         </div>
       </section>
 

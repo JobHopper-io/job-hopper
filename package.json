@@ -13,7 +13,7 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",
-    "db:types": "npx supabase gen types typescript --schema public > src/types/supabase.ts"
+    "db:types": "npx supabase gen types typescript --project-id imekpzzvylngpoagcdow --schema public > src/types/supabase.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

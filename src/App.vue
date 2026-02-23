@@ -14,7 +14,7 @@ const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
 
 // Load profile + subscription once when user becomes authenticated
 watch(isAuthenticated, (authenticated) => {
-  if (authenticated) userStore.loadUserData()
+  if (authenticated) userStore.refreshUserData()
   else userStore.clear()
 })
 
