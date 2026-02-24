@@ -41,19 +41,34 @@ export function formatProductLineLabel(product: Product): string {
 
 const productColumns = 'id, key, display_name, description, is_addon, price_cents, type'
 
+export interface CreateCheckoutSessionOptions {
+  trialEnd?: number
+}
+
 export const subscriptionAPI = {
   async createCheckoutSession(
     productIds: string[],
     successUrl?: string,
     cancelUrl?: string,
+    options?: CreateCheckoutSessionOptions,
   ) {
+    const body: {
+      productIds: string[]
+      successUrl?: string
+      cancelUrl?: string
+      trialEnd?: number
+    } = {
+      productIds,
+      successUrl:
+        successUrl ?? `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: cancelUrl ?? `${window.location.origin}/billing`,
+    }
+    if (typeof options?.trialEnd === 'number' && options.trialEnd > 0) {
+      body.trialEnd = options.trialEnd
+    }
+
     const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-      body: {
-        productIds,
-        successUrl:
-          successUrl ?? `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: cancelUrl ?? `${window.location.origin}/billing`,
-      },
+      body,
     })
 
     if (error) {

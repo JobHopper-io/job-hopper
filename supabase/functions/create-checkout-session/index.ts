@@ -76,7 +76,7 @@ serve(async (req) => {
       }
     }
 
-    const { productIds = [], successUrl, cancelUrl } = await req.json()
+    const { productIds = [], successUrl, cancelUrl, trialEnd } = await req.json()
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       throw new Error('productIds must be a non-empty array')
@@ -101,7 +101,13 @@ serve(async (req) => {
       throw new Error('You may not purchase more than one base plan.')
     }
 
-    const orderedProducts = [basePlans[0], ...addons]
+    const hasBasePlan = basePlans.length === 1
+    const hasAddonsOnly = basePlans.length === 0 && addons.length > 0
+    if (!hasBasePlan && !hasAddonsOnly) {
+      throw new Error('Must include at least one base plan or at least one addon.')
+    }
+
+    const orderedProducts = hasBasePlan ? [basePlans[0], ...addons] : addons
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = orderedProducts.map((product) => {
       const priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData = {
@@ -123,6 +129,17 @@ serve(async (req) => {
       }
     })
 
+    const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] = {
+      metadata: {
+        profile_id: profile.id,
+      },
+    }
+    if (typeof trialEnd === 'number' && trialEnd > 0) {
+      subscriptionData.trial_end = trialEnd
+    } else if (hasBasePlan) {
+      subscriptionData.trial_period_days = 7
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -133,12 +150,7 @@ serve(async (req) => {
       metadata: {
         profile_id: profile.id,
       },
-      subscription_data: {
-        trial_period_days: 7,
-        metadata: {
-          profile_id: profile.id,
-        },
-      },
+      subscription_data: subscriptionData,
     })
 
     return new Response(

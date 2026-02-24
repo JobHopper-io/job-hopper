@@ -110,6 +110,11 @@ const router = createRouter({
       name: 'billing',
       component: () => import('../views/BillingView.vue'),
     },
+    {
+      path: '/billing/purchase',
+      name: 'billing-purchase',
+      component: () => import('../views/PurchaseAddonsView.vue'),
+    },
   ],
   scrollBehavior(_to, _from, savedPosition) {
     // Back/forward: restore browser's saved position

@@ -58,7 +58,7 @@ const handleManageBilling = async () => {
             </p>
             <p class="text-neutral-body">
               <span class="font-semibold">Monthly price:</span>
-              <span v-if="basePlan">${{ getProductPrice(basePlan) }}/month</span>
+              <span v-if="basePlan"> ${{ getProductPrice(basePlan) }}/month</span>
               <span v-else>—</span>
             </p>
             <p v-if="nextBillingAt" class="text-neutral-body">
@@ -104,10 +104,16 @@ const handleManageBilling = async () => {
                   aria-hidden="true"
                 >
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a 8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
                 {{ billingPortalLoading ? 'Opening...' : 'Open Billing Portal' }}
               </button>
+              <router-link
+                to="/billing/purchase"
+                class="btn-secondary inline-flex items-center justify-center"
+              >
+                Purchase add-ons
+              </router-link>
             </div>
             <p v-if="billingPortalError" class="text-sm text-red-600" role="alert">
               {{ billingPortalError }}
@@ -117,8 +123,19 @@ const handleManageBilling = async () => {
       </div>
       <div v-else class="space-y-6">
         <p class="text-neutral-body">No active plan</p>
+        <div class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Purchase add-ons</h2>
+          <p class="text-sm text-neutral-body mb-4">
+            You don't have an active base plan yet, but you can browse and purchase available add-ons.
+          </p>
+          <router-link
+            to="/billing/purchase"
+            class="btn-secondary inline-flex items-center justify-center"
+          >
+            Purchase add-ons
+          </router-link>
+        </div>
       </div>
     </div>
   </div>
 </template>
-
