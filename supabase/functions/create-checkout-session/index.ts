@@ -113,7 +113,7 @@ serve(async (req) => {
     const stripeProductIdsBySupabaseId = new Map<string, string>()
     await Promise.all(
       orderedProducts.map(async (product) => {
-        const stripeProductId = await getStripeProductId(supabaseClient, product)
+        const stripeProductId = await getStripeProductId(product)
         stripeProductIdsBySupabaseId.set(product.id, stripeProductId)
       }),
     )

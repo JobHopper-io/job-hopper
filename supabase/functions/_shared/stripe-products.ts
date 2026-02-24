@@ -1,10 +1,21 @@
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
   httpClient: Stripe.createFetchHttpClient(),
 })
+
+let supabaseAdmin: ReturnType<typeof createClient> | null = null
+function getSupabaseAdmin(): ReturnType<typeof createClient> {
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
+  }
+  return supabaseAdmin
+}
 
 type SupabaseProductRow = {
   id: string
@@ -12,8 +23,8 @@ type SupabaseProductRow = {
   stripe_product_id: string | null
 }
 
+/** Ensures a Stripe product exists for the Supabase product and persists stripe_product_id (uses service-role client; RLS only allows SELECT for anon/authenticated). */
 export async function getStripeProductId(
-  supabaseClient: SupabaseClient,
   product: SupabaseProductRow,
 ): Promise<string> {
   if (product.stripe_product_id) {
@@ -24,13 +35,17 @@ export async function getStripeProductId(
     name: product.display_name,
   })
 
-  const { error } = await supabaseClient
+  const admin = getSupabaseAdmin()
+  const { error } = await admin
     .from('products')
     .update({ stripe_product_id: stripeProduct.id })
     .eq('id', product.id)
 
   if (error) {
     console.error('Failed to update products.stripe_product_id', error)
+    throw new Error(
+      `Could not persist stripe_product_id for product ${product.id}: ${error.message}`,
+    )
   }
 
   return stripeProduct.id

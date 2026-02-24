@@ -28,7 +28,7 @@
   - Rows are not deleted when Stripe cancels; status is set to `canceled` for history.
 
 ### products
-- **Meaning**: Catalog of products used for display, pricing, and gating. The catalog is **DB-only**; there is no `stripe_product_id`. Stripe products/prices are created on the fly at checkout via `price_data` and `product_data`; the webhook resolves products only from session/line-item metadata `supabase_product_id` (our product id).
+- **Meaning**: Catalog of products used for display, pricing, and gating. The catalog is **DB-only**; Supabase products are the source of truth, and each product may have a canonical Stripe Product referenced by `stripe_product_id`. Stripe products/prices are created as a projection of this table and are looked up by `stripe_product_id`.
 - **Columns**: `id`, `key`, `display_name`, `description` (text), `is_addon`, `price_cents` (integer), `type` (enum `product_type`: `subscription` | `payment`), `stripe_product_id` (text, nullable).
 - **Key relationships**:
   - Referenced by `subscription_product` (products on a subscription) and `profile_product` (one-time purchases attached to a profile).

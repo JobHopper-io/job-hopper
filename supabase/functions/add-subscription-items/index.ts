@@ -160,10 +160,7 @@ serve(async (req) => {
 
     const productsWithStripeIds = await Promise.all(
       products.map(async (product) => {
-        const stripeProductId = await getStripeProductId(
-          supabaseClient,
-          product,
-        )
+        const stripeProductId = await getStripeProductId(product)
         return { ...product, stripeProductId }
       }),
     )
