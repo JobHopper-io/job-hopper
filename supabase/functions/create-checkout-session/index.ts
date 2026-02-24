@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import { getStripeProductId } from '../_shared/stripe-products.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -84,7 +85,7 @@ serve(async (req) => {
 
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, key, display_name, is_addon, price_cents, type')
+      .select('id, key, display_name, is_addon, price_cents, type, stripe_product_id')
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -109,16 +110,24 @@ serve(async (req) => {
 
     const orderedProducts = hasBasePlan ? [basePlans[0], ...addons] : addons
 
+    const stripeProductIdsBySupabaseId = new Map<string, string>()
+    await Promise.all(
+      orderedProducts.map(async (product) => {
+        const stripeProductId = await getStripeProductId(supabaseClient, product)
+        stripeProductIdsBySupabaseId.set(product.id, stripeProductId)
+      }),
+    )
+
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = orderedProducts.map((product) => {
+      const stripeProductId = stripeProductIdsBySupabaseId.get(product.id)
+      if (!stripeProductId) {
+        throw new Error(`Missing Stripe product id for product ${product.id}`)
+      }
+
       const priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData = {
         currency: 'usd',
         unit_amount: product.price_cents,
-        product_data: {
-          name: product.display_name,
-          metadata: {
-            supabase_product_id: product.id,
-          },
-        },
+        product: stripeProductId,
       }
       if (product.type === 'subscription') {
         priceData.recurring = { interval: 'month' }

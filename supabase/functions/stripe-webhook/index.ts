@@ -10,20 +10,12 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
-const METADATA_PRODUCT_ID = 'supabase_product_id'
-
 function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
   if (stripeStatus === 'active' || stripeStatus === 'past_due') return 'active'
   return 'canceled'
 }
 
-function getOurProductId(stripeProduct: Stripe.Product | string): string | null {
-  const product = stripeProduct
-  if (typeof product === 'string') return null
-  const id = product.metadata?.[METADATA_PRODUCT_ID]
-  return typeof id === 'string' && id.length > 0 ? id : null
-}
 
 serve(async (req) => {
   const signature = req.headers.get('stripe-signature')
@@ -72,7 +64,7 @@ serve(async (req) => {
         if (session.subscription) {
           const stripeSubscription = await stripe.subscriptions.retrieve(
             session.subscription as string,
-            { expand: ['items.data.price.product'] }
+            { expand: ['items.data.price.product'] },
           )
 
           const subscriptionStatus = mapStripeStatus(stripeSubscription.status)
@@ -98,13 +90,61 @@ serve(async (req) => {
 
           const subscriptionId = subRow.id
 
+          const stripeProductIds = new Set<string>()
           for (const item of stripeSubscription.items.data) {
-            const product = item.price?.product as Stripe.Product | string
-            const productId = getOurProductId(product)
-            if (!productId) {
-              console.error('checkout.session.completed: missing supabase_product_id in product metadata, skipping item')
+            const price = item.price
+            if (!price) continue
+            const product = price.product
+            if (typeof product === 'string') {
+              stripeProductIds.add(product)
+            } else if (product && typeof product.id === 'string') {
+              stripeProductIds.add(product.id)
+            }
+          }
+
+          const stripeProductIdArray = Array.from(stripeProductIds)
+          const { data: productsForSub, error: productsForSubError } =
+            await supabaseAdmin
+              .from('products')
+              .select('id, stripe_product_id')
+              .in('stripe_product_id', stripeProductIdArray)
+
+          if (productsForSubError) {
+            console.error(
+              'checkout.session.completed: failed to load products for subscription items',
+              productsForSubError,
+            )
+          }
+
+          const productIdByStripeProductId = new Map<string, string>()
+          for (const row of productsForSub ?? []) {
+            if (row.stripe_product_id) {
+              productIdByStripeProductId.set(row.stripe_product_id, row.id)
+            }
+          }
+
+          for (const item of stripeSubscription.items.data) {
+            const price = item.price
+            if (!price) continue
+            const product = price.product
+            const stripeProductId =
+              typeof product === 'string' ? product : product?.id
+            if (!stripeProductId) {
+              console.error(
+                'checkout.session.completed: missing Stripe product id on subscription item, skipping',
+              )
               continue
             }
+
+            const productId = productIdByStripeProductId.get(stripeProductId)
+            if (!productId) {
+              console.error(
+                'checkout.session.completed: no matching Supabase product for Stripe product id, skipping item',
+                stripeProductId,
+              )
+              continue
+            }
+
             await supabaseAdmin
               .from('subscription_product')
               .upsert(
@@ -113,31 +153,84 @@ serve(async (req) => {
                   product_id: productId,
                   stripe_subscription_item_id: item.id,
                 },
-                { onConflict: 'subscription_id,product_id' }
+                { onConflict: 'subscription_id,product_id' },
               )
           }
         }
 
-        const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
-          expand: ['data.price.product'],
-        })
+        const lineItems = await stripe.checkout.sessions.listLineItems(
+          session.id,
+          {
+            expand: ['data.price.product'],
+          },
+        )
 
+        const oneTimeStripeProductIds = new Set<string>()
         for (const line of lineItems.data) {
           const price = line.price
           if (!price) continue
           if (price.recurring != null) continue
-          const product = price.product as Stripe.Product | string
-          const productId = getOurProductId(product)
-          if (!productId) {
-            console.error('checkout.session.completed: one-time line missing supabase_product_id, skipping')
-            continue
+          const product = price.product
+          if (typeof product === 'string') {
+            oneTimeStripeProductIds.add(product)
+          } else if (product && typeof product.id === 'string') {
+            oneTimeStripeProductIds.add(product.id)
           }
-          await supabaseAdmin
-            .from('profile_product')
-            .upsert(
-              { profile_id: profileId, product_id: productId },
-              { onConflict: 'profile_id,product_id' }
+        }
+
+        const oneTimeStripeProductIdArray = Array.from(oneTimeStripeProductIds)
+        if (oneTimeStripeProductIdArray.length > 0) {
+          const { data: oneTimeProducts, error: oneTimeProductsError } =
+            await supabaseAdmin
+              .from('products')
+              .select('id, stripe_product_id')
+              .in('stripe_product_id', oneTimeStripeProductIdArray)
+
+          if (oneTimeProductsError) {
+            console.error(
+              'checkout.session.completed: failed to load products for one-time items',
+              oneTimeProductsError,
             )
+          }
+
+          const oneTimeProductIdByStripeProductId = new Map<string, string>()
+          for (const row of oneTimeProducts ?? []) {
+            if (row.stripe_product_id) {
+              oneTimeProductIdByStripeProductId.set(row.stripe_product_id, row.id)
+            }
+          }
+
+          for (const line of lineItems.data) {
+            const price = line.price
+            if (!price) continue
+            if (price.recurring != null) continue
+            const product = price.product
+            const stripeProductId =
+              typeof product === 'string' ? product : product?.id
+            if (!stripeProductId) {
+              console.error(
+                'checkout.session.completed: one-time line missing Stripe product id, skipping',
+              )
+              continue
+            }
+
+            const productId =
+              oneTimeProductIdByStripeProductId.get(stripeProductId)
+            if (!productId) {
+              console.error(
+                'checkout.session.completed: no matching Supabase product for one-time Stripe product id, skipping',
+                stripeProductId,
+              )
+              continue
+            }
+
+            await supabaseAdmin
+              .from('profile_product')
+              .upsert(
+                { profile_id: profileId, product_id: productId },
+                { onConflict: 'profile_id,product_id' },
+              )
+          }
         }
         break
       }
@@ -169,11 +262,51 @@ serve(async (req) => {
           })
           .eq('id', existingSub.id)
 
+        const stripeProductIds = new Set<string>()
+        for (const item of expanded.items.data) {
+          const price = item.price
+          if (!price) continue
+          const product = price.product
+          if (typeof product === 'string') {
+            stripeProductIds.add(product)
+          } else if (product && typeof product.id === 'string') {
+            stripeProductIds.add(product.id)
+          }
+        }
+
+        const stripeProductIdArray = Array.from(stripeProductIds)
+        const { data: productsForSub, error: productsForSubError } =
+          await supabaseAdmin
+            .from('products')
+            .select('id, stripe_product_id')
+            .in('stripe_product_id', stripeProductIdArray)
+
+        if (productsForSubError) {
+          console.error(
+            'customer.subscription.updated: failed to load products for subscription items',
+            productsForSubError,
+          )
+        }
+
+        const productIdByStripeProductId = new Map<string, string>()
+        for (const row of productsForSub ?? []) {
+          if (row.stripe_product_id) {
+            productIdByStripeProductId.set(row.stripe_product_id, row.id)
+          }
+        }
+
         const productIdsInStripe: string[] = []
         for (const item of expanded.items.data) {
-          const product = item.price?.product as Stripe.Product | string
-          const productId = getOurProductId(product)
+          const price = item.price
+          if (!price) continue
+          const product = price.product
+          const stripeProductId =
+            typeof product === 'string' ? product : product?.id
+          if (!stripeProductId) continue
+
+          const productId = productIdByStripeProductId.get(stripeProductId)
           if (!productId) continue
+
           productIdsInStripe.push(productId)
           await supabaseAdmin
             .from('subscription_product')
@@ -183,7 +316,7 @@ serve(async (req) => {
                 product_id: productId,
                 stripe_subscription_item_id: item.id,
               },
-              { onConflict: 'subscription_id,product_id' }
+              { onConflict: 'subscription_id,product_id' },
             )
         }
 

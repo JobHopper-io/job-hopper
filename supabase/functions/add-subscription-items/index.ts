@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import { getStripeProductId } from '../_shared/stripe-products.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -60,7 +61,7 @@ serve(async (req) => {
     // Load requested addon products
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, display_name, is_addon, price_cents, type')
+      .select('id, display_name, is_addon, price_cents, type, stripe_product_id')
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -145,20 +146,31 @@ serve(async (req) => {
       { expand: ['items.data.price.product'] },
     )
 
-    // Build set of product ids already on subscription
-    const existingProductIds = new Set<string>()
+    const existingStripeProductIds = new Set<string>()
     for (const item of stripeSubscription.items.data) {
       const price = item.price
       if (!price) continue
       const product = price.product
-      if (typeof product === 'string') continue
-      const id = product.metadata?.supabase_product_id
-      if (typeof id === 'string' && id.length > 0) {
-        existingProductIds.add(id)
+      if (typeof product === 'string') {
+        existingStripeProductIds.add(product)
+      } else if (product && typeof product.id === 'string') {
+        existingStripeProductIds.add(product.id)
       }
     }
 
-    const productsToAdd = products.filter((p) => !existingProductIds.has(p.id))
+    const productsWithStripeIds = await Promise.all(
+      products.map(async (product) => {
+        const stripeProductId = await getStripeProductId(
+          supabaseClient,
+          product,
+        )
+        return { ...product, stripeProductId }
+      }),
+    )
+
+    const productsToAdd = productsWithStripeIds.filter(
+      (p) => !existingStripeProductIds.has(p.stripeProductId),
+    )
     if (productsToAdd.length === 0) {
       return new Response(
         JSON.stringify({ success: true, message: 'No new add-ons to add.' }),
@@ -169,7 +181,6 @@ serve(async (req) => {
       )
     }
 
-    // Create subscription items with inline price_data for each new add-on
     for (const product of productsToAdd) {
       await stripe.subscriptionItems.create({
         subscription: stripeSubscriptionId,
@@ -177,12 +188,7 @@ serve(async (req) => {
           currency: 'usd',
           unit_amount: product.price_cents,
           recurring: { interval: 'month' },
-          product_data: {
-            name: product.display_name,
-            metadata: {
-              supabase_product_id: product.id,
-            },
-          },
+          product: product.stripeProductId,
         },
         proration_behavior: 'create_prorations',
       })
