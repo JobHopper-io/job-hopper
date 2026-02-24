@@ -108,7 +108,11 @@ serve(async (req) => {
             await supabaseAdmin
               .from('subscription_product')
               .upsert(
-                { subscription_id: subscriptionId, product_id: productId },
+                {
+                  subscription_id: subscriptionId,
+                  product_id: productId,
+                  stripe_subscription_item_id: item.id,
+                },
                 { onConflict: 'subscription_id,product_id' }
               )
           }
@@ -174,7 +178,11 @@ serve(async (req) => {
           await supabaseAdmin
             .from('subscription_product')
             .upsert(
-              { subscription_id: existingSub.id, product_id: productId },
+              {
+                subscription_id: existingSub.id,
+                product_id: productId,
+                stripe_subscription_item_id: item.id,
+              },
               { onConflict: 'subscription_id,product_id' }
             )
         }

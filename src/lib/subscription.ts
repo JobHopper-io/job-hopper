@@ -46,6 +46,20 @@ export interface CreateCheckoutSessionOptions {
 }
 
 export const subscriptionAPI = {
+  async addSubscriptionItems(productIds: string[]) {
+    const { data, error } = await supabase.functions.invoke('add-subscription-items', {
+      body: {
+        productIds,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
   async createCheckoutSession(
     productIds: string[],
     successUrl?: string,

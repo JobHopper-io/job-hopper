@@ -43,6 +43,7 @@
   - `subscription_id` → `subscriptions.id`, `product_id` → `products.id`. UNIQUE(`subscription_id`, `product_id`).
 - **Non‑obvious rules**:
   - Updated by webhook `customer.subscription.updated` to match Stripe subscription items exactly (add missing, remove extras).
+  - Stores `stripe_subscription_item_id` for each `(subscription_id, product_id)` so Stripe subscription items can be updated or cancelled individually without treating Stripe as a source of truth.
 
 ### profile_product
 - **Meaning**: One-time product purchases attached to a profile (e.g. resume upgrade).

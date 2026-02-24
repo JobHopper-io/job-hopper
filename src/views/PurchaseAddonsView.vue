@@ -46,34 +46,20 @@ async function handleContinueToCheckout() {
   error.value = ''
   checkoutLoading.value = true
   try {
-    const successUrl = `${window.location.origin}/billing?session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${window.location.origin}/billing`
-    const options =
-      trialEndsAt.value != null
-        ? {
-            trialEnd: Math.floor(new Date(trialEndsAt.value).getTime() / 1000),
-          }
-        : undefined
-
-    const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
+    const { error: addError } = await subscriptionAPI.addSubscriptionItems(
       selectedAddonIds.value,
-      successUrl,
-      cancelUrl,
-      options,
     )
 
-    if (checkoutError) {
-      console.error('Checkout session error:', checkoutError)
-      error.value = 'Unable to start checkout. Please try again.'
+    if (addError) {
+      console.error('Add-on update error:', addError)
+      error.value = 'Unable to update your subscription. Please try again.'
       return
     }
-    if (data?.url) {
-      window.location.href = data.url
-    } else {
-      error.value = 'Unable to start checkout. Please try again.'
-    }
+
+    // Reload subscription data so Billing view reflects new add-ons
+    await userStore.refreshUserData()
   } catch (err) {
-    console.error('Checkout error:', err)
+    console.error('Add-on update error:', err)
     error.value = 'An unexpected error occurred. Please try again.'
   } finally {
     checkoutLoading.value = false
