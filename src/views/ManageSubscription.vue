@@ -130,7 +130,7 @@ onMounted(async () => {
         </router-link>
       </div>
       <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">
-        Manage add-ons
+        Manage aSubscription
       </h1>
       <p class="text-neutral-body mb-2">
         Add or remove features to your subscription with add-ons.
@@ -290,7 +290,7 @@ onMounted(async () => {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              {{ checkoutLoading ? 'Redirecting to checkout...' : 'Continue to checkout' }}
+              {{ checkoutLoading ? 'Adding to subscription...' : 'Add to subscription' }}
             </button>
             <router-link
               to="/billing"
@@ -327,7 +327,7 @@ onMounted(async () => {
           <p class="text-neutral-body mb-6">
             Are you sure you would like to remove
             <strong>{{ confirmRemoveProduct.display_name }}</strong>
-            from your subscription? You may receive a prorated credit on your next invoice.
+            from your subscription?
           </p>
           <div class="flex flex-col sm:flex-row gap-3 justify-end">
             <button

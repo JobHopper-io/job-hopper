@@ -111,9 +111,9 @@ const router = createRouter({
       component: () => import('../views/Billing.vue'),
     },
     {
-      path: '/billing/purchase',
+      path: '/billing/manage',
       name: 'billing-purchase',
-      component: () => import('../views/ManageAddons.vue'),
+      component: () => import('../views/ManageSubscription.vue'),
     },
   ],
   scrollBehavior(_to, _from, savedPosition) {

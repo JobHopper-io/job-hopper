@@ -85,7 +85,7 @@ const handleManageBilling = async () => {
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Manage Subscription</h2>
           <p class="text-sm text-neutral-body mb-4">
-            Use the billing portal to update your payment method, view invoices, change your plan, manage add-ons, or update your billing address.
+            Use the billing portal to update your payment method, view invoices, or update your billing address. Use manage subscription page to change your plan and manage add-ons.
           </p>
           <div class="flex flex-col gap-2">
             <div class="flex flex-col sm:flex-row gap-4">
@@ -109,10 +109,10 @@ const handleManageBilling = async () => {
                 {{ billingPortalLoading ? 'Opening...' : 'Open Billing Portal' }}
               </button>
               <router-link
-                to="/billing/purchase"
+                to="/billing/manage"
                 class="btn-secondary inline-flex items-center justify-center"
               >
-                Manage add-ons
+                Manage Subscription
               </router-link>
             </div>
             <p v-if="billingPortalError" class="text-sm text-red-600" role="alert">
@@ -124,15 +124,15 @@ const handleManageBilling = async () => {
       <div v-else class="space-y-6">
         <p class="text-neutral-body">No active plan</p>
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Manage add-ons</h2>
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Manage Subscription</h2>
           <p class="text-sm text-neutral-body mb-4">
-            You don't have an active base plan yet, but you can browse and purchase available add-ons.
+            You don't have an active subscription yet.
           </p>
           <router-link
-            to="/billing/purchase"
+            to="/billing/manage"
             class="btn-secondary inline-flex items-center justify-center"
           >
-            Purchase add-ons
+            Browse Subscriptions
           </router-link>
         </div>
       </div>
