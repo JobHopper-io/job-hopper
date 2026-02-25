@@ -125,7 +125,7 @@ onMounted(async () => {
         </router-link>
       </div>
       <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">
-        Manage aSubscription
+        Manage Subscription
       </h1>
       <p class="text-neutral-body mb-2">
         Add or remove features to your subscription with add-ons.
