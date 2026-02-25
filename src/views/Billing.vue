@@ -112,7 +112,7 @@ const handleManageBilling = async () => {
                 to="/billing/purchase"
                 class="btn-secondary inline-flex items-center justify-center"
               >
-                Purchase add-ons
+                Manage add-ons
               </router-link>
             </div>
             <p v-if="billingPortalError" class="text-sm text-red-600" role="alert">
@@ -124,7 +124,7 @@ const handleManageBilling = async () => {
       <div v-else class="space-y-6">
         <p class="text-neutral-body">No active plan</p>
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Purchase add-ons</h2>
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Manage add-ons</h2>
           <p class="text-sm text-neutral-body mb-4">
             You don't have an active base plan yet, but you can browse and purchase available add-ons.
           </p>

@@ -15,6 +15,7 @@ const checkoutLoading = ref(false)
 const error = ref('')
 const removeError = ref('')
 const removingAddonIds = ref<string[]>([])
+const confirmRemoveProduct = ref<Product | null>(null)
 
 const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id)))
 
@@ -68,19 +69,25 @@ async function handleContinueToCheckout() {
   }
 }
 
-async function handleRemoveAddon(productId: string) {
-  if (removingAddonIds.value.includes(productId)) return
-  // Simple confirmation to avoid accidental removals
-  const confirmed = window.confirm(
-    'Are you sure you would like to remove this add-on? You may receive a prorated credit on your next invoice.',
-  )
-  if (!confirmed) return
+function openRemoveConfirm(product: Product) {
+  removeError.value = ''
+  confirmRemoveProduct.value = product
+}
+
+function closeRemoveConfirm() {
+  confirmRemoveProduct.value = null
+}
+
+async function confirmRemoveAddon() {
+  const product = confirmRemoveProduct.value
+  if (!product || removingAddonIds.value.includes(product.id)) return
 
   removeError.value = ''
-  removingAddonIds.value = [...removingAddonIds.value, productId]
+  removingAddonIds.value = [...removingAddonIds.value, product.id]
+  closeRemoveConfirm()
   try {
     const { error: removeErrorResult } = await subscriptionAPI.removeSubscriptionItems([
-      productId,
+      product.id,
     ])
 
     if (removeErrorResult) {
@@ -95,7 +102,7 @@ async function handleRemoveAddon(productId: string) {
     console.error('Remove add-on error:', err)
     removeError.value = 'An unexpected error occurred while removing the add-on.'
   } finally {
-    removingAddonIds.value = removingAddonIds.value.filter((id) => id !== productId)
+    removingAddonIds.value = removingAddonIds.value.filter((id) => id !== product.id)
   }
 }
 
@@ -123,10 +130,10 @@ onMounted(async () => {
         </router-link>
       </div>
       <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">
-        Purchase add-ons
+        Manage add-ons
       </h1>
       <p class="text-neutral-body mb-2">
-        Add more features to your subscription with additional add-ons.
+        Add or remove features to your subscription with add-ons.
       </p>
       <p
         v-if="formattedTrialEnd"
@@ -171,10 +178,6 @@ onMounted(async () => {
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
             Current add-ons
           </h2>
-          <p class="text-sm text-neutral-body mb-4">
-            These add-ons are currently active on your subscription. You can remove them
-            at any time.
-          </p>
           <div class="space-y-3">
             <div
               v-for="product in addonProducts"
@@ -194,7 +197,7 @@ onMounted(async () => {
                 type="button"
                 class="btn-secondary text-sm"
                 :disabled="removingAddonIds.includes(product.id)"
-                @click="handleRemoveAddon(product.id)"
+                @click="openRemoveConfirm(product)"
               >
                 {{ removingAddonIds.includes(product.id) ? 'Removing...' : 'Remove' }}
               </button>
@@ -299,5 +302,51 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- Remove add-on confirmation modal -->
+    <Teleport to="body">
+      <div
+        v-if="confirmRemoveProduct"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-remove-title"
+        @keydown.escape="closeRemoveConfirm"
+        @click.self="closeRemoveConfirm"
+      >
+        <div
+          class="card p-6 max-w-md w-full shadow-xl"
+          @click.stop
+        >
+          <h2
+            id="confirm-remove-title"
+            class="text-xl font-heading font-semibold text-brand-charcoal mb-2"
+          >
+            Remove add-on?
+          </h2>
+          <p class="text-neutral-body mb-6">
+            Are you sure you would like to remove
+            <strong>{{ confirmRemoveProduct.display_name }}</strong>
+            from your subscription? You may receive a prorated credit on your next invoice.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-end">
+            <button
+              type="button"
+              class="btn-secondary order-2 sm:order-1"
+              @click="closeRemoveConfirm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn-primary order-1 sm:order-2"
+              @click="confirmRemoveAddon"
+            >
+              Remove add-on
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

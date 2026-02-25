@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import ConfirmEmailView from '../views/ConfirmEmailView.vue'
-import OnboardingView from '../views/OnboardingView.vue'
+import LoginView from '../views/Login.vue'
+import RegisterView from '../views/Register.vue'
+import ConfirmEmailView from '../views/ConfirmEmail.vue'
+import OnboardingView from '../views/Onboarding.vue'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 import type { Profile } from '@/types/database'
@@ -29,32 +29,32 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('../views/Home.vue'),
     },
     {
       path: '/how-it-works',
       name: 'how-it-works',
-      component: () => import('../views/HowItWorksView.vue'),
+      component: () => import('../views/HowItWorks.vue'),
     },
     {
       path: '/pricing',
       name: 'pricing',
-      component: () => import('../views/PricingView.vue'),
+      component: () => import('../views/Pricing.vue'),
     },
     {
       path: '/faq',
       name: 'faq',
-      component: () => import('../views/FAQView.vue'),
+      component: () => import('../views/FAQ.vue'),
     },
     {
       path: '/about',
       name: 'about',
-      component: () => import('../views/AboutView.vue'),
+      component: () => import('../views/About.vue'),
     },
     {
       path: '/support',
       name: 'support',
-      component: () => import('../views/SupportView.vue'),
+      component: () => import('../views/Support.vue'),
     },
     {
       path: '/contact',
@@ -63,12 +63,12 @@ const router = createRouter({
     {
       path: '/privacy',
       name: 'privacy',
-      component: () => import('../views/PrivacyView.vue'),
+      component: () => import('../views/Privacy.vue'),
     },
     {
       path: '/terms',
       name: 'terms',
-      component: () => import('../views/TermsView.vue'),
+      component: () => import('../views/Terms.vue'),
     },
     {
       path: '/login',
@@ -93,27 +93,27 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
+      component: () => import('../views/Dashboard.vue'),
     },
     {
       path: '/job/:id',
       name: 'job-detail',
-      component: () => import('../views/JobDetailView.vue'),
+      component: () => import('../views/JobDetail.vue'),
     },
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('../views/ProfileView.vue'),
+      component: () => import('../views/Profile.vue'),
     },
     {
       path: '/billing',
       name: 'billing',
-      component: () => import('../views/BillingView.vue'),
+      component: () => import('../views/Billing.vue'),
     },
     {
       path: '/billing/purchase',
       name: 'billing-purchase',
-      component: () => import('../views/PurchaseAddonsView.vue'),
+      component: () => import('../views/ManageAddons.vue'),
     },
   ],
   scrollBehavior(_to, _from, savedPosition) {
