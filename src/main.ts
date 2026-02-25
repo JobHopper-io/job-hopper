@@ -5,11 +5,13 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { registerFontAwesome } from '@/plugins/fontawesome'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+registerFontAwesome(app)
 
 app.mount('#app')
 

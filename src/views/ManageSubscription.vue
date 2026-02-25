@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { subscriptionAPI, formatProductLineLabel } from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
@@ -15,6 +15,7 @@ const checkoutLoading = ref(false)
 const error = ref('')
 const removeError = ref('')
 const removingAddonIds = ref<string[]>([])
+const pendingAddonIds = ref<string[]>([])
 const confirmRemoveProduct = ref<Product | null>(null)
 
 const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id)))
@@ -22,6 +23,26 @@ const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id
 const availableAddons = computed(() =>
   allAddonProducts.value.filter((p) => !ownedAddonIds.value.has(p.id)),
 )
+
+watch(addonProducts, (newAddonProducts) => {
+  const ownedIds = new Set(newAddonProducts.map((p) => p.id))
+
+  if (pendingAddonIds.value.length > 0) {
+    const stillPending = pendingAddonIds.value.filter((id) => !ownedIds.has(id))
+
+    if (stillPending.length === 0) {
+      pendingAddonIds.value = []
+      checkoutLoading.value = false
+      selectedAddonIds.value = []
+    } else {
+      pendingAddonIds.value = stillPending
+    }
+  }
+
+  if (removingAddonIds.value.length > 0) {
+    removingAddonIds.value = removingAddonIds.value.filter((id) => ownedIds.has(id))
+  }
+})
 
 const canCheckout = computed(
   () => selectedAddonIds.value.length > 0 && !checkoutLoading.value,
@@ -48,20 +69,32 @@ async function handleContinueToCheckout() {
   if (!canCheckout.value) return
   error.value = ''
   checkoutLoading.value = true
+  const requestedAddonIds = [...selectedAddonIds.value]
+
   try {
     const { error: addError } = await subscriptionAPI.addSubscriptionItems(
-      selectedAddonIds.value,
+      requestedAddonIds,
     )
 
     if (addError) {
       console.error('Add-on update error:', addError)
       error.value = 'Unable to update your subscription. Please try again.'
+      checkoutLoading.value = false
       return
+    }
+
+    const ownedIds = new Set(addonProducts.value.map((p) => p.id))
+    const notYetOwned = requestedAddonIds.filter((id) => !ownedIds.has(id))
+
+    if (notYetOwned.length === 0) {
+      checkoutLoading.value = false
+      selectedAddonIds.value = []
+    } else {
+      pendingAddonIds.value = notYetOwned
     }
   } catch (err) {
     console.error('Add-on update error:', err)
     error.value = 'An unexpected error occurred. Please try again.'
-  } finally {
     checkoutLoading.value = false
   }
 }
@@ -91,12 +124,12 @@ async function confirmRemoveAddon() {
       console.error('Remove add-on error:', removeErrorResult)
       removeError.value =
         'Unable to remove this add-on from your subscription. Please try again.'
+      removingAddonIds.value = removingAddonIds.value.filter((id) => id !== product.id)
       return
     }
   } catch (err) {
     console.error('Remove add-on error:', err)
     removeError.value = 'An unexpected error occurred while removing the add-on.'
-  } finally {
     removingAddonIds.value = removingAddonIds.value.filter((id) => id !== product.id)
   }
 }
@@ -145,26 +178,12 @@ onMounted(async () => {
       </p>
 
       <div v-if="isLoadingProducts" class="text-center py-12">
-        <svg
-          class="animate-spin h-8 w-8 text-brand-primary mx-auto mb-4"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
+        <font-awesome-icon
+          icon="spinner"
+          spin
+          class="h-8 w-8 text-brand-primary mx-auto mb-4"
+          aria-hidden="true"
+        />
         <p class="text-neutral-body">Loading add-ons...</p>
       </div>
 
@@ -190,11 +209,25 @@ onMounted(async () => {
               </div>
               <button
                 type="button"
-                class="btn-secondary text-sm"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 disabled:text-red-300 disabled:hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 :disabled="removingAddonIds.includes(product.id)"
                 @click="openRemoveConfirm(product)"
+                :aria-label="'Remove ' + product.display_name"
+                :title="'Remove ' + product.display_name"
               >
-                {{ removingAddonIds.includes(product.id) ? 'Removing...' : 'Remove' }}
+                <font-awesome-icon
+                  v-if="!removingAddonIds.includes(product.id)"
+                  :icon="['fas', 'trash']"
+                  class="w-5 h-5"
+                  aria-hidden="true"
+                />
+                <font-awesome-icon
+                  v-else
+                  :icon="['fas', 'spinner']"
+                  spin
+                  class="w-5 h-5 text-red-500"
+                  aria-hidden="true"
+                />
               </button>
             </div>
           </div>
@@ -263,28 +296,13 @@ onMounted(async () => {
               class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               @click="handleContinueToCheckout"
             >
-              <svg
+              <font-awesome-icon
                 v-if="checkoutLoading"
-                class="animate-spin h-5 w-5"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+                :icon="['fas', 'spinner']"
+                spin
+                class="h-5 w-5"
                 aria-hidden="true"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
+              />
               {{ checkoutLoading ? 'Adding to subscription...' : 'Add to subscription' }}
             </button>
             <router-link

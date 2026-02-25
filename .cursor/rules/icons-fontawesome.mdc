@@ -1,0 +1,20 @@
+---
+description: Use centralized Font Awesome icons instead of ad-hoc SVG or icon markup
+alwaysApply: true
+---
+
+# Icons and Font Awesome
+
+- **Font Awesome is the standard icon system for this project.**
+  - Use the global `font-awesome-icon` component registered via `registerFontAwesome` in `src/plugins/fontawesome.ts`.
+  - Only add new icons by importing them into `src/plugins/fontawesome.ts` and registering them with the shared `library`.
+- **Do NOT introduce custom, ad-hoc icon implementations** unless there is no suitable Font Awesome alternative.
+  - Avoid inline `<svg>` markup for common actions (delete, add, confirm, loading, warning, success, navigation, etc.).
+  - Avoid CSS-based icon hacks (e.g. using plain text symbols as icons) for new UI work.
+- **When editing existing code**:
+  - Prefer refactoring repeated or semantic icons (spinners, trash/delete, checkmarks, alerts) to use `<font-awesome-icon>` instead of duplicating SVG paths.
+  - If keeping an existing inline SVG for a very specific illustration, leave a short comment in the code explaining why Font Awesome is not appropriate there.
+- **Loading states and status icons**:
+  - Use the shared `faSpinner` icon (with the `spin` prop) for loading indicators.
+  - Use the shared semantic icons from the plugin (e.g. `faTrash`, `faCheck`, `faExclamationTriangle`) for destructive actions, confirmations, and warnings.
+
