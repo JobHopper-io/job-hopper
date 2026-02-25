@@ -60,6 +60,20 @@ export const subscriptionAPI = {
     return { data, error: null }
   },
 
+  async removeSubscriptionItems(productIds: string[]) {
+    const { data, error } = await supabase.functions.invoke('remove-subscription-items', {
+      body: {
+        productIds,
+      },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  },
+
   async createCheckoutSession(
     productIds: string[],
     successUrl?: string,

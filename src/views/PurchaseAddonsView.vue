@@ -13,6 +13,8 @@ const selectedAddonIds = ref<string[]>([])
 const isLoadingProducts = ref(true)
 const checkoutLoading = ref(false)
 const error = ref('')
+const removeError = ref('')
+const removingAddonIds = ref<string[]>([])
 
 const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id)))
 
@@ -63,6 +65,37 @@ async function handleContinueToCheckout() {
     error.value = 'An unexpected error occurred. Please try again.'
   } finally {
     checkoutLoading.value = false
+  }
+}
+
+async function handleRemoveAddon(productId: string) {
+  if (removingAddonIds.value.includes(productId)) return
+  // Simple confirmation to avoid accidental removals
+  const confirmed = window.confirm(
+    'Are you sure you would like to remove this add-on? You may receive a prorated credit on your next invoice.',
+  )
+  if (!confirmed) return
+
+  removeError.value = ''
+  removingAddonIds.value = [...removingAddonIds.value, productId]
+  try {
+    const { error: removeErrorResult } = await subscriptionAPI.removeSubscriptionItems([
+      productId,
+    ])
+
+    if (removeErrorResult) {
+      console.error('Remove add-on error:', removeErrorResult)
+      removeError.value =
+        'Unable to remove this add-on from your subscription. Please try again.'
+      return
+    }
+
+    await userStore.refreshUserData()
+  } catch (err) {
+    console.error('Remove add-on error:', err)
+    removeError.value = 'An unexpected error occurred while removing the add-on.'
+  } finally {
+    removingAddonIds.value = removingAddonIds.value.filter((id) => id !== productId)
   }
 }
 
@@ -133,87 +166,136 @@ onMounted(async () => {
         <p class="text-neutral-body">Loading add-ons...</p>
       </div>
 
-      <div v-else-if="availableAddons.length === 0" class="card p-6">
-        <p class="text-neutral-body mb-4">
-          You have all available add-ons.
-        </p>
-        <router-link to="/billing" class="btn-primary inline-block">
-          Back to billing
-        </router-link>
-      </div>
-
-      <div v-else class="card p-6">
-        <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-          Available add-ons
-        </h2>
-        <p class="text-sm text-neutral-body mb-6">
-          Select the add-ons you want to add to your subscription.
-        </p>
-        <div class="space-y-3 mb-8">
-          <label
-            v-for="product in availableAddons"
-            :key="product.id"
-            class="flex items-start cursor-pointer"
-          >
-            <input
-              :checked="selectedAddonIds.includes(product.id)"
-              type="checkbox"
-              class="mr-3 mt-1 w-4 h-4"
-              @change="
-                (e) =>
-                  toggleAddon(product.id, (e.target as HTMLInputElement).checked)
-              "
-            />
-            <div>
-              <span class="font-medium text-brand-charcoal">{{
-                product.display_name
-              }}</span>
-              <span class="text-sm text-neutral-body block">
-                {{ formatProductLineLabel(product) }}
-                <span v-if="product.description"> — {{ product.description }}</span>
-              </span>
-            </div>
-          </label>
-        </div>
-
-        <div v-if="error" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-[12px]">
-          <p class="text-red-800 text-sm">{{ error }}</p>
-        </div>
-
-        <div class="flex flex-col sm:flex-row gap-4">
-          <button
-            type="button"
-            :disabled="!canCheckout"
-            class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            @click="handleContinueToCheckout"
-          >
-            <svg
-              v-if="checkoutLoading"
-              class="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+      <div v-else class="space-y-6">
+        <div class="card p-6" v-if="addonProducts.length">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            Current add-ons
+          </h2>
+          <p class="text-sm text-neutral-body mb-4">
+            These add-ons are currently active on your subscription. You can remove them
+            at any time.
+          </p>
+          <div class="space-y-3">
+            <div
+              v-for="product in addonProducts"
+              :key="product.id"
+              class="flex items-center justify-between"
             >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            {{ checkoutLoading ? 'Redirecting to checkout...' : 'Continue to checkout' }}
-          </button>
-          <router-link to="/billing" class="btn-secondary inline-flex items-center justify-center">
-            Cancel
+              <div>
+                <span class="font-medium text-brand-charcoal">{{
+                  product.display_name
+                }}</span>
+                <span class="text-sm text-neutral-body block">
+                  {{ formatProductLineLabel(product) }}
+                  <span v-if="product.description"> — {{ product.description }}</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                class="btn-secondary text-sm"
+                :disabled="removingAddonIds.includes(product.id)"
+                @click="handleRemoveAddon(product.id)"
+              >
+                {{ removingAddonIds.includes(product.id) ? 'Removing...' : 'Remove' }}
+              </button>
+            </div>
+          </div>
+          <div
+            v-if="removeError"
+            class="mt-4 p-4 bg-red-50 border border-red-200 rounded-[12px]"
+          >
+            <p class="text-red-800 text-sm">{{ removeError }}</p>
+          </div>
+        </div>
+
+        <div v-if="availableAddons.length === 0" class="card p-6">
+          <p class="text-neutral-body mb-4">
+            You have all available add-ons.
+          </p>
+          <router-link to="/billing" class="btn-primary inline-block">
+            Back to billing
           </router-link>
+        </div>
+
+        <div v-else class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            Available add-ons
+          </h2>
+          <p class="text-sm text-neutral-body mb-6">
+            Select the add-ons you want to add to your subscription.
+          </p>
+          <div class="space-y-3 mb-8">
+            <label
+              v-for="product in availableAddons"
+              :key="product.id"
+              class="flex items-start cursor-pointer"
+            >
+              <input
+                :checked="selectedAddonIds.includes(product.id)"
+                type="checkbox"
+                class="mr-3 mt-1 w-4 h-4"
+                @change="
+                  (e) =>
+                    toggleAddon(product.id, (e.target as HTMLInputElement).checked)
+                "
+              />
+              <div>
+                <span class="font-medium text-brand-charcoal">{{
+                  product.display_name
+                }}</span>
+                <span class="text-sm text-neutral-body block">
+                  {{ formatProductLineLabel(product) }}
+                  <span v-if="product.description"> — {{ product.description }}</span>
+                </span>
+              </div>
+            </label>
+          </div>
+
+          <div
+            v-if="error"
+            class="mb-4 p-4 bg-red-50 border border-red-200 rounded-[12px]"
+          >
+            <p class="text-red-800 text-sm">{{ error }}</p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-4">
+            <button
+              type="button"
+              :disabled="!canCheckout"
+              class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="handleContinueToCheckout"
+            >
+              <svg
+                v-if="checkoutLoading"
+                class="animate-spin h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              {{ checkoutLoading ? 'Redirecting to checkout...' : 'Continue to checkout' }}
+            </button>
+            <router-link
+              to="/billing"
+              class="btn-secondary inline-flex items-center justify-center"
+            >
+              Cancel
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
