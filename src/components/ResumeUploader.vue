@@ -94,7 +94,6 @@ const handleResumeFileChange = async (event: Event) => {
         return
       }
       if (data) {
-        await userStore.refreshProfile()
         const bucketKey = data.resume_bucket_key
         if (bucketKey) await fetchResumeUrl(bucketKey)
         resumeFile.value = null

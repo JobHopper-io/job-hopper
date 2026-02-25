@@ -2,15 +2,12 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { profileAPI } from '@/lib/profile'
-import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
-const userStore = useUserStore()
 
 onMounted(async () => {
   try {
     await profileAPI.markOnboardingComplete()
-    await userStore.refreshProfile()
     router.push('/dashboard')
   } catch (err) {
     console.error('Error completing onboarding:', err)

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { profileAPI } from '@/lib/profile'
 import { subscriptionAPI } from '@/lib/subscription'
 import { getStatusLabel } from '@/lib/subscription'
+import { supabase } from '@/lib/supabase'
 import type { Profile, Subscription, Product, SubscriptionProduct, SubscriptionStatus } from '@/types/database'
 
 export const useUserStore = defineStore('user', () => {
@@ -12,6 +13,11 @@ export const useUserStore = defineStore('user', () => {
   const subscriptions = ref<Subscription[]>([])
   const products = ref<Product[]>([])
   const subscriptionProducts = ref<SubscriptionProduct[]>([])
+
+  // Realtime subscription for subscription_product (user's subscriptions only)
+  let subscriptionProductChannel: ReturnType<typeof supabase.channel> | null = null
+  // Realtime subscription for the current user's profile
+  let profileChannel: ReturnType<typeof supabase.channel> | null = null
 
   // Helper Data
   const isLoading = ref(false)
@@ -73,31 +79,95 @@ export const useUserStore = defineStore('user', () => {
   })
 
   // Data Management Functions
-  async function refreshUserData() {
-    isLoading.value = true
-    try {
-        const [profileResult, subscriptionResult] = await Promise.all([
-            profileAPI.getCurrentUserProfile(),
-            subscriptionAPI.getProfileSubscriptionData(),
-        ])
-        if (!profileResult.error) profile.value = profileResult.data
-        if (!subscriptionResult.error && subscriptionResult.data) {
-            subscriptions.value = subscriptionResult.data.subscriptions
-            products.value = subscriptionResult.data.products
-            subscriptionProducts.value = subscriptionResult.data.subscriptionProducts
-        }
-    } catch (error) {
-        console.error('Error loading user data:', error)
-    } finally {
-        isLoading.value = false
-    }
-  }
   async function refreshProfile() {
     const { data, error } = await profileAPI.getCurrentUserProfile()
-    if (!error) profile.value = data
+    if (!error && data) {
+      profile.value = data
+      startProfileRealtime(data.id)
+    } else if (error) {
+      console.error('Error loading profile data:', error)
+      stopProfileRealtime()
+    }
+  }
+
+  async function refreshSubscription() {
+    isLoading.value = true
+    try {
+      const subscriptionResult = await subscriptionAPI.getProfileSubscriptionData()
+      if (!subscriptionResult.error && subscriptionResult.data) {
+        subscriptions.value = subscriptionResult.data.subscriptions
+        products.value = subscriptionResult.data.products
+        subscriptionProducts.value = subscriptionResult.data.subscriptionProducts
+        const subIds = subscriptionResult.data.subscriptions.map((s) => s.id)
+        startSubscriptionProductRealtime(subIds)
+      } else {
+        stopSubscriptionProductRealtime()
+      }
+    } catch (error) {
+      console.error('Error loading subscription data:', error)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  function stopProfileRealtime() {
+    if (profileChannel) {
+      supabase.removeChannel(profileChannel)
+      profileChannel = null
+    }
+  }
+
+  function startProfileRealtime(profileId: string | null | undefined) {
+    if (!profileId) return
+    stopProfileRealtime()
+    profileChannel = supabase
+      .channel('user-profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profileId}`,
+        },
+        () => {
+          void refreshProfile()
+        },
+      )
+      .subscribe()
+  }
+
+  function stopSubscriptionProductRealtime() {
+    if (subscriptionProductChannel) {
+      supabase.removeChannel(subscriptionProductChannel)
+      subscriptionProductChannel = null
+    }
+  }
+
+  function startSubscriptionProductRealtime(subscriptionIds: string[]) {
+    if (subscriptionIds.length === 0) return
+    stopSubscriptionProductRealtime()
+    const filter = `subscription_id=in.(${subscriptionIds.join(',')})`
+    subscriptionProductChannel = supabase
+      .channel('user-subscription-product-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscription_product',
+          filter,
+        },
+        () => {
+          void refreshSubscription()
+        },
+      )
+      .subscribe()
   }
 
   function clear() {
+    stopSubscriptionProductRealtime()
+    stopProfileRealtime()
     profile.value = null
     subscriptions.value = []
     products.value = []
@@ -115,8 +185,8 @@ export const useUserStore = defineStore('user', () => {
     products,
     subscriptionProducts,
     isLoading,
-    refreshUserData,
     refreshProfile,
+    refreshSubscription,
     clear,
     basePlan,
     addonProducts,

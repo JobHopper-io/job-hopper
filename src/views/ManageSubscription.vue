@@ -58,9 +58,6 @@ async function handleContinueToCheckout() {
       error.value = 'Unable to update your subscription. Please try again.'
       return
     }
-
-    // Reload subscription data so Billing view reflects new add-ons
-    await userStore.refreshUserData()
   } catch (err) {
     console.error('Add-on update error:', err)
     error.value = 'An unexpected error occurred. Please try again.'
@@ -96,8 +93,6 @@ async function confirmRemoveAddon() {
         'Unable to remove this add-on from your subscription. Please try again.'
       return
     }
-
-    await userStore.refreshUserData()
   } catch (err) {
     console.error('Remove add-on error:', err)
     removeError.value = 'An unexpected error occurred while removing the add-on.'

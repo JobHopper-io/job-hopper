@@ -96,7 +96,6 @@ const saveProfile = async () => {
     setTimeout(() => {
       saveSuccess.value = false
     }, 2000)
-    await userStore.refreshProfile()
   } catch (error) {
     console.error('Error saving profile:', error)
   } finally {

@@ -100,7 +100,6 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  userStore.refreshProfile()
   const [baseRes, addonRes] = await Promise.all([
     subscriptionAPI.getBasePlanProducts(),
     subscriptionAPI.getAddonProducts()

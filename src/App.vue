@@ -14,8 +14,14 @@ const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
 
 // Load profile + subscription once when user becomes authenticated
 watch(isAuthenticated, (authenticated) => {
-  if (authenticated) userStore.refreshUserData()
-  else userStore.clear()
+  if (authenticated) {
+    void Promise.all([
+      userStore.refreshProfile(),
+      userStore.refreshSubscription(),
+    ])
+  } else {
+    userStore.clear()
+  }
 })
 
 // Listen to auth state changes to update isAuthenticated reactively
