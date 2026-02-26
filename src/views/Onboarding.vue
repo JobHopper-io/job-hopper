@@ -500,7 +500,12 @@ const handleProceedToCheckout = async () => {
                   <div>
                     <span class="font-medium text-brand-charcoal">{{ product.display_name }}</span>
                     <span class="text-sm text-neutral-body block">
-                      {{ product.type === 'payment' ? `$${getProductPrice(product).toFixed(2)} one-time` : `+$${getProductPrice(product)}/month` }} — {{ product.description || '' }}
+                      {{
+                        product.category === 'one_time_addon' || product.category === 'one_time_item'
+                          ? `$${getProductPrice(product).toFixed(2)} one-time`
+                          : `+$${getProductPrice(product)}/month`
+                      }}
+                      — {{ product.description || '' }}
                     </span>
                   </div>
                 </label>

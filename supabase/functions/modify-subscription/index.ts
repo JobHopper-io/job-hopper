@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, is_addon, type, price_cents, stripe_product_id, display_name')
+      .select('id, category, price_cents, stripe_product_id, display_name')
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -71,12 +71,14 @@ serve(async (req) => {
       throw new Error('Some product ids are invalid')
     }
 
-    const invalidType = products.filter((p) => p.type !== 'subscription')
+    const invalidType = products.filter(
+      (p) => p.category !== 'base_plan' && p.category !== 'subscription_addon',
+    )
     if (invalidType.length > 0) {
       throw new Error('All products must be subscription products')
     }
 
-    const basePlans = products.filter((p) => !p.is_addon)
+    const basePlans = products.filter((p) => p.category === 'base_plan')
     if (basePlans.length === 0) {
       throw new Error('At least one base plan is required')
     }
@@ -119,20 +121,20 @@ serve(async (req) => {
       const { data: productsForSubs, error: productsForSubsError } =
         await supabaseClient
           .from('products')
-          .select('id, is_addon')
+          .select('id, category')
           .in('id', productIdsInSubs)
 
       if (productsForSubsError) {
         throw new Error(productsForSubsError.message)
       }
 
-      const productIsAddon = new Map(
-        (productsForSubs ?? []).map((p) => [p.id, p.is_addon] as const),
+      const productCategoryById = new Map(
+        (productsForSubs ?? []).map((p) => [p.id, p.category] as const),
       )
 
       const subHasBasePlan = new Set(
         (subProducts ?? [])
-          .filter((sp) => productIsAddon.get(sp.product_id) === false)
+          .filter((sp) => productCategoryById.get(sp.product_id) === 'base_plan')
           .map((sp) => sp.subscription_id),
       )
 

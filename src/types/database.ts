@@ -30,5 +30,5 @@ export type ProfileUserEditable = Pick<
 export type Subscription = Tables<'subscriptions'>
 export type SubscriptionStatus = Enums<'subscription_status'>
 export type Product = Tables<'products'>
-export type ProductType = Enums<'product_type'>
+export type ProductCategory = Enums<'product_category'>
 export type SubscriptionProduct = Tables<'subscription_product'>

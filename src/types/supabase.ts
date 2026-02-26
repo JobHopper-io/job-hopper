@@ -259,31 +259,31 @@ export type Database = {
       }
       products: {
         Row: {
+          category: Database["public"]["Enums"]["product_category"]
           description: string
           display_name: string
           id: string
-          is_addon: boolean
           key: string
           price_cents: number
-          type: Database["public"]["Enums"]["product_type"]
+          stripe_product_id: string | null
         }
         Insert: {
+          category: Database["public"]["Enums"]["product_category"]
           description?: string
           display_name: string
           id?: string
-          is_addon: boolean
           key: string
           price_cents: number
-          type: Database["public"]["Enums"]["product_type"]
+          stripe_product_id?: string | null
         }
         Update: {
+          category?: Database["public"]["Enums"]["product_category"]
           description?: string
           display_name?: string
           id?: string
-          is_addon?: boolean
           key?: string
           price_cents?: number
-          type?: Database["public"]["Enums"]["product_type"]
+          stripe_product_id?: string | null
         }
         Relationships: []
       }
@@ -468,16 +468,19 @@ export type Database = {
         Row: {
           id: string
           product_id: string
+          stripe_subscription_item_id: string | null
           subscription_id: string
         }
         Insert: {
           id?: string
           product_id: string
+          stripe_subscription_item_id?: string | null
           subscription_id: string
         }
         Update: {
           id?: string
           product_id?: string
+          stripe_subscription_item_id?: string | null
           subscription_id?: string
         }
         Relationships: [
@@ -570,6 +573,11 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
+      product_category:
+        | "base_plan"
+        | "subscription_addon"
+        | "one_time_addon"
+        | "one_time_item"
       product_type: "subscription" | "payment"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -706,6 +714,12 @@ export const Constants = {
         "NOT FOUND",
         "Ready for AI Personalization",
         "Invalid Email",
+      ],
+      product_category: [
+        "base_plan",
+        "subscription_addon",
+        "one_time_addon",
+        "one_time_item",
       ],
       product_type: ["subscription", "payment"],
       subscription_status: ["trial", "active", "canceled"],

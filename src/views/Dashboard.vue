@@ -26,7 +26,7 @@ const {
   isLoading,
   basePlan,
   subscriptionStatusLabel,
-  addonProducts,
+  subscriptionAddonProducts,
 } = storeToRefs(userStore)
 
 const profileCompletionDismissed = ref(
@@ -62,7 +62,7 @@ const userName = computed(() => {
 })
 
 const activeAddonsForDisplay = computed(() =>
-  addonProducts.value.map((p: Product) => p.display_name),
+  subscriptionAddonProducts.value.map((p: Product) => p.display_name),
 )
 
 // Profile completion: key fields that improve matching

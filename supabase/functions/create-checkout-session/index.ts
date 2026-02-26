@@ -85,7 +85,7 @@ serve(async (req) => {
 
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, key, display_name, is_addon, price_cents, type, stripe_product_id')
+      .select('id, key, display_name, category, price_cents, stripe_product_id')
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -96,8 +96,8 @@ serve(async (req) => {
       throw new Error('Some product ids are invalid')
     }
 
-    const basePlans = products.filter((p) => !p.is_addon)
-    const addons = products.filter((p) => p.is_addon)
+    const basePlans = products.filter((p) => p.category === 'base_plan')
+    const addons = products.filter((p) => p.category !== 'base_plan')
     if (basePlans.length > 1) {
       throw new Error('You may not purchase more than one base plan.')
     }
@@ -118,25 +118,31 @@ serve(async (req) => {
       }),
     )
 
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = orderedProducts.map((product) => {
-      const stripeProductId = stripeProductIdsBySupabaseId.get(product.id)
-      if (!stripeProductId) {
-        throw new Error(`Missing Stripe product id for product ${product.id}`)
-      }
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
+      orderedProducts.map((product) => {
+        const stripeProductId = stripeProductIdsBySupabaseId.get(product.id)
+        if (!stripeProductId) {
+          throw new Error(`Missing Stripe product id for product ${product.id}`)
+        }
 
-      const priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData = {
-        currency: 'usd',
-        unit_amount: product.price_cents,
-        product: stripeProductId,
-      }
-      if (product.type === 'subscription') {
-        priceData.recurring = { interval: 'month' }
-      }
-      return {
-        price_data: priceData,
-        quantity: 1,
-      }
-    })
+        const priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData = {
+          currency: 'usd',
+          unit_amount: product.price_cents,
+          product: stripeProductId,
+        }
+
+        if (
+          product.category === 'base_plan' ||
+          product.category === 'subscription_addon'
+        ) {
+          priceData.recurring = { interval: 'month' }
+        }
+
+        return {
+          price_data: priceData,
+          quantity: 1,
+        }
+      })
 
     const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] = {
       metadata: {

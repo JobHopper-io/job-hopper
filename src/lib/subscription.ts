@@ -33,13 +33,16 @@ export function getProductPrice(basePlan: Product | null | undefined): number {
 export function formatProductLineLabel(product: Product): string {
   const base = product.display_name
   const price = getProductPrice(product)
-  if (product.type === 'payment') {
+  if (
+    product.category === 'one_time_addon' ||
+    product.category === 'one_time_item'
+  ) {
     return `${base} ($${price.toFixed(2)} one-time)`
   }
   return `${base} (+$${price}/month)`
 }
 
-const productColumns = 'id, key, display_name, description, is_addon, price_cents, type'
+const productColumns = 'id, key, display_name, description, category, price_cents'
 
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
@@ -94,12 +97,12 @@ export const subscriptionAPI = {
     return { data, error: null }
   },
 
-  /** Fetch products where is_addon = true */
+  /** Fetch products that are add-ons (recurring or one-time) */
   async getAddonProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
     const { data, error } = await supabase
       .from('products')
       .select(productColumns)
-      .eq('is_addon', true)
+      .in('category', ['subscription_addon', 'one_time_addon'])
     if (error) return { data: null, error: new Error(error.message) }
     return { data: (data ?? []) as Product[], error: null }
   },
@@ -108,7 +111,7 @@ export const subscriptionAPI = {
     const { data, error } = await supabase
       .from('products')
       .select(productColumns)
-      .eq('is_addon', false)
+      .eq('category', 'base_plan')
     if (error) return { data: null, error: new Error(error.message) }
     return { data: (data ?? []) as Product[], error: null }
   },

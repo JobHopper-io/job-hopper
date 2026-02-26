@@ -5,8 +5,14 @@ import { subscriptionAPI, formatProductLineLabel, getProductPrice } from '@/lib/
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const { basePlan, addonProducts, nextBillingAt, trialEndsAt, isLoading } =
-  storeToRefs(userStore)
+const {
+  basePlan,
+  subscriptionAddonProducts,
+  oneTimeAddonProducts,
+  nextBillingAt,
+  trialEndsAt,
+  isLoading,
+} = storeToRefs(userStore)
 
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
@@ -74,13 +80,42 @@ const handleManageBilling = async () => {
 
         <!-- Active Add-ons -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Active Add-ons</h2>
-          <div v-if="addonProducts.length" class="space-y-2">
-            <p v-for="product in addonProducts" :key="product.id" class="text-neutral-body">
-              ✓ {{ formatProductLineLabel(product) }}
-            </p>
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            Active Add-ons
+          </h2>
+          <div class="space-y-4">
+            <div>
+              <h3 class="text-sm font-semibold text-brand-charcoal mb-2">
+                Subscription add-ons
+              </h3>
+              <div v-if="subscriptionAddonProducts.length" class="space-y-2">
+                <p
+                  v-for="product in subscriptionAddonProducts"
+                  :key="product.id"
+                  class="text-neutral-body"
+                >
+                  ✓ {{ formatProductLineLabel(product) }}
+                </p>
+              </div>
+              <p v-else class="text-neutral-body">No active subscription add-ons</p>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold text-brand-charcoal mb-2">
+                One-time purchases
+              </h3>
+              <div v-if="oneTimeAddonProducts.length" class="space-y-2">
+                <p
+                  v-for="product in oneTimeAddonProducts"
+                  :key="product.id"
+                  class="text-neutral-body"
+                >
+                  ✓ {{ formatProductLineLabel(product) }}
+                </p>
+              </div>
+              <p v-else class="text-neutral-body">No one-time purchases</p>
+            </div>
           </div>
-          <p v-else class="text-neutral-body">No active add-ons</p>
         </div>
 
         <!-- Actions -->

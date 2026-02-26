@@ -25,14 +25,27 @@ export const useUserStore = defineStore('user', () => {
   // Computed Data
   const basePlan = computed<Product | null>(() => {
     const base = products.value.find(
-      (p) => !p.is_addon && p.type === 'subscription',
+      (p) => p.category === 'base_plan',
     )
     return base ?? null
   })
 
-  const addonProducts = computed<Product[]>(() =>
-    products.value.filter((p) => p.is_addon),
+  const subscriptionAddonProducts = computed<Product[]>(() =>
+    products.value.filter((p) => p.category === 'subscription_addon'),
   )
+
+  const oneTimeAddonProducts = computed<Product[]>(() =>
+    products.value.filter((p) => p.category === 'one_time_addon'),
+  )
+
+  const oneTimeItems = computed<Product[]>(() =>
+    products.value.filter((p) => p.category === 'one_time_item'),
+  )
+
+  const addonProducts = computed<Product[]>(() => [
+    ...subscriptionAddonProducts.value,
+    ...oneTimeAddonProducts.value,
+  ])
 
   const trialProducts = computed<Product[]>(() => {
     if (!subscriptions.value.length || !subscriptionProducts.value.length || !products.value.length) {
@@ -190,6 +203,9 @@ export const useUserStore = defineStore('user', () => {
     clear,
     basePlan,
     addonProducts,
+    subscriptionAddonProducts,
+    oneTimeAddonProducts,
+    oneTimeItems,
     trialProducts,
     nextBillingAt,
     trialEndsAt,
