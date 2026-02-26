@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// TEMPORARY TEST PAGE – DO NOT SHIP TO PRODUCTION
-// This view is only for internal debugging of the match-jobs Edge Function.
-// It should be removed before any production release.
+// __TEST_ONLY_START__ — Entire view is for match-jobs debugging. Remove this file, the route in router, and src/lib/job-matching.ts before production.
 
 import { ref, onMounted, computed } from 'vue'
 import {
@@ -40,6 +38,7 @@ async function loadMatches() {
 onMounted(() => {
   void loadMatches()
 })
+// __TEST_ONLY_END__
 </script>
 
 <template>

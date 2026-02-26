@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-// TEMPORARY TEST HELPER – DO NOT SHIP TO PRODUCTION
-// This helper exists only to support the temporary match-jobs debug view.
+// __TEST_ONLY_START__ — Entire file is for match-jobs debug view only. Remove this file, MatchJobsDebug.vue, and the debug route before production.
 
 export interface RankedJob {
   id: number
@@ -89,3 +88,4 @@ export const jobMatchingAPI = {
   },
 }
 
+// __TEST_ONLY_END__

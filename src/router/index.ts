@@ -25,6 +25,7 @@ export const publicPaths = [
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  // Search for __TEST_ONLY__ to find test-only routes and related code to remove before production.
   routes: [
     {
       path: '/',
@@ -115,12 +116,13 @@ const router = createRouter({
       name: 'billing-purchase',
       component: () => import('../views/ManageSubscription.vue'),
     },
+    // __TEST_ONLY_START__ — Debug route for match-jobs; remove this block, MatchJobsDebug.vue, and src/lib/job-matching.ts before production
     {
-      // TEMPORARY TEST ROUTE – DO NOT SHIP TO PRODUCTION
       path: '/__debug/match-jobs',
       name: 'debug-match-jobs',
       component: () => import('../views/MatchJobsDebug.vue'),
     },
+    // __TEST_ONLY_END__
   ],
   scrollBehavior(_to, _from, savedPosition) {
     // Back/forward: restore browser's saved position
