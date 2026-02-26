@@ -144,29 +144,53 @@ serve(async (req) => {
         }
       })
 
-    const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] = {
-      metadata: {
-        profile_id: profile.id,
-      },
-    }
-    if (typeof trialEnd === 'number' && trialEnd > 0) {
-      subscriptionData.trial_end = trialEnd
-    } else if (hasBasePlan) {
-      subscriptionData.trial_period_days = 7
-    }
+    const hasRecurringProduct = orderedProducts.some(
+      (p) => p.category === 'base_plan' || p.category === 'subscription_addon',
+    )
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'subscription',
-      success_url: successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
-      metadata: {
-        profile_id: profile.id,
-      },
-      subscription_data: subscriptionData,
-    })
+    let session: Stripe.Checkout.Session
+
+    if (hasRecurringProduct) {
+      const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] =
+        {
+          metadata: {
+            profile_id: profile.id,
+          },
+        }
+      if (typeof trialEnd === 'number' && trialEnd > 0) {
+        subscriptionData.trial_end = trialEnd
+      } else if (hasBasePlan) {
+        subscriptionData.trial_period_days = 7
+      }
+
+      session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        mode: 'subscription',
+        success_url:
+          successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
+        metadata: {
+          profile_id: profile.id,
+        },
+        subscription_data: subscriptionData,
+      })
+    } else {
+      // One-time products only (e.g. resume upgrade purchased separately)
+      session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        mode: 'payment',
+        success_url:
+          successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
+        metadata: {
+          profile_id: profile.id,
+        },
+      })
+    }
 
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),

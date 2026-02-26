@@ -473,7 +473,7 @@ onMounted(async () => {
                 <button
                   type="button"
                   class="inline-flex items-center justify-center w-8 h-8 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 disabled:text-red-300 disabled:hover:bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  :disabled="removingAddonIds.includes(product.id)"
+                  :disabled="removingAddonIds.length > 0"
                   @click="openRemoveConfirm(product)"
                   :aria-label="'Remove ' + product.display_name"
                   :title="'Remove ' + product.display_name"
@@ -524,16 +524,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="availableSubscriptionAddons.length === 0" class="card p-6">
-          <p class="text-neutral-body mb-4">
-            You have all available subscription add-ons.
-          </p>
-          <router-link to="/billing" class="btn-primary inline-block">
-            Back to billing
-          </router-link>
-        </div>
-
-        <div v-else class="card p-6">
+        <div v-if="availableSubscriptionAddons.length" class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
             Available add-ons
           </h2>
@@ -600,7 +591,7 @@ onMounted(async () => {
         </div>
 
         <div
-          v-if="oneTimeAddonProducts.length || availableOneTimeAddons.length"
+          v-if="availableOneTimeAddons.length"
           class="card p-6"
         >
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
@@ -611,15 +602,21 @@ onMounted(async () => {
             subscription price.
           </p>
 
-          <div v-if="oneTimeAddonProducts.length" class="space-y-3 mb-6">
-            <h3 class="text-sm font-semibold text-brand-charcoal">
-              Already purchased
-            </h3>
-            <div
-              v-for="product in oneTimeAddonProducts"
+          <div class="space-y-3 mb-6">
+            <label
+              v-for="product in availableOneTimeAddons"
               :key="product.id"
-              class="flex items-center justify-between"
+              class="flex items-start cursor-pointer"
             >
+              <input
+                :checked="selectedOneTimeIds.includes(product.id)"
+                type="checkbox"
+                class="mr-3 mt-1 w-4 h-4"
+                @change="
+                  (e) =>
+                    toggleOneTimeAddon(product.id, (e.target as HTMLInputElement).checked)
+                "
+              />
               <div>
                 <span class="font-medium text-brand-charcoal">{{
                   product.display_name
@@ -629,42 +626,7 @@ onMounted(async () => {
                   <span v-if="product.description"> — {{ product.description }}</span>
                 </span>
               </div>
-            </div>
-          </div>
-
-          <div class="space-y-3 mb-6">
-            <h3 class="text-sm font-semibold text-brand-charcoal">
-              Available one-time upgrades
-            </h3>
-            <div v-if="availableOneTimeAddons.length" class="space-y-3">
-              <label
-                v-for="product in availableOneTimeAddons"
-                :key="product.id"
-                class="flex items-start cursor-pointer"
-              >
-                <input
-                  :checked="selectedOneTimeIds.includes(product.id)"
-                  type="checkbox"
-                  class="mr-3 mt-1 w-4 h-4"
-                  @change="
-                    (e) =>
-                      toggleOneTimeAddon(product.id, (e.target as HTMLInputElement).checked)
-                  "
-                />
-                <div>
-                  <span class="font-medium text-brand-charcoal">{{
-                    product.display_name
-                  }}</span>
-                  <span class="text-sm text-neutral-body block">
-                    {{ formatProductLineLabel(product) }}
-                    <span v-if="product.description"> — {{ product.description }}</span>
-                  </span>
-                </div>
-              </label>
-            </div>
-            <p v-else class="text-neutral-body">
-              No additional one-time upgrades are available right now.
-            </p>
+            </label>
           </div>
 
           <div
