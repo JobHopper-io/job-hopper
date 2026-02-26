@@ -115,6 +115,12 @@ const router = createRouter({
       name: 'billing-purchase',
       component: () => import('../views/ManageSubscription.vue'),
     },
+    {
+      // TEMPORARY TEST ROUTE – DO NOT SHIP TO PRODUCTION
+      path: '/__debug/match-jobs',
+      name: 'debug-match-jobs',
+      component: () => import('../views/MatchJobsDebug.vue'),
+    },
   ],
   scrollBehavior(_to, _from, savedPosition) {
     // Back/forward: restore browser's saved position
