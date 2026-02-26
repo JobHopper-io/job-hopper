@@ -1,9 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  matchJobs,
   type JobRecord,
   type SubscriberPreferences,
+  matchJobsWithDebug,
 } from '../_shared/match-jobs.ts'
 
 const corsHeaders = {
@@ -28,7 +28,7 @@ serve(async (req) => {
       )
     }
 
-    const supabaseClient = createClient(
+    const supabaseUserClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -40,7 +40,7 @@ serve(async (req) => {
 
     const {
       data: { user },
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseUserClient.auth.getUser()
 
     if (!user) {
       return new Response(
@@ -52,7 +52,7 @@ serve(async (req) => {
       )
     }
 
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseUserClient
       .from('profiles')
       .select(
         `
@@ -87,30 +87,75 @@ serve(async (req) => {
 
     const url = new URL(req.url)
     const limitParam = url.searchParams.get('limit')
-    const limit = Math.max(1, Math.min(500, limitParam ? Number(limitParam) : 200))
+    const maxJobs =
+      limitParam != null && !Number.isNaN(Number(limitParam))
+        ? Math.max(1, Math.floor(Number(limitParam)))
+        : null
 
-    const { data: jobs, error: jobsError } = await supabaseClient
-      .from('job_hopper_live')
-      .select(
-        `
-        id,
-        "Job Title",
-        "Company Name",
-        Location,
-        Description,
-        "Job Highlights",
-        "Apply Link",
-        created_at
-      `,
-      )
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (jobsError) {
-      throw new Error(jobsError.message)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceRoleKey) {
+      throw new Error('Service role key not configured')
     }
 
-    const jobRecords: JobRecord[] = (jobs ?? []).map((row: any) => ({
+    const supabaseAdminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      serviceRoleKey,
+      {
+        auth: {
+          persistSession: false,
+        },
+      },
+    )
+
+    const allJobs: any[] = []
+    const pageSize = 1000
+    let offset = 0
+
+    // Fetch ALL jobs from job_hopper_live in pages (optionally capped by ?limit=).
+    while (true) {
+      const remaining = maxJobs != null ? maxJobs - allJobs.length : null
+      if (remaining !== null && remaining <= 0) {
+        break
+      }
+
+      const effectivePageSize =
+        remaining !== null && remaining < pageSize ? remaining : pageSize
+
+      const { data: page, error: jobsError } = await supabaseAdminClient
+        .from('job_hopper_live')
+        .select(
+          `
+          id,
+          "Job Title",
+          "Company Name",
+          Location,
+          Description,
+          "Job Highlights",
+          "Apply Link",
+          created_at
+        `,
+        )
+        .order('created_at', { ascending: false })
+        .range(offset, offset + effectivePageSize - 1)
+
+      if (jobsError) {
+        throw new Error(jobsError.message)
+      }
+
+      if (!page || page.length === 0) {
+        break
+      }
+
+      allJobs.push(...page)
+
+      if (page.length < effectivePageSize) {
+        break
+      }
+
+      offset += effectivePageSize
+    }
+
+    const jobRecords: JobRecord[] = allJobs.map((row: any) => ({
       id: row.id,
       title: row['Job Title'] ?? null,
       companyName: row['Company Name'] ?? null,
@@ -121,13 +166,14 @@ serve(async (req) => {
       createdAt: row.created_at,
     }))
 
-    const ranked = matchJobs(preferences, jobRecords)
+    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords)
 
     return new Response(
       JSON.stringify({
         profile_id: profile.id,
         total: ranked.length,
         jobs: ranked,
+        debug,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

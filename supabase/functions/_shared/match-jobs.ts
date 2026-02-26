@@ -28,6 +28,73 @@ export interface RankedJob extends JobRecord {
   matchedRoleKeywords: string[]
 }
 
+export interface MatchJobsDebugSampleJob {
+  id: number
+  title: string | null
+  companyName: string | null
+  location: string | null
+  reason: 'role' | 'remote' | 'location'
+}
+
+export interface MatchJobsDebug {
+  input: {
+    roles: string[]
+    currentJobTitle?: string | null
+    currentIndustry?: string | null
+    preferredLocations: string[]
+    openToRelocation: boolean
+    openToRemote: boolean
+    roleKeywords: string[]
+  }
+  filters: {
+    totalJobs: number
+    excludedByRole: number
+    excludedByRemoteOptOut: number
+    excludedByLocation: number
+    includedAfterFilters: number
+  }
+  scores: {
+    minScore: number | null
+    maxScore: number | null
+    averageScore: number | null
+    averageRoleScore: number | null
+    averageLocationScore: number | null
+    averageRecencyScore: number | null
+  }
+  keywords: {
+    keyword: string
+    matchedJobCount: number
+  }[]
+  samples: {
+    excludedByRole: MatchJobsDebugSampleJob[]
+    excludedByRemote: MatchJobsDebugSampleJob[]
+    excludedByLocation: MatchJobsDebugSampleJob[]
+  }
+}
+
+interface MatchJobsInternalCollector {
+  roleKeywords: string[]
+  preferredLocations: string[]
+  openToRelocation: boolean
+  openToRemote: boolean
+  totalJobs: number
+  excludedByRole: number
+  excludedByRemoteOptOut: number
+  excludedByLocation: number
+  includedAfterFilters: number
+  scoreSum: number
+  roleScoreSum: number
+  locationScoreSum: number
+  recencyScoreSum: number
+  minScore: number | null
+  maxScore: number | null
+  sampleLimit: number
+  excludedByRoleSamples: MatchJobsDebugSampleJob[]
+  excludedByRemoteSamples: MatchJobsDebugSampleJob[]
+  excludedByLocationSamples: MatchJobsDebugSampleJob[]
+  keywordMatchCounts: Map<string, number>
+}
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase()
 }
@@ -52,9 +119,10 @@ function extractKeywords(...inputs: (string | null | undefined)[]): string[] {
   return Array.from(set)
 }
 
-export function matchJobs(
+function coreMatchJobs(
   subscriber: SubscriberPreferences,
   jobs: JobRecord[],
+  collector?: MatchJobsInternalCollector,
 ): RankedJob[] {
   const roleKeywords = new Set<string>()
 
@@ -79,6 +147,8 @@ export function matchJobs(
     }
   }
 
+  const roleKeywordsArray = Array.from(roleKeywords)
+
   const preferredLocations = (subscriber.preferredLocations ?? [])
     .filter((loc) => !!loc)
     .map((loc) => loc.toLowerCase())
@@ -87,6 +157,14 @@ export function matchJobs(
   const wantsRemote = !!subscriber.openToRemote
 
   const nowMs = Date.now()
+
+  if (collector) {
+    collector.roleKeywords = roleKeywordsArray
+    collector.preferredLocations = preferredLocations
+    collector.openToRelocation = relocationWilling
+    collector.openToRemote = wantsRemote
+    collector.totalJobs = jobs.length
+  }
 
   const ranked: RankedJob[] = []
 
@@ -111,6 +189,18 @@ export function matchJobs(
 
     // If subscriber has specified role-related keywords, require at least one match
     if (roleKeywords.size > 0 && roleScore === 0) {
+      if (collector) {
+        collector.excludedByRole += 1
+        if (collector.excludedByRoleSamples.length < collector.sampleLimit) {
+          collector.excludedByRoleSamples.push({
+            id: job.id,
+            title: job.title,
+            companyName: job.companyName,
+            location: job.location,
+            reason: 'role',
+          })
+        }
+      }
       continue
     }
 
@@ -122,6 +212,18 @@ export function matchJobs(
 
     // Remote jobs are only considered if the subscriber has explicitly opted in.
     if (isRemote && !wantsRemote) {
+      if (collector) {
+        collector.excludedByRemoteOptOut += 1
+        if (collector.excludedByRemoteSamples.length < collector.sampleLimit) {
+          collector.excludedByRemoteSamples.push({
+            id: job.id,
+            title: job.title,
+            companyName: job.companyName,
+            location: job.location,
+            reason: 'remote',
+          })
+        }
+      }
       continue
     }
 
@@ -153,6 +255,18 @@ export function matchJobs(
     }
 
     if (!locationIncluded) {
+      if (collector) {
+        collector.excludedByLocation += 1
+        if (collector.excludedByLocationSamples.length < collector.sampleLimit) {
+          collector.excludedByLocationSamples.push({
+            id: job.id,
+            title: job.title,
+            companyName: job.companyName,
+            location: job.location,
+            reason: 'location',
+          })
+        }
+      }
       continue
     }
 
@@ -174,6 +288,26 @@ export function matchJobs(
     }
 
     const totalScore = roleScore * 10 + locationScore * 3 + recencyScore
+
+    if (collector) {
+      collector.includedAfterFilters += 1
+      collector.scoreSum += totalScore
+      collector.roleScoreSum += roleScore
+      collector.locationScoreSum += locationScore
+      collector.recencyScoreSum += recencyScore
+
+      if (collector.minScore === null || totalScore < collector.minScore) {
+        collector.minScore = totalScore
+      }
+      if (collector.maxScore === null || totalScore > collector.maxScore) {
+        collector.maxScore = totalScore
+      }
+
+      for (const kw of matchedRoleKeywords) {
+        const prev = collector.keywordMatchCounts.get(kw) ?? 0
+        collector.keywordMatchCounts.set(kw, prev + 1)
+      }
+    }
 
     ranked.push({
       ...job,
@@ -201,5 +335,88 @@ export function matchJobs(
   })
 
   return ranked
+}
+
+export function matchJobs(
+  subscriber: SubscriberPreferences,
+  jobs: JobRecord[],
+): RankedJob[] {
+  return coreMatchJobs(subscriber, jobs)
+}
+
+export function matchJobsWithDebug(
+  subscriber: SubscriberPreferences,
+  jobs: JobRecord[],
+): { ranked: RankedJob[]; debug: MatchJobsDebug } {
+  const collector: MatchJobsInternalCollector = {
+    roleKeywords: [],
+    preferredLocations: [],
+    openToRelocation: false,
+    openToRemote: false,
+    totalJobs: 0,
+    excludedByRole: 0,
+    excludedByRemoteOptOut: 0,
+    excludedByLocation: 0,
+    includedAfterFilters: 0,
+    scoreSum: 0,
+    roleScoreSum: 0,
+    locationScoreSum: 0,
+    recencyScoreSum: 0,
+    minScore: null,
+    maxScore: null,
+    sampleLimit: 10,
+    excludedByRoleSamples: [],
+    excludedByRemoteSamples: [],
+    excludedByLocationSamples: [],
+    keywordMatchCounts: new Map<string, number>(),
+  }
+
+  const ranked = coreMatchJobs(subscriber, jobs, collector)
+
+  const included = collector.includedAfterFilters
+
+  const scores = {
+    minScore: collector.minScore,
+    maxScore: collector.maxScore,
+    averageScore: included > 0 ? collector.scoreSum / included : null,
+    averageRoleScore: included > 0 ? collector.roleScoreSum / included : null,
+    averageLocationScore:
+      included > 0 ? collector.locationScoreSum / included : null,
+    averageRecencyScore:
+      included > 0 ? collector.recencyScoreSum / included : null,
+  }
+
+  const keywords = Array.from(collector.keywordMatchCounts.entries())
+    .map(([keyword, matchedJobCount]) => ({ keyword, matchedJobCount }))
+    .sort((a, b) => b.matchedJobCount - a.matchedJobCount)
+    .slice(0, 25)
+
+  const debug: MatchJobsDebug = {
+    input: {
+      roles: subscriber.roles ?? [],
+      currentJobTitle: subscriber.currentJobTitle ?? null,
+      currentIndustry: subscriber.currentIndustry ?? null,
+      preferredLocations: collector.preferredLocations,
+      openToRelocation: collector.openToRelocation,
+      openToRemote: collector.openToRemote,
+      roleKeywords: collector.roleKeywords,
+    },
+    filters: {
+      totalJobs: collector.totalJobs,
+      excludedByRole: collector.excludedByRole,
+      excludedByRemoteOptOut: collector.excludedByRemoteOptOut,
+      excludedByLocation: collector.excludedByLocation,
+      includedAfterFilters: collector.includedAfterFilters,
+    },
+    scores,
+    keywords,
+    samples: {
+      excludedByRole: collector.excludedByRoleSamples,
+      excludedByRemote: collector.excludedByRemoteSamples,
+      excludedByLocation: collector.excludedByLocationSamples,
+    },
+  }
+
+  return { ranked, debug }
 }
 

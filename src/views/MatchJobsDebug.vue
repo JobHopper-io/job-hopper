@@ -4,20 +4,27 @@
 // It should be removed before any production release.
 
 import { ref, onMounted, computed } from 'vue'
-import { jobMatchingAPI, type MatchJobsResponse, type RankedJob } from '@/lib/job-matching'
+import {
+  jobMatchingAPI,
+  type MatchJobsResponse,
+  type RankedJob,
+  type MatchJobsDebugPayload,
+} from '@/lib/job-matching'
 
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
 const result = ref<MatchJobsResponse | null>(null)
-const limit = ref(200)
 
 const jobs = computed<RankedJob[]>(() => result.value?.jobs ?? [])
+const debug = computed<MatchJobsDebugPayload | null>(
+  () => result.value?.debug ?? null,
+)
 
 async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
 
-  const { data, error } = await jobMatchingAPI.getMatches(limit.value)
+  const { data, error } = await jobMatchingAPI.getMatches()
 
   if (error) {
     // TEMPORARY: surface raw error to make debugging easier.
@@ -51,25 +58,8 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Controls -->
-      <div class="card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-end gap-4">
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-neutral-body mb-1" for="limit-input">
-            Max jobs fetched from <code>job_hopper_live</code>
-          </label>
-          <input
-            id="limit-input"
-            v-model.number="limit"
-            type="number"
-            min="1"
-            max="500"
-            class="input w-full max-w-xs"
-          />
-          <p class="mt-1 text-xs text-neutral-body">
-            The Edge Function still applies its own safety cap (1–500).
-          </p>
-        </div>
-
+      <!-- Reload control -->
+      <div class="card p-4 sm:p-6 flex justify-end">
         <button
           type="button"
           class="btn-primary w-full sm:w-auto"
@@ -104,6 +94,153 @@ onMounted(() => {
           <span class="font-semibold">Matched jobs:</span>
           {{ result.total }} (showing {{ jobs.length }})
         </p>
+
+        <div v-if="debug" class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
+              Algorithm inputs & filters
+            </h3>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Roles:</span>
+              <span>
+                {{
+                  debug.input.roles.length
+                    ? debug.input.roles.join(', ')
+                    : '—'
+                }}
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Current title:</span>
+              <span>{{ debug.input.currentJobTitle || '—' }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Current industry:</span>
+              <span>{{ debug.input.currentIndustry || '—' }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Preferred locations:</span>
+              <span>
+                {{
+                  debug.input.preferredLocations.length
+                    ? debug.input.preferredLocations.join(', ')
+                    : '—'
+                }}
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Open to relocation:</span>
+              <span>{{ debug.input.openToRelocation ? 'Yes' : 'No' }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Open to remote:</span>
+              <span>{{ debug.input.openToRemote ? 'Yes' : 'No' }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Role keywords:</span>
+              <span>
+                {{
+                  debug.input.roleKeywords.length
+                    ? debug.input.roleKeywords.join(', ')
+                    : '—'
+                }}
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body mt-2">
+              <span class="font-semibold">Jobs fetched:</span>
+              <span>{{ debug.filters.totalJobs }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">After filters:</span>
+              <span>{{ debug.filters.includedAfterFilters }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by role:</span>
+              <span>{{ debug.filters.excludedByRole }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by remote opt-out:</span>
+              <span>{{ debug.filters.excludedByRemoteOptOut }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by location:</span>
+              <span>{{ debug.filters.excludedByLocation }}</span>
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
+              Score statistics & top keywords
+            </h3>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Score range:</span>
+              <span>
+                <span v-if="debug.scores.minScore !== null">
+                  {{ debug.scores.minScore.toFixed(2) }}
+                  –
+                  {{ debug.scores.maxScore?.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Average total score:</span>
+              <span>
+                <span v-if="debug.scores.averageScore !== null">
+                  {{ debug.scores.averageScore.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Average role score:</span>
+              <span>
+                <span v-if="debug.scores.averageRoleScore !== null">
+                  {{ debug.scores.averageRoleScore.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Average location score:</span>
+              <span>
+                <span v-if="debug.scores.averageLocationScore !== null">
+                  {{ debug.scores.averageLocationScore.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Average recency score:</span>
+              <span>
+                <span v-if="debug.scores.averageRecencyScore !== null">
+                  {{ debug.scores.averageRecencyScore.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+
+            <div class="mt-2">
+              <p class="text-xs font-semibold text-neutral-body mb-1">
+                Top matched role keywords (by job count)
+              </p>
+              <ul class="text-[11px] text-neutral-body max-h-32 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
+                <li v-if="!debug.keywords.length">None</li>
+                <li
+                  v-for="kw in debug.keywords"
+                  v-else
+                  :key="kw.keyword"
+                  class="flex justify-between gap-2"
+                >
+                  <span class="truncate">{{ kw.keyword }}</span>
+                  <span class="font-mono text-[10px]">
+                    {{ kw.matchedJobCount }}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Jobs table -->
@@ -192,6 +329,106 @@ onMounted(() => {
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div v-if="debug" class="card p-4 sm:p-6 space-y-3">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
+          Sample excluded jobs by reason
+        </h2>
+        <p class="text-xs text-neutral-body">
+          These small samples show how filters removed jobs at each step without
+          dumping every job.
+        </p>
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
+              By role (no keyword match)
+            </h3>
+            <p class="text-[11px] text-neutral-body mb-1">
+              Showing up to {{ debug.samples.excludedByRole.length }} examples.
+            </p>
+            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
+              <li v-if="!debug.samples.excludedByRole.length">None</li>
+              <li
+                v-for="job in debug.samples.excludedByRole"
+                v-else
+                :key="`role-${job.id}`"
+              >
+                <div class="font-semibold truncate">
+                  {{ job.title || '(no title)' }}
+                </div>
+                <div class="flex justify-between gap-1">
+                  <span class="truncate">
+                    {{ job.companyName || '—' }}
+                  </span>
+                  <span class="truncate">
+                    {{ job.location || '—' }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
+              By remote opt-out
+            </h3>
+            <p class="text-[11px] text-neutral-body mb-1">
+              Showing up to {{ debug.samples.excludedByRemote.length }} examples.
+            </p>
+            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
+              <li v-if="!debug.samples.excludedByRemote.length">None</li>
+              <li
+                v-for="job in debug.samples.excludedByRemote"
+                v-else
+                :key="`remote-${job.id}`"
+              >
+                <div class="font-semibold truncate">
+                  {{ job.title || '(no title)' }}
+                </div>
+                <div class="flex justify-between gap-1">
+                  <span class="truncate">
+                    {{ job.companyName || '—' }}
+                  </span>
+                  <span class="truncate">
+                    {{ job.location || '—' }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
+              By location
+            </h3>
+            <p class="text-[11px] text-neutral-body mb-1">
+              Showing up to
+              {{ debug.samples.excludedByLocation.length }}
+              examples.
+            </p>
+            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
+              <li v-if="!debug.samples.excludedByLocation.length">None</li>
+              <li
+                v-for="job in debug.samples.excludedByLocation"
+                v-else
+                :key="`loc-${job.id}`"
+              >
+                <div class="font-semibold truncate">
+                  {{ job.title || '(no title)' }}
+                </div>
+                <div class="flex justify-between gap-1">
+                  <span class="truncate">
+                    {{ job.companyName || '—' }}
+                  </span>
+                  <span class="truncate">
+                    {{ job.location || '—' }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 
