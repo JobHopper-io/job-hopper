@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { subscriptionAPI, formatProductLineLabel } from '@/lib/subscription'
+import {
+  subscriptionAPI,
+  formatProductLineLabel,
+  getProductPrice,
+} from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 
 const userStore = useUserStore()
-const { addonProducts, trialEndsAt } = storeToRefs(userStore)
+const { addonProducts, trialEndsAt, basePlan } = storeToRefs(userStore)
 
 const allAddonProducts = ref<Product[]>([])
+const basePlanProducts = ref<Product[]>([])
 const selectedAddonIds = ref<string[]>([])
+const selectedBasePlanId = ref<string | null>(null)
 const isLoadingProducts = ref(true)
 const checkoutLoading = ref(false)
+const changePlanLoading = ref(false)
 const error = ref('')
 const removeError = ref('')
+const changePlanError = ref('')
 const removingAddonIds = ref<string[]>([])
 const pendingAddonIds = ref<string[]>([])
 const confirmRemoveProduct = ref<Product | null>(null)
@@ -22,6 +30,18 @@ const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id
 
 const availableAddons = computed(() =>
   allAddonProducts.value.filter((p) => !ownedAddonIds.value.has(p.id)),
+)
+
+/** Subscription-type addon product IDs currently on the subscription (for modify-subscription payload). */
+const currentSubscriptionAddonIds = computed(() =>
+  addonProducts.value.filter((p) => p.type === 'subscription').map((p) => p.id),
+)
+
+const canChangePlan = computed(
+  () =>
+    !!selectedBasePlanId.value &&
+    selectedBasePlanId.value !== basePlan.value?.id &&
+    !changePlanLoading.value,
 )
 
 watch(addonProducts, (newAddonProducts) => {
@@ -43,6 +63,16 @@ watch(addonProducts, (newAddonProducts) => {
     removingAddonIds.value = removingAddonIds.value.filter((id) => ownedIds.has(id))
   }
 })
+
+watch(
+  basePlan,
+  (newBasePlan) => {
+    if (newBasePlan && !changePlanLoading.value) {
+      selectedBasePlanId.value = newBasePlan.id
+    }
+  },
+  { immediate: true },
+)
 
 const canCheckout = computed(
   () => selectedAddonIds.value.length > 0 && !checkoutLoading.value,
@@ -66,18 +96,21 @@ function toggleAddon(productId: string, checked: boolean) {
 }
 
 async function handleContinueToCheckout() {
-  if (!canCheckout.value) return
+  if (!canCheckout.value || !basePlan.value) return
   error.value = ''
   checkoutLoading.value = true
   const requestedAddonIds = [...selectedAddonIds.value]
 
   try {
-    const { error: addError } = await subscriptionAPI.addSubscriptionItems(
-      requestedAddonIds,
-    )
+    const productIds = [
+      basePlan.value.id,
+      ...currentSubscriptionAddonIds.value,
+      ...requestedAddonIds,
+    ]
+    const { error: modifyError } = await subscriptionAPI.modifySubscription(productIds)
 
-    if (addError) {
-      console.error('Add-on update error:', addError)
+    if (modifyError) {
+      console.error('Add-on update error:', modifyError)
       error.value = 'Unable to update your subscription. Please try again.'
       checkoutLoading.value = false
       return
@@ -99,6 +132,33 @@ async function handleContinueToCheckout() {
   }
 }
 
+async function handleChangeBasePlan() {
+  if (!canChangePlan.value || !selectedBasePlanId.value) return
+
+  changePlanError.value = ''
+  changePlanLoading.value = true
+
+  try {
+    const productIds = [
+      selectedBasePlanId.value,
+      ...currentSubscriptionAddonIds.value,
+    ]
+    const { error: changeError } = await subscriptionAPI.modifySubscription(productIds)
+
+    if (changeError) {
+      console.error('Base plan change error:', changeError)
+      changePlanError.value =
+        'Unable to update your base plan right now. Please try again.'
+      return
+    }
+  } catch (err) {
+    console.error('Base plan change error:', err)
+    changePlanError.value = 'An unexpected error occurred. Please try again.'
+  } finally {
+    changePlanLoading.value = false
+  }
+}
+
 function openRemoveConfirm(product: Product) {
   removeError.value = ''
   confirmRemoveProduct.value = product
@@ -110,15 +170,19 @@ function closeRemoveConfirm() {
 
 async function confirmRemoveAddon() {
   const product = confirmRemoveProduct.value
-  if (!product || removingAddonIds.value.includes(product.id)) return
+  if (!product || removingAddonIds.value.includes(product.id) || !basePlan.value)
+    return
 
   removeError.value = ''
   removingAddonIds.value = [...removingAddonIds.value, product.id]
   closeRemoveConfirm()
   try {
-    const { error: removeErrorResult } = await subscriptionAPI.removeSubscriptionItems([
-      product.id,
-    ])
+    const productIds = [
+      basePlan.value.id,
+      ...currentSubscriptionAddonIds.value.filter((id) => id !== product.id),
+    ]
+    const { error: removeErrorResult } =
+      await subscriptionAPI.modifySubscription(productIds)
 
     if (removeErrorResult) {
       console.error('Remove add-on error:', removeErrorResult)
@@ -136,13 +200,33 @@ async function confirmRemoveAddon() {
 
 onMounted(async () => {
   isLoadingProducts.value = true
-  const { data, error: fetchError } = await subscriptionAPI.getAddonProducts()
-  isLoadingProducts.value = false
-  if (fetchError) {
-    error.value = 'Unable to load add-ons. Please try again.'
-    return
+  try {
+    const [addonRes, baseRes] = await Promise.all([
+      subscriptionAPI.getAddonProducts(),
+      subscriptionAPI.getBasePlanProducts(),
+    ])
+
+    if (addonRes.error) {
+      error.value = 'Unable to load add-ons. Please try again.'
+    } else {
+      allAddonProducts.value = addonRes.data ?? []
+    }
+
+    if (baseRes.error) {
+      changePlanError.value =
+        'Unable to load available subscription plans. Please try again later.'
+    } else {
+      basePlanProducts.value = baseRes.data ?? []
+      if (!selectedBasePlanId.value && basePlan.value) {
+        selectedBasePlanId.value = basePlan.value.id
+      }
+    }
+  } catch (err) {
+    console.error('Error loading subscription data:', err)
+    error.value = 'Unable to load subscription options. Please try again.'
+  } finally {
+    isLoadingProducts.value = false
   }
-  allAddonProducts.value = data ?? []
 })
 </script>
 
@@ -161,7 +245,7 @@ onMounted(async () => {
         Manage Subscription
       </h1>
       <p class="text-neutral-body mb-2">
-        Add or remove features to your subscription with add-ons.
+        View your current plan, change tiers, and manage add-ons.
       </p>
       <p
         v-if="formattedTrialEnd"
@@ -179,7 +263,7 @@ onMounted(async () => {
 
       <div v-if="isLoadingProducts" class="text-center py-12">
         <font-awesome-icon
-          icon="spinner"
+          :icon="['fas', 'spinner']"
           spin
           class="h-8 w-8 text-brand-primary mx-auto mb-4"
           aria-hidden="true"
@@ -188,6 +272,115 @@ onMounted(async () => {
       </div>
 
       <div v-else class="space-y-6">
+        <div class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            Base plan
+          </h2>
+          <div class="space-y-2 mb-4">
+            <p
+              v-if="basePlan"
+              class="text-neutral-body"
+            >
+              <span class="font-semibold">Current plan:</span>
+              {{ basePlan.display_name }}
+            </p>
+            <p
+              v-if="basePlan"
+              class="text-neutral-body"
+            >
+              <span class="font-semibold">Monthly price:</span>
+              <span> ${{ getProductPrice(basePlan) }}/month</span>
+            </p>
+            <p
+              v-else
+              class="text-neutral-body"
+            >
+              You don't have an active base plan yet.
+            </p>
+          </div>
+
+          <div v-if="basePlanProducts.length" class="mt-2 space-y-4">
+            <h3 class="text-sm font-semibold text-brand-charcoal">
+              Change your base plan
+            </h3>
+            <div class="space-y-3">
+              <label
+                v-for="product in basePlanProducts"
+                :key="product.id"
+                class="flex items-start cursor-pointer"
+              >
+                <input
+                  v-model="selectedBasePlanId"
+                  type="radio"
+                  class="mr-3 mt-1 w-4 h-4"
+                  :value="product.id"
+                  :disabled="changePlanLoading"
+                />
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-brand-charcoal">
+                      {{ product.display_name }}
+                    </span>
+                    <span
+                      v-if="basePlan && product.id === basePlan.id"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-semibold"
+                    >
+                      <font-awesome-icon
+                        :icon="['fas', 'check']"
+                        class="w-3 h-3 mr-1"
+                        aria-hidden="true"
+                      />
+                      Current plan
+                    </span>
+                  </div>
+                  <span class="text-sm text-neutral-body block">
+                    ${{ getProductPrice(product) }}/month
+                    <span v-if="product.description"> — {{ product.description }}</span>
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 mt-4">
+              <button
+                type="button"
+                class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!canChangePlan"
+                @click="handleChangeBasePlan"
+              >
+                <font-awesome-icon
+                  v-if="changePlanLoading"
+                  :icon="['fas', 'spinner']"
+                  spin
+                  class="h-5 w-5"
+                  aria-hidden="true"
+                />
+                {{
+                  changePlanLoading
+                    ? 'Updating plan...'
+                    : basePlan
+                      ? 'Update base plan'
+                      : 'Choose base plan'
+                }}
+              </button>
+            </div>
+
+            <p
+              v-if="changePlanError"
+              class="mt-4 text-sm text-red-600"
+              role="alert"
+            >
+              {{ changePlanError }}
+            </p>
+          </div>
+          <p
+            v-else
+            class="text-sm text-neutral-body"
+          >
+            No other base plans are available right now.
+          </p>
+        </div>
+
         <div class="card p-6" v-if="addonProducts.length">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
             Current add-ons

@@ -67,7 +67,7 @@ const handleManageBilling = async () => {
               <span class="font-semibold">Next billing date:</span> {{ new Date(nextBillingAt).toLocaleDateString() }}
             </p>
             <p v-if="trialEndsAt" class="text-sm text-red-600 font-medium">
-              You're on a free trial. Your first charge will occur on {{ new Date(trialEndsAt).toLocaleDateString() }} unless you cancel.
+              You're on a free trial.
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import { getStripeProductId } from '../_shared/stripe-products.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -30,7 +31,7 @@ serve(async (req) => {
         global: {
           headers: { Authorization: authHeader },
         },
-      }
+      },
     )
 
     const {
@@ -59,7 +60,7 @@ serve(async (req) => {
 
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, is_addon, type')
+      .select('id, is_addon, type, price_cents, stripe_product_id, display_name')
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -70,11 +71,17 @@ serve(async (req) => {
       throw new Error('Some product ids are invalid')
     }
 
-    const invalid = products.filter(
-      (p) => !p.is_addon || p.type !== 'subscription',
-    )
-    if (invalid.length > 0) {
-      throw new Error('All products must be subscription add-ons')
+    const invalidType = products.filter((p) => p.type !== 'subscription')
+    if (invalidType.length > 0) {
+      throw new Error('All products must be subscription products')
+    }
+
+    const basePlans = products.filter((p) => !p.is_addon)
+    if (basePlans.length === 0) {
+      throw new Error('At least one base plan is required')
+    }
+    if (basePlans.length > 1) {
+      throw new Error('You may not attach more than one base plan')
     }
 
     const { data: subscriptions, error: subsError } = await supabaseClient
@@ -88,7 +95,7 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      throw new Error('No active subscription found; Purchase a base plan first.')
+      throw new Error('No active subscription found; purchase a base plan first.')
     }
 
     let primarySubscription = subscriptions[0]
@@ -135,33 +142,75 @@ serve(async (req) => {
       }
     }
 
-    const { data: subscriptionProducts, error: subscriptionProductsError } =
-      await supabaseClient
-        .from('subscription_product')
-        .select('product_id, stripe_subscription_item_id')
-        .eq('subscription_id', primarySubscription.id)
-        .in('product_id', productIds)
-
-    if (subscriptionProductsError) {
-      throw new Error(subscriptionProductsError.message)
+    const stripeSubscriptionId = primarySubscription.stripe_subscription_id
+    if (!stripeSubscriptionId) {
+      throw new Error('Subscription is missing Stripe subscription id')
     }
 
-    const itemsToRemove = (subscriptionProducts ?? []).filter(
-      (sp) => sp.stripe_subscription_item_id,
+    // Resolve Stripe product ids for all desired products and keep a lookup map
+    const desiredStripeProductIds: string[] = []
+    const productByStripeProductId = new Map<string, (typeof products)[number]>()
+
+    for (const product of products) {
+      const stripeProductId = await getStripeProductId(product)
+      desiredStripeProductIds.push(stripeProductId)
+      productByStripeProductId.set(stripeProductId, product)
+    }
+
+    const desiredStripeProductIdSet = new Set(desiredStripeProductIds)
+
+    const stripeSubscription = await stripe.subscriptions.retrieve(
+      stripeSubscriptionId,
+      { expand: ['items.data.price.product'] },
     )
 
-    if (itemsToRemove.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: 'No matching add-ons to remove.' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        },
-      )
+    const existingItems = stripeSubscription.items.data
+    const existingStripeProductIdsByItemId = new Map<string, string>()
+
+    for (const item of existingItems) {
+      const price = item.price
+      if (!price) continue
+      const product = price.product
+      let stripeProductId: string | null = null
+      if (typeof product === 'string') {
+        stripeProductId = product
+      } else if (product && typeof product.id === 'string') {
+        stripeProductId = product.id
+      }
+      if (!stripeProductId) continue
+      existingStripeProductIdsByItemId.set(item.id, stripeProductId)
     }
 
-    for (const item of itemsToRemove) {
-      await stripe.subscriptionItems.del(item.stripe_subscription_item_id as string, {
+    const existingStripeProductIdSet = new Set(existingStripeProductIdsByItemId.values())
+
+    // Remove items whose Stripe product id is not in the desired set
+    for (const item of existingItems) {
+      const stripeProductId = existingStripeProductIdsByItemId.get(item.id)
+      if (!stripeProductId) continue
+      if (!desiredStripeProductIdSet.has(stripeProductId)) {
+        await stripe.subscriptionItems.del(item.id, {
+          proration_behavior: 'create_prorations',
+        })
+      }
+    }
+
+    // Add items for desired Stripe products that are not currently present
+    const stripeProductIdsToAdd = desiredStripeProductIds.filter(
+      (id) => !existingStripeProductIdSet.has(id),
+    )
+
+    for (const stripeProductId of stripeProductIdsToAdd) {
+      const product = productByStripeProductId.get(stripeProductId)
+      if (!product) continue
+
+      await stripe.subscriptionItems.create({
+        subscription: stripeSubscriptionId,
+        price_data: {
+          currency: 'usd',
+          unit_amount: product.price_cents,
+          recurring: { interval: 'month' },
+          product: stripeProductId,
+        },
         proration_behavior: 'create_prorations',
       })
     }
