@@ -87,7 +87,7 @@ const handleManageBilling = async () => {
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Manage Subscription</h2>
           <p class="text-sm text-neutral-body mb-4">
-            Use the billing portal to update your payment method, view invoices, or update your billing address. Use manage subscription page to change your plan and manage add-ons.
+            Use the billing portal to update your payment method, view invoices, or update your billing address. Use manage subscription page to change your plan and manage add-ons. Price changes and prorations will take effect on your next billing cycle.
           </p>
           <div class="flex flex-col gap-2">
             <div class="flex flex-col sm:flex-row gap-4">

@@ -147,17 +147,27 @@ serve(async (req) => {
       throw new Error('Subscription is missing Stripe subscription id')
     }
 
-    // Resolve Stripe product ids for all desired products and keep a lookup map
+    // Resolve Stripe product ids for all desired products and keep lookup maps
     const desiredStripeProductIds: string[] = []
     const productByStripeProductId = new Map<string, (typeof products)[number]>()
+    const stripeProductIdBySupabaseId = new Map<string, string>()
 
     for (const product of products) {
       const stripeProductId = await getStripeProductId(product)
       desiredStripeProductIds.push(stripeProductId)
       productByStripeProductId.set(stripeProductId, product)
+      stripeProductIdBySupabaseId.set(product.id, stripeProductId)
     }
 
     const desiredStripeProductIdSet = new Set(desiredStripeProductIds)
+
+    const desiredBaseProduct = basePlans[0]
+    const desiredBaseStripeProductId = stripeProductIdBySupabaseId.get(
+      desiredBaseProduct.id,
+    )
+    if (!desiredBaseStripeProductId) {
+      throw new Error('Failed to resolve Stripe product id for base plan')
+    }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(
       stripeSubscriptionId,
@@ -181,25 +191,55 @@ serve(async (req) => {
       existingStripeProductIdsByItemId.set(item.id, stripeProductId)
     }
 
-    const existingStripeProductIdSet = new Set(existingStripeProductIdsByItemId.values())
+    // Determine which items to keep vs. remove, and which desired products still need adding
+    const desiredStripeProductIdsToAdd = new Set(desiredStripeProductIds)
+    const removableItemIds: string[] = []
 
-    // Remove items whose Stripe product id is not in the desired set
     for (const item of existingItems) {
       const stripeProductId = existingStripeProductIdsByItemId.get(item.id)
       if (!stripeProductId) continue
-      if (!desiredStripeProductIdSet.has(stripeProductId)) {
-        await stripe.subscriptionItems.del(item.id, {
-          proration_behavior: 'create_prorations',
-        })
+
+      if (desiredStripeProductIdSet.has(stripeProductId)) {
+        // Already a desired product on the subscription: keep it and don't re-add later
+        desiredStripeProductIdsToAdd.delete(stripeProductId)
+      } else {
+        // Not desired according to the requested productIds: candidate for removal
+        removableItemIds.push(item.id)
       }
     }
 
-    // Add items for desired Stripe products that are not currently present
-    const stripeProductIdsToAdd = desiredStripeProductIds.filter(
-      (id) => !existingStripeProductIdSet.has(id),
-    )
+    // Special case: subscription currently has a single item which is not in the desired set.
+    // Instead of deleting the last item (which Stripe rejects), update it in-place to the desired base plan.
+    if (existingItems.length === 1 && removableItemIds.length === 1) {
+      const singleItemId = removableItemIds[0]
+      const singleStripeProductId = existingStripeProductIdsByItemId.get(singleItemId)
 
-    for (const stripeProductId of stripeProductIdsToAdd) {
+      if (singleStripeProductId && singleStripeProductId !== desiredBaseStripeProductId) {
+        await stripe.subscriptionItems.update(singleItemId, {
+          price_data: {
+            currency: 'usd',
+            unit_amount: desiredBaseProduct.price_cents,
+            recurring: { interval: 'month' },
+            product: desiredBaseStripeProductId,
+          },
+          proration_behavior: 'create_prorations',
+        })
+
+        // Base plan now satisfied by the updated item; do not delete it or re-add it.
+        desiredStripeProductIdsToAdd.delete(desiredBaseStripeProductId)
+        removableItemIds.length = 0
+      }
+    }
+
+    // Remove any remaining undesired items
+    for (const itemId of removableItemIds) {
+      await stripe.subscriptionItems.del(itemId, {
+        proration_behavior: 'create_prorations',
+      })
+    }
+
+    // Add items for desired Stripe products that are not currently present
+    for (const stripeProductId of desiredStripeProductIdsToAdd) {
       const product = productByStripeProductId.get(stripeProductId)
       if (!product) continue
 
