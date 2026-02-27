@@ -1,22 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Product, Profile } from '@/types/database'
+import type { Product } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
-import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
-
-interface JobFeedItem {
-  id: string
-  title: string
-  company: string
-  location: string
-  salary_min?: number
-  salary_max?: number
-  brief?: string
-  tags?: string[]
-  status?: 'new' | 'updated' | 'closing_soon'
-}
+import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
+import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
 
@@ -41,12 +30,14 @@ function dismissProfileCompletion() {
   }
 }
 
-const jobs = ref<JobFeedItem[]>([]) // Placeholder for job feed
+const matches = ref<MatchedJob[]>([])
+const isLoadingMatches = ref(false)
+const matchesError = ref<string | null>(null)
 
 // Filters
-const selectedRoleTypes = ref<string[]>([])
+const selectedRoleTypes = ref<RoleCategoryValue[]>([])
 const selectedLocation = ref('')
-const salaryRange = ref([0, 200000])
+const salaryRange = ref<[number, number]>([0, 200000])
 const showSavedOnly = ref(false)
 
 // Dynamic greeting
@@ -86,30 +77,75 @@ const showProfileCompletionCard = computed(
   () => profileCompletion.value.percent < 100 && !profileCompletionDismissed.value
 )
 
-// Matching statistics (placeholder until API exists)
-const matchingStats = ref({
-  thisWeek: null as number | null,
-  totalDelivered: null as number | null,
-  avgMatchScore: null as number | null
+const matchingStats = ref<MatchingStats>({
+  thisWeek: 0,
+  totalDelivered: 0,
+  avgMatchScore: null,
 })
 
-function applyProfileToFilters(p: Profile | null | undefined) {
-  if (!p) return
-  const values = p.target_role_categories ?? []
-  if (values.length) selectedRoleTypes.value = values as RoleCategoryValue[]
-  const locations = p.preferred_locations ?? []
-  if (locations.length) selectedLocation.value = locations.join(', ')
-  const min = p.desired_salary_min
-  const max = p.desired_salary_max
-  if (min != null || max != null) {
-    salaryRange.value = [
-      min != null ? min : 0,
-      max != null ? max : 200000
-    ]
+const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
+
+const filteredMatches = computed(() => {
+  let result = matches.value
+
+  if (showSavedOnly.value) {
+    result = result.filter((m) => m.isSaved)
+  }
+
+  const location = selectedLocation.value.trim().toLowerCase()
+  if (location) {
+    result = result.filter((m) =>
+      (m.location ?? '').toLowerCase().includes(location),
+    )
+  }
+
+  // Placeholder: salary and role-type filtering can be layered in here
+  // once those attributes are available on MatchedJob/job metadata.
+
+  return result
+})
+
+async function loadMatchesAndStats() {
+  isLoadingMatches.value = true
+  matchesError.value = null
+  try {
+    const [matchesResult, statsResult] = await Promise.all([
+      jobsAPI.getJobMatches(),
+      jobsAPI.getMatchingStats(),
+    ])
+
+    if (matchesResult.error) {
+      matchesError.value = matchesResult.error.message
+      matches.value = []
+    } else {
+      matches.value = matchesResult.data
+    }
+
+    if (!statsResult.error) {
+      matchingStats.value = statsResult.data
+    }
+  } finally {
+    isLoadingMatches.value = false
   }
 }
 
-watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
+async function handleToggleSave(matchId: string, isSaved: boolean) {
+  if (isSaved) {
+    await jobsAPI.unsaveJob(matchId)
+  } else {
+    await jobsAPI.saveJob(matchId)
+  }
+  const { data } = await jobsAPI.getJobMatches()
+  matches.value = data
+}
+
+watch(profile, () => {
+  // Filters start neutral; do not auto-populate from profile.
+})
+
+onMounted(() => {
+  void loadMatchesAndStats()
+})
 </script>
 
 <template>
@@ -213,9 +249,13 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
       </div>
 
       <!-- Recent job matches -->
-      <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Recent job matches</h2>
+      <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
+        Recent job matches
+      </h2>
       <div class="card p-6 mb-8">
-        <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">Filters</h3>
+        <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">
+          Filters
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-sm font-medium text-brand-charcoal mb-2">Role type</label>
@@ -268,7 +308,7 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center py-12">
+      <div v-if="overallLoading" class="text-center py-12">
         <font-awesome-icon
           :icon="['fas', 'spinner']"
           spin
@@ -278,12 +318,27 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
         <p class="text-neutral-body">Loading...</p>
       </div>
 
-      <!-- Empty State -->
-      <div v-else-if="jobs.length === 0" class="card p-12 text-center">
+      <!-- Empty State: no matches at all -->
+      <div
+        v-else-if="matches.length === 0"
+        class="card p-12 text-center"
+      >
         <div class="max-w-md mx-auto">
-          <div class="w-16 h-16 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          <div
+            class="w-16 h-16 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <svg
+              class="w-8 h-8 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
             </svg>
           </div>
           <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
@@ -298,12 +353,28 @@ watch(profile, (p) => applyProfileToFilters(p), { immediate: true })
         </div>
       </div>
 
+      <!-- Empty State: matches exist but filters hide them -->
+      <div
+        v-else-if="filteredMatches.length === 0"
+        class="card p-12 text-center"
+      >
+        <div class="max-w-md mx-auto">
+          <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+            No jobs match your filters.
+          </h2>
+          <p class="text-neutral-body mb-6">
+            Try clearing one or more filters to see more of your matches.
+          </p>
+        </div>
+      </div>
+
       <!-- Job Feed -->
       <div v-else class="grid grid-cols-1 gap-6">
         <JobCard
-          v-for="job in jobs"
-          :key="job.id"
+          v-for="job in filteredMatches"
+          :key="job.matchId"
           :job="job"
+          @toggle-save="handleToggleSave"
         />
       </div>
     </div>

@@ -38,3 +38,7 @@ export type ScheduledJob = Tables<'scheduled_jobs'>
 export type ScheduledJobStatus = Enums<'scheduled_job_status'>
 export type ScheduledJobInsert = TablesInsert<'scheduled_jobs'>
 export type ScheduledJobUpdate = TablesUpdate<'scheduled_jobs'>
+
+// Job matching and favorites
+export type JobMatch = Tables<'job_matches'>
+export type SavedJob = Tables<'saved_jobs'>

@@ -257,6 +257,45 @@ export type Database = {
         }
         Relationships: []
       }
+      job_matches: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: number
+          profile_id: string
+          score: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: number
+          profile_id: string
+          score?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: number
+          profile_id?: string
+          score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_matches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_hopper_live"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_matches_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: Database["public"]["Enums"]["product_category"]
@@ -445,6 +484,42 @@ export type Database = {
           "Reason for Apollo"?: string | null
         }
         Relationships: []
+      }
+      saved_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          match_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          match_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          match_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_jobs_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_jobs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scheduled_jobs: {
         Row: {

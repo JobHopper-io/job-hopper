@@ -174,7 +174,7 @@ const handleProceedToCheckout = async () => {
     isLoading.value = true
     error.value = ''
 
-    const profileError = await profileAPI.updateProfile({
+    const { error: updateError } = await profileAPI.updateProfile({
       first_name: firstName.value.trim() || undefined,
       last_name: lastName.value.trim() || undefined,
       current_job_title: currentJobTitle.value,
@@ -188,8 +188,10 @@ const handleProceedToCheckout = async () => {
       open_to_remote: openToRemote.value
     })
 
-    if (profileError.error) {
-      console.error('Error updating profile:', profileError.error)
+    if (updateError) {
+      console.error('Error updating profile:', updateError)
+      error.value = 'We couldn’t save your profile details. Please try again before continuing to checkout.'
+      return
     }
 
     if (resumeFile.value) {
@@ -205,7 +207,7 @@ const handleProceedToCheckout = async () => {
       return
     }
 
-    const successUrl = `${window.location.origin}/onboarding/complete?session_id={CHECKOUT_SESSION_ID}`
+    const successUrl = `${window.location.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${window.location.origin}/onboarding`
     const productIds = [selectedBasePlanId.value, ...selectedAddonIds.value]
 

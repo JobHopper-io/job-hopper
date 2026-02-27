@@ -65,6 +65,24 @@
   - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows.
   - `enriched_lead` and `raw_jobs` often contain semi‑structured JSON metadata (`apollo_metadata`, `icypeas_meta_data`, `"apollo data"`, `"Meta Data"`); downstream logic should treat these as opaque blobs unless there is explicit parsing logic.
 
+### job_matches
+- **Meaning**: Records which jobs have been matched to which profile over time; this is the primary source for the user-facing “Recent job matches” and Job Browsing UI.
+- **Key relationships**:
+  - `profile_id` → `profiles.id`
+  - `job_id` → `job_hopper_live.id`
+- **Non‑obvious rules**:
+  - A `(profile_id, job_id)` pair appears at most once; the matching pipeline skips any job that has already been matched in the past, even across multiple scheduled runs.
+  - Rows are written only by backend edge functions (service_role), not by the frontend. Authenticated users can read only rows for their own profile.
+
+### saved_jobs
+- **Meaning**: Explicit favorites/saved jobs for a profile; separate from `job_matches` so that a user can star or un-star matches without affecting matching history.
+- **Key relationships**:
+  - `profile_id` → `profiles.id`
+  - `match_id` → `job_matches.id` (and therefore indirectly to `job_hopper_live.id` via `job_matches.job_id`)
+- **Non‑obvious rules**:
+  - Authenticated users can insert/delete rows only for their own profile (enforced via RLS).
+  - The frontend typically joins `saved_jobs` → `job_matches` → `job_hopper_live` to show saved matches with full job details.
+
 ## Function scheduling (scheduled_jobs)
 
 - **Meaning**: Table of jobs to run at a given time. The `run-scheduled-jobs` edge function is invoked every 15 minutes by pg_cron + pg_net, selects pending rows (up to a limit), and HTTP-invokes the target edge function with the stored payload. Only system/cron-designed edge functions (no user JWT) should be scheduled.

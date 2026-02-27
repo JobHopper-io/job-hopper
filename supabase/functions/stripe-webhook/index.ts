@@ -232,6 +232,19 @@ serve(async (req) => {
               )
           }
         }
+
+        // Schedule initial job matching for this profile ~45 minutes after onboarding completes.
+        const runAt = new Date(Date.now() + 45 * 60 * 1000).toISOString()
+        const { error: scheduleError } = await supabaseAdmin
+          .from('scheduled_jobs')
+          .insert({
+            function_name: 'match-profile-jobs',
+            payload: { profile_id: profileId, limit: 15 },
+            run_at: runAt,
+          })
+        if (scheduleError) {
+          console.error('checkout.session.completed: failed to schedule match-profile-jobs:', scheduleError)
+        }
         break
       }
 
