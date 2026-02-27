@@ -446,6 +446,42 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          function_name: string
+          id: string
+          payload: Json
+          run_at: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["scheduled_job_status"]
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          function_name: string
+          id?: string
+          payload?: Json
+          run_at: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scheduled_job_status"]
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          function_name?: string
+          id?: string
+          payload?: Json
+          run_at?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scheduled_job_status"]
+        }
+        Relationships: []
+      }
       sic_codes: {
         Row: {
           csv_industry_code: string | null
@@ -579,6 +615,7 @@ export type Database = {
         | "one_time_addon"
         | "one_time_item"
       product_type: "subscription" | "payment"
+      scheduled_job_status: "pending" | "running" | "completed" | "failed"
       subscription_status: "trial" | "active" | "canceled"
     }
     CompositeTypes: {
@@ -722,6 +759,7 @@ export const Constants = {
         "one_time_item",
       ],
       product_type: ["subscription", "payment"],
+      scheduled_job_status: ["pending", "running", "completed", "failed"],
       subscription_status: ["trial", "active", "canceled"],
     },
   },

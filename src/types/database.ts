@@ -32,3 +32,9 @@ export type SubscriptionStatus = Enums<'subscription_status'>
 export type Product = Tables<'products'>
 export type ProductCategory = Enums<'product_category'>
 export type SubscriptionProduct = Tables<'subscription_product'>
+
+// Scheduled jobs (run by run-scheduled-jobs edge function; only service_role accesses this table)
+export type ScheduledJob = Tables<'scheduled_jobs'>
+export type ScheduledJobStatus = Enums<'scheduled_job_status'>
+export type ScheduledJobInsert = TablesInsert<'scheduled_jobs'>
+export type ScheduledJobUpdate = TablesUpdate<'scheduled_jobs'>

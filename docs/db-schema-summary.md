@@ -64,3 +64,12 @@
   - `bd_leads.status` uses the `bd_leads_status` enum for the internal processing pipeline (see enum values in `supabase.ts`).
   - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows.
   - `enriched_lead` and `raw_jobs` often contain semi‑structured JSON metadata (`apollo_metadata`, `icypeas_meta_data`, `"apollo data"`, `"Meta Data"`); downstream logic should treat these as opaque blobs unless there is explicit parsing logic.
+
+## Function scheduling (scheduled_jobs)
+
+- **Meaning**: Table of jobs to run at a given time. The `run-scheduled-jobs` edge function is invoked every 15 minutes by pg_cron + pg_net, selects pending rows (up to a limit), and HTTP-invokes the target edge function with the stored payload. Only system/cron-designed edge functions (no user JWT) should be scheduled.
+- **Key columns**: `function_name` (edge function name), `payload` (jsonb, POST body), `run_at` (timestamptz), `status` (`pending` | `running` | `completed` | `failed`), `error_message` (set on failure), `started_at` / `finished_at` (for execution and stale-job recovery).
+- **Non‑obvious rules**:
+  - Only the scheduler (edge function using service_role) reads and updates this table. RLS has no policies for anon/authenticated; access is via service_role only.
+  - Stale jobs (left `running` after a crash or timeout) are marked `failed` at the start of each scheduler run (e.g. `started_at` older than 20 minutes).
+  - Insert rows from backend code (e.g. another edge function or a server process) with `status = 'pending'` and `run_at` set to the desired execution time.
