@@ -28,9 +28,21 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  console.log('run-scheduled-jobs invoked', {
+    requestedAt: new Date().toISOString(),
+  })
+
   const cronSecret = req.headers.get('x-cron-secret')
   const expectedSecret = Deno.env.get('CRON_SECRET')
   if (!expectedSecret || cronSecret !== expectedSecret) {
+    if (!expectedSecret) {
+      console.error('CRON_SECRET env is missing for run-scheduled-jobs')
+    } else {
+      console.error('Invalid x-cron-secret header for run-scheduled-jobs', {
+        hasHeader: !!cronSecret,
+      })
+    }
+
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       {
@@ -43,6 +55,11 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !serviceRoleKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for run-scheduled-jobs', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceRoleKey: !!serviceRoleKey,
+    })
+
     return new Response(
       JSON.stringify({ error: 'Server misconfiguration' }),
       {
@@ -71,6 +88,12 @@ serve(async (req) => {
     .lt('started_at', staleThreshold)
 
   if (staleError) {
+    console.error('Failed to recover stale scheduled jobs', {
+      error: staleError.message,
+    })
+  }
+
+  if (staleError) {
     return new Response(
       JSON.stringify({ error: 'Failed to recover stale jobs', details: staleError.message }),
       {
@@ -90,6 +113,10 @@ serve(async (req) => {
     .limit(PER_RUN_LIMIT)
 
   if (selectError) {
+    console.error('Failed to select pending scheduled jobs', {
+      error: selectError.message,
+    })
+
     return new Response(
       JSON.stringify({ error: 'Failed to select pending jobs', details: selectError.message }),
       {
@@ -103,7 +130,25 @@ serve(async (req) => {
   let completed = 0
   let failed = 0
 
+  console.log('pending scheduled jobs selected', {
+    count: jobs.length,
+  })
+
+  const jobResults: {
+    id: string
+    function_name: string
+    run_at: string
+    status: 'completed' | 'failed'
+    error_message: string | null
+  }[] = []
+
   for (const job of jobs) {
+    console.log('processing scheduled job', {
+      id: job.id,
+      function_name: job.function_name,
+      run_at: job.run_at,
+    })
+
     // Mark as running
     await supabase
       .from('scheduled_jobs')
@@ -131,6 +176,11 @@ serve(async (req) => {
       clearTimeout(timeoutId)
 
       if (response.ok) {
+        console.log('scheduled job invocation succeeded', {
+          id: job.id,
+          function_name: job.function_name,
+          status: response.status,
+        })
         success = true
       } else {
         const body = await response.text()
@@ -138,16 +188,34 @@ serve(async (req) => {
           `HTTP ${response.status}: ${body || response.statusText}`,
           ERROR_MESSAGE_MAX_LENGTH,
         )
+        console.error('scheduled job invocation failed with non-2xx response', {
+          id: job.id,
+          function_name: job.function_name,
+          status: response.status,
+        })
       }
     } catch (err) {
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
           errorMessage = 'Invocation timeout after 60s'
+          console.error('scheduled job invocation timed out', {
+            id: job.id,
+            function_name: job.function_name,
+          })
         } else {
           errorMessage = truncate(err.message, ERROR_MESSAGE_MAX_LENGTH)
+          console.error('scheduled job invocation threw error', {
+            id: job.id,
+            function_name: job.function_name,
+            message: err.message,
+          })
         }
       } else {
         errorMessage = 'Unknown invocation error'
+        console.error('scheduled job invocation threw non-Error value', {
+          id: job.id,
+          function_name: job.function_name,
+        })
       }
     }
 
@@ -173,13 +241,29 @@ serve(async (req) => {
         })
         .eq('id', job.id)
     }
+
+    jobResults.push({
+      id: job.id,
+      function_name: job.function_name,
+      run_at: job.run_at,
+      status: success ? 'completed' : 'failed',
+      error_message: errorMessage,
+    })
   }
+
+  console.log('run-scheduled-jobs completed', {
+    processed: jobs.length,
+    completed,
+    failed,
+  })
 
   return new Response(
     JSON.stringify({
       processed: jobs.length,
       completed,
       failed,
+      jobs: jobResults,
+      timestamp: now,
     }),
     {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
