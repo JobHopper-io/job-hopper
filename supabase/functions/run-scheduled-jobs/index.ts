@@ -54,7 +54,6 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !serviceRoleKey) {
     console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for run-scheduled-jobs', {
       hasSupabaseUrl: !!supabaseUrl,
