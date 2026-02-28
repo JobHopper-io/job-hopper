@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 const PER_RUN_LIMIT = 25
@@ -32,15 +32,16 @@ serve(async (req) => {
     requestedAt: new Date().toISOString(),
   })
 
-  const cronSecret = req.headers.get('x-cron-secret')
-  const expectedSecret = Deno.env.get('CRON_SECRET')
-  if (!expectedSecret || cronSecret !== expectedSecret) {
-    if (!expectedSecret) {
-      console.error('CRON_SECRET env is missing for run-scheduled-jobs')
+  const authHeader = req.headers.get('Authorization')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const validServiceRole =
+    serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`
+
+  if (!validServiceRole) {
+    if (!serviceRoleKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY missing for run-scheduled-jobs')
     } else {
-      console.error('Invalid x-cron-secret header for run-scheduled-jobs', {
-        hasHeader: !!cronSecret,
-      })
+      console.error('Invalid auth for run-scheduled-jobs', { hasAuthHeader: !!authHeader })
     }
 
     return new Response(
