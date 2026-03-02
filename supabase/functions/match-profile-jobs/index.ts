@@ -32,18 +32,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!supabaseUrl || !serviceRoleKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server misconfiguration' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        },
-      )
-    }
-
     const payload = (await req.json()) as MatchProfileJobsPayload
 
     if (!payload || typeof payload.profile_id !== 'string' || !payload.profile_id) {
@@ -62,7 +50,26 @@ serve(async (req) => {
         ? Math.min(Math.max(1, Math.floor(Number(rawLimit))), 100)
         : 15
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const authHeader = req.headers.get('Authorization') ?? ''
+
+    if (!supabaseUrl || !anonKey) {
+      return new Response(
+        JSON.stringify({ error: 'Server misconfiguration' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        },
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, anonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
       auth: { persistSession: false },
     })
 
@@ -117,53 +124,34 @@ serve(async (req) => {
       created_at: string
     }
 
-    // Fetch all jobs from job_hopper_live in pages.
-    const allJobs: JobRow[] = []
-    const pageSize = 1000
-    let offset = 0
+    // Fetch all jobs from job_hopper_live in a single query.
+    const { data, error: jobsError } = await supabase
+      .from('job_hopper_live')
+      .select(
+        `
+        id,
+        "Job Title",
+        "Company Name",
+        Location,
+        Description,
+        "Job Highlights",
+        "Apply Link",
+        created_at
+      `,
+      )
+      .order('created_at', { ascending: false })
 
-    while (true) {
-      const { data: page, error: jobsError } = await supabase
-        .from('job_hopper_live')
-        .select(
-          `
-          id,
-          "Job Title",
-          "Company Name",
-          Location,
-          Description,
-          "Job Highlights",
-          "Apply Link",
-          created_at
-        `,
-        )
-        .order('created_at', { ascending: false })
-        .range(offset, offset + pageSize - 1)
-
-      if (jobsError) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to load jobs', details: jobsError.message }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-          },
-        )
-      }
-
-      const pageRows = (page ?? []) as JobRow[]
-
-      if (!pageRows.length) {
-        break
-      }
-
-      allJobs.push(...pageRows)
-
-      if (pageRows.length < pageSize) {
-        break
-      }
-
-      offset += pageSize
+    if (jobsError) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to load jobs', details: jobsError.message }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        },
+      )
     }
+
+    const allJobs = (data ?? []) as JobRow[]
 
     const jobRecords: JobRecord[] = allJobs.map((row) => ({
       id: row.id,

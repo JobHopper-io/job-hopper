@@ -32,32 +32,14 @@ serve(async (req) => {
     requestedAt: new Date().toISOString(),
   })
 
-  const authHeader = req.headers.get('Authorization')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const validServiceRole =
-    serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`
-
-  if (!validServiceRole) {
-    if (!serviceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY missing for run-scheduled-jobs')
-    } else {
-      console.error('Invalid auth for run-scheduled-jobs', { hasAuthHeader: !!authHeader })
-    }
-
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401,
-      },
-    )
-  }
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for run-scheduled-jobs', {
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const authHeader = req.headers.get('Authorization') ?? ''
+
+  if (!supabaseUrl || !anonKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY for run-scheduled-jobs', {
       hasSupabaseUrl: !!supabaseUrl,
-      hasServiceRoleKey: !!serviceRoleKey,
+      hasAnonKey: !!anonKey,
     })
 
     return new Response(
@@ -69,7 +51,12 @@ serve(async (req) => {
     )
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const supabase = createClient(supabaseUrl, anonKey, {
+    global: {
+      headers: {
+        Authorization: authHeader,
+      },
+    },
     auth: { persistSession: false },
   })
 
@@ -167,7 +154,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${serviceRoleKey}`,
+          Authorization: authHeader,
         },
         body: JSON.stringify(job.payload ?? {}),
         signal: controller.signal,
