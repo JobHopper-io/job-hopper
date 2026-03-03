@@ -23,7 +23,7 @@ const DEFAULT_MAILTRAP_BASE_URL = 'https://send.api.mailtrap.io'
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN') ?? ''
   const baseUrl = (Deno.env.get('MAILTRAP_BASE_URL') ?? DEFAULT_MAILTRAP_BASE_URL).replace(/\/+$/, '')
-  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? ''
+  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? 'demomailtrap.co'
 
   if (!apiToken) {
     const missing = []
@@ -37,9 +37,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress =
-    fromEnv.trim() ||
-    'Job-Hopper <no-reply@mailtrap.io>'
+  const fromAddress = { email: fromEnv.trim() || 'no-reply@mailtrap.io', name: 'Job-Hopper' }
 
   const url = `${baseUrl.replace(/\/+$/, '')}/api/send`
 
@@ -49,7 +47,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     url,
   })
 
-  const toAddress = params.to.trim()
+  const toAddress = { email: params.to.trim() }
 
   const payload: Record<string, unknown> = {
     from: fromAddress,
@@ -83,7 +81,6 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     })
 
     let messageId: string | null = null
-    let error: string | undefined
 
     let bodyText = ''
     try {
@@ -114,7 +111,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
 
     const truncatedBody = bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText
-    error = `Mailtrap error ${resp.status}: ${truncatedBody || resp.statusText}`
+    const errorMessage = `Mailtrap error ${resp.status}: ${truncatedBody || resp.statusText}`
     console.error('[email-provider] Mailtrap send failed', {
       to: params.to,
       category: params.category,
@@ -126,7 +123,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     return {
       messageId: null,
       success: false,
-      error,
+      error: errorMessage,
     }
   } catch (err) {
     const error =
