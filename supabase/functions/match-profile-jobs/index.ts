@@ -42,6 +42,9 @@ serve(async (req) => {
     const payload = (await req.json()) as MatchProfileJobsPayload
 
     if (!payload || typeof payload.profile_id !== 'string' || !payload.profile_id) {
+      console.error('match-profile-jobs: missing or invalid profile_id in payload', {
+        payload,
+      })
       return new Response(
         JSON.stringify({ error: 'Missing or invalid profile_id' }),
         {
@@ -62,6 +65,10 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization') ?? ''
 
     if (!supabaseUrl || !anonKey) {
+      console.error('match-profile-jobs: SUPABASE_URL or SUPABASE_ANON_KEY missing from environment', {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasAnonKey: !!anonKey,
+      })
       return new Response(
         JSON.stringify({ error: 'Server misconfiguration' }),
         {
@@ -102,6 +109,10 @@ serve(async (req) => {
       .single()
 
     if (profileError || !profile) {
+      console.error('match-profile-jobs: profile not found for profile_id', {
+        profileId: payload.profile_id,
+        error: profileError,
+      })
       return new Response(
         JSON.stringify({ error: 'Profile not found for profile_id' }),
         {
@@ -151,6 +162,9 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
 
     if (jobsError) {
+      console.error('match-profile-jobs: failed to load jobs from job_hopper_live', {
+        error: jobsError,
+      })
       return new Response(
         JSON.stringify({ error: 'Failed to load jobs', details: jobsError.message }),
         {
@@ -182,6 +196,10 @@ serve(async (req) => {
       .eq('profile_id', payload.profile_id)
 
     if (existingError) {
+      console.error('match-profile-jobs: failed to load existing job_matches for profile', {
+        profileId: payload.profile_id,
+        error: existingError,
+      })
       return new Response(
         JSON.stringify({ error: 'Failed to load existing matches', details: existingError.message }),
         {
@@ -222,6 +240,11 @@ serve(async (req) => {
         .insert(rowsToInsert, { count: 'exact' })
 
       if (insertError) {
+        console.error('match-profile-jobs: failed to insert job_matches', {
+          profileId: payload.profile_id,
+          rowsToInsertCount: rowsToInsert.length,
+          error: insertError,
+        })
         return new Response(
           JSON.stringify({ error: 'Failed to insert job_matches', details: insertError.message }),
           {
@@ -310,6 +333,13 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
               .eq('profile_id', payload.profile_id)
+          } else {
+            console.error('match-profile-jobs: sendEmail reported failure for job match digest', {
+              profileId: payload.profile_id,
+              jobCount: jobSummaries.length,
+              error: result.error,
+              messageId: result.messageId,
+            })
           }
         }
       } catch (err) {

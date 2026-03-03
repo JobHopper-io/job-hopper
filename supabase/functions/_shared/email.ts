@@ -37,16 +37,34 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
 
   if (options.supabase && options.profileId != null && options.eventType) {
     const status = result.success ? "sent" : "failed"
-    await options.supabase.from("email_events").insert({
-      profile_id: options.profileId,
-      type: options.eventType,
-      subject: options.subject,
-      template_key: options.templateKey ?? null,
-      payload: options.payload ?? null,
-      provider_message_id: result.messageId,
-      status,
-      error_message: result.error ?? null,
-    })
+    try {
+      const { error } = await options.supabase.from("email_events").insert({
+        profile_id: options.profileId,
+        type: options.eventType,
+        subject: options.subject,
+        template_key: options.templateKey ?? null,
+        payload: options.payload ?? null,
+        provider_message_id: result.messageId,
+        status,
+        error_message: result.error ?? null,
+      })
+
+      if (error) {
+        console.error("[email] failed to insert email_events row", {
+          profileId: options.profileId,
+          eventType: options.eventType,
+          status,
+          error,
+        })
+      }
+    } catch (err) {
+      console.error("[email] unexpected error inserting email_events row", {
+        profileId: options.profileId,
+        eventType: options.eventType,
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
   }
 
   return result
