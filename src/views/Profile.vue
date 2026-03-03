@@ -285,7 +285,8 @@ watch(
                     :value="opt.value"
                   >
                     {{ opt.label }}
-                  </select>
+                  </option>
+                </select>
                 <p class="text-xs text-neutral-body mt-1">
                   Immediate and daily are sent when we run matching (about once per day).
                 </p>

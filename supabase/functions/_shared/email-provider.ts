@@ -45,6 +45,13 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
   const url = `${baseUrl}/${encodeURIComponent(domain)}/messages`
 
+  console.log('[email-provider] Mailgun send attempt', {
+    to: params.to,
+    category: params.category,
+    url,
+    domain,
+  })
+
   const form = new URLSearchParams()
   form.set('from', from)
   form.set('to', params.to)
@@ -121,6 +128,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
       to: params.to,
       category: params.category,
       status: resp.status,
+      url,
       body: truncatedBody,
     })
 
