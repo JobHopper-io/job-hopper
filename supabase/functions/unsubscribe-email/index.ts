@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { decodeBase64Url } from "https://deno.land/std@0.168.0/encoding/base64url.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +12,19 @@ interface UnsubscribePayload {
   profile_id: string
   scope: string
   exp: number
+}
+
+function decodeBase64Url(value: string): Uint8Array {
+  let base64 = value.replace(/-/g, "+").replace(/_/g, "/")
+  while (base64.length % 4 !== 0) {
+    base64 += "="
+  }
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
 }
 
 async function verifyToken(token: string, secret: string): Promise<UnsubscribePayload | null> {

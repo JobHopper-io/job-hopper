@@ -2,9 +2,17 @@
  * Create a signed token for one-click unsubscribe links.
  * Verify with the same secret in unsubscribe-email edge function.
  */
-import { encodeBase64Url } from "https://deno.land/std@0.168.0/encoding/base64url.ts"
 
 const DEFAULT_EXP_SECONDS = 60 * 60 * 24 * 365 // 1 year
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = ''
+  for (const b of bytes) {
+    binary += String.fromCharCode(b)
+  }
+  const base64 = btoa(binary)
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
 
 export async function createUnsubscribeToken(
   profileId: string,
@@ -45,11 +53,12 @@ export async function getFooterLinksForProfile(profileId: string): Promise<{
   unsubscribeUrl: string
   siteUrl: string
 }> {
-  const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173"
+  const denoEnv = (globalThis as { Deno?: { env: { get: (key: string) => string | undefined } } }).Deno?.env
+  const siteUrl = denoEnv?.get("SITE_URL") ?? "http://localhost:5173"
   const preferencesUrl = `${siteUrl}/profile`
   let unsubscribeUrl = `${siteUrl}/profile?unsubscribe=1`
-  const secret = Deno.env.get("UNSUBSCRIBE_EMAIL_SECRET")
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")
+  const secret = denoEnv?.get("UNSUBSCRIBE_EMAIL_SECRET")
+  const supabaseUrl = denoEnv?.get("SUPABASE_URL")
   if (secret && supabaseUrl) {
     try {
       const token = await createUnsubscribeToken(profileId, secret)

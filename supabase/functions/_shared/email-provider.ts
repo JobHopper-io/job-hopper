@@ -85,7 +85,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     })
 
     let messageId: string | null = null
-    const error: string | undefined
+    let error: string | undefined
 
     let bodyText = ''
     try {
