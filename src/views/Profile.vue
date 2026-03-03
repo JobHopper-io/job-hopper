@@ -241,90 +241,6 @@ watch(
           </router-link>
         </div>
 
-        <!-- Email / Notification Preferences -->
-        <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Email preferences</h2>
-          <p class="text-sm text-neutral-body mb-4">
-            Choose which emails you receive. You can change these anytime.
-          </p>
-          <div v-if="notificationSettingsLoading" class="text-neutral-body text-sm">Loading...</div>
-          <div v-else-if="notificationSettings" class="space-y-4">
-            <div v-if="notificationSettings.email_unsubscribed_at" class="p-3 bg-neutral-bg rounded-[12px]">
-              <p class="text-sm text-neutral-body mb-2">You are unsubscribed from all Job-Hopper emails.</p>
-              <button
-                type="button"
-                class="btn-primary text-sm"
-                :disabled="notificationSettingsSaving"
-                @click="setResubscribed"
-              >
-                Re-enable emails
-              </button>
-            </div>
-            <template v-else>
-              <label class="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  class="w-4 h-4"
-                  :checked="notificationSettings.job_match_email_enabled"
-                  :disabled="notificationSettingsSaving"
-                  @change="saveNotificationSettings({ job_match_email_enabled: !notificationSettings.job_match_email_enabled })"
-                />
-                <span class="text-sm text-brand-charcoal">Job match emails</span>
-              </label>
-              <div v-if="notificationSettings.job_match_email_enabled" class="ml-6">
-                <label class="block text-xs font-medium text-neutral-body mb-1">Frequency</label>
-                <select
-                  :value="notificationSettings.job_match_email_frequency"
-                  class="input text-sm max-w-xs"
-                  :disabled="notificationSettingsSaving"
-                  @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
-                >
-                  <option
-                    v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
-                    :key="opt.value"
-                    :value="opt.value"
-                  >
-                    {{ opt.label }}
-                  </option>
-                </select>
-                <p class="text-xs text-neutral-body mt-1">
-                  Immediate and daily are sent when we run matching (about once per day).
-                </p>
-              </div>
-              <label class="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  class="w-4 h-4"
-                  :checked="notificationSettings.subscription_updates_email_enabled"
-                  :disabled="notificationSettingsSaving"
-                  @change="saveNotificationSettings({ subscription_updates_email_enabled: !notificationSettings.subscription_updates_email_enabled })"
-                />
-                <span class="text-sm text-brand-charcoal">Subscription updates</span>
-              </label>
-              <label class="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  class="w-4 h-4"
-                  :checked="notificationSettings.system_announcements_email_enabled"
-                  :disabled="notificationSettingsSaving"
-                  @change="saveNotificationSettings({ system_announcements_email_enabled: !notificationSettings.system_announcements_email_enabled })"
-                />
-                <span class="text-sm text-brand-charcoal">System announcements</span>
-              </label>
-              <div class="pt-2 border-t border-neutral-border">
-                <button
-                  type="button"
-                  class="text-sm text-red-600 hover:underline"
-                  :disabled="notificationSettingsSaving"
-                  @click="setUnsubscribedFromAll"
-                >
-                  Unsubscribe from all emails
-                </button>
-              </div>
-            </template>
-          </div>
-        </div>
-
         <!-- About You -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">About You</h2>
@@ -409,6 +325,94 @@ watch(
                 <span class="text-sm text-neutral-body">Open to remote roles</span>
               </label>
             </div>
+          </div>
+        </div>
+
+        <!-- Email / Notification Preferences -->
+        <div class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Email preferences</h2>
+          <p class="text-sm text-neutral-body mb-4">
+            Choose which emails you receive. You can change these anytime.
+          </p>
+          <div v-if="notificationSettingsLoading" class="text-neutral-body text-sm">Loading...</div>
+          <div v-else-if="notificationSettings" class="space-y-4">
+            <div v-if="notificationSettings.email_unsubscribed_at" class="p-3 bg-neutral-bg rounded-[12px]">
+              <p class="text-sm text-neutral-body mb-2">You are unsubscribed from all Job-Hopper emails.</p>
+              <button
+                type="button"
+                class="btn-primary text-sm"
+                :disabled="notificationSettingsSaving"
+                @click="setResubscribed"
+              >
+                Re-enable emails
+              </button>
+            </div>
+            <template v-else>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-4">
+                  <label class="flex items-center gap-3 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      class="w-4 h-4"
+                      :checked="notificationSettings.job_match_email_enabled"
+                      :disabled="notificationSettingsSaving"
+                      @change="saveNotificationSettings({ job_match_email_enabled: !notificationSettings.job_match_email_enabled })"
+                    />
+                    <span class="text-sm text-brand-charcoal">Job match emails</span>
+                  </label>
+                  <div
+                    v-if="notificationSettings.job_match_email_enabled"
+                    class="flex items-center gap-2"
+                  >
+                    <label class="block text-xs font-medium text-neutral-body">Frequency</label>
+                    <select
+                      :value="notificationSettings.job_match_email_frequency"
+                      class="input text-sm max-w-xs"
+                      :disabled="notificationSettingsSaving"
+                      @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                    >
+                      <option
+                        v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
+                        :key="opt.value"
+                        :value="opt.value"
+                      >
+                        {{ opt.label }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <label class="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="w-4 h-4"
+                  :checked="notificationSettings.subscription_updates_email_enabled"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ subscription_updates_email_enabled: !notificationSettings.subscription_updates_email_enabled })"
+                />
+                <span class="text-sm text-brand-charcoal">Subscription updates</span>
+              </label>
+              <label class="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="w-4 h-4"
+                  :checked="notificationSettings.system_announcements_email_enabled"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ system_announcements_email_enabled: !notificationSettings.system_announcements_email_enabled })"
+                />
+                <span class="text-sm text-brand-charcoal">System announcements</span>
+              </label>
+              <div class="pt-2 border-t border-neutral-border">
+                <button
+                  type="button"
+                  class="text-sm text-red-600 hover:underline"
+                  :disabled="notificationSettingsSaving"
+                  @click="setUnsubscribedFromAll"
+                >
+                  Unsubscribe from all emails
+                </button>
+              </div>
+            </template>
           </div>
         </div>
 
