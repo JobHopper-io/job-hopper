@@ -5,6 +5,7 @@ import { sendEmail } from '../_shared/email.ts'
 import {
   renderSubscriptionStarted,
   renderSubscriptionUpdated,
+  renderSubscriptionCancelScheduled,
   renderSubscriptionCanceled,
 } from '../_shared/email-templates.ts'
 import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
@@ -323,6 +324,9 @@ serve(async (req) => {
           ? new Date(expanded.current_period_end * 1000).toISOString()
           : null
 
+        const isCancelScheduled =
+          expanded.cancel_at_period_end === true || !!expanded.cancel_at
+
         await supabaseAdmin
           .from('subscriptions')
           .update({
@@ -402,36 +406,59 @@ serve(async (req) => {
             .eq('product_id', row.product_id)
         }
 
-        // Subscription updated email: plan name and next billing date.
+        // Subscription updated email: plan name and next billing date, or cancellation scheduled notice.
         const profileIdUpdated = existingSub.profile_id
         if (profileIdUpdated) {
           const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileIdUpdated)
           if (recipient) {
             try {
               const nextBilling = currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString() : undefined
+              const cancelAtDate = expanded.cancel_at
+                ? new Date(expanded.cancel_at * 1000).toLocaleDateString()
+                : nextBilling
+
               let planName: string | undefined
               if (productIdsInStripe.length > 0) {
                 const { data: products } = await supabaseAdmin.from('products').select('display_name').in('id', productIdsInStripe.slice(0, 3))
                 planName = (products ?? []).map((p) => p.display_name).join(', ')
               }
               const footer = await getFooterLinksForProfile(profileIdUpdated)
-              const { html, text } = renderSubscriptionUpdated({
-                recipientName: recipient.firstName,
-                planName,
-                nextBillingDate: nextBilling,
-                footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
-              })
-              await sendEmail({
-                to: recipient.email,
-                subject: 'Your Job-Hopper subscription was updated',
-                html,
-                text,
-                profileId: profileIdUpdated,
-                eventType: 'subscription_update',
-                templateKey: 'subscription_updated',
-                payload: { planName, nextBillingDate: nextBilling },
-                supabase: supabaseAdmin,
-              })
+              if (isCancelScheduled && subscriptionStatus !== 'canceled') {
+                const { html, text } = renderSubscriptionCancelScheduled({
+                  recipientName: recipient.firstName,
+                  cancelAtDate,
+                  footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+                })
+                await sendEmail({
+                  to: recipient.email,
+                  subject: 'Your Job-Hopper subscription will be canceled',
+                  html,
+                  text,
+                  profileId: profileIdUpdated,
+                  eventType: 'subscription_update',
+                  templateKey: 'subscription_cancel_scheduled',
+                  payload: { cancelAtDate },
+                  supabase: supabaseAdmin,
+                })
+              } else {
+                const { html, text } = renderSubscriptionUpdated({
+                  recipientName: recipient.firstName,
+                  planName,
+                  nextBillingDate: nextBilling,
+                  footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+                })
+                await sendEmail({
+                  to: recipient.email,
+                  subject: 'Your Job-Hopper subscription was updated',
+                  html,
+                  text,
+                  profileId: profileIdUpdated,
+                  eventType: 'subscription_update',
+                  templateKey: 'subscription_updated',
+                  payload: { planName, nextBillingDate: nextBilling },
+                  supabase: supabaseAdmin,
+                })
+              }
             } catch (err) {
               console.error('customer.subscription.updated: email failed', { profileId: profileIdUpdated, message: err instanceof Error ? err.message : String(err) })
             }

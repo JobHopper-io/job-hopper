@@ -168,6 +168,52 @@ export function renderSubscriptionUpdated(params: {
 }
 
 /**
+ * Subscription cancellation scheduled email.
+ */
+export function renderSubscriptionCancelScheduled(params: {
+  recipientName: string
+  cancelAtDate?: string
+  footer?: Partial<TemplateFooterOptions>
+}): { html: string; text: string } {
+  const { recipientName, cancelAtDate, footer } = params
+  const prefsUrl = footer?.preferencesUrl ?? DEFAULT_FOOTER_OPTIONS.preferencesUrl
+  const unsubUrl = footer?.unsubscribeUrl ?? DEFAULT_FOOTER_OPTIONS.unsubscribeUrl
+
+  const dateLine = cancelAtDate
+    ? ` Your access will continue until <strong>${escapeHtml(cancelAtDate)}</strong>.`
+    : ''
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Your subscription will be canceled</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 1rem;">
+  <h1 style="font-size: 1.5rem;">Hi ${escapeHtml(recipientName)},</h1>
+  <p>You've scheduled your Job-Hopper subscription to be canceled at the end of your current billing period.${dateLine}</p>
+  <p>You’ll keep access to Job-Hopper and your job matches until your subscription ends. You can change your mind and update your subscription anytime from your billing settings.</p>
+  ${footerHtml({ preferencesUrl: prefsUrl, unsubscribeUrl: unsubUrl })}
+</body>
+</html>`
+
+  const textParts = [
+    `Hi ${recipientName},`,
+    "You've scheduled your Job-Hopper subscription to be canceled at the end of your current billing period.",
+  ]
+  if (cancelAtDate) {
+    textParts.push(`Your access will continue until ${cancelAtDate}.`)
+  }
+  textParts.push(
+    "You’ll keep access to Job-Hopper and your job matches until your subscription ends. You can change your mind and update your subscription anytime from your billing settings.",
+    "Manage preferences: " + prefsUrl,
+    "Unsubscribe: " + unsubUrl,
+  )
+
+  const text = textParts.join("\n")
+
+  return { html, text }
+}
+
+/**
  * Subscription canceled email.
  */
 export function renderSubscriptionCanceled(params: {
