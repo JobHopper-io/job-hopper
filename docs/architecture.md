@@ -22,6 +22,18 @@ A table-driven scheduler runs edge functions at approximately a given time. Use 
 
 ### Email notifications
 
-Edge functions send transactional emails (job match digests, subscription updates, system announcements) via a provider-agnostic `sendEmail` helper in `supabase/functions/_shared/`. Out of the box, a **stub implementation** logs payloads and records rows in `email_events` without sending real email.
+Edge functions send transactional emails (job match digests, subscription updates, system announcements) via a provider-agnostic `sendEmail` helper in `supabase/functions/_shared/`, backed by Mailgun’s HTTP API.
 
-To enable real delivery, implement a real provider in `supabase/functions/_shared/email-provider.ts` (e.g. SMTP with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, or an HTTP API such as Resend with `RESEND_API_KEY`). Set **Edge Function secrets** in the Supabase dashboard (or via `supabase secrets set`). For one-click unsubscribe links, set `UNSUBSCRIBE_EMAIL_SECRET`; for site links in emails, set `SITE_URL`.
+- **Provider implementation**: `supabase/functions/_shared/email-provider.ts` calls Mailgun’s `POST /v3/{domain}/messages` endpoint using HTTP Basic auth (`api:MAILGUN_API_KEY`) and maps responses into `email_events`.
+- **Configuration (Edge Function secrets)**:
+  - `MAILGUN_API_KEY`: Mailgun private API key.
+  - `MAILGUN_DOMAIN`: Mailgun sending domain, e.g. `mg.example.com`.
+  - `MAILGUN_BASE_URL` (optional): defaults to `https://api.mailgun.net/v3`.
+  - `MAILGUN_FROM` (optional): default `From` address, e.g. `"Job-Hopper" <no-reply@example.com>`. If omitted, falls back to `Job-Hopper <no-reply@MAILGUN_DOMAIN>`.
+  - `UNSUBSCRIBE_EMAIL_SECRET`: HMAC secret used to sign one‑click unsubscribe tokens.
+  - `SITE_URL`: Base URL for links in emails (e.g. `https://app.job-hopper.com`), used for profile/preferences and dashboard links.
+- **Fallback behavior**:
+  - If `MAILGUN_API_KEY` or `MAILGUN_DOMAIN` are missing, `sendEmail` returns `success: false` with a clear error message and logs to the function console; core flows (job matching, Stripe webhooks, announcements) still complete, but no email is sent.
+  - Non‑2xx responses from Mailgun are logged (status + truncated body) and recorded in `email_events` with `status = 'failed'`.
+
+All unsubscribe links use a signed token (see `supabase/functions/_shared/unsubscribe-token.ts` and `supabase/functions/unsubscribe-email`) and respect `notification_settings.email_unsubscribed_at`, so users can one‑click unsubscribe from all emails while still managing granular preferences from the profile screen.

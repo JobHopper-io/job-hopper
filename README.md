@@ -36,4 +36,25 @@ After that, each commit will:
 - Regenerate Supabase types using the same command as `npm run db:types`.
 - Fail the commit if `src/types/supabase.ts` changes and is not yet staged, prompting you to add it.
 
+### Email notifications (Mailgun)
+
+Edge functions (e.g. `match-profile-jobs`, `stripe-webhook`, `send-system-announcement`) send transactional emails via a shared `sendEmail` helper in `supabase/functions/_shared/`, backed by **Mailgun**.
+
+- **Code path**: `supabase/functions/_shared/email.ts` → `supabase/functions/_shared/email-provider.ts` → Mailgun `POST /v3/{domain}/messages`.
+- **Required Edge Function secrets** (set via Supabase dashboard or `supabase secrets set`):
+  - `MAILGUN_API_KEY`: Mailgun private API key.
+  - `MAILGUN_DOMAIN`: Mailgun sending domain, e.g. `mg.example.com`.
+  - `MAILGUN_BASE_URL` (optional): defaults to `https://api.mailgun.net/v3`.
+  - `MAILGUN_FROM` (optional): default `From` address, e.g. `"Job-Hopper" <no-reply@example.com>`. If omitted, falls back to `Job-Hopper <no-reply@MAILGUN_DOMAIN>`.
+  - `UNSUBSCRIBE_EMAIL_SECRET`: HMAC secret used to sign one‑click unsubscribe tokens.
+  - `SITE_URL`: Base URL for links in emails (e.g. `https://app.job-hopper.com`).
+
+If `MAILGUN_API_KEY` or `MAILGUN_DOMAIN` are not set in a given environment, email sends will return `success: false` with a clear error message, but core flows will still succeed (job matching, subscription updates, announcements). This makes it safe to run locally without a Mailgun account.
+
+To test in a non‑production environment:
+
+1. Create a Mailgun sandbox domain and API key.
+2. Set the above secrets for your local Supabase Edge Functions.
+3. Trigger an email (e.g. complete checkout to hit `stripe-webhook`, or invoke `match-profile-jobs` / `send-system-announcement` via the Supabase CLI).
+4. Verify delivery in the Mailgun dashboard or logs.
 
