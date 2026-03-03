@@ -177,9 +177,19 @@ template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
 max_frequency = "5s"
 
+#
+# Edge function auth overrides
+#
+
 # Disable JWT verification for stripe-webhook so Stripe (no Authorization header) can invoke it.
 # Security is enforced by verifying Stripe-Signature with STRIPE_WEBHOOK_SECRET inside the function.
 [functions.stripe-webhook]
+verify_jwt = false
+
+# Disable JWT verification for unsubscribe-email so one-click unsubscribe links from emails
+# (which are opened from email clients without an Authorization header) can work.
+# Security is enforced by validating the signed unsubscribe token (UNSUBSCRIBE_EMAIL_SECRET).
+[functions.unsubscribe-email]
 verify_jwt = false
 
 [edge_runtime]

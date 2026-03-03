@@ -21,6 +21,7 @@ export const publicPaths = [
   '/login',
   '/register',
   '/confirm-email',
+  '/unsubscribe-success',
 ]
 
 const router = createRouter({
@@ -85,6 +86,11 @@ const router = createRouter({
       path: '/confirm-email',
       name: 'confirm-email',
       component: ConfirmEmailView,
+    },
+    {
+      path: '/unsubscribe-success',
+      name: 'unsubscribe-success',
+      component: () => import('../views/UnsubscribeSuccess.vue'),
     },
     {
       path: '/onboarding',

@@ -105,5 +105,5 @@ serve(async (req) => {
     return Response.redirect(`${SITE_URL}/profile?unsubscribe=error`, 302)
   }
 
-  return Response.redirect(`${SITE_URL}/profile?unsubscribe=success`, 302)
+  return Response.redirect(`${SITE_URL}/unsubscribe-success`, 302)
 })
