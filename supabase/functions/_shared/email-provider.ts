@@ -18,12 +18,12 @@ export interface SendEmailResult {
   error?: string
 }
 
-const DEFAULT_MAILTRAP_BASE_URL = 'https://send.api.mailtrap.io'
+const DEFAULT_MAILTRAP_URL = 'https://sandbox.api.mailtrap.io/api/send/4428525' // 'https://send.api.mailtrap.io/api/send'
 
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN') ?? ''
-  const baseUrl = (Deno.env.get('MAILTRAP_BASE_URL') ?? DEFAULT_MAILTRAP_BASE_URL).replace(/\/+$/, '')
-  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? 'demomailtrap.co'
+  const url = (Deno.env.get('MAILTRAP_URL') ?? DEFAULT_MAILTRAP_URL).replace(/\/+$/, '')
+  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? ''
 
   if (!apiToken) {
     const missing = []
@@ -37,9 +37,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress = { email: fromEnv.trim() || 'no-reply@mailtrap.io', name: 'Job-Hopper' }
-
-  const url = `${baseUrl.replace(/\/+$/, '')}/api/send`
+  const fromAddress = { email: fromEnv.trim() || 'hello@demomailtrap.co', name: 'Job-Hopper' }
 
   console.log('[email-provider] Mailtrap send attempt', {
     to: params.to,
