@@ -2,9 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   type JobRecord,
+  type RankedJob,
   type SubscriberPreferences,
   matchJobs,
 } from '../_shared/match-jobs.ts'
+import { sendEmail } from '../_shared/email.ts'
+import {
+  renderJobMatchDigest,
+  type JobSummary,
+} from '../_shared/email-templates.ts'
+import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,12 +80,14 @@ serve(async (req) => {
       auth: { persistSession: false },
     })
 
-    // Load profile preferences for this profile id.
+    // Load profile preferences and email/name for notifications.
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select(
         `
         id,
+        first_name,
+        email,
         current_job_title,
         current_industry,
         target_role_categories,
@@ -206,6 +215,7 @@ serve(async (req) => {
     }
 
     let inserted = 0
+    const newlyMatchedRankedJobs: RankedJob[] = []
     if (rowsToInsert.length > 0) {
       const { error: insertError, count } = await supabase
         .from('job_matches')
@@ -222,6 +232,92 @@ serve(async (req) => {
       }
 
       inserted = count ?? rowsToInsert.length
+      const insertedJobIds = new Set(rowsToInsert.map((r) => r.job_id))
+      for (const j of ranked) {
+        if (insertedJobIds.has(j.id)) newlyMatchedRankedJobs.push(j)
+      }
+    }
+
+    // Send job match digest email (respects notification_settings and frequency).
+    let emailSent = false
+    if (inserted > 0 && profile.email && newlyMatchedRankedJobs.length > 0) {
+      try {
+        const { data: settings } = await supabase
+          .from('notification_settings')
+          .select('job_match_email_enabled, job_match_email_frequency, email_unsubscribed_at, last_job_match_email_sent_at')
+          .eq('profile_id', payload.profile_id)
+          .maybeSingle()
+
+        let settingsRow = settings
+        if (!settingsRow) {
+          const { data: insertedSettings } = await supabase
+            .from('notification_settings')
+            .insert({ profile_id: payload.profile_id })
+            .select('job_match_email_enabled, job_match_email_frequency, email_unsubscribed_at, last_job_match_email_sent_at')
+            .single()
+          settingsRow = insertedSettings ?? null
+        }
+        const unsubscribed = settingsRow?.email_unsubscribed_at != null
+        const enabled = settingsRow?.job_match_email_enabled !== false
+        const frequency = settingsRow?.job_match_email_frequency ?? 'daily'
+        const lastSent = settingsRow?.last_job_match_email_sent_at
+          ? new Date(settingsRow.last_job_match_email_sent_at).getTime()
+          : 0
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+
+        const shouldSend =
+          !unsubscribed &&
+          enabled &&
+          (frequency === 'immediate' || frequency === 'daily' || (frequency === 'weekly' && lastSent < weekAgo))
+
+        if (shouldSend) {
+          const jobSummaries: JobSummary[] = newlyMatchedRankedJobs.slice(0, 10).map((j) => ({
+            id: j.id,
+            title: j.title,
+            companyName: j.companyName,
+            location: j.location,
+            description: j.description,
+            jobHighlights: j.jobHighlights,
+            applyLink: j.applyLink,
+          }))
+          const footer = await getFooterLinksForProfile(payload.profile_id)
+          const { html, text } = renderJobMatchDigest({
+            recipientName: profile.first_name?.trim() || 'there',
+            jobs: jobSummaries,
+            dashboardUrl: `${footer.siteUrl}/dashboard`,
+            footer: {
+              preferencesUrl: footer.preferencesUrl,
+              unsubscribeUrl: footer.unsubscribeUrl,
+            },
+          })
+          const result = await sendEmail({
+            to: profile.email,
+            subject: 'Your new Job-Hopper matches',
+            html,
+            text,
+            eventType: 'job_match_digest',
+            templateKey: 'job_match_digest_default',
+            profileId: payload.profile_id,
+            payload: { job_count: jobSummaries.length },
+            supabase,
+          })
+          if (result.success) {
+            emailSent = true
+            await supabase
+              .from('notification_settings')
+              .update({
+                last_job_match_email_sent_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('profile_id', payload.profile_id)
+          }
+        }
+      } catch (err) {
+        console.error('match-profile-jobs: job match email failed', {
+          profileId: payload.profile_id,
+          message: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
 
     return new Response(
@@ -231,6 +327,7 @@ serve(async (req) => {
         total_jobs_considered: ranked.length,
         existing_matches: existingJobIds.size,
         stored: inserted,
+        email_sent: emailSent,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

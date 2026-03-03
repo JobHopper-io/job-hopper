@@ -1,13 +1,35 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { profileAPI } from '@/lib/profile'
+import { notificationsAPI, JOB_MATCH_FREQUENCY_OPTIONS } from '@/lib/notifications'
+import type { JobMatchEmailFrequency, NotificationSettingsUpdate } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 
+const route = useRoute()
 const userStore = useUserStore()
 const { profile, basePlan, isLoading } = storeToRefs(userStore)
+
+const unsubscribeMessage = computed(() => {
+  const q = route.query.unsubscribe
+  if (q === 'success') return { type: 'success' as const, text: 'You have been unsubscribed from all emails.' }
+  if (q === 'invalid') return { type: 'warning' as const, text: 'That unsubscribe link is invalid or has expired.' }
+  if (q === 'error') return { type: 'error' as const, text: 'Something went wrong. Please try again from your profile.' }
+  return null
+})
+
+const notificationSettings = ref<{
+  job_match_email_enabled: boolean
+  job_match_email_frequency: JobMatchEmailFrequency
+  subscription_updates_email_enabled: boolean
+  system_announcements_email_enabled: boolean
+  email_unsubscribed_at: string | null
+} | null>(null)
+const notificationSettingsLoading = ref(true)
+const notificationSettingsSaving = ref(false)
 
 const initialLoadDone = ref(false)
 const isSaving = ref(false)
@@ -58,7 +80,53 @@ onMounted(() => {
   nextTick(() => {
     initialLoadDone.value = true
   })
+  loadNotificationSettings()
 })
+
+async function loadNotificationSettings() {
+  notificationSettingsLoading.value = true
+  try {
+    const { data } = await notificationsAPI.getNotificationSettings()
+    if (data) {
+      notificationSettings.value = {
+        job_match_email_enabled: data.job_match_email_enabled,
+        job_match_email_frequency: data.job_match_email_frequency,
+        subscription_updates_email_enabled: data.subscription_updates_email_enabled,
+        system_announcements_email_enabled: data.system_announcements_email_enabled,
+        email_unsubscribed_at: data.email_unsubscribed_at,
+      }
+    }
+  } finally {
+    notificationSettingsLoading.value = false
+  }
+}
+
+async function saveNotificationSettings(updates: Partial<NotificationSettingsUpdate>) {
+  if (!notificationSettings.value) return
+  notificationSettingsSaving.value = true
+  try {
+    const { data, error } = await notificationsAPI.updateNotificationSettings(updates)
+    if (!error && data) {
+      notificationSettings.value = {
+        job_match_email_enabled: data.job_match_email_enabled,
+        job_match_email_frequency: data.job_match_email_frequency,
+        subscription_updates_email_enabled: data.subscription_updates_email_enabled,
+        system_announcements_email_enabled: data.system_announcements_email_enabled,
+        email_unsubscribed_at: data.email_unsubscribed_at,
+      }
+    }
+  } finally {
+    notificationSettingsSaving.value = false
+  }
+}
+
+async function setUnsubscribedFromAll() {
+  await saveNotificationSettings({ email_unsubscribed_at: new Date().toISOString() })
+}
+
+async function setResubscribed() {
+  await saveNotificationSettings({ email_unsubscribed_at: null })
+}
 
 const toggleRoleCategory = (value: RoleCategoryValue) => {
   const index = targetRoleCategories.value.indexOf(value)
@@ -144,6 +212,19 @@ watch(
       </div>
 
       <div v-else class="space-y-6">
+        <!-- Unsubscribe query param message -->
+        <div
+          v-if="unsubscribeMessage"
+          :class="[
+            'p-4 rounded-[12px]',
+            unsubscribeMessage.type === 'success' && 'bg-green-50 text-green-800',
+            unsubscribeMessage.type === 'warning' && 'bg-amber-50 text-amber-800',
+            unsubscribeMessage.type === 'error' && 'bg-red-50 text-red-800'
+          ]"
+        >
+          {{ unsubscribeMessage.text }}
+        </div>
+
         <!-- Subscription Info -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Subscription</h2>
@@ -158,6 +239,89 @@ watch(
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage Subscription
           </router-link>
+        </div>
+
+        <!-- Email / Notification Preferences -->
+        <div class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Email preferences</h2>
+          <p class="text-sm text-neutral-body mb-4">
+            Choose which emails you receive. You can change these anytime.
+          </p>
+          <div v-if="notificationSettingsLoading" class="text-neutral-body text-sm">Loading...</div>
+          <div v-else-if="notificationSettings" class="space-y-4">
+            <div v-if="notificationSettings.email_unsubscribed_at" class="p-3 bg-neutral-bg rounded-[12px]">
+              <p class="text-sm text-neutral-body mb-2">You are unsubscribed from all Job-Hopper emails.</p>
+              <button
+                type="button"
+                class="btn-primary text-sm"
+                :disabled="notificationSettingsSaving"
+                @click="setResubscribed"
+              >
+                Re-enable emails
+              </button>
+            </div>
+            <template v-else>
+              <label class="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="w-4 h-4"
+                  :checked="notificationSettings.job_match_email_enabled"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ job_match_email_enabled: !notificationSettings.job_match_email_enabled })"
+                />
+                <span class="text-sm text-brand-charcoal">Job match emails</span>
+              </label>
+              <div v-if="notificationSettings.job_match_email_enabled" class="ml-6">
+                <label class="block text-xs font-medium text-neutral-body mb-1">Frequency</label>
+                <select
+                  :value="notificationSettings.job_match_email_frequency"
+                  class="input text-sm max-w-xs"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                >
+                  <option
+                    v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </select>
+                <p class="text-xs text-neutral-body mt-1">
+                  Immediate and daily are sent when we run matching (about once per day).
+                </p>
+              </div>
+              <label class="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="w-4 h-4"
+                  :checked="notificationSettings.subscription_updates_email_enabled"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ subscription_updates_email_enabled: !notificationSettings.subscription_updates_email_enabled })"
+                />
+                <span class="text-sm text-brand-charcoal">Subscription updates</span>
+              </label>
+              <label class="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="w-4 h-4"
+                  :checked="notificationSettings.system_announcements_email_enabled"
+                  :disabled="notificationSettingsSaving"
+                  @change="saveNotificationSettings({ system_announcements_email_enabled: !notificationSettings.system_announcements_email_enabled })"
+                />
+                <span class="text-sm text-brand-charcoal">System announcements</span>
+              </label>
+              <div class="pt-2 border-t border-neutral-border">
+                <button
+                  type="button"
+                  class="text-sm text-red-600 hover:underline"
+                  :disabled="notificationSettingsSaving"
+                  @click="setUnsubscribedFromAll"
+                >
+                  Unsubscribe from all emails
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
 
         <!-- About You -->

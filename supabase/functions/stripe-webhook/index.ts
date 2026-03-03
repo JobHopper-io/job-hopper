@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import { sendEmail } from '../_shared/email.ts'
+import {
+  renderSubscriptionStarted,
+  renderSubscriptionUpdated,
+  renderSubscriptionCanceled,
+} from '../_shared/email-templates.ts'
+import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -14,6 +21,30 @@ function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' 
   if (stripeStatus === 'trialing') return 'trial'
   if (stripeStatus === 'active' || stripeStatus === 'past_due') return 'active'
   return 'canceled'
+}
+
+type SupabaseAdmin = ReturnType<typeof createClient>
+
+async function loadProfileAndCheckSubscriptionEmailAllowed(
+  supabaseAdmin: SupabaseAdmin,
+  profileId: string
+): Promise<{ email: string; firstName: string } | null> {
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('email, first_name')
+    .eq('id', profileId)
+    .single()
+  if (!profile?.email) return null
+
+  const { data: settings } = await supabaseAdmin
+    .from('notification_settings')
+    .select('subscription_updates_email_enabled, email_unsubscribed_at')
+    .eq('profile_id', profileId)
+    .maybeSingle()
+  if (settings?.email_unsubscribed_at != null) return null
+  if (settings?.subscription_updates_email_enabled === false) return null
+
+  return { email: profile.email, firstName: profile.first_name?.trim() || 'there' }
 }
 
 
@@ -245,6 +276,31 @@ serve(async (req) => {
         if (scheduleError) {
           console.error('checkout.session.completed: failed to schedule match-profile-jobs:', scheduleError)
         }
+
+        // Welcome / subscription started email (if allowed by notification settings).
+        const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileId)
+        if (recipient) {
+          try {
+            const footer = await getFooterLinksForProfile(profileId)
+            const { html, text } = renderSubscriptionStarted({
+              recipientName: recipient.firstName,
+              footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+            })
+            await sendEmail({
+              to: recipient.email,
+              subject: 'Welcome to Job-Hopper',
+              html,
+              text,
+              profileId,
+              eventType: 'subscription_update',
+              templateKey: 'subscription_started',
+              payload: null,
+              supabase: supabaseAdmin,
+            })
+          } catch (err) {
+            console.error('checkout.session.completed: welcome email failed', { profileId, message: err instanceof Error ? err.message : String(err) })
+          }
+        }
         break
       }
 
@@ -256,7 +312,7 @@ serve(async (req) => {
 
         const { data: existingSub } = await supabaseAdmin
           .from('subscriptions')
-          .select('id')
+          .select('id, profile_id')
           .eq('stripe_subscription_id', stripeSub.id)
           .single()
 
@@ -345,15 +401,81 @@ serve(async (req) => {
             .eq('subscription_id', existingSub.id)
             .eq('product_id', row.product_id)
         }
+
+        // Subscription updated email: plan name and next billing date.
+        const profileIdUpdated = existingSub.profile_id
+        if (profileIdUpdated) {
+          const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileIdUpdated)
+          if (recipient) {
+            try {
+              const nextBilling = currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString() : undefined
+              let planName: string | undefined
+              if (productIdsInStripe.length > 0) {
+                const { data: products } = await supabaseAdmin.from('products').select('display_name').in('id', productIdsInStripe.slice(0, 3))
+                planName = (products ?? []).map((p) => p.display_name).join(', ')
+              }
+              const footer = await getFooterLinksForProfile(profileIdUpdated)
+              const { html, text } = renderSubscriptionUpdated({
+                recipientName: recipient.firstName,
+                planName,
+                nextBillingDate: nextBilling,
+                footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+              })
+              await sendEmail({
+                to: recipient.email,
+                subject: 'Your Job-Hopper subscription was updated',
+                html,
+                text,
+                profileId: profileIdUpdated,
+                eventType: 'subscription_update',
+                templateKey: 'subscription_updated',
+                payload: { planName, nextBillingDate: nextBilling },
+                supabase: supabaseAdmin,
+              })
+            } catch (err) {
+              console.error('customer.subscription.updated: email failed', { profileId: profileIdUpdated, message: err instanceof Error ? err.message : String(err) })
+            }
+          }
+        }
         break
       }
 
       case 'customer.subscription.deleted': {
         const stripeSub = event.data.object as Stripe.Subscription
+        const { data: deletedSub } = await supabaseAdmin
+          .from('subscriptions')
+          .select('profile_id')
+          .eq('stripe_subscription_id', stripeSub.id)
+          .single()
         await supabaseAdmin
           .from('subscriptions')
           .update({ status: 'canceled' })
           .eq('stripe_subscription_id', stripeSub.id)
+        if (deletedSub?.profile_id) {
+          const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, deletedSub.profile_id)
+          if (recipient) {
+            try {
+              const footer = await getFooterLinksForProfile(deletedSub.profile_id)
+              const { html, text } = renderSubscriptionCanceled({
+                recipientName: recipient.firstName,
+                footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+              })
+              await sendEmail({
+                to: recipient.email,
+                subject: 'Your Job-Hopper subscription was canceled',
+                html,
+                text,
+                profileId: deletedSub.profile_id,
+                eventType: 'subscription_update',
+                templateKey: 'subscription_canceled',
+                payload: null,
+                supabase: supabaseAdmin,
+              })
+            } catch (err) {
+              console.error('customer.subscription.deleted: email failed', { profileId: deletedSub.profile_id, message: err instanceof Error ? err.message : String(err) })
+            }
+          }
+        }
         break
       }
 

@@ -71,6 +71,53 @@ export type Database = {
         }
         Relationships: []
       }
+      email_events: {
+        Row: {
+          error_message: string | null
+          id: string
+          payload: Json | null
+          profile_id: string | null
+          provider_message_id: string | null
+          sent_at: string
+          status: Database["public"]["Enums"]["email_event_status"]
+          subject: string | null
+          template_key: string | null
+          type: Database["public"]["Enums"]["email_event_type"]
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          profile_id?: string | null
+          provider_message_id?: string | null
+          sent_at?: string
+          status: Database["public"]["Enums"]["email_event_status"]
+          subject?: string | null
+          template_key?: string | null
+          type: Database["public"]["Enums"]["email_event_type"]
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          profile_id?: string | null
+          provider_message_id?: string | null
+          sent_at?: string
+          status?: Database["public"]["Enums"]["email_event_status"]
+          subject?: string | null
+          template_key?: string | null
+          type?: Database["public"]["Enums"]["email_event_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_events_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enriched_lead: {
         Row: {
           address: string | null
@@ -291,6 +338,53 @@ export type Database = {
             foreignKeyName: "job_matches_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_settings: {
+        Row: {
+          created_at: string
+          email_unsubscribed_at: string | null
+          id: string
+          job_match_email_enabled: boolean
+          job_match_email_frequency: Database["public"]["Enums"]["job_match_email_frequency"]
+          last_job_match_email_sent_at: string | null
+          profile_id: string
+          subscription_updates_email_enabled: boolean
+          system_announcements_email_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email_unsubscribed_at?: string | null
+          id?: string
+          job_match_email_enabled?: boolean
+          job_match_email_frequency?: Database["public"]["Enums"]["job_match_email_frequency"]
+          last_job_match_email_sent_at?: string | null
+          profile_id: string
+          subscription_updates_email_enabled?: boolean
+          system_announcements_email_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email_unsubscribed_at?: string | null
+          id?: string
+          job_match_email_enabled?: boolean
+          job_match_email_frequency?: Database["public"]["Enums"]["job_match_email_frequency"]
+          last_job_match_email_sent_at?: string | null
+          profile_id?: string
+          subscription_updates_email_enabled?: boolean
+          system_announcements_email_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -643,6 +737,47 @@ export type Database = {
           },
         ]
       }
+      system_announcements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email_body_html: string
+          email_subject: string
+          id: string
+          published_at: string | null
+          slug: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email_body_html: string
+          email_subject: string
+          id?: string
+          published_at?: string | null
+          slug: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email_body_html?: string
+          email_subject?: string
+          id?: string
+          published_at?: string | null
+          slug?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -684,6 +819,12 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
+      email_event_status: "sent" | "failed"
+      email_event_type:
+        | "job_match_digest"
+        | "subscription_update"
+        | "system_announcement"
+      job_match_email_frequency: "immediate" | "daily" | "weekly"
       product_category:
         | "base_plan"
         | "subscription_addon"
@@ -827,6 +968,13 @@ export const Constants = {
         "Ready for AI Personalization",
         "Invalid Email",
       ],
+      email_event_status: ["sent", "failed"],
+      email_event_type: [
+        "job_match_digest",
+        "subscription_update",
+        "system_announcement",
+      ],
+      job_match_email_frequency: ["immediate", "daily", "weekly"],
       product_category: [
         "base_plan",
         "subscription_addon",

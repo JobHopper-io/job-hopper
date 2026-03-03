@@ -42,3 +42,15 @@ export type ScheduledJobUpdate = TablesUpdate<'scheduled_jobs'>
 // Job matching and favorites
 export type JobMatch = Tables<'job_matches'>
 export type SavedJob = Tables<'saved_jobs'>
+
+// Notification and email
+export type NotificationSettings = Tables<'notification_settings'>
+export type NotificationSettingsInsert = TablesInsert<'notification_settings'>
+export type NotificationSettingsUpdate = TablesUpdate<'notification_settings'>
+export type JobMatchEmailFrequency = Enums<'job_match_email_frequency'>
+export type EmailEvent = Tables<'email_events'>
+export type EmailEventInsert = TablesInsert<'email_events'>
+export type EmailEventType = Enums<'email_event_type'>
+export type EmailEventStatus = Enums<'email_event_status'>
+export type SystemAnnouncement = Tables<'system_announcements'>
+export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>

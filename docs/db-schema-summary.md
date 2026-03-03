@@ -83,6 +83,24 @@
   - Authenticated users can insert/delete rows only for their own profile (enforced via RLS).
   - The frontend typically joins `saved_jobs` → `job_matches` → `job_hopper_live` to show saved matches with full job details.
 
+### notification_settings
+- **Meaning**: One row per profile; controls email notification preferences and when the last job-match digest was sent.
+- **Key relationships**: `profile_id` → `profiles.id` (unique).
+- **Non‑obvious rules**:
+  - Created on first read or when the user opens email preferences; edge functions may also insert a row when sending job-match emails so that `last_job_match_email_sent_at` can be updated.
+  - When `email_unsubscribed_at` is set, no transactional or marketing emails are sent regardless of per-channel toggles.
+  - `job_match_email_frequency`: `immediate` | `daily` | `weekly`; with the current daily matching cadence, immediate and daily both send on each run when there are new matches; weekly sends only if `last_job_match_email_sent_at` is older than 7 days.
+
+### email_events
+- **Meaning**: Log of every email send attempt (job match digest, subscription update, system announcement) for debugging and metrics.
+- **Key relationships**: `profile_id` → `profiles.id` (nullable for system-wide sends).
+- **Non‑obvious rules**: Written by edge functions via the shared `sendEmail` helper; status is `sent` or `failed`. Not exposed for direct client writes.
+
+### system_announcements
+- **Meaning**: Broadcast announcements sent to opted-in users via the `send-system-announcement` edge function.
+- **Key columns**: `slug`, `title`, `email_subject`, `email_body_html`, `published_at`. When `published_at` is set, the announcement can be sent.
+- **Non‑obvious rules**: Only published rows are sent; target audience is derived from `notification_settings` (system_announcements_email_enabled = true and email_unsubscribed_at is null).
+
 ## Function scheduling (scheduled_jobs)
 
 - **Meaning**: Table of jobs to run at a given time. The `run-scheduled-jobs` edge function is invoked every 15 minutes by pg_cron + pg_net, selects pending rows (up to a limit), and HTTP-invokes the target edge function with the stored payload. Only system/cron-designed edge functions (no user JWT) should be scheduled.
