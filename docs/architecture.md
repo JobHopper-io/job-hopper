@@ -22,18 +22,17 @@ A table-driven scheduler runs edge functions at approximately a given time. Use 
 
 ### Email notifications
 
-Edge functions send transactional emails (job match digests, subscription updates, system announcements) via a provider-agnostic `sendEmail` helper in `supabase/functions/_shared/`, backed by Mailgun’s HTTP API.
+Edge functions send transactional emails (job match digests, subscription updates, system announcements) via a provider-agnostic `sendEmail` helper in `supabase/functions/_shared/`, backed by Mailtrap’s Email Sending HTTP API.
 
-- **Provider implementation**: `supabase/functions/_shared/email-provider.ts` calls Mailgun’s `POST /v3/{domain}/messages` endpoint using HTTP Basic auth (`api:MAILGUN_API_KEY`) and maps responses into `email_events`.
+- **Provider implementation**: `supabase/functions/_shared/email-provider.ts` calls Mailtrap’s `POST /api/send` endpoint on `https://send.api.mailtrap.io` with an API token (`MAILTRAP_API_TOKEN`) and maps responses into `email_events`.
 - **Configuration (Edge Function secrets)**:
-  - `MAILGUN_API_KEY`: Mailgun private API key.
-  - `MAILGUN_DOMAIN`: Mailgun sending domain, e.g. `mg.example.com`.
-  - `MAILGUN_BASE_URL` (optional): defaults to `https://api.mailgun.net/v3`.
-  - `MAILGUN_FROM` (optional): default `From` address, e.g. `"Job-Hopper" <no-reply@example.com>`. If omitted, falls back to `Job-Hopper <no-reply@MAILGUN_DOMAIN>`.
+  - `MAILTRAP_API_TOKEN`: Mailtrap Email Sending API token.
+  - `MAILTRAP_BASE_URL` (optional): defaults to `https://send.api.mailtrap.io`.
+  - `MAILTRAP_FROM` (optional): default `From` address, e.g. `"Job-Hopper" <no-reply@example.com>`. If omitted, falls back to `Job-Hopper <no-reply@mailtrap.io>`.
   - `UNSUBSCRIBE_EMAIL_SECRET`: HMAC secret used to sign one‑click unsubscribe tokens.
   - `SITE_URL`: Base URL for links in emails (e.g. `https://app.job-hopper.com`), used for profile/preferences and dashboard links.
 - **Fallback behavior**:
-  - If `MAILGUN_API_KEY` or `MAILGUN_DOMAIN` are missing, `sendEmail` returns `success: false` with a clear error message and logs to the function console; core flows (job matching, Stripe webhooks, announcements) still complete, but no email is sent.
-  - Non‑2xx responses from Mailgun are logged (status + truncated body) and recorded in `email_events` with `status = 'failed'`.
+  - If `MAILTRAP_API_TOKEN` is missing, `sendEmail` returns `success: false` with a clear error message and logs to the function console; core flows (job matching, Stripe webhooks, announcements) still complete, but no email is sent.
+  - Non‑2xx responses from Mailtrap are logged (status + truncated body) and recorded in `email_events` with `status = 'failed'`.
 
 All unsubscribe links use a signed token (see `supabase/functions/_shared/unsubscribe-token.ts` and `supabase/functions/unsubscribe-email`) and respect `notification_settings.email_unsubscribed_at`, so users can one‑click unsubscribe from all emails while still managing granular preferences from the profile screen.
