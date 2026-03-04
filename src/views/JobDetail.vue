@@ -148,12 +148,16 @@ async function handleTailoringCheckout() {
   tailoringError.value = null
   const returnPath = route.path
   const { data, error } = await resumeProductsAPI.startTailoringCheckout(job.value.matchId, returnPath)
-  tailoringCheckoutLoading.value = false
   if (error) {
+    tailoringCheckoutLoading.value = false
     tailoringError.value = error.message
     return
   }
-  if (data?.url) window.location.href = data.url
+  if (data?.url) {
+    window.location.href = data.url
+    return
+  }
+  tailoringCheckoutLoading.value = false
 }
 </script>
 

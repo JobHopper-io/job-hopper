@@ -40,19 +40,20 @@ async function handleTailoringCheckout() {
       '/dashboard',
     )
     if (error) {
+      tailoringLoading.value = false
       tailoringError.value = error.message
       return
     }
     if (data?.url) {
       window.location.href = data.url
-    } else {
-      tailoringError.value = 'Unable to start checkout. Please try again.'
+      return
     }
+    tailoringLoading.value = false
+    tailoringError.value = 'Unable to start checkout. Please try again.'
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error starting checkout'
-    tailoringError.value = message
-  } finally {
     tailoringLoading.value = false
+    tailoringError.value = message
   }
 }
 </script>
