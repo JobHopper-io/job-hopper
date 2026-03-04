@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import type { Product } from '@/types/database'
 import { subscriptionAPI, formatProductLineLabel, getProductPrice } from '@/lib/subscription'
+import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -16,6 +18,26 @@ const {
 
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
+const tailoringPurchaseCount = ref<number | null>(null)
+
+function formatOneTimeLine(product: Product, tailoringCount: number | null): string {
+  const price = getProductPrice(product)
+  const suffix = `($${price.toFixed(2)} one-time)`
+  if (product.key === 'resume_tailoring' && tailoringCount !== null) {
+    return `${product.display_name} (${tailoringCount}) ${suffix}`
+  }
+  return `${product.display_name} ${suffix}`
+}
+
+onMounted(async () => {
+  const { data, error } = await resumeProductsAPI.getTailoringPurchasesByMatchId()
+  if (!error && data) {
+    const nonCancelled = Object.values(data).filter((p) => p.status !== 'cancelled')
+    tailoringPurchaseCount.value = nonCancelled.length
+  } else {
+    tailoringPurchaseCount.value = 0
+  }
+})
 
 const BILLING_PORTAL_ERROR_MSG = 'Unable to open billing portal. Please try again later.'
 
@@ -110,7 +132,7 @@ const handleManageBilling = async () => {
                   :key="product.id"
                   class="text-neutral-body"
                 >
-                  ✓ {{ formatProductLineLabel(product) }}
+                  ✓ {{ formatOneTimeLine(product, tailoringPurchaseCount) }}
                 </p>
               </div>
               <p v-else class="text-neutral-body">No one-time purchases</p>
