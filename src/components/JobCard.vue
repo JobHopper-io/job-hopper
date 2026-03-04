@@ -28,7 +28,7 @@ const showTailorButton = computed(() => {
 const tailoringStatusText = computed<string | null>(() => {
   const p = props.tailoringPurchase
   if (!p || p.status === 'cancelled') return null
-  if (p.status === 'pending' || p.status === 'in_progress') return 'Tailoring in progress'
+  if (p.status === 'pending') return 'Tailoring in progress'
   if (p.status === 'complete') return 'Tailored resume ready'
   return null
 })

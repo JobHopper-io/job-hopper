@@ -56,7 +56,7 @@
   - UNIQUE(`profile_id`, `job_match_id`, `product_id`): at most one tailoring purchase per job per profile; resume upgrade uses `job_match_id` null.
 - **Non‑obvious rules**:
   - Populated by webhook `checkout.session.completed` from one-time line items for products with `key IN ('resume_upgrade', 'resume_tailoring')`; `job_match_id` comes from session metadata for tailoring.
-  - `status` enum: `pending` | `in_progress` | `complete` | `cancelled`; default `pending`. `completed_at` set when status becomes `complete`.
+  - `status` enum: `pending` | `complete` | `cancelled`; default `pending`. `completed_at` set when status becomes `complete`.
   - Only service_role (e.g. edge functions) writes; authenticated users can SELECT their own rows via RLS.
 
 ## Job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)

@@ -137,7 +137,7 @@ const canPurchaseTailoring = computed(() => {
 const tailoringStatusLabel = computed(() => {
   const p = tailoringPurchase.value
   if (!p) return null
-  if (p.status === 'pending' || p.status === 'in_progress') return 'Tailoring in progress'
+  if (p.status === 'pending') return 'Tailoring in progress'
   if (p.status === 'complete') return 'Tailored resume ready'
   return null
 })
