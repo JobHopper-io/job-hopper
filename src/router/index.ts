@@ -166,7 +166,8 @@ async function getUserWithTimeout(timeoutMs = 2000) {
 router.beforeEach(async (to) => {
   const targetPath = to.path
   const isPublicPath = publicPaths.includes(targetPath)
-  const publicRedirectPaths = ['/login', '/register']
+  // Public routes that authenticated users should be redirected away from
+  const publicRedirectPaths = ['/', '/login', '/register']
 
   let user: unknown = null
 
