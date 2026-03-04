@@ -24,7 +24,7 @@ function formatOneTimeLine(product: Product, tailoringCount: number | null): str
   const price = getProductPrice(product)
   const suffix = `($${price.toFixed(2)} one-time)`
   if (product.key === 'resume_tailoring' && tailoringCount !== null) {
-    return `${product.display_name} (${tailoringCount}) ${suffix}`
+    return `${product.display_name} ${suffix} ✖ ${tailoringCount}`
   }
   return `${product.display_name} ${suffix}`
 }
