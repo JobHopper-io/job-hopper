@@ -80,6 +80,18 @@ export const resumeProductsAPI = {
     data: { url: string } | null
     error: Error | null
   }> {
+    const { data: existing, error: existingError } =
+      await resumeProductsAPI.getTailoringPurchaseForMatch(matchId)
+    if (existingError) {
+      return { data: null, error: existingError }
+    }
+    if (existing && existing.status !== 'cancelled') {
+      return {
+        data: null,
+        error: new Error('You have already purchased resume tailoring for this job.'),
+      }
+    }
+
     const { data: product, error: productError } =
       await resumeProductsAPI.getResumeTailoringProduct()
     if (productError || !product) {

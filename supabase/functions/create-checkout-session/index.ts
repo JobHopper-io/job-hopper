@@ -96,6 +96,25 @@ serve(async (req) => {
       throw new Error('Some product ids are invalid')
     }
 
+    const tailoringProduct = products.find((p) => p.key === 'resume_tailoring')
+    if (
+      typeof jobMatchId === 'string' &&
+      jobMatchId &&
+      tailoringProduct
+    ) {
+      const { data: existingTailoring } = await supabaseClient
+        .from('resume_products')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .eq('job_match_id', jobMatchId)
+        .eq('product_id', tailoringProduct.id)
+        .neq('status', 'cancelled')
+        .maybeSingle()
+      if (existingTailoring) {
+        throw new Error('You have already purchased resume tailoring for this job.')
+      }
+    }
+
     const basePlans = products.filter((p) => p.category === 'base_plan')
     const addons = products.filter((p) => p.category !== 'base_plan')
     if (basePlans.length > 1) {
