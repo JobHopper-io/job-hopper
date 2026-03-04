@@ -12,15 +12,19 @@ CREATE TYPE public.resume_product_status_new AS ENUM (
   'cancelled'
 );
 
--- 3. Switch column to new type (in_progress already updated to pending above)
+-- 3. Drop default so the column type can be changed
+ALTER TABLE public.resume_products
+  ALTER COLUMN status DROP DEFAULT;
+
+-- 4. Switch column to new type (in_progress already updated to pending above)
 ALTER TABLE public.resume_products
   ALTER COLUMN status TYPE public.resume_product_status_new
   USING (status::text::public.resume_product_status_new);
 
--- 4. Drop old enum and rename new one
+-- 5. Drop old enum and rename new one
 DROP TYPE public.resume_product_status;
 ALTER TYPE public.resume_product_status_new RENAME TO resume_product_status;
 
--- 5. Restore default (alter type can clear it)
+-- 6. Restore default
 ALTER TABLE public.resume_products
   ALTER COLUMN status SET DEFAULT 'pending'::public.resume_product_status;
