@@ -420,39 +420,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profile_product: {
-        Row: {
-          id: string
-          product_id: string
-          profile_id: string
-        }
-        Insert: {
-          id?: string
-          product_id: string
-          profile_id: string
-        }
-        Update: {
-          id?: string
-          product_id?: string
-          profile_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_product_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_product_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           auth_user_id: string | null
@@ -578,6 +545,58 @@ export type Database = {
           "Reason for Apollo"?: string | null
         }
         Relationships: []
+      }
+      resume_products: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          job_match_id: string | null
+          product_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["resume_product_status"]
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          job_match_id?: string | null
+          product_id: string
+          profile_id: string
+          status?: Database["public"]["Enums"]["resume_product_status"]
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          job_match_id?: string | null
+          product_id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["resume_product_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resume_products_job_match_id_fkey"
+            columns: ["job_match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resume_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resume_products_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_jobs: {
         Row: {
@@ -831,6 +850,11 @@ export type Database = {
         | "one_time_addon"
         | "one_time_item"
       product_type: "subscription" | "payment"
+      resume_product_status:
+        | "pending"
+        | "in_progress"
+        | "complete"
+        | "cancelled"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -982,6 +1006,12 @@ export const Constants = {
         "one_time_item",
       ],
       product_type: ["subscription", "payment"],
+      resume_product_status: [
+        "pending",
+        "in_progress",
+        "complete",
+        "cancelled",
+      ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
       subscription_status: ["trial", "active", "canceled"],
     },

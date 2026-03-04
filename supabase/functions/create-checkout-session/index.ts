@@ -77,7 +77,7 @@ serve(async (req) => {
       }
     }
 
-    const { productIds = [], successUrl, cancelUrl, trialEnd } = await req.json()
+    const { productIds = [], successUrl, cancelUrl, trialEnd, jobMatchId } = await req.json()
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       throw new Error('productIds must be a non-empty array')
@@ -163,6 +163,8 @@ serve(async (req) => {
         subscriptionData.trial_period_days = 7
       }
 
+      const metadata: Record<string, string> = { profile_id: profile.id }
+      if (typeof jobMatchId === 'string' && jobMatchId) metadata.job_match_id = jobMatchId
       session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ['card'],
@@ -171,13 +173,12 @@ serve(async (req) => {
         success_url:
           successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
-        metadata: {
-          profile_id: profile.id,
-        },
+        metadata,
         subscription_data: subscriptionData,
       })
     } else {
-      // One-time products only (e.g. resume upgrade purchased separately)
+      const metadata: Record<string, string> = { profile_id: profile.id }
+      if (typeof jobMatchId === 'string' && jobMatchId) metadata.job_match_id = jobMatchId
       session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ['card'],
@@ -186,9 +187,7 @@ serve(async (req) => {
         success_url:
           successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
-        metadata: {
-          profile_id: profile.id,
-        },
+        metadata,
       })
     }
 

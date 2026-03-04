@@ -43,6 +43,12 @@ export type ScheduledJobUpdate = TablesUpdate<'scheduled_jobs'>
 export type JobMatch = Tables<'job_matches'>
 export type SavedJob = Tables<'saved_jobs'>
 
+// Resume products (upgrade and per-job tailoring lifecycle)
+export type ResumeProduct = Tables<'resume_products'>
+export type ResumeProductStatus = Enums<'resume_product_status'>
+export type ResumeProductInsert = TablesInsert<'resume_products'>
+export type ResumeProductUpdate = TablesUpdate<'resume_products'>
+
 // Notification and email
 export type NotificationSettings = Tables<'notification_settings'>
 export type NotificationSettingsInsert = TablesInsert<'notification_settings'>

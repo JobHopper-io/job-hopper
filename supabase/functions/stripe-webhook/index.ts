@@ -215,7 +215,7 @@ serve(async (req) => {
           const { data: oneTimeProducts, error: oneTimeProductsError } =
             await supabaseAdmin
               .from('products')
-              .select('id, stripe_product_id')
+              .select('id, key, stripe_product_id')
               .in('stripe_product_id', oneTimeStripeProductIdArray)
 
           if (oneTimeProductsError) {
@@ -225,12 +225,14 @@ serve(async (req) => {
             )
           }
 
-          const oneTimeProductIdByStripeProductId = new Map<string, string>()
+          const oneTimeProductIdByStripeProductId = new Map<string, { id: string; key: string }>()
           for (const row of oneTimeProducts ?? []) {
             if (row.stripe_product_id) {
-              oneTimeProductIdByStripeProductId.set(row.stripe_product_id, row.id)
+              oneTimeProductIdByStripeProductId.set(row.stripe_product_id, { id: row.id, key: row.key })
             }
           }
+
+          const jobMatchId = session.metadata?.job_match_id ?? null
 
           for (const line of lineItems.data) {
             const price = line.price
@@ -246,9 +248,8 @@ serve(async (req) => {
               continue
             }
 
-            const productId =
-              oneTimeProductIdByStripeProductId.get(stripeProductId)
-            if (!productId) {
+            const resolved = oneTimeProductIdByStripeProductId.get(stripeProductId)
+            if (!resolved) {
               console.error(
                 'checkout.session.completed: no matching Supabase product for one-time Stripe product id, skipping',
                 stripeProductId,
@@ -256,12 +257,26 @@ serve(async (req) => {
               continue
             }
 
-            await supabaseAdmin
-              .from('profile_product')
+            if (resolved.key !== 'resume_upgrade' && resolved.key !== 'resume_tailoring') {
+              continue
+            }
+
+            const { error: resumeProductError } = await supabaseAdmin
+              .from('resume_products')
               .upsert(
-                { profile_id: profileId, product_id: productId },
-                { onConflict: 'profile_id,product_id' },
+                {
+                  profile_id: profileId,
+                  product_id: resolved.id,
+                  job_match_id: jobMatchId || null,
+                },
+                { onConflict: 'profile_id,job_match_id,product_id' },
               )
+            if (resumeProductError) {
+              console.error(
+                'checkout.session.completed: failed to upsert resume_products',
+                resumeProductError,
+              )
+            }
           }
         }
 

@@ -46,6 +46,8 @@ const productColumns = 'id, key, display_name, description, category, price_cent
 
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
+  /** For per-job resume tailoring; passed to Stripe session metadata and webhook. */
+  jobMatchId?: string
 }
 
 export const subscriptionAPI = {
@@ -76,6 +78,7 @@ export const subscriptionAPI = {
       successUrl?: string
       cancelUrl?: string
       trialEnd?: number
+      jobMatchId?: string
     } = {
       productIds,
       successUrl:
@@ -84,6 +87,9 @@ export const subscriptionAPI = {
     }
     if (typeof options?.trialEnd === 'number' && options.trialEnd > 0) {
       body.trialEnd = options.trialEnd
+    }
+    if (typeof options?.jobMatchId === 'string' && options.jobMatchId) {
+      body.jobMatchId = options.jobMatchId
     }
 
     const { data, error } = await supabase.functions.invoke('create-checkout-session', {
@@ -187,16 +193,16 @@ export const subscriptionAPI = {
       subscriptionProducts.map((sp) => sp.product_id),
     )
 
-    const { data: profileProducts } = await supabase
-      .from('profile_product')
+    const { data: resumeProductRows } = await supabase
+      .from('resume_products')
       .select('product_id')
       .eq('profile_id', profile.id)
-    const profileProductIds = new Set<string>(
-      (profileProducts ?? []).map((r) => r.product_id),
+    const resumeProductIds = new Set<string>(
+      (resumeProductRows ?? []).map((r) => r.product_id),
     )
 
     const allProductIds = Array.from(
-      new Set<string>([...productIdsFromSubs, ...profileProductIds]),
+      new Set<string>([...productIdsFromSubs, ...resumeProductIds]),
     )
 
     let products: Product[] = []

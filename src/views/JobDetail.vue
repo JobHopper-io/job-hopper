@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob } from '@/lib/jobs'
+import { resumeProductsAPI } from '@/lib/resumeProducts'
+import type { ResumeProduct } from '@/types/database'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,7 +14,23 @@ const job = ref<MatchedJob | null>(null)
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 
-const userStore = useUserStore()
+const tailoringPurchase = ref<ResumeProduct | null>(null)
+const tailoringLoading = ref(false)
+const tailoringCheckoutLoading = ref(false)
+const tailoringError = ref<string | null>(null)
+
+async function loadTailoringPurchase(matchId: string) {
+  tailoringLoading.value = true
+  tailoringError.value = null
+  const { data, error } = await resumeProductsAPI.getTailoringPurchaseForMatch(matchId)
+  tailoringLoading.value = false
+  if (error) {
+    tailoringError.value = error.message
+    tailoringPurchase.value = null
+    return
+  }
+  tailoringPurchase.value = data
+}
 
 onMounted(async () => {
   try {
@@ -31,6 +48,7 @@ onMounted(async () => {
       return
     }
     job.value = data
+    await loadTailoringPurchase(data.matchId)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     loadError.value = message
@@ -39,23 +57,23 @@ onMounted(async () => {
   }
 })
 
-type OverviewBlock =
+type DescriptionBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'list'; items: string[] }
 
-function buildOverviewBlocks(raw: string | null | undefined): OverviewBlock[] {
+function buildDescriptionBlocks(raw: string | null | undefined): DescriptionBlock[] {
   const source = raw?.trim()
   if (!source) {
     return [
       {
         type: 'paragraph',
-        text: 'This role does not have a detailed overview yet.',
+        text: 'This role does not have a detailed description yet.',
       },
     ]
   }
 
   // Normalize common scraped formatting into line breaks + bullets.
-  let normalized = source
+  const normalized = source
     // Turn middle-dot or asterisk bullets into real bullets on their own lines.
     .replace(/(?:\u00b7|\*)\s*/g, '\n• ')
     // Insert breaks between sentences when there is a capital letter after punctuation.
@@ -67,7 +85,7 @@ function buildOverviewBlocks(raw: string | null | undefined): OverviewBlock[] {
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
 
-  const blocks: OverviewBlock[] = []
+  const blocks: DescriptionBlock[] = []
   let currentList: string[] | null = null
 
   for (const line of rawLines) {
@@ -90,8 +108,8 @@ function buildOverviewBlocks(raw: string | null | undefined): OverviewBlock[] {
   return blocks
 }
 
-const formattedOverview = computed<OverviewBlock[]>(() =>
-  buildOverviewBlocks(job.value?.description),
+const formattedDescription = computed<DescriptionBlock[]>(() =>
+  buildDescriptionBlocks(job.value?.description),
 )
 
 async function handleToggleSave() {
@@ -109,6 +127,34 @@ function handleApplyClick() {
   if (!job.value || !job.value.applyLink) return
   window.open(job.value.applyLink, '_blank', 'noopener,noreferrer')
 }
+
+const canPurchaseTailoring = computed(() => {
+  const p = tailoringPurchase.value
+  if (!p) return true
+  return p.status === 'cancelled'
+})
+
+const tailoringStatusLabel = computed(() => {
+  const p = tailoringPurchase.value
+  if (!p) return null
+  if (p.status === 'pending' || p.status === 'in_progress') return 'Tailoring in progress'
+  if (p.status === 'complete') return 'Tailored resume ready'
+  return null
+})
+
+async function handleTailoringCheckout() {
+  if (!job.value) return
+  tailoringCheckoutLoading.value = true
+  tailoringError.value = null
+  const returnPath = route.path
+  const { data, error } = await resumeProductsAPI.startTailoringCheckout(job.value.matchId, returnPath)
+  tailoringCheckoutLoading.value = false
+  if (error) {
+    tailoringError.value = error.message
+    return
+  }
+  if (data?.url) window.location.href = data.url
+}
 </script>
 
 <template>
@@ -117,19 +163,20 @@ function handleApplyClick() {
       <!-- Back Button -->
       <button
         @click="router.push('/dashboard')"
-        class="flex items-center text-brand-primary hover:underline mb-6"
+        class="inline-flex items-center gap-2 text-brand-primary hover:underline mb-6 text-sm font-medium"
+        type="button"
       >
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
+        <font-awesome-icon :icon="['fas', 'chevron-left']" class="text-xs" aria-hidden="true" />
         Back to Feed
       </button>
 
       <div v-if="isLoading" class="text-center py-12">
-        <svg class="animate-spin h-8 w-8 text-brand-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+        <font-awesome-icon
+          :icon="['fas', 'spinner']"
+          spin
+          class="h-8 w-8 text-brand-primary mx-auto mb-4 block"
+          aria-hidden="true"
+        />
         <p class="text-neutral-body">Loading job details...</p>
       </div>
 
@@ -138,19 +185,128 @@ function handleApplyClick() {
       </div>
 
       <div v-else-if="job" class="space-y-6">
-        <!-- Header -->
-        <div class="card p-6">
-          <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">{{ job.title }}</h1>
-          <p class="text-xl text-brand-primary font-medium mb-1">{{ job.company }}</p>
-          <p class="text-neutral-body">{{ job.location }}</p>
-        </div>
+        <!-- Job hero card -->
+        <article
+          class="relative overflow-hidden rounded-2xl border border-neutral-border bg-neutral-card shadow-md"
+          style="border-left: 4px solid var(--color-brand-primary);"
+        >
+          <div class="p-6 sm:p-8">
+            <!-- Top row: title + save -->
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div class="min-w-0 flex-1 pr-12 sm:pr-0">
+                <h1 class="text-2xl font-heading font-bold leading-tight text-brand-charcoal sm:text-3xl">
+                  {{ job.title }}
+                </h1>
+                <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-body">
+                  <span class="inline-flex items-center gap-1.5 font-medium text-brand-primary">
+                    <font-awesome-icon :icon="['fas', 'building']" class="shrink-0 opacity-80" aria-hidden="true" />
+                    {{ job.company }}
+                  </span>
+                  <span v-if="job.location" class="inline-flex items-center gap-1.5">
+                    <font-awesome-icon :icon="['fas', 'location-dot']" class="shrink-0 opacity-70" aria-hidden="true" />
+                    {{ job.location }}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="absolute right-4 top-6 shrink-0 transition-colors sm:static sm:right-auto sm:top-auto"
+                :class="job.isSaved
+                  ? 'rounded-full bg-brand-primary px-4 py-2.5 text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'
+                  : 'rounded-full border border-neutral-border bg-neutral-bg px-4 py-2.5 text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'"
+                :aria-pressed="job.isSaved"
+                :aria-label="job.isSaved ? 'Unsave this job' : 'Save this job'"
+                @click="handleToggleSave"
+              >
+                <font-awesome-icon
+                  :icon="['fas', 'bookmark']"
+                  :class="job.isSaved ? 'text-white' : 'text-neutral-body'"
+                  aria-hidden="true"
+                />
+                <span class="ml-2 text-sm font-medium" :class="job.isSaved ? 'text-white' : 'text-neutral-body'">
+                  {{ job.isSaved ? 'Saved' : 'Save' }}
+                </span>
+              </button>
+            </div>
 
-        <!-- Overview -->
+            <!-- Match + actions -->
+            <div class="mt-6 flex flex-col gap-4 border-t border-neutral-border pt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+              <div class="flex flex-wrap items-center gap-3">
+                <span
+                  v-if="job.score != null"
+                  class="inline-flex items-center rounded-full bg-neutral-bg px-3 py-1 text-sm font-semibold text-brand-charcoal"
+                  aria-label="Match score"
+                >
+                  {{ job.score.toFixed(0) }}% match
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                <button
+                  type="button"
+                  class="btn-primary"
+                  :disabled="!job.applyLink"
+                  @click="handleApplyClick"
+                >
+                  Apply
+                </button>
+                <button
+                  v-if="canPurchaseTailoring"
+                  type="button"
+                  class="btn-secondary inline-flex w-[11.5rem] items-center justify-center gap-2"
+                  :disabled="tailoringCheckoutLoading || tailoringLoading"
+                  @click="handleTailoringCheckout"
+                >
+                  <font-awesome-icon
+                    v-if="tailoringCheckoutLoading"
+                    :icon="['fas', 'spinner']"
+                    spin
+                    aria-hidden="true"
+                  />
+                  {{ tailoringCheckoutLoading ? 'Redirecting…' : 'Tailor Resume' }}
+                </button>
+              </div>
+            </div>
+            <!-- Tailoring status and error (below actions; does not affect button layout) -->
+            <div
+              v-if="tailoringLoading || tailoringStatusLabel || tailoringError"
+              class="mt-3 text-xs text-neutral-body"
+            >
+              <div v-if="tailoringLoading" class="flex items-center gap-2">
+                <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
+                <span>Checking tailoring status…</span>
+              </div>
+              <div
+                v-else-if="tailoringStatusLabel"
+                class="flex items-center gap-2"
+              >
+                <font-awesome-icon
+                  v-if="tailoringPurchase?.status === 'complete'"
+                  :icon="['fas', 'check']"
+                  class="text-green-600 shrink-0"
+                  aria-hidden="true"
+                />
+                <font-awesome-icon
+                  v-else
+                  :icon="['fas', 'spinner']"
+                  spin
+                  class="shrink-0"
+                  aria-hidden="true"
+                />
+                <span>{{ tailoringStatusLabel }}</span>
+              </div>
+              <p v-if="tailoringError" class="text-red-600">
+                {{ tailoringError }}
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <!-- Description -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Overview</h2>
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Description</h2>
           <div class="space-y-3 text-neutral-body leading-relaxed">
             <template
-              v-for="(block, index) in formattedOverview"
+              v-for="(block, index) in formattedDescription"
               :key="index"
             >
               <p v-if="block.type === 'paragraph'">
@@ -168,55 +324,6 @@ function handleApplyClick() {
                 </li>
               </ul>
             </template>
-          </div>
-        </div>
-
-        <!-- Key Details -->
-        <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Key Details</h2>
-          <ul class="space-y-2 text-neutral-body">
-            <li>
-              <span class="font-semibold">Apply link:</span>
-              <span v-if="job.applyLink">
-                <a
-                  :href="job.applyLink"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-brand-primary hover:underline"
-                >
-                  Apply on company site
-                </a>
-              </span>
-              <span v-else>Not provided</span>
-            </li>
-            <li>
-              <span class="font-semibold">Match score:</span>
-              {{ job.score != null ? job.score.toFixed(1) : '—' }}
-            </li>
-          </ul>
-        </div>
-
-        <!-- How to Apply -->
-        <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">How to apply</h2>
-          <p class="text-neutral-body mb-6">
-            Apply directly on the company's chosen platform using the button below. Use the insights above to tailor your resume and responses so you stand out from generic applicants.
-          </p>
-          <div class="flex gap-3">
-            <button
-              class="btn-primary flex-1"
-              :disabled="!job.applyLink"
-              @click="handleApplyClick"
-            >
-              Apply on company site
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="handleToggleSave"
-            >
-              {{ job.isSaved ? 'Unsave this job' : 'Save this job' }}
-            </button>
           </div>
         </div>
       </div>

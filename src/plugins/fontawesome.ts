@@ -7,9 +7,23 @@ import {
   faCheck,
   faSpinner,
   faExclamationTriangle,
+  faBookmark,
+  faChevronLeft,
+  faLocationDot,
+  faBuilding,
 } from '@fortawesome/free-solid-svg-icons'
 
-library.add(faTrash, faPlus, faCheck, faSpinner, faExclamationTriangle)
+library.add(
+  faTrash,
+  faPlus,
+  faCheck,
+  faSpinner,
+  faExclamationTriangle,
+  faBookmark,
+  faChevronLeft,
+  faLocationDot,
+  faBuilding,
+)
 
 export function registerFontAwesome(app: App) {
   app.component('font-awesome-icon', FontAwesomeIcon)
