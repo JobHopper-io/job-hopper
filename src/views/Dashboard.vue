@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Product } from '@/types/database'
+import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
+import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
@@ -31,6 +32,7 @@ function dismissProfileCompletion() {
 }
 
 const matches = ref<MatchedJob[]>([])
+const tailoringByMatchId = ref<Record<string, ResumeProduct>>({})
 const isLoadingMatches = ref(false)
 const matchesError = ref<string | null>(null)
 
@@ -109,9 +111,10 @@ async function loadMatchesAndStats() {
   isLoadingMatches.value = true
   matchesError.value = null
   try {
-    const [matchesResult, statsResult] = await Promise.all([
+    const [matchesResult, statsResult, tailoringResult] = await Promise.all([
       jobsAPI.getJobMatches(),
       jobsAPI.getMatchingStats(),
+      resumeProductsAPI.getTailoringPurchasesByMatchId(),
     ])
 
     if (matchesResult.error) {
@@ -123,6 +126,12 @@ async function loadMatchesAndStats() {
 
     if (!statsResult.error) {
       matchingStats.value = statsResult.data
+    }
+
+    if (!tailoringResult.error) {
+      tailoringByMatchId.value = tailoringResult.data
+    } else {
+      tailoringByMatchId.value = {}
     }
   } finally {
     isLoadingMatches.value = false
@@ -374,6 +383,7 @@ onMounted(() => {
           v-for="job in filteredMatches"
           :key="job.matchId"
           :job="job"
+          :tailoring-purchase="tailoringByMatchId[job.matchId] ?? null"
           @toggle-save="handleToggleSave"
         />
       </div>

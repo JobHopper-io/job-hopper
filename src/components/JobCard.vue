@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MatchedJob } from '@/lib/jobs'
+import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 
 const props = defineProps<{
   job: MatchedJob
+  tailoringPurchase?: ResumeProduct | null
 }>()
 
 const emit = defineEmits<{
@@ -16,6 +18,20 @@ const router = useRouter()
 
 const tailoringLoading = ref(false)
 const tailoringError = ref<string | null>(null)
+
+const showTailorButton = computed(() => {
+  const p = props.tailoringPurchase
+  if (!p) return true
+  return p.status === 'cancelled'
+})
+
+const tailoringStatusText = computed<string | null>(() => {
+  const p = props.tailoringPurchase
+  if (!p || p.status === 'cancelled') return null
+  if (p.status === 'pending' || p.status === 'in_progress') return 'Tailoring in progress'
+  if (p.status === 'complete') return 'Tailored resume ready'
+  return null
+})
 
 function handleViewDetails() {
   void router.push(`/job/${props.job.jobId}`)
@@ -131,23 +147,27 @@ async function handleTailoringCheckout() {
         >
           Apply
         </button>
-          <button
-            type="button"
-            class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-            :disabled="tailoringLoading"
-            @click="handleTailoringCheckout"
-          >
-            <font-awesome-icon
-              v-if="tailoringLoading"
-              :icon="['fas', 'spinner']"
-              spin
-              class="mr-1.5"
-              aria-hidden="true"
-            />
-            {{ tailoringLoading ? 'Redirecting…' : 'Tailor Resume' }}
-          </button>
+        <button
+          v-if="showTailorButton"
+          type="button"
+          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
+          :disabled="tailoringLoading"
+          @click="handleTailoringCheckout"
+        >
+          <font-awesome-icon
+            v-if="tailoringLoading"
+            :icon="['fas', 'spinner']"
+            spin
+            class="mr-1.5"
+            aria-hidden="true"
+          />
+          {{ tailoringLoading ? 'Redirecting…' : 'Tailor Resume' }}
+        </button>
       </div>
-      <p v-if="tailoringError" class="mt-2 text-xs text-red-600">
+      <p v-if="tailoringStatusText" class="mt-2 text-xs text-neutral-body">
+        {{ tailoringStatusText }}
+      </p>
+      <p v-else-if="tailoringError" class="mt-2 text-xs text-red-600">
         {{ tailoringError }}
       </p>
     </div>

@@ -73,6 +73,21 @@ export const resumeProductsAPI = {
     return { data: data as ResumeProduct | null, error: null }
   },
 
+  /** Returns a map of job_match_id → tailoring purchase for all matches that have one (any status). Uses the full list of resume products for the profile and filters to per-job tailoring (job_match_id not null). */
+  async getTailoringPurchasesByMatchId(): Promise<{
+    data: Record<string, ResumeProduct>
+    error: Error | null
+  }> {
+    const { data: allResumeProducts, error } =
+      await resumeProductsAPI.getResumeProductsForProfile()
+    if (error) return { data: {}, error }
+    const byMatchId: Record<string, ResumeProduct> = {}
+    for (const row of allResumeProducts ?? []) {
+      if (row.job_match_id) byMatchId[row.job_match_id] = row
+    }
+    return { data: byMatchId, error: null }
+  },
+
   async startTailoringCheckout(
     matchId: string,
     returnPath?: string,
