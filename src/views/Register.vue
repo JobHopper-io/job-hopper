@@ -33,6 +33,8 @@ const error = ref('')
 const emailAlreadyUsed = ref(false)
 const phoneAlreadyUsed = ref(false)
 
+const emailConsent = ref(false)
+
 const validateEmail = (value: string) => {
   if (!value.trim()) return null
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -78,7 +80,8 @@ const canProceedStep1 = computed(() => {
     password.value &&
     !passwordValidationError.value &&
     confirmPassword.value &&
-    passwordsMatch.value
+    passwordsMatch.value &&
+    emailConsent.value
   )
 })
 
@@ -128,7 +131,7 @@ const handleCreateAccount = async () => {
       '',
       '',
       normalizedPhone,
-      redirectTo
+      redirectTo,
     )
     if (signUpError) {
       const authErr = signUpError as AuthError & {
@@ -341,6 +344,29 @@ const handleCreateAccount = async () => {
           </div>
           <div v-else-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
             Passwords do not match
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <div class="border border-neutral-border rounded-[12px] p-4 bg-white">
+            <label class="flex items-start gap-3 cursor-pointer" for="email-consent">
+              <input
+                id="email-consent"
+                v-model="emailConsent"
+                type="checkbox"
+                class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
+              />
+              <div>
+                <p class="text-sm font-medium text-brand-charcoal">
+                  I agree to receive emails from Job-Hopper about my account and services, including product
+                  updates and general marketing emails.
+                </p>
+                <p class="mt-1 text-xs text-neutral-body">
+                  You can change your email preferences or unsubscribe at any time from your settings or
+                  from any email we send.
+                </p>
+              </div>
+            </label>
           </div>
         </div>
 
