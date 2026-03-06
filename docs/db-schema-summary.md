@@ -65,7 +65,7 @@
   - These tables currently have no explicit foreign‑key links to `profiles` or `subscriptions` in the generated types; linkages are done via shared fields (e.g. company name, job metadata) or app‑level logic.
 - **Non‑obvious rules**:
   - `bd_leads.status` uses the `bd_leads_status` enum for the internal processing pipeline (see enum values in `supabase.ts`).
-  - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows.
+  - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows. Each row now consists of `id`, `created_at`, `company_name`, with a unique constraint on (`company_name`).
   - `enriched_lead` and `raw_jobs` often contain semi‑structured JSON metadata (`apollo_metadata`, `icypeas_meta_data`, `"apollo data"`, `"Meta Data"`); downstream logic should treat these as opaque blobs unless there is explicit parsing logic.
 
 ### job_matches
