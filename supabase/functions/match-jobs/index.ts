@@ -126,12 +126,12 @@ serve(async (req) => {
         .select(
           `
           id,
-          "Job Title",
-          "Company Name",
-          Location,
-          Description,
-          "Job Highlights",
-          "Apply Link",
+          job_title,
+          company_name,
+          location,
+          description,
+          ai_job_briefing,
+          apply_link,
           created_at
         `,
         )
@@ -157,12 +157,12 @@ serve(async (req) => {
 
     const jobRecords: JobRecord[] = allJobs.map((row: any) => ({
       id: row.id,
-      title: row['Job Title'] ?? null,
-      companyName: row['Company Name'] ?? null,
-      location: row.Location ?? null,
-      description: row.Description ?? null,
-      jobHighlights: row['Job Highlights'] ?? null,
-      applyLink: row['Apply Link'] ?? null,
+      title: row.job_title ?? null,
+      companyName: row.company_name ?? null,
+      location: row.location ?? null,
+      description: row.description ?? null,
+      jobHighlights: row.ai_job_briefing ?? null,
+      applyLink: row.apply_link ?? null,
       createdAt: row.created_at,
     }))
 

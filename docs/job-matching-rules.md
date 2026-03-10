@@ -14,7 +14,7 @@
 ## Inputs
 
 **From subscriber preferences:** roles (array), pay_range_min, pay_range_max, location, relocation_willing.  
-**From job:** title, company_name, location, salary, description (job_hopper_jobs).
+**From job:** title, company_name, location, salary (derived from `pay_min`/`pay_max`/`pay_type` when present), description (job_hopper_live).
 
 ---
 

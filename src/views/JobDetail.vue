@@ -9,7 +9,6 @@ const route = useRoute()
 const router = useRouter()
 
 const jobIdParam = route.params.id as string
-const jobId = Number.parseInt(jobIdParam, 10)
 const job = ref<MatchedJob | null>(null)
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
@@ -34,11 +33,11 @@ async function loadTailoringPurchase(matchId: string) {
 
 onMounted(async () => {
   try {
-    if (Number.isNaN(jobId)) {
+    if (!jobIdParam) {
       loadError.value = 'Invalid job id'
       return
     }
-    const { data, error } = await jobsAPI.getJobMatchByJobId(jobId)
+    const { data, error } = await jobsAPI.getJobMatchByJobId(jobIdParam)
     if (error) {
       loadError.value = error.message
       return

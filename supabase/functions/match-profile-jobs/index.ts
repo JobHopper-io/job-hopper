@@ -134,13 +134,13 @@ serve(async (req) => {
     }
 
     type JobRow = {
-      id: number
-      'Job Title': string | null
-      'Company Name': string | null
-      Location: string | null
-      Description: string | null
-      'Job Highlights': string | null
-      'Apply Link': string | null
+      id: string
+      job_title: string | null
+      company_name: string | null
+      location: string | null
+      description: string | null
+      ai_job_briefing: string | null
+      apply_link: string | null
       created_at: string
     }
 
@@ -150,12 +150,12 @@ serve(async (req) => {
       .select(
         `
         id,
-        "Job Title",
-        "Company Name",
-        Location,
-        Description,
-        "Job Highlights",
-        "Apply Link",
+        job_title,
+        company_name,
+        location,
+        description,
+        ai_job_briefing,
+        apply_link,
         created_at
       `,
       )
@@ -178,12 +178,12 @@ serve(async (req) => {
 
     const jobRecords: JobRecord[] = allJobs.map((row) => ({
       id: row.id,
-      title: row['Job Title'] ?? null,
-      companyName: row['Company Name'] ?? null,
-      location: row.Location ?? null,
-      description: row.Description ?? null,
-      jobHighlights: row['Job Highlights'] ?? null,
-      applyLink: row['Apply Link'] ?? null,
+      title: row.job_title ?? null,
+      companyName: row.company_name ?? null,
+      location: row.location ?? null,
+      description: row.description ?? null,
+      jobHighlights: row.ai_job_briefing ?? null,
+      applyLink: row.apply_link ?? null,
       createdAt: row.created_at,
     }))
 
@@ -209,14 +209,14 @@ serve(async (req) => {
       )
     }
 
-    const existingJobIds = new Set<number>()
+    const existingJobIds = new Set<string>()
     for (const row of existingMatches ?? []) {
-      if (typeof row.job_id === 'number') {
+      if (row.job_id) {
         existingJobIds.add(row.job_id)
       }
     }
 
-    const rowsToInsert: { profile_id: string; job_id: number; score: number }[] = []
+    const rowsToInsert: { profile_id: string; job_id: string; score: number }[] = []
 
     for (const job of ranked) {
       if (rowsToInsert.length >= limit) {

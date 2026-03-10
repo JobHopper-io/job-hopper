@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 // __TEST_ONLY_START__ — Entire file is for match-jobs debug view only. Remove this file, MatchJobsDebug.vue, and the debug route before production.
 
 export interface RankedJob {
-  id: number
+  id: string
   title: string | null
   companyName: string | null
   location: string | null
@@ -19,7 +19,7 @@ export interface RankedJob {
 }
 
 export interface MatchJobsDebugSampleJob {
-  id: number
+  id: string
   title: string | null
   companyName: string | null
   location: string | null

@@ -10,7 +10,7 @@ export interface SubscriberPreferences {
 }
 
 export interface JobRecord {
-  id: number
+  id: string
   title: string | null
   companyName: string | null
   location: string | null
@@ -29,7 +29,7 @@ export interface RankedJob extends JobRecord {
 }
 
 export interface MatchJobsDebugSampleJob {
-  id: number
+  id: string
   title: string | null
   companyName: string | null
   location: string | null

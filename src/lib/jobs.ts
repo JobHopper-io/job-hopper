@@ -4,7 +4,7 @@ import type { JobMatch, SavedJob } from '@/types/database'
 
 export interface MatchedJob {
   matchId: string
-  jobId: number
+  jobId: string
   score: number | null
   createdAt: string
   isSaved: boolean
@@ -54,7 +54,7 @@ export const jobsAPI = {
       new Set(
         matches
           .map((m) => m.job_id)
-          .filter((id): id is number => typeof id === 'number'),
+          .filter((id): id is string => typeof id === 'string'),
       ),
     )
 
@@ -68,12 +68,12 @@ export const jobsAPI = {
               .select(
                 `
               id,
-              "Job Title",
-              "Company Name",
-              Location,
-              Description,
-              "Job Highlights",
-              "Apply Link",
+              job_title,
+              company_name,
+              location,
+              description,
+              ai_job_briefing,
+              apply_link,
               created_at
             `,
               )
@@ -104,19 +104,19 @@ export const jobsAPI = {
     const savedRows = (savedRowsRaw ?? []) as SavedJob[]
 
     type JobRow = {
-      id: number
-      'Job Title': string | null
-      'Company Name': string | null
-      Location: string | null
-      Description: string | null
-      'Job Highlights': string | null
-      'Apply Link': string | null
+      id: string
+      job_title: string | null
+      company_name: string | null
+      location: string | null
+      description: string | null
+      ai_job_briefing: string | null
+      apply_link: string | null
       created_at: string
     }
 
-    const jobById = new Map<number, JobRow>()
+    const jobById = new Map<string, JobRow>()
     for (const job of jobs as JobRow[]) {
-      if (typeof job.id === 'number') {
+      if (typeof job.id === 'string') {
         jobById.set(job.id, job)
       }
     }
@@ -126,19 +126,19 @@ export const jobsAPI = {
     )
 
     const result: MatchedJob[] = matches.map((match) => {
-      const job = jobById.get(match.job_id as number)
+      const job = match.job_id ? jobById.get(match.job_id) : undefined
       return {
         matchId: match.id,
-        jobId: match.job_id as number,
+        jobId: (match.job_id as string) ?? '',
         score: match.score ?? null,
         createdAt: match.created_at ?? '',
         isSaved: savedMatchIds.has(match.id),
-        title: job ? job['Job Title'] : null,
-        company: job ? job['Company Name'] : null,
-        location: job ? job.Location : null,
-        description: job ? job.Description : null,
-        jobHighlights: job ? job['Job Highlights'] : null,
-        applyLink: job ? job['Apply Link'] : null,
+        title: job ? job.job_title : null,
+        company: job ? job.company_name : null,
+        location: job ? job.location : null,
+        description: job ? job.description : null,
+        jobHighlights: job ? job.ai_job_briefing : null,
+        applyLink: job ? job.apply_link : null,
       }
     })
 
@@ -146,7 +146,7 @@ export const jobsAPI = {
   },
 
   async getJobMatchByJobId(
-    jobId: number,
+    jobId: string,
   ): Promise<{ data: MatchedJob | null; error: Error | null }> {
     const { data: matchRaw, error: matchError } = await supabase
       .from('job_matches')
@@ -179,12 +179,12 @@ export const jobsAPI = {
           .select(
             `
             id,
-            "Job Title",
-            "Company Name",
-            Location,
-            Description,
-            "Job Highlights",
-            "Apply Link",
+            job_title,
+            company_name,
+            location,
+            description,
+            ai_job_briefing,
+            apply_link,
             created_at
           `,
           )
@@ -219,16 +219,16 @@ export const jobsAPI = {
 
     const detail: MatchedJob = {
       matchId: match.id,
-      jobId: match.job_id as number,
+      jobId: (match.job_id as string) ?? '',
       score: match.score ?? null,
       createdAt: match.created_at ?? '',
       isSaved: !!savedRow,
-      title: job['Job Title'] ?? null,
-      company: job['Company Name'] ?? null,
-      location: job.Location ?? null,
-      description: job.Description ?? null,
-      jobHighlights: job['Job Highlights'] ?? null,
-      applyLink: job['Apply Link'] ?? null,
+      title: job.job_title ?? null,
+      company: job.company_name ?? null,
+      location: job.location ?? null,
+      description: job.description ?? null,
+      jobHighlights: job.ai_job_briefing ?? null,
+      applyLink: job.apply_link ?? null,
     }
 
     return { data: detail, error: null }
