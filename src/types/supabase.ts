@@ -16,57 +16,21 @@ export type Database = {
     Tables: {
       bd_leads: {
         Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
+          company_name: string | null
           created_at: string
-          Description: string | null
-          Extras: string | null
           id: number
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
-          "Reason for Apollo": string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
+          company_name?: string | null
           created_at?: string
-          Description?: string | null
-          Extras?: string | null
           id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
+          company_name?: string | null
           created_at?: string
-          Description?: string | null
-          Extras?: string | null
           id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Relationships: []
@@ -198,131 +162,112 @@ export type Database = {
       }
       exclusion_lists: {
         Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
+          company_name: string | null
           created_at: string
-          Description: string | null
-          Extras: string | null
           id: number
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
-          "Reason for Apollo": string | null
-          "reason for reject": string | null
         }
         Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
+          company_name?: string | null
           created_at?: string
-          Description?: string | null
-          Extras?: string | null
           id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-          "reason for reject"?: string | null
         }
         Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
+          company_name?: string | null
           created_at?: string
-          Description?: string | null
-          Extras?: string | null
           id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-          "reason for reject"?: string | null
         }
         Relationships: []
       }
       job_hopper_live: {
         Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
-          created_at: string
-          Description: string | null
-          Extras: string | null
-          id: number
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
+          ai_job_briefing: string
+          apply_link: string | null
+          company_name: string
+          created_at: string | null
+          description: string | null
+          employee_count: number | null
+          employment_types: string[] | null
+          id: string
+          is_remote: boolean
+          job_title: string
+          location: string | null
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          posted_date: string | null
+          role_category: Database["public"]["Enums"]["role_category"]
+          schedules: string[] | null
+          subscription_tier: string
         }
         Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
+          ai_job_briefing: string
+          apply_link?: string | null
+          company_name: string
+          created_at?: string | null
+          description?: string | null
+          employee_count?: number | null
+          employment_types?: string[] | null
+          id?: string
+          is_remote?: boolean
+          job_title: string
+          location?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          posted_date?: string | null
+          role_category: Database["public"]["Enums"]["role_category"]
+          schedules?: string[] | null
+          subscription_tier: string
         }
         Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
+          ai_job_briefing?: string
+          apply_link?: string | null
+          company_name?: string
+          created_at?: string | null
+          description?: string | null
+          employee_count?: number | null
+          employment_types?: string[] | null
+          id?: string
+          is_remote?: boolean
+          job_title?: string
+          location?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          posted_date?: string | null
+          role_category?: Database["public"]["Enums"]["role_category"]
+          schedules?: string[] | null
+          subscription_tier?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "job_hopper_live_subscription_tier_fkey"
+            columns: ["subscription_tier"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       job_matches: {
         Row: {
           created_at: string
           id: string
-          job_id: number
+          job_id: string | null
           profile_id: string
           score: number | null
         }
         Insert: {
           created_at?: string
           id?: string
-          job_id: number
+          job_id?: string | null
           profile_id: string
           score?: number | null
         }
         Update: {
           created_at?: string
           id?: string
-          job_id?: number
+          job_id?: string | null
           profile_id?: string
           score?: number | null
         }
@@ -670,6 +615,21 @@ export type Database = {
         }
         Relationships: []
       }
+      scraper_search_terms: {
+        Row: {
+          id: number
+          search_term: string
+        }
+        Insert: {
+          id?: number
+          search_term?: string
+        }
+        Update: {
+          id?: number
+          search_term?: string
+        }
+        Relationships: []
+      }
       sic_codes: {
         Row: {
           csv_industry_code: string | null
@@ -844,17 +804,21 @@ export type Database = {
         | "subscription_update"
         | "system_announcement"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
+      pay_type: "hour" | "year"
       product_category:
         | "base_plan"
         | "subscription_addon"
         | "one_time_addon"
         | "one_time_item"
       product_type: "subscription" | "payment"
-      resume_product_status:
-        | "pending"
-        | "in_progress"
-        | "complete"
-        | "cancelled"
+      resume_product_status: "pending" | "complete" | "cancelled"
+      role_category:
+        | "operations"
+        | "maintenance"
+        | "engineering"
+        | "management"
+        | "executive"
+        | "other"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -999,6 +963,7 @@ export const Constants = {
         "system_announcement",
       ],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
+      pay_type: ["hour", "year"],
       product_category: [
         "base_plan",
         "subscription_addon",
@@ -1006,11 +971,14 @@ export const Constants = {
         "one_time_item",
       ],
       product_type: ["subscription", "payment"],
-      resume_product_status: [
-        "pending",
-        "in_progress",
-        "complete",
-        "cancelled",
+      resume_product_status: ["pending", "complete", "cancelled"],
+      role_category: [
+        "operations",
+        "maintenance",
+        "engineering",
+        "management",
+        "executive",
+        "other",
       ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
       subscription_status: ["trial", "active", "canceled"],
