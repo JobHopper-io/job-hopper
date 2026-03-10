@@ -18,17 +18,17 @@ export interface SendEmailResult {
   error?: string
 }
 
-const DEFAULT_MAILTRAP_URL = 'https://sandbox.api.mailtrap.io/api/send/4428525' // 'https://send.api.mailtrap.io/api/send'
+const DEFAULT_MAILTRAP_URL = 'https://send.api.mailtrap.io/api/send'
 
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
-  const apiToken = Deno.env.get('MAILTRAP_API_TOKEN') ?? ''
+  const apiToken = Deno.env.get('MAILTRAP_API_TOKEN')
   const url = (Deno.env.get('MAILTRAP_URL') ?? DEFAULT_MAILTRAP_URL).replace(/\/+$/, '')
-  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? ''
+  const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? 'no-reply@job-hopper.io'
 
   if (!apiToken) {
     const missing = []
     if (!apiToken) missing.push('MAILTRAP_API_TOKEN')
-    const error = `Mailtrap configuration missing: ${missing.join(', ')}`
+    const error = `Mailtrap api token is missing`
     console.error('[email-provider] send failed –', error)
     return {
       messageId: null,
@@ -37,7 +37,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress = { email: fromEnv.trim() || 'hello@demomailtrap.co', name: 'Job-Hopper' }
+  const fromAddress = { email: fromEnv, name: 'Job-Hopper' }
 
   console.log('[email-provider] Mailtrap send attempt', {
     to: params.to,
@@ -68,11 +68,12 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     payload.custom_variables = params.metadata
   }
 
+
   try {
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
-        'Api-Token': apiToken,
+        'Authorization': 'Bearer ' + apiToken,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
