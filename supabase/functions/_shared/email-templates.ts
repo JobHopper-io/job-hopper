@@ -9,7 +9,7 @@ export interface JobSummary {
   companyName: string | null
   location: string | null
   description?: string | null
-  jobHighlights?: string | null
+  aiBriefing?: string | null
   applyLink: string | null
 }
 

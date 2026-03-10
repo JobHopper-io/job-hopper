@@ -12,7 +12,7 @@ export interface MatchedJob {
   company: string | null
   location: string | null
   description: string | null
-  jobHighlights: string | null
+  aiBriefing: string | null
   applyLink: string | null
 }
 
@@ -137,7 +137,7 @@ export const jobsAPI = {
         company: job ? job.company_name : null,
         location: job ? job.location : null,
         description: job ? job.description : null,
-        jobHighlights: job ? job.ai_job_briefing : null,
+        aiBriefing: job ? job.ai_job_briefing : null,
         applyLink: job ? job.apply_link : null,
       }
     })
@@ -227,7 +227,7 @@ export const jobsAPI = {
       company: job.company_name ?? null,
       location: job.location ?? null,
       description: job.description ?? null,
-      jobHighlights: job.ai_job_briefing ?? null,
+      aiBriefing: job.ai_job_briefing ?? null,
       applyLink: job.apply_link ?? null,
     }
 

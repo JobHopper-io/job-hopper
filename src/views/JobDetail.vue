@@ -56,61 +56,6 @@ onMounted(async () => {
   }
 })
 
-type DescriptionBlock =
-  | { type: 'paragraph'; text: string }
-  | { type: 'list'; items: string[] }
-
-function buildDescriptionBlocks(raw: string | null | undefined): DescriptionBlock[] {
-  const source = raw?.trim()
-  if (!source) {
-    return [
-      {
-        type: 'paragraph',
-        text: 'This role does not have a detailed description yet.',
-      },
-    ]
-  }
-
-  // Normalize common scraped formatting into line breaks + bullets.
-  const normalized = source
-    // Turn middle-dot or asterisk bullets into real bullets on their own lines.
-    .replace(/(?:\u00b7|\*)\s*/g, '\n• ')
-    // Insert breaks between sentences when there is a capital letter after punctuation.
-    .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')
-
-  // Split into logical lines.
-  const rawLines = normalized
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-
-  const blocks: DescriptionBlock[] = []
-  let currentList: string[] | null = null
-
-  for (const line of rawLines) {
-    const bulletMatch = line.match(/^(?:[-*•]\s+)(.+)$/)
-    if (bulletMatch) {
-      const itemText = bulletMatch[1].trim()
-      if (!currentList) {
-        currentList = []
-        blocks.push({ type: 'list', items: currentList })
-      }
-      currentList.push(itemText)
-      continue
-    }
-
-    // Non-bullet line: close any open list and add as its own paragraph.
-    currentList = null
-    blocks.push({ type: 'paragraph', text: line })
-  }
-
-  return blocks
-}
-
-const formattedDescription = computed<DescriptionBlock[]>(() =>
-  buildDescriptionBlocks(job.value?.description),
-)
-
 async function handleToggleSave() {
   if (!job.value) return
   if (job.value.isSaved) {
@@ -307,27 +252,10 @@ async function handleTailoringCheckout() {
         <!-- Description -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Description</h2>
-          <div class="space-y-3 text-neutral-body leading-relaxed">
-            <template
-              v-for="(block, index) in formattedDescription"
-              :key="index"
-            >
-              <p v-if="block.type === 'paragraph'">
-                {{ block.text }}
-              </p>
-              <ul
-                v-else
-                class="list-disc pl-5 space-y-1"
-              >
-                <li
-                  v-for="(item, idx) in block.items"
-                  :key="idx"
-                >
-                  {{ item }}
-                </li>
-              </ul>
-            </template>
-          </div>
+          <div
+            class="text-neutral-body leading-relaxed prose prose-sm max-w-none"
+            v-html="job.description?.trim() || 'This role does not have a detailed description yet.'"
+          />
         </div>
       </div>
     </div>

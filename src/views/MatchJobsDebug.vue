@@ -306,10 +306,10 @@ onMounted(() => {
                         {{ job.description }}
                       </p>
                     </div>
-                    <div v-if="job.jobHighlights" class="mt-2">
+                    <div v-if="job.aiBriefing" class="mt-2">
                       <div class="font-semibold text-xs mb-0.5">Highlights</div>
                       <p class="text-[11px] whitespace-pre-line">
-                        {{ job.jobHighlights }}
+                        {{ job.aiBriefing }}
                       </p>
                     </div>
                     <div v-if="job.applyLink" class="mt-2">

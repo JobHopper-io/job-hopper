@@ -15,7 +15,7 @@ export interface JobRecord {
   companyName: string | null
   location: string | null
   description: string | null
-  jobHighlights: string | null
+  aiBriefing: string | null
   applyLink: string | null
   createdAt: string
 }
@@ -171,7 +171,7 @@ function coreMatchJobs(
   for (const job of jobs) {
     const titleText = normalizeText(job.title)
     const descText = normalizeText(job.description)
-    const highlightsText = normalizeText(job.jobHighlights)
+    const highlightsText = normalizeText(job.aiBriefing)
     const combinedText = `${titleText} ${descText} ${highlightsText}`.trim()
 
     let roleScore = 0

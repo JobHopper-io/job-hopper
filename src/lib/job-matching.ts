@@ -8,7 +8,7 @@ export interface RankedJob {
   companyName: string | null
   location: string | null
   description: string | null
-  jobHighlights: string | null
+  aiBriefing: string | null
   applyLink: string | null
   createdAt: string
   score: number

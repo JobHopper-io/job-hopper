@@ -182,7 +182,7 @@ serve(async (req) => {
       companyName: row.company_name ?? null,
       location: row.location ?? null,
       description: row.description ?? null,
-      jobHighlights: row.ai_job_briefing ?? null,
+      aiBriefing: row.ai_job_briefing ?? null,
       applyLink: row.apply_link ?? null,
       createdAt: row.created_at,
     }))
@@ -300,7 +300,7 @@ serve(async (req) => {
             companyName: j.companyName,
             location: j.location,
             description: j.description,
-            jobHighlights: j.jobHighlights,
+            aiBriefing: j.aiBriefing,
             applyLink: j.applyLink,
           }))
           const footer = await getFooterLinksForProfile(payload.profile_id)
