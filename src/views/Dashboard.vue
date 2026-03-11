@@ -252,7 +252,7 @@ onMounted(() => {
             </p>
             <p class="text-neutral-body">
               <span class="font-medium text-brand-charcoal">Avg. match score:</span>
-              {{ matchingStats.avgMatchScore != null ? `${matchingStats.avgMatchScore}%` : '—' }}
+              {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
             </p>
           </div>
         </div>

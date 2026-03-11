@@ -228,6 +228,27 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
   return prefs.roles.some((role) => role.toLowerCase() === lowerCategory)
 }
 
+/**
+ * Highest possible total score for the given prefs and config (theoretical maximum).
+ * Used to show score as percentage of max on the test page.
+ */
+export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
+  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
+  const maxKeyword =
+    titleKeywords.length * cfg.keywordWeights.currentJobTitleKeyword +
+    industryKeywords.length * cfg.keywordWeights.currentIndustryKeyword
+  const maxPay = cfg.payWeights.insideRange
+  const maxLocation = Math.max(
+    cfg.locationWeights.sameMetro,
+    cfg.locationWeights.sameState,
+    cfg.locationWeights.remotePreferred,
+    cfg.locationWeights.relocationAllowed,
+  )
+  const maxRecency = cfg.recencyWeights.baseRecency
+  return maxKeyword + maxPay + maxLocation + maxRecency
+}
+
 function computeRoleScore(
   prefs: SubscriberPreferences,
   job: JobRecord,
@@ -540,6 +561,7 @@ export interface MatchJobsDebugPayload {
     averageRoleScore: number | null
     averageLocationScore: number | null
     averageRecencyScore: number | null
+    maxPossibleScore: number
   }
   keywords: {
     keyword: string
@@ -649,6 +671,7 @@ export function matchJobsWithDebug(
   })
 
   const count = ranked.length
+  const maxPossibleScore = getMaxPossibleScore(prefs, cfg)
 
   const debug: MatchJobsDebugPayload = {
     filters: {
@@ -665,6 +688,7 @@ export function matchJobsWithDebug(
       averageRoleScore: count > 0 ? sumRoleScore / count : null,
       averageLocationScore: count > 0 ? sumLocationScore / count : null,
       averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
+      maxPossibleScore,
     },
     keywords: Array.from(keywordCounts.entries())
       .sort(([, aCount], [, bCount]) => bCount - aCount)

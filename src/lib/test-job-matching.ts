@@ -36,6 +36,7 @@ export interface MatchJobsDebugPayload {
     averageRoleScore: number | null
     averageLocationScore: number | null
     averageRecencyScore: number | null
+    maxPossibleScore: number
   }
   keywords: {
     keyword: string

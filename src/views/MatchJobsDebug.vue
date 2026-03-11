@@ -552,6 +552,10 @@ onMounted(async () => {
               </span>
             </p>
             <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Max possible score:</span>
+              <span>{{ debug.scores.maxPossibleScore ?? '—' }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
               <span class="font-semibold">Average total score:</span>
               <span>
                 <span v-if="debug.scores.averageScore !== null">
@@ -640,7 +644,7 @@ onMounted(async () => {
           <table class="min-w-full divide-y divide-neutral-border text-xs sm:text-sm">
             <thead class="bg-neutral-surface">
               <tr>
-                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Score</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Score / % of max</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Title</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Company</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
@@ -658,6 +662,9 @@ onMounted(async () => {
               <tr v-for="job in pagedJobs" :key="job.id" class="align-top">
                 <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">
                   {{ job.score.toFixed(2) }}
+                  <span v-if="debug?.scores?.maxPossibleScore != null && debug.scores.maxPossibleScore > 0">
+                    ({{ ((100 * job.score) / debug.scores.maxPossibleScore).toFixed(1) }}%)
+                  </span>
                 </td>
                 <td class="px-3 py-2">
                   <div class="font-semibold text-brand-charcoal">

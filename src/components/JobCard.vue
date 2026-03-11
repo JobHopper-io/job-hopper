@@ -100,7 +100,7 @@ async function handleTailoringCheckout() {
               class="inline-flex rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal"
               aria-label="Match score"
             >
-              {{ job.score.toFixed(0) }}% match
+              Match score: {{ job.score.toFixed(0) }}
             </span>
           </div>
         </div>

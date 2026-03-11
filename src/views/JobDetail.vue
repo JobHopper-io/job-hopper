@@ -294,7 +294,7 @@ async function handleTailoringCheckout() {
                   class="inline-flex items-center rounded-full bg-neutral-bg px-3 py-1 text-sm font-semibold text-brand-charcoal"
                   aria-label="Match score"
                 >
-                  {{ job.score.toFixed(0) }}% match
+                  Match score: {{ job.score.toFixed(0) }}
                 </span>
               </div>
               <div class="flex flex-wrap items-center gap-3 sm:gap-4">
