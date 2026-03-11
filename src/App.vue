@@ -3,6 +3,9 @@ import { RouterView, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { useUserStore } from '@/stores/user'
+import jobHopperFullLogo from '@/assets/job-hopper-logo.png'
+import jobHopperWordsLogo from '@/assets/job-hopper-words.png'
+import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -82,12 +85,11 @@ const handleSignOutAndCloseMenu = async () => {
                 :to="isAuthenticated ? (isOnboarded ? '/dashboard' : '/onboarding') : '/'"
                 class="flex items-center space-x-2"
               >
-                <div class="w-8 h-8 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-lg flex items-center justify-center">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                  </svg>
-                </div>
-                <span class="text-lg sm:text-xl font-heading font-bold text-brand-primary">Job-Hopper</span>
+                <img
+                  :src="jobHopperFullLogo"
+                  alt="Job-Hopper"
+                  class="h-8 w-auto"
+                >
               </router-link>
             </div>
 
@@ -281,12 +283,16 @@ const handleSignOutAndCloseMenu = async () => {
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">
               <router-link to="/" class="flex items-center space-x-2 mb-4">
-                <div class="w-8 h-8 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-lg flex items-center justify-center">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                  </svg>
-                </div>
-                <span class="text-lg font-heading font-bold text-brand-primary">Job-Hopper</span>
+                <img
+                  :src="jobHopperWordsLogo"
+                  alt="Job-Hopper"
+                  class="h-5 w-auto"
+                >
+                <img
+                  :src="jobHopperRabbitLogo"
+                  alt="Job-Hopper rabbit logo"
+                  class="h-8 w-auto"
+                >
               </router-link>
               <p class="text-sm text-neutral-body">
                 Curated job matches delivered to your inbox. Stop applying into the void.

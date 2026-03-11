@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
 
@@ -333,25 +334,19 @@ onMounted(() => {
         class="card p-12 text-center"
       >
         <div class="max-w-md mx-auto">
-          <div
-            class="w-16 h-16 bg-gradient-to-r from-brand-rabbit-start to-brand-rabbit-end rounded-full flex items-center justify-center mx-auto mb-4"
-          >
-            <svg
-              class="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div class="flex items-center justify-center mx-auto mb-4">
+            <img
+              :src="jobHopperRabbitLogo"
+              alt="Job-Hopper rabbit"
+              class="w-14 h-14"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
           </div>
           <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
-            Your Hopper is warming up.
+            Your
+            <span class="font-heading font-bold text-brand-primary text-3xl tracking-tight leading-none">
+              Hopper
+            </span>
+            is warming up.
           </h2>
           <p class="text-neutral-body mb-6">
             We're scanning new jobs now based on your profile. Check back soon, or loosen your filters to see a wider range of roles.
