@@ -184,16 +184,7 @@ const whyFitBullets = computed(() => {
       bullets.push('This match is based on your profile and the role requirements.')
     }
   }
-  while (bullets.length < 3) {
-    bullets.push(
-      bullets.length === 0
-        ? 'Review the overview and key details to see how your experience aligns.'
-        : bullets.length === 1
-          ? 'Use the insights above to tailor your resume and responses.'
-          : 'Highlight relevant experience when you apply.',
-    )
-  }
-  return bullets.slice(0, 3)
+  return bullets;
 })
 
 async function handleTailoringCheckout() {
@@ -394,7 +385,7 @@ async function handleTailoringCheckout() {
               <span class="font-medium text-brand-charcoal">Employment type:</span> {{ employmentTypeText }}
             </li>
             <li v-if="postedDateText">
-              <span class="font-medium text-brand-charcoal">Posted or last-updated:</span> {{ postedDateText }}
+              <span class="font-medium text-brand-charcoal">Posted on:</span> {{ postedDateText }}
             </li>
           </ul>
         </div>
