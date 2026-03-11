@@ -137,11 +137,17 @@ serve(async (req) => {
       id: string
       job_title: string | null
       company_name: string | null
+      role_category: string | null
       location: string | null
+      is_remote: boolean | null
       description: string | null
       ai_job_briefing: string | null
       apply_link: string | null
+      pay_min: number | null
+      pay_max: number | null
+      pay_type: string | null
       created_at: string
+      posted_date: string | null
     }
 
     // Fetch all jobs from job_hopper_live in a single query.
@@ -152,11 +158,17 @@ serve(async (req) => {
         id,
         job_title,
         company_name,
+        role_category,
         location,
+        is_remote,
         description,
         ai_job_briefing,
         apply_link,
-        created_at
+        pay_min,
+        pay_max,
+        pay_type,
+        created_at,
+        posted_date
       `,
       )
       .order('created_at', { ascending: false })
@@ -180,11 +192,17 @@ serve(async (req) => {
       id: row.id,
       title: row.job_title ?? null,
       companyName: row.company_name ?? null,
+      roleCategory: row.role_category ?? null,
       location: row.location ?? null,
+      isRemote: !!row.is_remote,
       description: row.description ?? null,
       aiBriefing: row.ai_job_briefing ?? null,
       applyLink: row.apply_link ?? null,
+      payMin: row.pay_min,
+      payMax: row.pay_max,
+      payType: row.pay_type,
       createdAt: row.created_at,
+      postedDate: row.posted_date,
     }))
 
     const ranked = matchJobs(preferences, jobRecords)

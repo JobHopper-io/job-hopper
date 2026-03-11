@@ -1,51 +1,529 @@
 export interface SubscriberPreferences {
   roles: string[]
-  currentJobTitle?: string | null
-  currentIndustry?: string | null
-  payRangeMin?: number | null
-  payRangeMax?: number | null
-  preferredLocations?: string[] | null
-  openToRelocation?: boolean | null
-  openToRemote?: boolean | null
+  currentJobTitle: string | null
+  currentIndustry: string | null
+  payRangeMin: number | null
+  payRangeMax: number | null
+  preferredLocations: string[]
+  openToRelocation: boolean | null
+  openToRemote: boolean | null
 }
 
 export interface JobRecord {
   id: string
   title: string | null
   companyName: string | null
+  roleCategory: string | null
   location: string | null
+  isRemote: boolean
   description: string | null
   aiBriefing: string | null
   applyLink: string | null
+  payMin: number | null
+  payMax: number | null
+  payType: string | null
   createdAt: string
+  postedDate: string | null
+}
+
+export interface MatchConfigRoleWeights {
+  titleExact: number
+  titleKeyword: number
+  roleCategoryExact: number
+  currentJobTitleKeyword: number
+  currentIndustryKeyword: number
+}
+
+export interface MatchConfigPayWeights {
+  insideRange: number
+  nearRange: number
+  missingSalary: number
+  belowRangePenalty: number
+}
+
+export interface MatchConfigLocationWeights {
+  sameMetro: number
+  sameState: number
+  remotePreferred: number
+  relocationAllowed: number
+  otherLocationPenalty: number
+}
+
+export interface MatchConfigRecencyWeights {
+  baseRecency: number
+  perDayDecay: number
+  maxAgeDays: number
+}
+
+export interface MatchConfigThresholds {
+  minTotalScore: number
+  hardRoleMismatchPenalty: number
+  overPayTolerancePct: number
+  underPayTolerancePct: number
+}
+
+export interface MatchConfigDebug {
+  includeReasonBreakdown: boolean
+}
+
+export interface MatchConfig {
+  roleWeights: MatchConfigRoleWeights
+  payWeights: MatchConfigPayWeights
+  locationWeights: MatchConfigLocationWeights
+  recencyWeights: MatchConfigRecencyWeights
+  thresholds: MatchConfigThresholds
+  debug: MatchConfigDebug
 }
 
 export interface RankedJob extends JobRecord {
   score: number
-  roleScore: number
-  locationScore: number
-  recencyScore: number
-  matchedRoleKeywords: string[]
-}
-
-export interface MatchJobsDebugSampleJob {
-  id: string
-  title: string | null
-  companyName: string | null
-  location: string | null
-  reason: 'role' | 'remote' | 'location'
-}
-
-export interface MatchJobsDebug {
-  input: {
-    roles: string[]
-    currentJobTitle?: string | null
-    currentIndustry?: string | null
-    preferredLocations: string[]
-    openToRelocation: boolean
-    openToRemote: boolean
-    roleKeywords: string[]
+  components?: {
+    role: number
+    pay: number
+    location: number
+    recency: number
   }
+  matchedRoleKeywords?: string[]
+}
+
+export const defaultConfig: MatchConfig = {
+  roleWeights: {
+    titleExact: 8,
+    titleKeyword: 3,
+    roleCategoryExact: 10,
+    currentJobTitleKeyword: 2,
+    currentIndustryKeyword: 1,
+  },
+  payWeights: {
+    insideRange: 4,
+    nearRange: 2,
+    missingSalary: 1,
+    belowRangePenalty: -2,
+  },
+  locationWeights: {
+    sameMetro: 4,
+    sameState: 2,
+    remotePreferred: 3,
+    relocationAllowed: 1,
+    otherLocationPenalty: -3,
+  },
+  recencyWeights: {
+    baseRecency: 3,
+    perDayDecay: 0.1,
+    maxAgeDays: 45,
+  },
+  thresholds: {
+    minTotalScore: 5,
+    hardRoleMismatchPenalty: -100,
+    overPayTolerancePct: 0.25,
+    underPayTolerancePct: 0.15,
+  },
+  debug: {
+    includeReasonBreakdown: false,
+  },
+}
+
+export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined): MatchConfig {
+  if (!overrides) return defaultConfig
+
+  return {
+    ...defaultConfig,
+    ...overrides,
+    roleWeights: {
+      ...defaultConfig.roleWeights,
+      ...(overrides.roleWeights ?? {}),
+    },
+    payWeights: {
+      ...defaultConfig.payWeights,
+      ...(overrides.payWeights ?? {}),
+    },
+    locationWeights: {
+      ...defaultConfig.locationWeights,
+      ...(overrides.locationWeights ?? {}),
+    },
+    recencyWeights: {
+      ...defaultConfig.recencyWeights,
+      ...(overrides.recencyWeights ?? {}),
+    },
+    thresholds: {
+      ...defaultConfig.thresholds,
+      ...(overrides.thresholds ?? {}),
+    },
+    debug: {
+      ...defaultConfig.debug,
+      ...(overrides.debug ?? {}),
+    },
+  }
+}
+
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase()
+}
+
+function extractKeywords(input: string | null | undefined): string[] {
+  if (!input) return []
+  return input
+    .toLowerCase()
+    .split(/[^a-z0-9+/#]+/i)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2)
+}
+
+function uniqueKeywords(...inputs: (string | null | undefined)[]): string[] {
+  const set = new Set<string>()
+  for (const input of inputs) {
+    for (const kw of extractKeywords(input)) {
+      set.add(kw)
+    }
+  }
+  return Array.from(set)
+}
+
+function computeRoleScore(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): number {
+  const title = normalizeText(job.title)
+  const description = normalizeText(job.description)
+  const briefing = normalizeText(job.aiBriefing)
+  const combined = `${title} ${description} ${briefing}`.trim()
+
+  const roleKeywords = new Set<string>()
+  for (const role of prefs.roles) {
+    for (const kw of extractKeywords(role)) {
+      roleKeywords.add(kw)
+    }
+  }
+
+  const currentTitleKeywords = uniqueKeywords(prefs.currentJobTitle)
+  const currentIndustryKeywords = uniqueKeywords(prefs.currentIndustry)
+
+  let score = 0
+
+  if (job.roleCategory && prefs.roles.length > 0) {
+    const lowerCategory = job.roleCategory.toLowerCase()
+    for (const role of prefs.roles) {
+      if (lowerCategory === role.toLowerCase()) {
+        score += cfg.roleWeights.roleCategoryExact
+        break
+      }
+    }
+  }
+
+  if (combined.length > 0 && roleKeywords.size > 0) {
+    for (const kw of roleKeywords) {
+      if (combined.includes(kw)) {
+        const inTitle = title.includes(kw)
+        score += inTitle ? cfg.roleWeights.titleExact : cfg.roleWeights.titleKeyword
+      }
+    }
+  }
+
+  if (combined.length > 0 && currentTitleKeywords.length > 0) {
+    for (const kw of currentTitleKeywords) {
+      if (combined.includes(kw)) {
+        score += cfg.roleWeights.currentJobTitleKeyword
+      }
+    }
+  }
+
+  if (combined.length > 0 && currentIndustryKeywords.length > 0) {
+    for (const kw of currentIndustryKeywords) {
+      if (combined.includes(kw)) {
+        score += cfg.roleWeights.currentIndustryKeyword
+      }
+    }
+  }
+
+  if (roleKeywords.size > 0 || currentTitleKeywords.length > 0) {
+    const anyOverlap = score > 0
+    if (!anyOverlap) {
+      score += cfg.thresholds.hardRoleMismatchPenalty
+    }
+  }
+
+  return score
+}
+
+function computeRoleScoreWithKeywords(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): { score: number; matchedRoleKeywords: string[] } {
+  const title = normalizeText(job.title)
+  const description = normalizeText(job.description)
+  const briefing = normalizeText(job.aiBriefing)
+  const combined = `${title} ${description} ${briefing}`.trim()
+
+  const roleKeywords = new Set<string>()
+  for (const role of prefs.roles) {
+    for (const kw of extractKeywords(role)) {
+      roleKeywords.add(kw)
+    }
+  }
+
+  const currentTitleKeywords = uniqueKeywords(prefs.currentJobTitle)
+  const currentIndustryKeywords = uniqueKeywords(prefs.currentIndustry)
+
+  let score = 0
+  const matchedRoleKeywords: string[] = []
+
+  if (job.roleCategory && prefs.roles.length > 0) {
+    const lowerCategory = job.roleCategory.toLowerCase()
+    for (const role of prefs.roles) {
+      if (lowerCategory === role.toLowerCase()) {
+        score += cfg.roleWeights.roleCategoryExact
+        break
+      }
+    }
+  }
+
+  if (combined.length > 0 && roleKeywords.size > 0) {
+    for (const kw of roleKeywords) {
+      if (combined.includes(kw)) {
+        const inTitle = title.includes(kw)
+        score += inTitle ? cfg.roleWeights.titleExact : cfg.roleWeights.titleKeyword
+        matchedRoleKeywords.push(kw)
+      }
+    }
+  }
+
+  if (combined.length > 0 && currentTitleKeywords.length > 0) {
+    for (const kw of currentTitleKeywords) {
+      if (combined.includes(kw)) {
+        score += cfg.roleWeights.currentJobTitleKeyword
+      }
+    }
+  }
+
+  if (combined.length > 0 && currentIndustryKeywords.length > 0) {
+    for (const kw of currentIndustryKeywords) {
+      if (combined.includes(kw)) {
+        score += cfg.roleWeights.currentIndustryKeyword
+      }
+    }
+  }
+
+  if (roleKeywords.size > 0 || currentTitleKeywords.length > 0) {
+    const anyOverlap = score > 0
+    if (!anyOverlap) {
+      score += cfg.thresholds.hardRoleMismatchPenalty
+    }
+  }
+
+  return { score, matchedRoleKeywords }
+}
+
+function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: number | null } {
+  const { payMin, payMax, payType } = job
+  if (payMin == null && payMax == null) {
+    return { min: null, max: null }
+  }
+
+  const type = payType ?? 'annual'
+  const multiplier =
+    type === 'hourly'
+      ? 2080
+      : type === 'weekly'
+        ? 52
+        : type === 'monthly'
+          ? 12
+          : 1
+
+  const rawMin = payMin ?? payMax
+  const rawMax = payMax ?? payMin
+
+  if (rawMin == null && rawMax == null) {
+    return { min: null, max: null }
+  }
+
+  const min = rawMin != null ? rawMin * multiplier : null
+  const max = rawMax != null ? rawMax * multiplier : min
+
+  return { min, max }
+}
+
+function computePayScore(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): number {
+  const userMin = prefs.payRangeMin
+  const userMax = prefs.payRangeMax
+  const { min: jobMin, max: jobMax } = normalizeAnnualFromJob(job)
+
+  if (userMin == null || userMax == null || jobMin == null || jobMax == null) {
+    return cfg.payWeights.missingSalary
+  }
+
+  const overlapMin = Math.max(userMin, jobMin)
+  const overlapMax = Math.min(userMax, jobMax)
+  const hasOverlap = overlapMin <= overlapMax
+
+  if (hasOverlap) {
+    return cfg.payWeights.insideRange
+  }
+
+  const userCenter = (userMin + userMax) / 2
+  const jobCenter = (jobMin + jobMax) / 2
+
+  const diff = jobCenter - userCenter
+  const diffPct = diff / userCenter
+
+  if (diffPct > 0 && diffPct <= cfg.thresholds.overPayTolerancePct) {
+    return cfg.payWeights.nearRange
+  }
+
+  if (diffPct < 0 && Math.abs(diffPct) <= cfg.thresholds.underPayTolerancePct) {
+    return cfg.payWeights.nearRange
+  }
+
+  if (diffPct < 0 && Math.abs(diffPct) > cfg.thresholds.underPayTolerancePct) {
+    return cfg.payWeights.belowRangePenalty
+  }
+
+  return 0
+}
+
+function computeLocationScore(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): number {
+  const normalizedJobLocation = normalizeText(job.location)
+  const isRemote = job.isRemote
+  const prefersRemote = !!prefs.openToRemote
+
+  const preferredLocations = (prefs.preferredLocations ?? [])
+    .filter((loc) => loc)
+    .map((loc) => loc.toLowerCase())
+
+  let score = 0
+
+  if (isRemote && prefersRemote) {
+    score += cfg.locationWeights.remotePreferred
+  }
+
+  if (preferredLocations.length === 0) {
+    return score
+  }
+
+  let matchedPreferred = false
+  for (const pref of preferredLocations) {
+    if (normalizedJobLocation.includes(pref) || pref.includes(normalizedJobLocation)) {
+      matchedPreferred = true
+      score += cfg.locationWeights.sameMetro
+      break
+    }
+  }
+
+  if (!matchedPreferred && normalizedJobLocation) {
+    const jobTokens = normalizedJobLocation.split(/[^a-z0-9]+/i).filter((t) => t.length > 0)
+    for (const token of jobTokens) {
+      for (const pref of preferredLocations) {
+        if (pref.includes(token) || token.includes(pref)) {
+          matchedPreferred = true
+          score += cfg.locationWeights.sameState
+          break
+        }
+      }
+      if (matchedPreferred) {
+        break
+      }
+    }
+  }
+
+  if (!matchedPreferred && !isRemote) {
+    if (prefs.openToRelocation) {
+      score += cfg.locationWeights.relocationAllowed
+    } else {
+      score += cfg.locationWeights.otherLocationPenalty
+    }
+  }
+
+  return score
+}
+
+function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
+  const ts = job.postedDate ?? job.createdAt
+  if (!ts) return 0
+
+  const dateMs = Date.parse(ts)
+  if (Number.isNaN(dateMs)) return 0
+
+  const days = (nowMs - dateMs) / (1000 * 60 * 60 * 24)
+  if (days > cfg.recencyWeights.maxAgeDays) {
+    return -Infinity
+  }
+
+  const score = cfg.recencyWeights.baseRecency - days * cfg.recencyWeights.perDayDecay
+  return score > 0 ? score : 0
+}
+
+export function matchJobs(
+  prefs: SubscriberPreferences,
+  jobs: JobRecord[],
+  overrides?: Partial<MatchConfig> | null,
+): RankedJob[] {
+  const cfg = mergeConfig(overrides)
+  const nowMs = Date.now()
+
+  const ranked: RankedJob[] = []
+
+  for (const job of jobs) {
+    const roleScore = computeRoleScore(prefs, job, cfg)
+    if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
+      continue
+    }
+
+    const payScore = computePayScore(prefs, job, cfg)
+    const locationScore = computeLocationScore(prefs, job, cfg)
+    const recencyScore = computeRecencyScore(job, cfg, nowMs)
+
+    if (recencyScore === -Infinity) {
+      continue
+    }
+
+    const totalScore = roleScore + payScore + locationScore + recencyScore
+    if (totalScore < cfg.thresholds.minTotalScore) {
+      continue
+    }
+
+    const base: RankedJob = {
+      ...job,
+      score: totalScore,
+    }
+
+    if (cfg.debug.includeReasonBreakdown) {
+      base.components = {
+        role: roleScore,
+        pay: payScore,
+        location: locationScore,
+        recency: recencyScore,
+      }
+    }
+
+    ranked.push(base)
+  }
+
+  ranked.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
+
+    const aMs = Date.parse(a.postedDate ?? a.createdAt)
+    const bMs = Date.parse(b.postedDate ?? b.createdAt)
+
+    if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) {
+      return bMs - aMs
+    }
+
+    return 0
+  })
+
+  return ranked
+}
+
+export interface MatchJobsDebugPayload {
   filters: {
     totalJobs: number
     excludedByRole: number
@@ -65,267 +543,93 @@ export interface MatchJobsDebug {
     keyword: string
     matchedJobCount: number
   }[]
-  samples: {
-    excludedByRole: MatchJobsDebugSampleJob[]
-    excludedByRemote: MatchJobsDebugSampleJob[]
-    excludedByLocation: MatchJobsDebugSampleJob[]
-  }
 }
 
-interface MatchJobsInternalCollector {
-  roleKeywords: string[]
-  preferredLocations: string[]
-  openToRelocation: boolean
-  openToRemote: boolean
-  totalJobs: number
-  excludedByRole: number
-  excludedByRemoteOptOut: number
-  excludedByLocation: number
-  includedAfterFilters: number
-  scoreSum: number
-  roleScoreSum: number
-  locationScoreSum: number
-  recencyScoreSum: number
-  minScore: number | null
-  maxScore: number | null
-  sampleLimit: number
-  excludedByRoleSamples: MatchJobsDebugSampleJob[]
-  excludedByRemoteSamples: MatchJobsDebugSampleJob[]
-  excludedByLocationSamples: MatchJobsDebugSampleJob[]
-  keywordMatchCounts: Map<string, number>
-}
-
-function normalizeText(value: string | null | undefined): string {
-  return (value ?? '').toLowerCase()
-}
-
-function extractKeywords(...inputs: (string | null | undefined)[]): string[] {
-  const set = new Set<string>()
-
-  for (const input of inputs) {
-    if (!input) continue
-
-    const words = input
-      .toLowerCase()
-      .split(/[^a-z0-9+/#]+/i)
-      .map((w) => w.trim())
-      .filter((w) => w.length >= 2)
-
-    for (const w of words) {
-      set.add(w)
-    }
-  }
-
-  return Array.from(set)
-}
-
-function coreMatchJobs(
-  subscriber: SubscriberPreferences,
+export function matchJobsWithDebug(
+  prefs: SubscriberPreferences,
   jobs: JobRecord[],
-  collector?: MatchJobsInternalCollector,
-): RankedJob[] {
-  const roleKeywords = new Set<string>()
-
-  for (const role of subscriber.roles ?? []) {
-    const keywords = extractKeywords(role)
-    for (const kw of keywords) {
-      roleKeywords.add(kw)
-    }
-  }
-
-  if (subscriber.currentJobTitle) {
-    const keywords = extractKeywords(subscriber.currentJobTitle)
-    for (const kw of keywords) {
-      roleKeywords.add(kw)
-    }
-  }
-
-  if (subscriber.currentIndustry) {
-    const keywords = extractKeywords(subscriber.currentIndustry)
-    for (const kw of keywords) {
-      roleKeywords.add(kw)
-    }
-  }
-
-  const roleKeywordsArray = Array.from(roleKeywords)
-
-  const preferredLocations = (subscriber.preferredLocations ?? [])
-    .filter((loc) => !!loc)
-    .map((loc) => loc.toLowerCase())
-
-  const relocationWilling = !!subscriber.openToRelocation
-  const wantsRemote = !!subscriber.openToRemote
-
+  overrides?: Partial<MatchConfig> | null,
+): { ranked: RankedJob[]; debug: MatchJobsDebugPayload } {
+  const cfg = mergeConfig({
+    ...overrides,
+    debug: { includeReasonBreakdown: true },
+  })
   const nowMs = Date.now()
 
-  if (collector) {
-    collector.roleKeywords = roleKeywordsArray
-    collector.preferredLocations = preferredLocations
-    collector.openToRelocation = relocationWilling
-    collector.openToRemote = wantsRemote
-    collector.totalJobs = jobs.length
-  }
+  let excludedByRole = 0
+  let excludedByRemoteOptOut = 0
+  let excludedByLocation = 0
 
   const ranked: RankedJob[] = []
 
+  let minScore: number | null = null
+  let maxScore: number | null = null
+  let sumScore = 0
+  let sumRoleScore = 0
+  let sumLocationScore = 0
+  let sumRecencyScore = 0
+
+  const keywordCounts = new Map<string, number>()
+
   for (const job of jobs) {
-    const titleText = normalizeText(job.title)
-    const descText = normalizeText(job.description)
-    const highlightsText = normalizeText(job.aiBriefing)
-    const combinedText = `${titleText} ${descText} ${highlightsText}`.trim()
+    const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
 
-    let roleScore = 0
-    const matchedRoleKeywords: string[] = []
-
-    if (roleKeywords.size > 0 && combinedText.length > 0) {
-      for (const kw of roleKeywords) {
-        if (combinedText.includes(kw)) {
-          matchedRoleKeywords.push(kw)
-          const inTitle = titleText.includes(kw)
-          roleScore += inTitle ? 2 : 1
-        }
-      }
-    }
-
-    // If subscriber has specified role-related keywords, require at least one match
-    if (roleKeywords.size > 0 && roleScore === 0) {
-      if (collector) {
-        collector.excludedByRole += 1
-        if (collector.excludedByRoleSamples.length < collector.sampleLimit) {
-          collector.excludedByRoleSamples.push({
-            id: job.id,
-            title: job.title,
-            companyName: job.companyName,
-            location: job.location,
-            reason: 'role',
-          })
-        }
-      }
+    if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
+      excludedByRole += 1
       continue
     }
 
-    const jobLocation = normalizeText(job.location)
-    const isRemote =
-      jobLocation.includes('remote') ||
-      jobLocation.includes('anywhere') ||
-      jobLocation.includes('work from home')
-
-    // Remote jobs are only considered if the subscriber has explicitly opted in.
-    if (isRemote && !wantsRemote) {
-      if (collector) {
-        collector.excludedByRemoteOptOut += 1
-        if (collector.excludedByRemoteSamples.length < collector.sampleLimit) {
-          collector.excludedByRemoteSamples.push({
-            id: job.id,
-            title: job.title,
-            companyName: job.companyName,
-            location: job.location,
-            reason: 'remote',
-          })
-        }
-      }
+    const isRemote = job.isRemote
+    if (isRemote && prefs.openToRemote === false) {
+      excludedByRemoteOptOut += 1
       continue
     }
 
-    let locationScore = 0
-    let locationIncluded = true
+    const payScore = computePayScore(prefs, job, cfg)
+    const locationScore = computeLocationScore(prefs, job, cfg)
+    const recencyScore = computeRecencyScore(job, cfg, nowMs)
 
-    if (preferredLocations.length > 0) {
-      let isPreferred = false
-      for (const pref of preferredLocations) {
-        if (jobLocation.includes(pref) || pref.includes(jobLocation)) {
-          isPreferred = true
-          break
-        }
-      }
-
-      if (isPreferred) {
-        // Same metro/state (approximate via substring match)
-        locationScore = 2
-      } else if (relocationWilling && jobLocation) {
-        // Other locations allowed, but with lower rank
-        locationScore = 1
-      } else {
-        // Location preference but job does not match and subscriber is not willing to relocate
-        locationIncluded = false
-      }
-    } else if (isRemote && wantsRemote) {
-      // No explicit location preference: include remote jobs only if allowed, with a mild boost
-      locationScore = 1
-    }
-
-    if (!locationIncluded) {
-      if (collector) {
-        collector.excludedByLocation += 1
-        if (collector.excludedByLocationSamples.length < collector.sampleLimit) {
-          collector.excludedByLocationSamples.push({
-            id: job.id,
-            title: job.title,
-            companyName: job.companyName,
-            location: job.location,
-            reason: 'location',
-          })
-        }
-      }
+    if (recencyScore === -Infinity) {
+      excludedByLocation += 1
       continue
     }
 
-    // Pay range rule:
-    // - If structured salary is available on the job and subscriber has a desired range,
-    //   we would filter by overlapping ranges (with tolerance).
-    // - In the current schema, job_hopper_live does not expose structured salary,
-    //   so we intentionally do not exclude any jobs based on pay to avoid over-filtering.
-
-    let recencyScore = 0
-    if (job.createdAt) {
-      const createdMs = Date.parse(job.createdAt)
-      if (!Number.isNaN(createdMs)) {
-        const days = (nowMs - createdMs) / (1000 * 60 * 60 * 24)
-        const windowDays = 30
-        // Score between 0 and 1, decaying linearly over 30 days
-        recencyScore = Math.max(0, 1 - days / windowDays)
-      }
+    const totalScore = roleScore + payScore + locationScore + recencyScore
+    if (totalScore < cfg.thresholds.minTotalScore) {
+      continue
     }
 
-    const totalScore = roleScore * 10 + locationScore * 3 + recencyScore
-
-    if (collector) {
-      collector.includedAfterFilters += 1
-      collector.scoreSum += totalScore
-      collector.roleScoreSum += roleScore
-      collector.locationScoreSum += locationScore
-      collector.recencyScoreSum += recencyScore
-
-      if (collector.minScore === null || totalScore < collector.minScore) {
-        collector.minScore = totalScore
-      }
-      if (collector.maxScore === null || totalScore > collector.maxScore) {
-        collector.maxScore = totalScore
-      }
-
-      for (const kw of matchedRoleKeywords) {
-        const prev = collector.keywordMatchCounts.get(kw) ?? 0
-        collector.keywordMatchCounts.set(kw, prev + 1)
-      }
-    }
-
-    ranked.push({
+    const rankedJob: RankedJob = {
       ...job,
       score: totalScore,
-      roleScore,
-      locationScore,
-      recencyScore,
+      components: {
+        role: roleScore,
+        pay: payScore,
+        location: locationScore,
+        recency: recencyScore,
+      },
       matchedRoleKeywords,
-    })
+    }
+
+    ranked.push(rankedJob)
+
+    if (minScore === null || totalScore < minScore) minScore = totalScore
+    if (maxScore === null || totalScore > maxScore) maxScore = totalScore
+    sumScore += totalScore
+    sumRoleScore += roleScore
+    sumLocationScore += locationScore
+    sumRecencyScore += recencyScore
+
+    for (const kw of matchedRoleKeywords) {
+      keywordCounts.set(kw, (keywordCounts.get(kw) ?? 0) + 1)
+    }
   }
 
   ranked.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score
-    }
+    if (b.score !== a.score) return b.score - a.score
 
-    const aMs = Date.parse(a.createdAt)
-    const bMs = Date.parse(b.createdAt)
+    const aMs = Date.parse(a.postedDate ?? a.createdAt)
+    const bMs = Date.parse(b.postedDate ?? b.createdAt)
 
     if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) {
       return bMs - aMs
@@ -334,87 +638,28 @@ function coreMatchJobs(
     return 0
   })
 
-  return ranked
-}
+  const count = ranked.length
 
-export function matchJobs(
-  subscriber: SubscriberPreferences,
-  jobs: JobRecord[],
-): RankedJob[] {
-  return coreMatchJobs(subscriber, jobs)
-}
-
-export function matchJobsWithDebug(
-  subscriber: SubscriberPreferences,
-  jobs: JobRecord[],
-): { ranked: RankedJob[]; debug: MatchJobsDebug } {
-  const collector: MatchJobsInternalCollector = {
-    roleKeywords: [],
-    preferredLocations: [],
-    openToRelocation: false,
-    openToRemote: false,
-    totalJobs: 0,
-    excludedByRole: 0,
-    excludedByRemoteOptOut: 0,
-    excludedByLocation: 0,
-    includedAfterFilters: 0,
-    scoreSum: 0,
-    roleScoreSum: 0,
-    locationScoreSum: 0,
-    recencyScoreSum: 0,
-    minScore: null,
-    maxScore: null,
-    sampleLimit: 10,
-    excludedByRoleSamples: [],
-    excludedByRemoteSamples: [],
-    excludedByLocationSamples: [],
-    keywordMatchCounts: new Map<string, number>(),
-  }
-
-  const ranked = coreMatchJobs(subscriber, jobs, collector)
-
-  const included = collector.includedAfterFilters
-
-  const scores = {
-    minScore: collector.minScore,
-    maxScore: collector.maxScore,
-    averageScore: included > 0 ? collector.scoreSum / included : null,
-    averageRoleScore: included > 0 ? collector.roleScoreSum / included : null,
-    averageLocationScore:
-      included > 0 ? collector.locationScoreSum / included : null,
-    averageRecencyScore:
-      included > 0 ? collector.recencyScoreSum / included : null,
-  }
-
-  const keywords = Array.from(collector.keywordMatchCounts.entries())
-    .map(([keyword, matchedJobCount]) => ({ keyword, matchedJobCount }))
-    .sort((a, b) => b.matchedJobCount - a.matchedJobCount)
-    .slice(0, 25)
-
-  const debug: MatchJobsDebug = {
-    input: {
-      roles: subscriber.roles ?? [],
-      currentJobTitle: subscriber.currentJobTitle ?? null,
-      currentIndustry: subscriber.currentIndustry ?? null,
-      preferredLocations: collector.preferredLocations,
-      openToRelocation: collector.openToRelocation,
-      openToRemote: collector.openToRemote,
-      roleKeywords: collector.roleKeywords,
-    },
+  const debug: MatchJobsDebugPayload = {
     filters: {
-      totalJobs: collector.totalJobs,
-      excludedByRole: collector.excludedByRole,
-      excludedByRemoteOptOut: collector.excludedByRemoteOptOut,
-      excludedByLocation: collector.excludedByLocation,
-      includedAfterFilters: collector.includedAfterFilters,
+      totalJobs: jobs.length,
+      excludedByRole,
+      excludedByRemoteOptOut,
+      excludedByLocation,
+      includedAfterFilters: count,
     },
-    scores,
-    keywords,
-    samples: {
-      excludedByRole: collector.excludedByRoleSamples,
-      excludedByRemote: collector.excludedByRemoteSamples,
-      excludedByLocation: collector.excludedByLocationSamples,
+    scores: {
+      minScore,
+      maxScore,
+      averageScore: count > 0 ? sumScore / count : null,
+      averageRoleScore: count > 0 ? sumRoleScore / count : null,
+      averageLocationScore: count > 0 ? sumLocationScore / count : null,
+      averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
     },
+    keywords: Array.from(keywordCounts.entries())
+      .sort(([, aCount], [, bCount]) => bCount - aCount)
+      .slice(0, 50)
+      .map(([keyword, matchedJobCount]) => ({ keyword, matchedJobCount })),
   }
 
   return { ranked, debug }

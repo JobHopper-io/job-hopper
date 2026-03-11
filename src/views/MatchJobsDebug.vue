@@ -1,41 +1,163 @@
 <script setup lang="ts">
-// __TEST_ONLY_START__ — Entire view is for test-job-matching debugging. Remove this file, the route in router, and src/lib/job-matching.ts before production.
+// __TEST_ONLY_START__ — Entire view is for test-job-matching debugging. Remove this file, the route in router, and src/lib/test-job-matching.ts before production.
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
+import { profileAPI } from '@/lib/profile'
 import {
-  jobMatchingAPI,
+  jobMatchingTestAPI,
+  DEFAULT_TEST_MATCH_CONFIG,
   type MatchJobsResponse,
   type RankedJob,
   type MatchJobsDebugPayload,
-} from '@/lib/job-matching'
+  type SubscriberPreferencesOverride,
+  type MatchConfigOverride,
+} from '@/lib/test-job-matching'
+import type { Profile } from '@/types/database'
 
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
 const result = ref<MatchJobsResponse | null>(null)
 
+// Preferences form (defaults from user profile)
+const prefsForm = reactive<{
+  roles: string
+  currentJobTitle: string
+  currentIndustry: string
+  payRangeMin: string
+  payRangeMax: string
+  preferredLocations: string
+  openToRelocation: boolean
+  openToRemote: boolean
+}>({
+  roles: '',
+  currentJobTitle: '',
+  currentIndustry: '',
+  payRangeMin: '',
+  payRangeMax: '',
+  preferredLocations: '',
+  openToRelocation: false,
+  openToRemote: false,
+})
+
+// Match config form (defaults from DEFAULT_TEST_MATCH_CONFIG)
+const configForm = reactive<MatchConfigOverride>({
+  roleWeights: { ...DEFAULT_TEST_MATCH_CONFIG.roleWeights },
+  payWeights: { ...DEFAULT_TEST_MATCH_CONFIG.payWeights },
+  locationWeights: { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights },
+  recencyWeights: { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights },
+  thresholds: { ...DEFAULT_TEST_MATCH_CONFIG.thresholds },
+})
+
+const JOBS_PER_PAGE = 25
+const currentPage = ref(1)
+
 const jobs = computed<RankedJob[]>(() => result.value?.jobs ?? [])
+const totalPages = computed(() => Math.max(1, Math.ceil(jobs.value.length / JOBS_PER_PAGE)))
+const pagedJobs = computed(() => {
+  const start = (currentPage.value - 1) * JOBS_PER_PAGE
+  return jobs.value.slice(start, start + JOBS_PER_PAGE)
+})
+const pageRangeLabel = computed(() => {
+  if (jobs.value.length === 0) return '0'
+  const start = (currentPage.value - 1) * JOBS_PER_PAGE + 1
+  const end = Math.min(currentPage.value * JOBS_PER_PAGE, jobs.value.length)
+  return `${start}–${end}`
+})
+
 const debug = computed<MatchJobsDebugPayload | null>(
   () => result.value?.debug ?? null,
 )
+
+function goToPage(page: number) {
+  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+}
+
+function profileToPrefsForm(p: Profile | null) {
+  if (!p) return
+  prefsForm.roles = Array.isArray(p.target_role_categories)
+    ? (p.target_role_categories as string[]).join(', ')
+    : ''
+  prefsForm.currentJobTitle = p.current_job_title ?? ''
+  prefsForm.currentIndustry = p.current_industry ?? ''
+  prefsForm.payRangeMin = p.desired_salary_min != null ? String(p.desired_salary_min) : ''
+  prefsForm.payRangeMax = p.desired_salary_max != null ? String(p.desired_salary_max) : ''
+  prefsForm.preferredLocations = Array.isArray(p.preferred_locations)
+    ? (p.preferred_locations as string[]).join(', ')
+    : ''
+  prefsForm.openToRelocation = p.open_to_relocation === true
+  prefsForm.openToRemote = p.open_to_remote === true
+}
+
+function buildPreferencesOverride(): SubscriberPreferencesOverride {
+  const roles = prefsForm.roles
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const preferredLocations = prefsForm.preferredLocations
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return {
+    roles: roles.length ? roles : undefined,
+    currentJobTitle: prefsForm.currentJobTitle || null,
+    currentIndustry: prefsForm.currentIndustry || null,
+    payRangeMin:
+      prefsForm.payRangeMin !== '' && !Number.isNaN(Number(prefsForm.payRangeMin))
+        ? Number(prefsForm.payRangeMin)
+        : undefined,
+    payRangeMax:
+      prefsForm.payRangeMax !== '' && !Number.isNaN(Number(prefsForm.payRangeMax))
+        ? Number(prefsForm.payRangeMax)
+        : undefined,
+    preferredLocations: preferredLocations.length ? preferredLocations : undefined,
+    openToRelocation: prefsForm.openToRelocation,
+    openToRemote: prefsForm.openToRemote,
+  }
+}
+
+function buildMatchConfigOverride(): MatchConfigOverride {
+  return {
+    roleWeights: { ...configForm.roleWeights },
+    payWeights: { ...configForm.payWeights },
+    locationWeights: { ...configForm.locationWeights },
+    recencyWeights: { ...configForm.recencyWeights },
+    thresholds: { ...configForm.thresholds },
+  }
+}
+
+async function resetToDefaults() {
+  const { data: profile } = await profileAPI.getCurrentUserProfile()
+  profileToPrefsForm(profile ?? null)
+  configForm.roleWeights = { ...DEFAULT_TEST_MATCH_CONFIG.roleWeights }
+  configForm.payWeights = { ...DEFAULT_TEST_MATCH_CONFIG.payWeights }
+  configForm.locationWeights = { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights }
+  configForm.recencyWeights = { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights }
+  configForm.thresholds = { ...DEFAULT_TEST_MATCH_CONFIG.thresholds }
+}
 
 async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
 
-  const { data, error } = await jobMatchingAPI.getMatches()
+  const { data, error } = await jobMatchingTestAPI.getTestMatches({
+    preferencesOverride: buildPreferencesOverride(),
+    matchConfigOverride: buildMatchConfigOverride(),
+  })
 
   if (error) {
-    // TEMPORARY: surface raw error to make debugging easier.
     errorMessage.value = error.message
     result.value = null
   } else {
     result.value = data
+    currentPage.value = 1
   }
 
   isLoading.value = false
 }
 
-onMounted(() => {
+onMounted(async () => {
+  const { data: profile } = await profileAPI.getCurrentUserProfile()
+  profileToPrefsForm(profile ?? null)
   void loadMatches()
 })
 // __TEST_ONLY_END__
@@ -57,17 +179,335 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Reload control -->
-      <div class="card p-4 sm:p-6 flex justify-end">
-        <button
-          type="button"
-          class="btn-primary w-full sm:w-auto"
-          :disabled="isLoading"
-          @click="loadMatches"
-        >
-          <span v-if="isLoading">Loading matches…</span>
-          <span v-else>Reload matches</span>
-        </button>
+      <!-- Preferences & config form -->
+      <div class="card p-4 sm:p-6 space-y-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
+          Algorithm input
+        </h2>
+
+        <section class="space-y-3">
+          <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
+            Preferences (defaults from your profile)
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Target roles (comma-separated)</label>
+              <input
+                v-model="prefsForm.roles"
+                type="text"
+                class="input w-full"
+                placeholder="e.g. Engineering, Product"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title</label>
+              <input
+                v-model="prefsForm.currentJobTitle"
+                type="text"
+                class="input w-full"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Current industry</label>
+              <input
+                v-model="prefsForm.currentIndustry"
+                type="text"
+                class="input w-full"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary min</label>
+              <input
+                v-model="prefsForm.payRangeMin"
+                type="number"
+                class="input w-full"
+                placeholder="Annual"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary max</label>
+              <input
+                v-model="prefsForm.payRangeMax"
+                type="number"
+                class="input w-full"
+                placeholder="Annual"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Preferred locations (comma-separated)</label>
+              <input
+                v-model="prefsForm.preferredLocations"
+                type="text"
+                class="input w-full"
+                placeholder="e.g. San Francisco, NYC"
+              >
+            </div>
+            <div class="flex items-center gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  v-model="prefsForm.openToRelocation"
+                  type="checkbox"
+                  class="rounded border-neutral-border"
+                >
+                <span class="text-sm text-neutral-body">Open to relocation</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  v-model="prefsForm.openToRemote"
+                  type="checkbox"
+                  class="rounded border-neutral-border"
+                >
+                <span class="text-sm text-neutral-body">Open to remote</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-3 border-t border-neutral-border pt-4">
+          <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
+            Match config (defaults from algorithm)
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-neutral-body">Role weights</p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.roleWeights!.titleExact"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job title exactly matches a target role keyword"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job title exactly matches a target role keyword">titleExact</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.roleWeights!.titleKeyword"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when a target role keyword appears in title/description (not exact title match)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when a target role keyword appears in title/description (not exact title match)">titleKeyword</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.roleWeights!.roleCategoryExact"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job role category exactly matches one of your target roles"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job role category exactly matches one of your target roles">roleCategoryExact</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.roleWeights!.currentJobTitleKeyword"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when your current job title keyword appears in the job"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when your current job title keyword appears in the job">currentJobTitleKeyword</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.roleWeights!.currentIndustryKeyword"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when your current industry keyword appears in the job"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when your current industry keyword appears in the job">currentIndustryKeyword</span>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-neutral-body">Pay weights</p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.payWeights!.insideRange"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job salary range overlaps your desired range"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job salary range overlaps your desired range">insideRange</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.payWeights!.nearRange"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job salary is slightly above or below your range (within tolerance)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job salary is slightly above or below your range (within tolerance)">nearRange</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.payWeights!.missingSalary"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job has no salary listed"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job has no salary listed">missingSalary</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.payWeights!.belowRangePenalty"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Penalty when job salary is below your range (beyond tolerance)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job salary is below your range (beyond tolerance)">belowRangePenalty</span>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-neutral-body">Location weights</p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.sameMetro"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job location matches a preferred location (metro)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job location matches a preferred location (metro)">sameMetro</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.sameState"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job is in same state/region as a preferred location"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is in same state/region as a preferred location">sameState</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.remotePreferred"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job is remote and you are open to remote"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is remote and you are open to remote">remotePreferred</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.relocationAllowed"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Score when job is outside preferred locations but you are open to relocation"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is outside preferred locations but you are open to relocation">relocationAllowed</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.otherLocationPenalty"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Penalty when job is in a non-preferred location and you are not open to relocation"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job is in a non-preferred location and you are not open to relocation">otherLocationPenalty</span>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-neutral-body">Recency weights</p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.recencyWeights!.baseRecency"
+                    type="number"
+                    step="0.1"
+                    class="input w-20 text-sm"
+                    title="Base score for job recency; decay is applied per day"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Base score for job recency; decay is applied per day">baseRecency</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.recencyWeights!.perDayDecay"
+                    type="number"
+                    step="0.01"
+                    class="input w-20 text-sm"
+                    title="Amount subtracted from recency score per day since posted"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Amount subtracted from recency score per day since posted">perDayDecay</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.recencyWeights!.maxAgeDays"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Jobs older than this many days are excluded (recency score becomes -Infinity)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded (recency score becomes -Infinity)">maxAgeDays</span>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-neutral-body">Thresholds</p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.thresholds!.minTotalScore"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Minimum total score for a job to be included in results"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Minimum total score for a job to be included in results">minTotalScore</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.thresholds!.hardRoleMismatchPenalty"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Penalty applied when no role keyword matches (job is excluded if score drops below half this)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Penalty applied when no role keyword matches (job is excluded if score drops below half this)">hardRoleMismatchPenalty</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.thresholds!.overPayTolerancePct"
+                    type="number"
+                    step="0.01"
+                    class="input w-20 text-sm"
+                    title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange">overPayTolerancePct</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.thresholds!.underPayTolerancePct"
+                    type="number"
+                    step="0.01"
+                    class="input w-20 text-sm"
+                    title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="flex flex-wrap gap-3 pt-2">
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="isLoading"
+            @click="loadMatches"
+          >
+            <span v-if="isLoading">Running…</span>
+            <span v-else>Run matching</span>
+          </button>
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="isLoading"
+            @click="resetToDefaults"
+          >
+            Reset to defaults
+          </button>
+        </div>
       </div>
 
       <!-- Error state -->
@@ -80,7 +520,7 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Summary -->
+      <!-- Summary & debug (filters, scores, keywords only) -->
       <div v-if="result" class="card p-4 sm:p-6 space-y-2">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
           Match summary
@@ -91,61 +531,16 @@ onMounted(() => {
         </p>
         <p class="text-sm text-neutral-body">
           <span class="font-semibold">Matched jobs:</span>
-          {{ result.total }} (showing {{ jobs.length }})
+          {{ result.total }}
+          <span v-if="result.total > 0">(showing {{ pageRangeLabel }} of {{ result.total }})</span>
         </p>
 
         <div v-if="debug" class="mt-4 grid gap-4 sm:grid-cols-2">
           <div class="space-y-2">
             <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-              Algorithm inputs & filters
+              Filters
             </h3>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Roles:</span>
-              <span>
-                {{
-                  debug.input.roles.length
-                    ? debug.input.roles.join(', ')
-                    : '—'
-                }}
-              </span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Current title:</span>
-              <span>{{ debug.input.currentJobTitle || '—' }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Current industry:</span>
-              <span>{{ debug.input.currentIndustry || '—' }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Preferred locations:</span>
-              <span>
-                {{
-                  debug.input.preferredLocations.length
-                    ? debug.input.preferredLocations.join(', ')
-                    : '—'
-                }}
-              </span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Open to relocation:</span>
-              <span>{{ debug.input.openToRelocation ? 'Yes' : 'No' }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Open to remote:</span>
-              <span>{{ debug.input.openToRemote ? 'Yes' : 'No' }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Role keywords:</span>
-              <span>
-                {{
-                  debug.input.roleKeywords.length
-                    ? debug.input.roleKeywords.join(', ')
-                    : '—'
-                }}
-              </span>
-            </p>
-            <p class="text-xs text-neutral-body mt-2">
               <span class="font-semibold">Jobs fetched:</span>
               <span>{{ debug.filters.totalJobs }}</span>
             </p>
@@ -162,7 +557,7 @@ onMounted(() => {
               <span>{{ debug.filters.excludedByRemoteOptOut }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by location:</span>
+              <span class="font-semibold">Excluded by location/recency:</span>
               <span>{{ debug.filters.excludedByLocation }}</span>
             </p>
           </div>
@@ -242,8 +637,31 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Jobs table -->
+      <!-- Jobs table (paginated) -->
       <div v-if="jobs.length" class="card p-0 overflow-hidden">
+        <div class="px-3 py-2 border-b border-neutral-border bg-neutral-surface flex flex-wrap items-center justify-between gap-2">
+          <span class="text-sm text-neutral-body">
+            Page {{ currentPage }} of {{ totalPages }}
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="btn-secondary text-sm py-1 px-2"
+              :disabled="currentPage <= 1"
+              @click="goToPage(currentPage - 1)"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              class="btn-secondary text-sm py-1 px-2"
+              :disabled="currentPage >= totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Next
+            </button>
+          </div>
+        </div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-neutral-border text-xs sm:text-sm">
             <thead class="bg-neutral-surface">
@@ -263,7 +681,7 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-neutral-border bg-white">
-              <tr v-for="job in jobs" :key="job.id" class="align-top">
+              <tr v-for="job in pagedJobs" :key="job.id" class="align-top">
                 <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">
                   {{ job.score.toFixed(2) }}
                 </td>
@@ -285,12 +703,12 @@ onMounted(() => {
                   {{ new Date(job.createdAt).toLocaleString() }}
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
-                  <div>Role: {{ job.roleScore }}</div>
-                  <div>Location: {{ job.locationScore }}</div>
-                  <div>Recency: {{ job.recencyScore.toFixed(2) }}</div>
+                  <div>Role: {{ job.components?.role ?? '—' }}</div>
+                  <div>Location: {{ job.components?.location ?? '—' }}</div>
+                  <div>Recency: {{ job.components?.recency != null ? job.components.recency.toFixed(2) : '—' }}</div>
                 </td>
                 <td class="px-3 py-2 text-neutral-body">
-                  <span v-if="job.matchedRoleKeywords.length">
+                  <span v-if="job.matchedRoleKeywords?.length">
                     {{ job.matchedRoleKeywords.join(', ') }}
                   </span>
                   <span v-else>—</span>
@@ -331,112 +749,11 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="debug" class="card p-4 sm:p-6 space-y-3">
-        <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
-          Sample excluded jobs by reason
-        </h2>
-        <p class="text-xs text-neutral-body">
-          These small samples show how filters removed jobs at each step without
-          dumping every job.
-        </p>
-        <div class="grid gap-4 sm:grid-cols-3">
-          <div>
-            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
-              By role (no keyword match)
-            </h3>
-            <p class="text-[11px] text-neutral-body mb-1">
-              Showing up to {{ debug.samples.excludedByRole.length }} examples.
-            </p>
-            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
-              <li v-if="!debug.samples.excludedByRole.length">None</li>
-              <li
-                v-for="job in debug.samples.excludedByRole"
-                v-else
-                :key="`role-${job.id}`"
-              >
-                <div class="font-semibold truncate">
-                  {{ job.title || '(no title)' }}
-                </div>
-                <div class="flex justify-between gap-1">
-                  <span class="truncate">
-                    {{ job.companyName || '—' }}
-                  </span>
-                  <span class="truncate">
-                    {{ job.location || '—' }}
-                  </span>
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
-              By remote opt-out
-            </h3>
-            <p class="text-[11px] text-neutral-body mb-1">
-              Showing up to {{ debug.samples.excludedByRemote.length }} examples.
-            </p>
-            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
-              <li v-if="!debug.samples.excludedByRemote.length">None</li>
-              <li
-                v-for="job in debug.samples.excludedByRemote"
-                v-else
-                :key="`remote-${job.id}`"
-              >
-                <div class="font-semibold truncate">
-                  {{ job.title || '(no title)' }}
-                </div>
-                <div class="flex justify-between gap-1">
-                  <span class="truncate">
-                    {{ job.companyName || '—' }}
-                  </span>
-                  <span class="truncate">
-                    {{ job.location || '—' }}
-                  </span>
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 class="text-sm font-heading font-semibold text-brand-charcoal mb-1">
-              By location
-            </h3>
-            <p class="text-[11px] text-neutral-body mb-1">
-              Showing up to
-              {{ debug.samples.excludedByLocation.length }}
-              examples.
-            </p>
-            <ul class="text-[11px] text-neutral-body space-y-1 max-h-40 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
-              <li v-if="!debug.samples.excludedByLocation.length">None</li>
-              <li
-                v-for="job in debug.samples.excludedByLocation"
-                v-else
-                :key="`loc-${job.id}`"
-              >
-                <div class="font-semibold truncate">
-                  {{ job.title || '(no title)' }}
-                </div>
-                <div class="flex justify-between gap-1">
-                  <span class="truncate">
-                    {{ job.companyName || '—' }}
-                  </span>
-                  <span class="truncate">
-                    {{ job.location || '—' }}
-                  </span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
       <div v-else-if="!isLoading" class="card p-4 sm:p-6">
         <p class="text-sm text-neutral-body">
-          No jobs matched for the current profile.
+          No jobs matched for the current input.
         </p>
       </div>
     </div>
   </div>
 </template>
-

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   type JobRecord,
+  type MatchConfig,
   type SubscriberPreferences,
   matchJobsWithDebug,
 } from '../_shared/job-matching-algorithm.ts'
@@ -9,6 +10,28 @@ import {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface TestJobMatchingBody {
+  preferencesOverride?: Partial<SubscriberPreferences>
+  matchConfigOverride?: Partial<MatchConfig>
+}
+
+function mergePreferences(
+  base: SubscriberPreferences,
+  overrides: Partial<SubscriberPreferences> | null | undefined,
+): SubscriberPreferences {
+  if (!overrides) return base
+  return {
+    roles: overrides.roles ?? base.roles,
+    currentJobTitle: overrides.currentJobTitle !== undefined ? overrides.currentJobTitle : base.currentJobTitle,
+    currentIndustry: overrides.currentIndustry !== undefined ? overrides.currentIndustry : base.currentIndustry,
+    payRangeMin: overrides.payRangeMin !== undefined ? overrides.payRangeMin : base.payRangeMin,
+    payRangeMax: overrides.payRangeMax !== undefined ? overrides.payRangeMax : base.payRangeMax,
+    preferredLocations: overrides.preferredLocations ?? base.preferredLocations,
+    openToRelocation: overrides.openToRelocation !== undefined ? overrides.openToRelocation : base.openToRelocation,
+    openToRemote: overrides.openToRemote !== undefined ? overrides.openToRemote : base.openToRemote,
+  }
 }
 
 serve(async (req) => {
@@ -74,7 +97,7 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
-    const preferences: SubscriberPreferences = {
+    const basePreferences: SubscriberPreferences = {
       roles: (profile.target_role_categories ?? []) as string[],
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
@@ -84,6 +107,17 @@ serve(async (req) => {
       openToRelocation: profile.open_to_relocation,
       openToRemote: profile.open_to_remote,
     }
+
+    let body: TestJobMatchingBody = {}
+    if (req.method === 'POST' && req.headers.get('Content-Type')?.includes('application/json')) {
+      try {
+        body = (await req.json()) as TestJobMatchingBody
+      } catch {
+        // ignore invalid JSON; use empty overrides
+      }
+    }
+
+    const preferences = mergePreferences(basePreferences, body.preferencesOverride)
 
     const url = new URL(req.url)
     const limitParam = url.searchParams.get('limit')
@@ -128,11 +162,17 @@ serve(async (req) => {
           id,
           job_title,
           company_name,
+          role_category,
           location,
+          is_remote,
           description,
           ai_job_briefing,
           apply_link,
-          created_at
+          pay_min,
+          pay_max,
+          pay_type,
+          created_at,
+          posted_date
         `,
         )
         .order('created_at', { ascending: false })
@@ -159,14 +199,20 @@ serve(async (req) => {
       id: row.id,
       title: row.job_title ?? null,
       companyName: row.company_name ?? null,
+      roleCategory: row.role_category ?? null,
       location: row.location ?? null,
+      isRemote: !!row.is_remote,
       description: row.description ?? null,
       aiBriefing: row.ai_job_briefing ?? null,
       applyLink: row.apply_link ?? null,
+      payMin: row.pay_min,
+      payMax: row.pay_max,
+      payType: row.pay_type,
       createdAt: row.created_at,
+      postedDate: row.posted_date,
     }))
 
-    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords)
+    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, body.matchConfigOverride)
 
     return new Response(
       JSON.stringify({
