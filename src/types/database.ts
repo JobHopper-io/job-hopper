@@ -42,6 +42,52 @@ export type ScheduledJobUpdate = TablesUpdate<'scheduled_jobs'>
 // Job matching and favorites
 export type JobMatch = Tables<'job_matches'>
 export type SavedJob = Tables<'saved_jobs'>
+export type JobHopperLive = Tables<'job_hopper_live'>
+export type PayType = Enums<'pay_type'>
+export type RoleCategory = Enums<'role_category'>
+
+/** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
+export interface JobContact {
+  name: string
+  title: string | null
+  location: string | null
+  note: string | null
+}
+
+/** Job match with joined job details for feed and job detail views */
+export interface MatchedJob {
+  matchId: string
+  jobId: string
+  score: number | null
+  createdAt: string
+  isSaved: boolean
+  title: string | null
+  company: string | null
+  location: string | null
+  description: string | null
+  aiBriefing: string | null
+  applyLink: string | null
+  roleCategory: RoleCategory | null
+  subscriptionTier: string | null
+  /** Human-readable tier label from products.display_name (e.g. plan level) */
+  subscriptionTierDisplayName: string | null
+  schedules: string[] | null
+  employmentTypes: string[] | null
+  payMin: number | null
+  payMax: number | null
+  payType: PayType | null
+  employeeCount: number | null
+  postedDate: string | null
+  isRemote: boolean | null
+  contacts?: JobContact[]
+}
+
+/** Aggregate stats for the current user's job matches */
+export interface MatchingStats {
+  thisWeek: number
+  totalDelivered: number
+  avgMatchScore: number | null
+}
 
 // Resume products (upgrade and per-job tailoring lifecycle)
 export type ResumeProduct = Tables<'resume_products'>

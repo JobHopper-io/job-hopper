@@ -1,25 +1,68 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
-import type { JobMatch, SavedJob } from '@/types/database'
+import type {
+  JobMatch,
+  SavedJob,
+  JobHopperLive,
+  MatchedJob,
+  MatchingStats,
+  PayType,
+  RoleCategory,
+} from '@/types/database'
 
-export interface MatchedJob {
-  matchId: string
-  jobId: string
-  score: number | null
-  createdAt: string
-  isSaved: boolean
-  title: string | null
-  company: string | null
-  location: string | null
-  description: string | null
-  aiBriefing: string | null
-  applyLink: string | null
-}
+export type { PayType, RoleCategory, MatchedJob, MatchingStats }
 
-export interface MatchingStats {
-  thisWeek: number
-  totalDelivered: number
-  avgMatchScore: number | null
+/** Columns selected from job_hopper_live for match list and detail (single source of truth) */
+const JOB_HOPPER_LIVE_SELECT = `
+  id,
+  job_title,
+  company_name,
+  location,
+  description,
+  ai_job_briefing,
+  apply_link,
+  created_at,
+  role_category,
+  subscription_tier,
+  schedules,
+  employment_types,
+  pay_min,
+  pay_max,
+  pay_type,
+  employee_count,
+  posted_date,
+  is_remote
+` as const
+
+function toMatchedJob(
+  match: JobMatch,
+  job: JobHopperLive | null,
+  isSaved: boolean,
+): MatchedJob {
+  return {
+    matchId: match.id,
+    jobId: (match.job_id as string) ?? '',
+    score: match.score ?? null,
+    createdAt: match.created_at ?? '',
+    isSaved,
+    title: job?.job_title ?? null,
+    company: job?.company_name ?? null,
+    location: job?.location ?? null,
+    description: job?.description ?? null,
+    aiBriefing: job?.ai_job_briefing ?? null,
+    applyLink: job?.apply_link ?? null,
+    roleCategory: job?.role_category ?? null,
+    subscriptionTier: job?.subscription_tier ?? null,
+    subscriptionTierDisplayName: null,
+    schedules: job?.schedules ?? null,
+    employmentTypes: job?.employment_types ?? null,
+    payMin: job?.pay_min ?? null,
+    payMax: job?.pay_max ?? null,
+    payType: job?.pay_type ?? null,
+    employeeCount: job?.employee_count ?? null,
+    postedDate: job?.posted_date ?? null,
+    isRemote: job?.is_remote ?? null,
+  }
 }
 
 // API helper, should not be exported
@@ -63,29 +106,8 @@ export const jobsAPI = {
     const [{ data: jobsRaw, error: jobsError }, { data: savedRowsRaw, error: savedError }] =
       await Promise.all([
         jobIds.length
-          ? supabase
-              .from('job_hopper_live')
-              .select(
-                `
-              id,
-              job_title,
-              company_name,
-              location,
-              description,
-              ai_job_briefing,
-              apply_link,
-              created_at
-            `,
-              )
-              .in('id', jobIds)
-          : supabase
-              .from('job_hopper_live')
-              .select(
-                `
-              id
-            `,
-              )
-              .limit(0),
+          ? supabase.from('job_hopper_live').select(JOB_HOPPER_LIVE_SELECT).in('id', jobIds)
+          : supabase.from('job_hopper_live').select('id').limit(0),
         supabase
           .from('saved_jobs')
           .select('match_id')
@@ -100,24 +122,40 @@ export const jobsAPI = {
       return { data: [], error: savedError }
     }
 
-    const jobs = jobsRaw ?? []
+    const jobs = (jobsRaw ?? []) as JobHopperLive[]
     const savedRows = (savedRowsRaw ?? []) as SavedJob[]
 
-    type JobRow = {
-      id: string
-      job_title: string | null
-      company_name: string | null
-      location: string | null
-      description: string | null
-      ai_job_briefing: string | null
-      apply_link: string | null
-      created_at: string
+    const tierKeys = Array.from(
+      new Set(
+        jobs
+          .map((j) => j.subscription_tier)
+          .filter((key): key is string => typeof key === 'string' && key.length > 0),
+      ),
+    )
+
+    let tierNameByKey = new Map<string, string>()
+    if (tierKeys.length > 0) {
+      const { data: productsRaw, error: productsError } = await supabase
+        .from('products')
+        .select('key, display_name')
+        .in('key', tierKeys)
+
+      if (productsError) {
+        return { data: [], error: productsError }
+      }
+
+      tierNameByKey = new Map(
+        (productsRaw ?? []).map((p: { key: string; display_name: string }) => [
+          p.key,
+          p.display_name,
+        ]),
+      )
     }
 
-    const jobById = new Map<string, JobRow>()
-    for (const job of jobs as JobRow[]) {
-      if (typeof job.id === 'string') {
-        jobById.set(job.id, job)
+    const jobById = new Map<string, JobHopperLive>()
+    for (const row of jobs) {
+      if (typeof row.id === 'string') {
+        jobById.set(row.id, row)
       }
     }
 
@@ -126,19 +164,15 @@ export const jobsAPI = {
     )
 
     const result: MatchedJob[] = matches.map((match) => {
-      const job = match.job_id ? jobById.get(match.job_id) : undefined
+      const job = match.job_id ? jobById.get(match.job_id) ?? null : null
+      const base = toMatchedJob(match, job, savedMatchIds.has(match.id))
+      const tierName =
+        base.subscriptionTier != null
+          ? tierNameByKey.get(base.subscriptionTier) ?? null
+          : null
       return {
-        matchId: match.id,
-        jobId: (match.job_id as string) ?? '',
-        score: match.score ?? null,
-        createdAt: match.created_at ?? '',
-        isSaved: savedMatchIds.has(match.id),
-        title: job ? job.job_title : null,
-        company: job ? job.company_name : null,
-        location: job ? job.location : null,
-        description: job ? job.description : null,
-        aiBriefing: job ? job.ai_job_briefing : null,
-        applyLink: job ? job.apply_link : null,
+        ...base,
+        subscriptionTierDisplayName: tierName,
       }
     })
 
@@ -176,18 +210,7 @@ export const jobsAPI = {
       await Promise.all([
         supabase
           .from('job_hopper_live')
-          .select(
-            `
-            id,
-            job_title,
-            company_name,
-            location,
-            description,
-            ai_job_briefing,
-            apply_link,
-            created_at
-          `,
-          )
+          .select(JOB_HOPPER_LIVE_SELECT)
           .eq('id', match.job_id)
           .maybeSingle(),
         supabase
@@ -217,21 +240,39 @@ export const jobsAPI = {
       }
     }
 
-    const detail: MatchedJob = {
-      matchId: match.id,
-      jobId: (match.job_id as string) ?? '',
-      score: match.score ?? null,
-      createdAt: match.created_at ?? '',
-      isSaved: !!savedRow,
-      title: job.job_title ?? null,
-      company: job.company_name ?? null,
-      location: job.location ?? null,
-      description: job.description ?? null,
-      aiBriefing: job.ai_job_briefing ?? null,
-      applyLink: job.apply_link ?? null,
+    let subscriptionTierDisplayName: string | null = null
+    if (job.subscription_tier) {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('key, display_name')
+        .eq('key', job.subscription_tier)
+        .maybeSingle()
+
+      if (productError) {
+        const isNoRowsError =
+          typeof productError === 'object' &&
+          productError !== null &&
+          'code' in productError &&
+          (productError as { code?: string }).code === 'PGRST116'
+
+        if (!isNoRowsError) {
+          return { data: null, error: productError }
+        }
+      }
+
+      subscriptionTierDisplayName =
+        (product as { display_name?: string } | null)?.display_name ?? null
     }
 
-    return { data: detail, error: null }
+    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow)
+
+    return {
+      data: {
+        ...base,
+        subscriptionTierDisplayName,
+      },
+      error: null,
+    }
   },
 
   async getMatchingStats(): Promise<{ data: MatchingStats; error: Error | null }> {
