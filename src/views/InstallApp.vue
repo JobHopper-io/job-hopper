@@ -2,6 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import chromeInstallIcon from '@/assets/chrome-install-icon.png'
 import edgeInstallIcon from '@/assets/edge-install-icon.png'
+import iosMoreIcon from '@/assets/ios-more-icon.png'
+import iosShareIcon from '@/assets/ios-share-icon.png'
+import iosAddToHomeIcon from '@/assets/ios-add-to-home-icon.png'
 
 type BrowserKind = 'safari' | 'chrome' | 'edge' | 'firefox' | 'other'
 
@@ -158,13 +161,38 @@ const showFallback = computed(
             iPhone or iPad (Safari)
           </h2>
           <p class="text-neutral-body mb-3">
-            On iOS, apps like Job-Hopper can only be installed from Safari using “Add to Home
-            Screen”.
+            On iOS, apps like Job-Hopper can be installed from Safari using “Add to Home Screen”.
           </p>
           <ol class="list-decimal pl-5 space-y-2 text-neutral-body">
-            <li>Tap the Share icon in the Safari toolbar (square with an arrow pointing up).</li>
-            <li>Scroll down in the sheet and tap <span class="font-medium">Add to Home Screen</span>.</li>
-            <li>Optionally rename it to <span class="font-medium">Job-Hopper</span>, then tap
+            <li>
+              Tap the three dots (<span class="font-medium">More</span>) button to reveal the full
+              toolbar
+              <img
+                :src="iosMoreIcon"
+                alt="More button icon"
+                class="ml-1 inline-block h-4 w-auto align-middle"
+              >.
+            </li>
+            <li>
+              Tap 
+              <img
+                :src="iosShareIcon"
+                alt="Share button icon"
+                class="ml-1 inline-block h-4 w-auto align-middle"
+              >
+              Share in the toolbar.
+            </li>
+            <li>
+              Scroll down in the sheet and tap
+              <img
+                :src="iosAddToHomeIcon"
+                alt="Add to Home Screen icon"
+                class="mr-1 inline-block h-4 w-auto align-middle"
+              >
+              <span class="font-medium">Add to Home Screen</span>
+              .
+            </li>
+            <li>Tap
               <span class="font-medium">Add</span>.
             </li>
             <li>Find Job-Hopper on your home screen and open it like any other app.</li>
