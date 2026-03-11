@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-// __TEST_ONLY_START__ — Entire file is for match-jobs debug view only. Remove this file, MatchJobsDebug.vue, and the debug route before production.
+// __TEST_ONLY_START__ — Entire file is for test-job-matching debug view only. Remove this file, MatchJobsDebug.vue, and the debug route before production.
 
 export interface RankedJob {
   id: string
@@ -76,7 +76,7 @@ export const jobMatchingAPI = {
     error: Error | null
   }> {
     const { data, error } = await supabase.functions.invoke<MatchJobsResponse>(
-      'match-jobs',
+      'test-job-matching',
       {},
     )
 

@@ -78,7 +78,7 @@ serve(async (req) => {
         }
       }
 
-      // 2. For each profile, call match-profile-jobs with a random limit between 2 and 5.
+      // 2. For each profile, call match-jobs with a random limit between 2 and 5.
       for (const profileId of profileIds) {
         processedProfiles += 1
 
@@ -88,7 +88,7 @@ serve(async (req) => {
         const timeoutId = setTimeout(() => controller.abort(), INVOCATION_TIMEOUT_MS)
 
         try {
-          const url = `${supabaseUrl}/functions/v1/match-profile-jobs`
+          const url = `${supabaseUrl}/functions/v1/match-jobs`
 
           const response = await fetch(url, {
             method: "POST",
@@ -110,7 +110,7 @@ serve(async (req) => {
           } else {
             matchInvocationsFailed += 1
             const errorBody = await response.text().catch(() => "")
-            console.error("daily-job-matching: match-profile-jobs returned non-2xx", {
+            console.error("daily-job-matching: match-jobs returned non-2xx", {
               status: response.status,
               statusText: response.statusText,
               body: errorBody,
@@ -123,12 +123,12 @@ serve(async (req) => {
           matchInvocationsFailed += 1
 
           if (err instanceof Error && err.name === "AbortError") {
-            console.error("daily-job-matching: match-profile-jobs invocation timed out", {
+            console.error("daily-job-matching: match-jobs invocation timed out", {
               profileId,
               limit,
             })
           } else {
-            console.error("daily-job-matching: match-profile-jobs invocation error", {
+            console.error("daily-job-matching: match-jobs invocation error", {
               profileId,
               limit,
               message: err instanceof Error ? err.message : String(err),

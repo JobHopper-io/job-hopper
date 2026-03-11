@@ -285,12 +285,12 @@ serve(async (req) => {
         const { error: scheduleError } = await supabaseAdmin
           .from('scheduled_jobs')
           .insert({
-            function_name: 'match-profile-jobs',
+            function_name: 'match-jobs',
             payload: { profile_id: profileId, limit: 15 },
             run_at: runAt,
           })
         if (scheduleError) {
-          console.error('checkout.session.completed: failed to schedule match-profile-jobs:', scheduleError)
+          console.error('checkout.session.completed: failed to schedule match-jobs:', scheduleError)
         }
 
         // Welcome / subscription started email (if allowed by notification settings).

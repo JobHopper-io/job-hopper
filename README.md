@@ -38,7 +38,7 @@ After that, each commit will:
 
 ### Email notifications (Mailtrap)
 
-Edge functions (e.g. `match-profile-jobs`, `stripe-webhook`, `send-system-announcement`) send transactional emails via a shared `sendEmail` helper in `supabase/functions/_shared/`, backed by **Mailtrap Email Sending**.
+Edge functions (e.g. `match-jobs`, `stripe-webhook`, `send-system-announcement`) send transactional emails via a shared `sendEmail` helper in `supabase/functions/_shared/`, backed by **Mailtrap Email Sending**.
 
 - **Code path**: `supabase/functions/_shared/email.ts` → `supabase/functions/_shared/email-provider.ts` → Mailtrap `POST /api/send` on `https://send.api.mailtrap.io`.
 - **Required Edge Function secrets** (set via Supabase dashboard or `supabase secrets set`):
@@ -54,5 +54,5 @@ To test in a non‑production environment:
 
 1. Create a Mailtrap project and Email Sending API token.
 2. Set the above secrets for your local Supabase Edge Functions.
-3. Trigger an email (e.g. complete checkout to hit `stripe-webhook`, or invoke `match-profile-jobs` / `send-system-announcement` via the Supabase CLI).
+3. Trigger an email (e.g. complete checkout to hit `stripe-webhook`, or invoke `match-jobs` / `send-system-announcement` via the Supabase CLI).
 4. Verify delivery in the Mailtrap Email Sending dashboard or logs.

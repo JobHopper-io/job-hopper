@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// __TEST_ONLY_START__ — Entire view is for match-jobs debugging. Remove this file, the route in router, and src/lib/job-matching.ts before production.
+// __TEST_ONLY_START__ — Entire view is for test-job-matching debugging. Remove this file, the route in router, and src/lib/job-matching.ts before production.
 
 import { ref, onMounted, computed } from 'vue'
 import {
@@ -51,7 +51,7 @@ onMounted(() => {
           TEMPORARY MATCHING DEBUG PAGE – DO NOT SHIP TO PRODUCTION
         </h1>
         <p class="text-sm sm:text-base text-red-800">
-          This screen is for internal testing of the <code>match-jobs</code> Edge Function and
+          This screen is for internal testing of the <code>test-job-matching</code> Edge Function and
           should be removed before launch. Do not link to this page from any user-facing
           navigation.
         </p>
@@ -73,7 +73,7 @@ onMounted(() => {
       <!-- Error state -->
       <div v-if="errorMessage" class="card border border-red-300 bg-red-50 p-4 sm:p-6">
         <h2 class="text-lg font-heading font-semibold text-red-800 mb-2">
-          Error invoking <code>match-jobs</code>
+          Error invoking <code>test-job-matching</code>
         </h2>
         <p class="text-sm text-red-800 whitespace-pre-line">
           {{ errorMessage }}

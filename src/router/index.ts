@@ -133,7 +133,7 @@ const router = createRouter({
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
     },
-    // __TEST_ONLY_START__ — Debug route for match-jobs; remove this block, MatchJobsDebug.vue, and src/lib/job-matching.ts before production
+    // __TEST_ONLY_START__ — Debug route for test-job-matching; remove this block, MatchJobsDebug.vue, and src/lib/job-matching.ts before production
     {
       path: '/__debug/match-jobs',
       name: 'debug-match-jobs',
