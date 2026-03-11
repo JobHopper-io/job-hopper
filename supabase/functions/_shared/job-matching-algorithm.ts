@@ -154,16 +154,65 @@ function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase()
 }
 
-/** Keywords from current job title and industry only: comma-separated, trimmed, lowercased. */
+const AUXILIARY_KEYWORDS = new Set<string>([
+  'senior',
+  'jr',
+  'junior',
+  'sr',
+  'mid',
+  'middle',
+  'temp',
+  'temporary',
+])
+
+/**
+ * Generate keyword phrases from a comma-separated field.
+ *
+ * For each comma-separated segment, we:
+ * - split into words
+ * - generate all contiguous left-to-right n-grams (length 1..N)
+ * - drop single-word n-grams that are purely auxiliary (e.g. "senior", "junior", "mid", "temp")
+ *
+ * Example: "Senior Electrical Engineer" →
+ * - "senior electrical engineer"
+ * - "senior electrical"
+ * - "senior engineer"
+ * - "electrical engineer"
+ * - "electrical"
+ * - "engineer"
+ */
 function commaSeparatedKeywords(input: string | null | undefined): string[] {
   if (!input) return []
-  return input
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter((s) => s.length >= 1)
+
+  const set = new Set<string>()
+
+  for (const rawSegment of input.split(',')) {
+    const segment = rawSegment.trim().toLowerCase()
+    if (!segment) continue
+
+    const words = segment
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0)
+
+    if (!words.length) continue
+
+    const n = words.length
+    for (let len = n; len >= 1; len -= 1) {
+      for (let start = 0; start + len <= n; start += 1) {
+        const slice = words.slice(start, start + len)
+        if (slice.length === 1 && AUXILIARY_KEYWORDS.has(slice[0])) {
+          continue
+        }
+        set.add(slice.join(' '))
+      }
+    }
+  }
+
+  return Array.from(set)
 }
 
-/** All keywords used for role matching: union of current job title and industry (comma-separated). */
+/** All keywords used for role matching: union of current job title and industry. */
 function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
   const set = new Set<string>()
   for (const kw of commaSeparatedKeywords(prefs.currentJobTitle)) set.add(kw)
