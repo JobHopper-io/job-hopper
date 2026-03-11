@@ -115,7 +115,7 @@ const showFallback = computed(
             class="block w-full sm:w-72 rounded-md border border-neutral-border bg-neutral-card px-3 py-2 text-sm text-brand-charcoal shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
           >
             <option value="auto">
-              Auto-detect (recommended)
+              Auto-detect
             </option>
             <option value="ios-safari">
               iPhone or iPad · Safari
