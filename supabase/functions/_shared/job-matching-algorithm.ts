@@ -26,10 +26,7 @@ export interface JobRecord {
   postedDate: string | null
 }
 
-export interface MatchConfigRoleWeights {
-  titleExact: number
-  titleKeyword: number
-  roleCategoryExact: number
+export interface MatchConfigKeywordWeights {
   currentJobTitleKeyword: number
   currentIndustryKeyword: number
 }
@@ -67,7 +64,7 @@ export interface MatchConfigDebug {
 }
 
 export interface MatchConfig {
-  roleWeights: MatchConfigRoleWeights
+  keywordWeights: MatchConfigKeywordWeights
   payWeights: MatchConfigPayWeights
   locationWeights: MatchConfigLocationWeights
   recencyWeights: MatchConfigRecencyWeights
@@ -87,10 +84,7 @@ export interface RankedJob extends JobRecord {
 }
 
 export const defaultConfig: MatchConfig = {
-  roleWeights: {
-    titleExact: 8,
-    titleKeyword: 3,
-    roleCategoryExact: 10,
+  keywordWeights: {
     currentJobTitleKeyword: 2,
     currentIndustryKeyword: 1,
   },
@@ -129,9 +123,9 @@ export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined):
   return {
     ...defaultConfig,
     ...overrides,
-    roleWeights: {
-      ...defaultConfig.roleWeights,
-      ...(overrides.roleWeights ?? {}),
+    keywordWeights: {
+      ...defaultConfig.keywordWeights,
+      ...(overrides.keywordWeights ?? {}),
     },
     payWeights: {
       ...defaultConfig.payWeights,
@@ -160,23 +154,29 @@ function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase()
 }
 
-function extractKeywords(input: string | null | undefined): string[] {
+/** Keywords from current job title and industry only: comma-separated, trimmed, lowercased. */
+function commaSeparatedKeywords(input: string | null | undefined): string[] {
   if (!input) return []
   return input
-    .toLowerCase()
-    .split(/[^a-z0-9+/#]+/i)
-    .map((w) => w.trim())
-    .filter((w) => w.length >= 2)
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length >= 1)
 }
 
-function uniqueKeywords(...inputs: (string | null | undefined)[]): string[] {
+/** All keywords used for role matching: union of current job title and industry (comma-separated). */
+function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
   const set = new Set<string>()
-  for (const input of inputs) {
-    for (const kw of extractKeywords(input)) {
-      set.add(kw)
-    }
-  }
+  for (const kw of commaSeparatedKeywords(prefs.currentJobTitle)) set.add(kw)
+  for (const kw of commaSeparatedKeywords(prefs.currentIndustry)) set.add(kw)
   return Array.from(set)
+}
+
+/** True if job is in scope: user has no target roles, or job's role_category is one of them. */
+function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): boolean {
+  if (prefs.roles.length === 0) return true
+  if (!job.roleCategory) return false
+  const lowerCategory = job.roleCategory.toLowerCase()
+  return prefs.roles.some((role) => role.toLowerCase() === lowerCategory)
 }
 
 function computeRoleScore(
@@ -189,54 +189,28 @@ function computeRoleScore(
   const briefing = normalizeText(job.aiBriefing)
   const combined = `${title} ${description} ${briefing}`.trim()
 
-  const roleKeywords = new Set<string>()
-  for (const role of prefs.roles) {
-    for (const kw of extractKeywords(role)) {
-      roleKeywords.add(kw)
-    }
-  }
-
-  const currentTitleKeywords = uniqueKeywords(prefs.currentJobTitle)
-  const currentIndustryKeywords = uniqueKeywords(prefs.currentIndustry)
+  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
 
-  if (job.roleCategory && prefs.roles.length > 0) {
-    const lowerCategory = job.roleCategory.toLowerCase()
-    for (const role of prefs.roles) {
-      if (lowerCategory === role.toLowerCase()) {
-        score += cfg.roleWeights.roleCategoryExact
-        break
-      }
-    }
-  }
-
-  if (combined.length > 0 && roleKeywords.size > 0) {
-    for (const kw of roleKeywords) {
+  if (combined.length > 0 && titleKeywords.length > 0) {
+    for (const kw of titleKeywords) {
       if (combined.includes(kw)) {
-        const inTitle = title.includes(kw)
-        score += inTitle ? cfg.roleWeights.titleExact : cfg.roleWeights.titleKeyword
+        score += cfg.keywordWeights.currentJobTitleKeyword
       }
     }
   }
 
-  if (combined.length > 0 && currentTitleKeywords.length > 0) {
-    for (const kw of currentTitleKeywords) {
+  if (combined.length > 0 && industryKeywords.length > 0) {
+    for (const kw of industryKeywords) {
       if (combined.includes(kw)) {
-        score += cfg.roleWeights.currentJobTitleKeyword
+        score += cfg.keywordWeights.currentIndustryKeyword
       }
     }
   }
 
-  if (combined.length > 0 && currentIndustryKeywords.length > 0) {
-    for (const kw of currentIndustryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.roleWeights.currentIndustryKeyword
-      }
-    }
-  }
-
-  if (roleKeywords.size > 0 || currentTitleKeywords.length > 0) {
+  if (titleKeywords.length > 0 || industryKeywords.length > 0) {
     const anyOverlap = score > 0
     if (!anyOverlap) {
       score += cfg.thresholds.hardRoleMismatchPenalty
@@ -256,56 +230,31 @@ function computeRoleScoreWithKeywords(
   const briefing = normalizeText(job.aiBriefing)
   const combined = `${title} ${description} ${briefing}`.trim()
 
-  const roleKeywords = new Set<string>()
-  for (const role of prefs.roles) {
-    for (const kw of extractKeywords(role)) {
-      roleKeywords.add(kw)
-    }
-  }
-
-  const currentTitleKeywords = uniqueKeywords(prefs.currentJobTitle)
-  const currentIndustryKeywords = uniqueKeywords(prefs.currentIndustry)
+  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
   const matchedRoleKeywords: string[] = []
 
-  if (job.roleCategory && prefs.roles.length > 0) {
-    const lowerCategory = job.roleCategory.toLowerCase()
-    for (const role of prefs.roles) {
-      if (lowerCategory === role.toLowerCase()) {
-        score += cfg.roleWeights.roleCategoryExact
-        break
-      }
-    }
-  }
-
-  if (combined.length > 0 && roleKeywords.size > 0) {
-    for (const kw of roleKeywords) {
+  if (combined.length > 0 && titleKeywords.length > 0) {
+    for (const kw of titleKeywords) {
       if (combined.includes(kw)) {
-        const inTitle = title.includes(kw)
-        score += inTitle ? cfg.roleWeights.titleExact : cfg.roleWeights.titleKeyword
+        score += cfg.keywordWeights.currentJobTitleKeyword
         matchedRoleKeywords.push(kw)
       }
     }
   }
 
-  if (combined.length > 0 && currentTitleKeywords.length > 0) {
-    for (const kw of currentTitleKeywords) {
+  if (combined.length > 0 && industryKeywords.length > 0) {
+    for (const kw of industryKeywords) {
       if (combined.includes(kw)) {
-        score += cfg.roleWeights.currentJobTitleKeyword
+        score += cfg.keywordWeights.currentIndustryKeyword
+        matchedRoleKeywords.push(kw)
       }
     }
   }
 
-  if (combined.length > 0 && currentIndustryKeywords.length > 0) {
-    for (const kw of currentIndustryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.roleWeights.currentIndustryKeyword
-      }
-    }
-  }
-
-  if (roleKeywords.size > 0 || currentTitleKeywords.length > 0) {
+  if (titleKeywords.length > 0 || industryKeywords.length > 0) {
     const anyOverlap = score > 0
     if (!anyOverlap) {
       score += cfg.thresholds.hardRoleMismatchPenalty
@@ -472,6 +421,10 @@ export function matchJobs(
   const ranked: RankedJob[] = []
 
   for (const job of jobs) {
+    if (!jobMatchesTargetRoles(job, prefs)) {
+      continue
+    }
+
     const roleScore = computeRoleScore(prefs, job, cfg)
     if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
       continue
@@ -569,13 +522,21 @@ export function matchJobsWithDebug(
   let sumLocationScore = 0
   let sumRecencyScore = 0
 
+  const allKeywords = getRoleMatchKeywords(prefs)
   const keywordCounts = new Map<string, number>()
+  for (const kw of allKeywords) {
+    keywordCounts.set(kw, 0)
+  }
 
   for (const job of jobs) {
+    if (!jobMatchesTargetRoles(job, prefs)) {
+      excludedByRole += 1
+      continue
+    }
+
     const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
 
     if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
-      excludedByRole += 1
       continue
     }
 
@@ -658,7 +619,6 @@ export function matchJobsWithDebug(
     },
     keywords: Array.from(keywordCounts.entries())
       .sort(([, aCount], [, bCount]) => bCount - aCount)
-      .slice(0, 50)
       .map(([keyword, matchedJobCount]) => ({ keyword, matchedJobCount })),
   }
 

@@ -41,7 +41,7 @@ const prefsForm = reactive<{
 
 // Match config form (defaults from DEFAULT_TEST_MATCH_CONFIG)
 const configForm = reactive<MatchConfigOverride>({
-  roleWeights: { ...DEFAULT_TEST_MATCH_CONFIG.roleWeights },
+  keywordWeights: { ...DEFAULT_TEST_MATCH_CONFIG.keywordWeights },
   payWeights: { ...DEFAULT_TEST_MATCH_CONFIG.payWeights },
   locationWeights: { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights },
   recencyWeights: { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights },
@@ -117,7 +117,7 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
 
 function buildMatchConfigOverride(): MatchConfigOverride {
   return {
-    roleWeights: { ...configForm.roleWeights },
+    keywordWeights: { ...configForm.keywordWeights },
     payWeights: { ...configForm.payWeights },
     locationWeights: { ...configForm.locationWeights },
     recencyWeights: { ...configForm.recencyWeights },
@@ -128,7 +128,7 @@ function buildMatchConfigOverride(): MatchConfigOverride {
 async function resetToDefaults() {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
-  configForm.roleWeights = { ...DEFAULT_TEST_MATCH_CONFIG.roleWeights }
+  configForm.keywordWeights = { ...DEFAULT_TEST_MATCH_CONFIG.keywordWeights }
   configForm.payWeights = { ...DEFAULT_TEST_MATCH_CONFIG.payWeights }
   configForm.locationWeights = { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights }
   configForm.recencyWeights = { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights }
@@ -158,7 +158,6 @@ async function loadMatches() {
 onMounted(async () => {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
-  void loadMatches()
 })
 // __TEST_ONLY_END__
 </script>
@@ -200,19 +199,21 @@ onMounted(async () => {
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title (comma-separated keywords)</label>
               <input
                 v-model="prefsForm.currentJobTitle"
                 type="text"
                 class="input w-full"
+                placeholder="e.g. Engineer, Manager"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Current industry</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Current industry (comma-separated keywords)</label>
               <input
                 v-model="prefsForm.currentIndustry"
                 type="text"
                 class="input w-full"
+                placeholder="e.g. Tech, Finance"
               >
             </div>
             <div>
@@ -269,52 +270,25 @@ onMounted(async () => {
           </h3>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div class="space-y-2">
-              <p class="text-xs font-semibold text-neutral-body">Role weights</p>
+              <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
                   <input
-                    v-model.number="configForm.roleWeights!.titleExact"
+                    v-model.number="configForm.keywordWeights!.currentJobTitleKeyword"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when job title exactly matches a target role keyword"
+                    title="Score when a current job title keyword (comma-separated) appears in the job"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job title exactly matches a target role keyword">titleExact</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when a current job title keyword (comma-separated) appears in the job">currentJobTitleKeyword</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input
-                    v-model.number="configForm.roleWeights!.titleKeyword"
+                    v-model.number="configForm.keywordWeights!.currentIndustryKeyword"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when a target role keyword appears in title/description (not exact title match)"
+                    title="Score when a current industry keyword (comma-separated) appears in the job"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when a target role keyword appears in title/description (not exact title match)">titleKeyword</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.roleWeights!.roleCategoryExact"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when job role category exactly matches one of your target roles"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job role category exactly matches one of your target roles">roleCategoryExact</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.roleWeights!.currentJobTitleKeyword"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when your current job title keyword appears in the job"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when your current job title keyword appears in the job">currentJobTitleKeyword</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.roleWeights!.currentIndustryKeyword"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when your current industry keyword appears in the job"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when your current industry keyword appears in the job">currentIndustryKeyword</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Score when a current industry keyword (comma-separated) appears in the job">currentIndustryKeyword</span>
                 </div>
               </div>
             </div>
@@ -616,7 +590,7 @@ onMounted(async () => {
 
             <div class="mt-2">
               <p class="text-xs font-semibold text-neutral-body mb-1">
-                Top matched role keywords (by job count)
+                Keywords (all — from current job title + industry, comma-separated)
               </p>
               <ul class="text-[11px] text-neutral-body max-h-32 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
                 <li v-if="!debug.keywords.length">None</li>

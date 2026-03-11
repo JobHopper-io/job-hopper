@@ -61,10 +61,7 @@ export interface SubscriberPreferencesOverride {
   openToRemote?: boolean | null
 }
 
-export interface MatchConfigRoleWeights {
-  titleExact?: number
-  titleKeyword?: number
-  roleCategoryExact?: number
+export interface MatchConfigKeywordWeights {
   currentJobTitleKeyword?: number
   currentIndustryKeyword?: number
 }
@@ -98,7 +95,7 @@ export interface MatchConfigThresholds {
 }
 
 export interface MatchConfigOverride {
-  roleWeights?: MatchConfigRoleWeights
+  keywordWeights?: MatchConfigKeywordWeights
   payWeights?: MatchConfigPayWeights
   locationWeights?: MatchConfigLocationWeights
   recencyWeights?: MatchConfigRecencyWeights
@@ -112,10 +109,7 @@ export interface GetTestMatchesOptions {
 
 /** Default match config values (mirror of backend defaultConfig). Used for form defaults and reset. */
 export const DEFAULT_TEST_MATCH_CONFIG: MatchConfigOverride = {
-  roleWeights: {
-    titleExact: 8,
-    titleKeyword: 3,
-    roleCategoryExact: 10,
+  keywordWeights: {
     currentJobTitleKeyword: 2,
     currentIndustryKeyword: 1,
   },
