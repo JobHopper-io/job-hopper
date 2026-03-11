@@ -126,8 +126,8 @@ async function handleTailoringCheckout() {
         </button>
       </div>
 
-      <p v-if="job.description" class="mt-3 text-sm text-neutral-body line-clamp-2">
-        {{ job.description }}
+      <p v-if="job.aiBriefing" class="mt-3 text-sm text-neutral-body line-clamp-2">
+        {{ job.aiBriefing }}
       </p>
 
       <!-- Actions -->
