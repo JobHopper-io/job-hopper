@@ -107,6 +107,12 @@ const handleSignOutAndCloseMenu = async () => {
                   Pricing
                 </router-link>
                 <router-link
+                  to="/install-app"
+                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Get the app
+                </router-link>
+                <router-link
                   to="/faq"
                   class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
@@ -192,6 +198,13 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Pricing
+                </router-link>
+                <router-link
+                  to="/install-app"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Get the app
                 </router-link>
                 <router-link
                   to="/faq"
@@ -284,6 +297,7 @@ const handleSignOutAndCloseMenu = async () => {
               <ul class="space-y-2">
                 <li><router-link to="/how-it-works" class="text-sm text-neutral-body hover:text-brand-primary">How It Works</router-link></li>
                 <li><router-link to="/pricing" class="text-sm text-neutral-body hover:text-brand-primary">Pricing</router-link></li>
+                <li><router-link to="/install-app" class="text-sm text-neutral-body hover:text-brand-primary">Get the app</router-link></li>
                 <li><router-link to="/faq" class="text-sm text-neutral-body hover:text-brand-primary">FAQ</router-link></li>
               </ul>
             </div>

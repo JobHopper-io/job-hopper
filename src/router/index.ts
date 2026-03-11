@@ -12,6 +12,7 @@ export const publicPaths = [
   '/',
   '/how-it-works',
   '/pricing',
+  '/install-app',
   '/faq',
   '/about',
   '/support',
@@ -42,6 +43,11 @@ const router = createRouter({
       path: '/pricing',
       name: 'pricing',
       component: () => import('../views/Pricing.vue'),
+    },
+    {
+      path: '/install-app',
+      name: 'install-app',
+      component: () => import('../views/InstallApp.vue'),
     },
     {
       path: '/faq',
