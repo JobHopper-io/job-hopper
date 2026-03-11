@@ -381,7 +381,7 @@ onUnmounted(() => {
     <div ref="scrollProgressRef" class="fixed top-0 left-0 h-1 bg-brand-primary z-50" style="width: 0%;"></div>
     
     <!-- Hero Section -->
-    <section ref="heroRef" class="relative bg-white py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <section ref="heroRef" class="relative bg-white py-16 lg:py-24 xl:py-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <!-- Animated gradient background -->
       <div class="absolute inset-0 gradient-mesh opacity-30"></div>
       
@@ -430,12 +430,169 @@ onUnmounted(() => {
             </p>
           </div>
           <div class="hidden lg:block perspective-1000">
-            <div 
-              ref="heroCardRef" 
-              class="bg-gradient-to-br from-brand-rabbit-start to-brand-rabbit-end rounded-[12px] p-8 h-96 flex items-center justify-center preserve-3d will-change-transform"
+            <div
+              ref="heroCardRef"
+              class="bg-gradient-to-br from-brand-rabbit-start to-brand-rabbit-end rounded-[12px] p-6 min-h-[20rem] flex items-center justify-center preserve-3d will-change-transform"
               style="transform-style: preserve-3d;"
             >
-              <p class="text-white text-lg font-semibold">Dashboard Preview</p>
+              <div class="w-full max-w-md bg-white/95 rounded-2xl shadow-lg p-4 text-left text-[0.8rem] leading-snug">
+                <!-- Dashboard header -->
+                <div class="mb-3">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary">
+                    Dashboard
+                  </p>
+                  <p class="text-lg font-heading font-bold text-brand-charcoal">
+                    Good morning, Carlos
+                  </p>
+                  <p class="text-xs text-neutral-body">
+                    Here are your latest job matches.
+                  </p>
+                </div>
+
+                <!-- Summary cards row -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
+                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
+                      Subscription
+                    </p>
+                    <p class="text-xs font-heading font-semibold text-brand-charcoal">
+                      Senior &amp; Management
+                    </p>
+                    <p class="text-[0.6rem] text-neutral-body">
+                      Active · Trial
+                    </p>
+                  </div>
+                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
+                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
+                      Add‑ons
+                    </p>
+                    <p class="text-xs text-brand-charcoal">
+                      Contact details
+                    </p>
+                    <p class="text-[0.6rem] text-neutral-body">
+                      Interview prep
+                    </p>
+                  </div>
+                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
+                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
+                      Profile
+                    </p>
+                    <div class="mt-1 flex items-center gap-1">
+                      <div class="h-1.5 flex-1 rounded-full bg-neutral-bg overflow-hidden">
+                        <div class="h-full w-4/5 rounded-full bg-brand-primary"></div>
+                      </div>
+                      <span class="text-[0.6rem] font-semibold text-brand-charcoal tabular-nums">
+                        80%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Filters strip -->
+                <div class="mb-3 rounded-xl border border-neutral-border bg-neutral-bg/80 px-3 py-2">
+                  <div class="mb-1 flex flex-wrap items-center gap-2">
+                    <p class="text-[0.65rem] font-semibold text-brand-charcoal">
+                      Filters
+                    </p>
+                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
+                      Role type: Maintenance, Production
+                    </span>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
+                      Location: Toledo, OH · 25 mi
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
+                      Wage: $26–$40/hr
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
+                      Saved only
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Mini job feed -->
+                <p class="mb-1 text-[0.7rem] font-semibold text-brand-charcoal">
+                  Recent job matches
+                </p>
+                <div class="space-y-1.5">
+                  <div
+                    class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
+                    style="border-left: 3px solid var(--color-brand-primary);"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0 pr-6">
+                        <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
+                          Maintenance Technician · Night shift
+                        </p>
+                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
+                          <span class="font-medium text-brand-primary">
+                            Lakeside Foods
+                          </span>
+                          <span>
+                            · Toledo, OH
+                          </span>
+                          <span>
+                            · $26–$29/hr
+                          </span>
+                          <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
+                            92% match
+                          </span>
+                        </div>
+                      </div>
+                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full bg-brand-primary px-2 py-[2px] text-[0.6rem] font-semibold text-white shadow-sm">
+                        Saved
+                      </span>
+                    </div>
+                    <div class="mt-2 flex gap-1.5 text-[0.6rem]">
+                      <span class="inline-flex flex-1 items-center justify-center rounded-full bg-brand-primary text-white">
+                        View details
+                      </span>
+                      <span class="inline-flex flex-1 items-center justify-center rounded-full border border-neutral-border bg-white text-neutral-body">
+                        Apply
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
+                    style="border-left: 3px solid var(--color-brand-primary);"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0 pr-6">
+                        <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
+                          Production Supervisor · 2nd shift
+                        </p>
+                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
+                          <span class="font-medium text-brand-primary">
+                            Heartland Manufacturing
+                          </span>
+                          <span>
+                            · Kansas City, MO
+                          </span>
+                          <span>
+                            · $72k–$82k
+                          </span>
+                          <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
+                            88% match
+                          </span>
+                        </div>
+                      </div>
+                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full bg-white px-2 py-[2px] text-[0.6rem] font-semibold text-brand-primary border border-brand-primary/40">
+                        Save
+                      </span>
+                    </div>
+                    <div class="mt-2 flex gap-1.5 text-[0.6rem]">
+                      <span class="inline-flex flex-1 items-center justify-center rounded-full bg-brand-primary text-white">
+                        View details
+                      </span>
+                      <span class="inline-flex flex-1 items-center justify-center rounded-full border border-neutral-border bg-white text-neutral-body">
+                        Apply
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
