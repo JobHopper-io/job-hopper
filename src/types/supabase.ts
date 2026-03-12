@@ -253,21 +253,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          job_id: string | null
+          job_id: string
           profile_id: string
           score: number | null
         }
         Insert: {
           created_at?: string
           id?: string
-          job_id?: string | null
+          job_id: string
           profile_id: string
           score?: number | null
         }
         Update: {
           created_at?: string
           id?: string
-          job_id?: string | null
+          job_id?: string
           profile_id?: string
           score?: number | null
         }
@@ -377,6 +377,7 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          location_radius_miles: number | null
           onboarding_completed: boolean | null
           open_to_relocation: boolean | null
           open_to_remote: boolean | null
@@ -399,6 +400,7 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          location_radius_miles?: number | null
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null
@@ -421,6 +423,7 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          location_radius_miles?: number | null
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null

@@ -4,6 +4,8 @@ import { STATE_NAME_TO_ABBREV } from './state-abbreviations.ts'
 export interface NormalizedLocationResult {
   normalized: string | null
   error: string | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 const STATE_ABBREVS = new Set<string>(Object.values(STATE_NAME_TO_ABBREV))
@@ -46,7 +48,12 @@ export function normalizeLocationInput(raw: string | null | undefined): Normaliz
     if (!STATE_ABBREVS.has(state)) {
       return { normalized: null, error: 'Resolved ZIP did not map to a valid US state.' }
     }
-    return { normalized: `${city}, ${state}`, error: null }
+    return {
+      normalized: `${city}, ${state}`,
+      error: null,
+      latitude: result.latitude ?? null,
+      longitude: result.longitude ?? null,
+    }
   }
 
   if (/^\d+$/.test(trimmed)) {
@@ -71,7 +78,18 @@ export function normalizeLocationInput(raw: string | null | undefined): Normaliz
       return { normalized: null, error: 'Please enter a valid US state or state abbreviation.' }
     }
     const city = titleCase(cityPart)
-    return { normalized: `${city}, ${stateAbbrev}`, error: null }
+    const matches = zipcodes.lookupByName(city, stateAbbrev)
+    const coord =
+      Array.isArray(matches) && matches.length > 0
+        ? matches[0]
+        : null
+
+    return {
+      normalized: `${city}, ${stateAbbrev}`,
+      error: null,
+      latitude: coord?.latitude ?? null,
+      longitude: coord?.longitude ?? null,
+    }
   }
 
   if (!/^[A-Za-z\s]+$/.test(trimmed)) {

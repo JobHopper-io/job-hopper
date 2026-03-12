@@ -29,6 +29,7 @@ const prefsForm = reactive<{
   preferredLocations: string[]
   openToRelocation: boolean
   openToRemote: boolean
+  locationRadiusMiles: string
 }>({
   roles: '',
   currentJobTitle: '',
@@ -38,6 +39,7 @@ const prefsForm = reactive<{
   preferredLocations: [],
   openToRelocation: false,
   openToRemote: false,
+  locationRadiusMiles: '',
 })
 
 // Match config form (defaults from DEFAULT_TEST_MATCH_CONFIG)
@@ -87,6 +89,9 @@ function profileToPrefsForm(p: Profile | null) {
     : []
   prefsForm.openToRelocation = p.open_to_relocation === true
   prefsForm.openToRemote = p.open_to_remote === true
+  prefsForm.locationRadiusMiles =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any).location_radius_miles != null ? String((p as any).location_radius_miles) : ''
 }
 
 function buildPreferencesOverride(): SubscriberPreferencesOverride {
@@ -110,6 +115,10 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
       prefsForm.preferredLocations.length > 0 ? prefsForm.preferredLocations : undefined,
     openToRelocation: prefsForm.openToRelocation,
     openToRemote: prefsForm.openToRemote,
+    locationRadiusMiles:
+      prefsForm.locationRadiusMiles !== '' && !Number.isNaN(Number(prefsForm.locationRadiusMiles))
+        ? Number(prefsForm.locationRadiusMiles)
+        : undefined,
   }
 }
 
@@ -230,6 +239,16 @@ onMounted(async () => {
                 type="number"
                 class="input w-full"
                 placeholder="Annual"
+              >
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Location radius (miles)</label>
+              <input
+                v-model="prefsForm.locationRadiusMiles"
+                type="number"
+                min="0"
+                class="input w-full"
+                placeholder="e.g. 25"
               >
             </div>
             <div>

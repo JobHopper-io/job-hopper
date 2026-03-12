@@ -9,6 +9,7 @@ export interface SubscriberPreferences {
   preferredLocations: string[]
   openToRelocation: boolean | null
   openToRemote: boolean | null
+  locationRadiusMiles: number | null
 }
 
 export interface JobRecord {
@@ -46,6 +47,12 @@ export interface MatchConfigLocationWeights {
   remotePreferred: number
   relocationAllowed: number
   otherLocationPenalty: number
+  distance0to10: number
+  distance10to25: number
+  distance25to50: number
+  distance50to100: number
+  distanceBeyond100: number
+  withinRadiusBonus: number
 }
 
 export interface MatchConfigRecencyWeights {
@@ -84,6 +91,8 @@ export interface RankedJob extends JobRecord {
     recency: number
   }
   matchedRoleKeywords?: string[]
+  locationDistanceMiles?: number | null
+  withinRadius?: boolean
 }
 
 export const defaultConfig: MatchConfig = {
@@ -103,6 +112,12 @@ export const defaultConfig: MatchConfig = {
     remotePreferred: 3,
     relocationAllowed: 1,
     otherLocationPenalty: -3,
+    distance0to10: 4,
+    distance10to25: 3,
+    distance25to50: 2,
+    distance50to100: 1,
+    distanceBeyond100: 0,
+    withinRadiusBonus: 3,
   },
   recencyWeights: {
     baseRecency: 3,
@@ -245,8 +260,9 @@ export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConf
   const maxLocation = Math.max(
     cfg.locationWeights.sameMetro,
     cfg.locationWeights.sameState,
-    cfg.locationWeights.remotePreferred,
-    cfg.locationWeights.relocationAllowed,
+    cfg.locationWeights.remotePreferred + cfg.locationWeights.distance0to10,
+    cfg.locationWeights.relocationAllowed + cfg.locationWeights.distance0to10,
+    cfg.locationWeights.distance0to10 + cfg.locationWeights.withinRadiusBonus,
   )
   const maxRecency = cfg.recencyWeights.baseRecency
   return maxKeyword + maxPay + maxLocation + maxRecency
@@ -408,7 +424,34 @@ function computePayScore(
   return 0
 }
 
-function computeLocationScore(
+type NormalizedWithCoords = {
+  normalized: string | null
+  lat: number | null
+  lon: number | null
+}
+
+function normalizeWithCoords(raw: string | null | undefined): NormalizedWithCoords {
+  const { normalized, latitude, longitude } = normalizeLocationInput(raw ?? '')
+  return {
+    normalized: normalized ?? null,
+    lat: latitude ?? null,
+    lon: longitude ?? null,
+  }
+}
+
+function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (v: number) => (v * Math.PI) / 180
+  const R = 3959 // Earth radius in miles
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+function computeCategoricalLocationScore(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
@@ -467,6 +510,90 @@ function computeLocationScore(
   return score
 }
 
+function computeLocationScore(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): { score: number; distanceMiles: number | null; withinRadius: boolean } {
+  const isRemote = job.isRemote
+  const prefersRemote = !!prefs.openToRemote
+
+  let score = 0
+
+  if (isRemote && prefersRemote) {
+    score += cfg.locationWeights.remotePreferred
+  }
+
+  const preferredLocationsRaw = prefs.preferredLocations ?? []
+  if (preferredLocationsRaw.length === 0) {
+    return { score, distanceMiles: null, withinRadius: false }
+  }
+
+  const jobNorm = normalizeWithCoords(job.location ?? '')
+  const preferred = preferredLocationsRaw
+    .map((loc) => normalizeWithCoords(loc))
+    .filter((loc) => loc.normalized)
+
+  const hasJobCoords = jobNorm.lat != null && jobNorm.lon != null
+  const hasAnyPreferredCoords = preferred.some((p) => p.lat != null && p.lon != null)
+
+  // If we don't have coordinates on either side, fall back to the old categorical rules.
+  if (!hasJobCoords || !hasAnyPreferredCoords) {
+    return {
+      score: score + computeCategoricalLocationScore(prefs, job, cfg),
+      distanceMiles: null,
+      withinRadius: false,
+    }
+  }
+
+  const distances: number[] = []
+  for (const pref of preferred) {
+    if (pref.lat == null || pref.lon == null) continue
+    distances.push(haversineMiles(pref.lat, pref.lon, jobNorm.lat as number, jobNorm.lon as number))
+  }
+
+  if (distances.length === 0) {
+    return {
+      score: score + computeCategoricalLocationScore(prefs, job, cfg),
+      distanceMiles: null,
+      withinRadius: false,
+    }
+  }
+
+  const minDistance = Math.min(...distances)
+  let withinRadius = false
+
+  // Distance band scoring
+  if (minDistance <= 10) {
+    score += cfg.locationWeights.distance0to10
+  } else if (minDistance <= 25) {
+    score += cfg.locationWeights.distance10to25
+  } else if (minDistance <= 50) {
+    score += cfg.locationWeights.distance25to50
+  } else if (minDistance <= 100) {
+    score += cfg.locationWeights.distance50to100
+  } else {
+    score += cfg.locationWeights.distanceBeyond100
+  }
+
+  // Radius bonus when inside user-selected radius
+  if (prefs.locationRadiusMiles != null && prefs.locationRadiusMiles > 0) {
+    if (minDistance <= prefs.locationRadiusMiles) {
+      score += cfg.locationWeights.withinRadiusBonus
+      withinRadius = true
+    }
+  }
+
+  // If far away, non-remote, and user not open to relocation, apply penalty
+  if (minDistance > 100 && !isRemote && !prefs.openToRelocation) {
+    score += cfg.locationWeights.otherLocationPenalty
+  } else if (minDistance > 100 && !isRemote && prefs.openToRelocation) {
+    score += cfg.locationWeights.relocationAllowed
+  }
+
+  return { score, distanceMiles: minDistance, withinRadius }
+}
+
 function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
   const ts = job.postedDate ?? job.createdAt
   if (!ts) return 0
@@ -504,7 +631,7 @@ export function matchJobs(
     }
 
     const payScore = computePayScore(prefs, job, cfg)
-    const locationScore = computeLocationScore(prefs, job, cfg)
+    const { score: locationScore } = computeLocationScore(prefs, job, cfg)
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
 
     if (recencyScore === -Infinity) {
@@ -621,7 +748,11 @@ export function matchJobsWithDebug(
     }
 
     const payScore = computePayScore(prefs, job, cfg)
-    const locationScore = computeLocationScore(prefs, job, cfg)
+    const { score: locationScore, distanceMiles, withinRadius } = computeLocationScore(
+      prefs,
+      job,
+      cfg,
+    )
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
 
     if (recencyScore === -Infinity) {
@@ -644,6 +775,8 @@ export function matchJobsWithDebug(
         recency: recencyScore,
       },
       matchedRoleKeywords,
+      locationDistanceMiles: distanceMiles,
+      withinRadius,
     }
 
     ranked.push(rankedJob)

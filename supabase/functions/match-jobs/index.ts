@@ -102,7 +102,8 @@ serve(async (req) => {
         desired_salary_max,
         preferred_locations,
         open_to_relocation,
-        open_to_remote
+        open_to_remote,
+        location_radius_miles
       `,
       )
       .eq('id', payload.profile_id)
@@ -131,6 +132,7 @@ serve(async (req) => {
       preferredLocations: (profile.preferred_locations ?? []) as string[],
       openToRelocation: profile.open_to_relocation,
       openToRemote: profile.open_to_remote,
+      locationRadiusMiles: profile.location_radius_miles ?? null,
     }
 
     type JobRow = {

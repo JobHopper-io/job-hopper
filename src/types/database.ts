@@ -24,6 +24,7 @@ export type ProfileUserEditable = Pick<
   | 'preferred_locations'
   | 'open_to_relocation'
   | 'open_to_remote'
+  | 'location_radius_miles'
 >
 
 // Subscription and product types from DB schema

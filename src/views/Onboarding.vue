@@ -7,6 +7,7 @@ import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
+import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
@@ -96,6 +97,10 @@ function populateFromProfile() {
   preferredLocations.value = p.preferred_locations ?? []
   openToRelocation.value = p.open_to_relocation ?? false
   openToRemote.value = p.open_to_remote ?? false
+  // location_radius_miles is nullable; default to 25 if not set
+  if (typeof p.location_radius_miles === 'number' && !Number.isNaN(p.location_radius_miles)) {
+    locationRadius.value = p.location_radius_miles
+  }
 
   currentStep.value = getFirstIncompleteStep()
 }
@@ -186,7 +191,8 @@ const handleProceedToCheckout = async () => {
       desired_salary_max: desiredSalaryMax.value ?? undefined,
       preferred_locations: preferredLocations.value.length > 0 ? preferredLocations.value : undefined,
       open_to_relocation: openToRelocation.value,
-      open_to_remote: openToRemote.value
+      open_to_remote: openToRemote.value,
+      location_radius_miles: locationRadius.value ?? undefined,
     })
 
     if (updateError) {
@@ -387,25 +393,13 @@ const handleProceedToCheckout = async () => {
               </div>
             </div>
 
-            <div>
+            <div class="space-y-3">
               <PreferredLocationsInput
                 v-model="preferredLocations"
                 label="Location preferences"
                 input-id="preferredLocations"
               />
-              <div class="flex items-center gap-4 mt-2">
-                <label class="flex items-center">
-                  <input
-                    v-model.number="locationRadius"
-                    type="range"
-                    min="5"
-                    max="100"
-                    step="5"
-                    class="mr-2"
-                  />
-                  <span class="text-sm text-neutral-body">Within {{ locationRadius }} miles</span>
-                </label>
-              </div>
+              <LocationRadiusInput v-model="locationRadius" label="Location radius" />
             </div>
 
             <div class="space-y-3">

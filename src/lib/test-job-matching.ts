@@ -19,6 +19,8 @@ export interface RankedJob {
     recency: number
   }
   matchedRoleKeywords?: string[]
+  locationDistanceMiles?: number | null
+  withinRadius?: boolean
 }
 
 export interface MatchJobsDebugPayload {
@@ -60,6 +62,7 @@ export interface SubscriberPreferencesOverride {
   preferredLocations?: string[]
   openToRelocation?: boolean | null
   openToRemote?: boolean | null
+   locationRadiusMiles?: number | null
 }
 
 export interface MatchConfigKeywordWeights {

@@ -9,6 +9,7 @@ import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
+import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -48,6 +49,7 @@ const desiredSalaryMax = ref<number | null>(null)
 const preferredLocations = ref<string[]>([])
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
+const locationRadiusMiles = ref<number | null>(null)
 
 
 function syncFormFromProfile() {
@@ -64,6 +66,10 @@ function syncFormFromProfile() {
   preferredLocations.value = p.preferred_locations || []
   openToRelocation.value = p.open_to_relocation || false
   openToRemote.value = p.open_to_remote || false
+  locationRadiusMiles.value =
+    typeof p.location_radius_miles === 'number' && !Number.isNaN(p.location_radius_miles)
+      ? p.location_radius_miles
+      : null
 }
 
 watch(profile, (p) => {
@@ -158,7 +164,8 @@ const saveProfile = async () => {
       desired_salary_max: desiredSalaryMax.value ?? undefined,
       preferred_locations: preferredLocations.value,
       open_to_relocation: openToRelocation.value,
-      open_to_remote: openToRemote.value
+      open_to_remote: openToRemote.value,
+      location_radius_miles: locationRadiusMiles.value ?? undefined,
     })
 
     saveSuccess.value = true
@@ -188,7 +195,8 @@ watch(
     desiredSalaryMax: desiredSalaryMax.value,
     preferredLocations: [...(preferredLocations.value ?? [])],
     openToRelocation: openToRelocation.value,
-    openToRemote: openToRemote.value
+    openToRemote: openToRemote.value,
+    locationRadiusMiles: locationRadiusMiles.value,
   }),
   () => {
     if (initialLoadDone.value && !isSyncingFromProfile.value) debouncedSave()
@@ -311,6 +319,13 @@ watch(
                 v-model="preferredLocations"
                 label="Preferred locations"
                 input-id="profile-preferred-locations"
+              />
+            </div>
+
+            <div>
+              <LocationRadiusInput
+                v-model="locationRadiusMiles"
+                label="Location radius (miles)"
               />
             </div>
 
