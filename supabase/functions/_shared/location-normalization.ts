@@ -37,6 +37,51 @@ export function normalizeLocationInput(raw: string | null | undefined): Normaliz
   const trimmed = (raw ?? '').trim()
   if (!trimmed) return { normalized: null, error: null }
 
+  // Support "City, ST ZIP" (common job posting format).
+  // Example: "Hannibal, MO 63401"
+  const cityStateZipMatch = trimmed.match(/^(.+),\s*([A-Za-z]{2})\s+(\d{5})$/)
+  if (cityStateZipMatch) {
+    const cityRaw = cityStateZipMatch[1].trim()
+    const statePartRaw = cityStateZipMatch[2].trim()
+    const zipRaw = cityStateZipMatch[3]
+
+    const zipLookup = zipcodes.lookup(zipRaw)
+    if (zipLookup) {
+      const city = titleCase(zipLookup.city)
+      const state = String(zipLookup.state || '').toUpperCase()
+      if (STATE_ABBREVS.has(state)) {
+        return {
+          normalized: `${city}, ${state}`,
+          error: null,
+          latitude: zipLookup.latitude ?? null,
+          longitude: zipLookup.longitude ?? null,
+        }
+      }
+    }
+
+    // Fallback: treat as "City, ST" and ignore ZIP for normalization.
+    const stateAbbrevFromText = normalizeState(statePartRaw)
+    if (!stateAbbrevFromText) {
+      return { normalized: null, error: 'Please enter a valid US state or state abbreviation.' }
+    }
+    if (!/^[A-Za-z\s.'-]+$/.test(cityRaw)) {
+      return { normalized: null, error: 'City should contain only letters and spaces.' }
+    }
+    const city = titleCase(cityRaw)
+    const matches = zipcodes.lookupByName(city, stateAbbrevFromText)
+    const coord =
+      Array.isArray(matches) && matches.length > 0
+        ? matches[0]
+        : null
+
+    return {
+      normalized: `${city}, ${stateAbbrevFromText}`,
+      error: null,
+      latitude: coord?.latitude ?? null,
+      longitude: coord?.longitude ?? null,
+    }
+  }
+
   const zipPattern = /^\d{5}$/
   if (zipPattern.test(trimmed)) {
     const result = zipcodes.lookup(trimmed)
