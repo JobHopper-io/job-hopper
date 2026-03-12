@@ -690,6 +690,8 @@ export interface MatchJobsDebugPayload {
     excludedByRemoteOptOut: number
     excludedByLocation: number
     excludedByRecency: number
+    excludedByNoKeywordMatch: number
+    excludedByMinTotalScore: number
     includedAfterFilters: number
   }
   scores: {
@@ -722,6 +724,8 @@ export function matchJobsWithDebug(
   let excludedByRemoteOptOut = 0
   let excludedByLocation = 0
   let excludedByRecency = 0
+  let excludedByNoKeywordMatch = 0
+  let excludedByMinTotalScore = 0
 
   const ranked: RankedJob[] = []
 
@@ -747,6 +751,7 @@ export function matchJobsWithDebug(
     const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
 
     if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
+      excludedByNoKeywordMatch += 1
       continue
     }
 
@@ -776,6 +781,7 @@ export function matchJobsWithDebug(
 
     const totalScore = roleScore + payScore + locationScore + recencyScore
     if (totalScore < cfg.thresholds.minTotalScore) {
+      excludedByMinTotalScore += 1
       continue
     }
 
@@ -831,6 +837,8 @@ export function matchJobsWithDebug(
       excludedByRemoteOptOut,
       excludedByLocation,
       excludedByRecency,
+      excludedByNoKeywordMatch,
+      excludedByMinTotalScore,
       includedAfterFilters: count,
     },
     scores: {

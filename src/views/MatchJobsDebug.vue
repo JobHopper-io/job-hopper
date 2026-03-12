@@ -656,6 +656,14 @@ onMounted(async () => {
               <span class="font-semibold">Excluded by recency:</span>
               <span>{{ debug.filters.excludedByRecency }}</span>
             </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by no keyword match:</span>
+              <span>{{ debug.filters.excludedByNoKeywordMatch }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by minTotalScore:</span>
+              <span>{{ debug.filters.excludedByMinTotalScore }}</span>
+            </p>
           </div>
 
           <div class="space-y-2">

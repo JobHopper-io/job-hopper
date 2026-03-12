@@ -31,6 +31,8 @@ export interface MatchJobsDebugPayload {
     excludedByRemoteOptOut: number
     excludedByLocation: number
     excludedByRecency: number
+    excludedByNoKeywordMatch: number
+    excludedByMinTotalScore: number
     includedAfterFilters: number
   }
   scores: {
