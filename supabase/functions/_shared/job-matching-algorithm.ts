@@ -93,6 +93,7 @@ export interface RankedJob extends JobRecord {
   matchedRoleKeywords?: string[]
   locationDistanceMiles?: number | null
   withinRadius?: boolean
+  locationParsed?: boolean
 }
 
 export const defaultConfig: MatchConfig = {
@@ -428,6 +429,7 @@ type NormalizedWithCoords = {
   normalized: string | null
   lat: number | null
   lon: number | null
+  parsed: boolean
 }
 
 function normalizeWithCoords(raw: string | null | undefined): NormalizedWithCoords {
@@ -436,6 +438,7 @@ function normalizeWithCoords(raw: string | null | undefined): NormalizedWithCoor
     normalized: normalized ?? null,
     lat: latitude ?? null,
     lon: longitude ?? null,
+    parsed: normalized != null,
   }
 }
 
@@ -516,7 +519,7 @@ function computeLocationScore(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
-): { score: number; distanceMiles: number | null; withinRadius: boolean } {
+): { score: number; distanceMiles: number | null; withinRadius: boolean; parsed: boolean } {
   const isRemote = job.isRemote
   const prefersRemote = !!prefs.openToRemote
 
@@ -528,7 +531,7 @@ function computeLocationScore(
 
   const preferredLocationsRaw = prefs.preferredLocations ?? []
   if (preferredLocationsRaw.length === 0) {
-    return { score, distanceMiles: null, withinRadius: false }
+    return { score, distanceMiles: null, withinRadius: false, parsed: jobNorm.parsed }
   }
 
   const jobNorm = normalizeWithCoords(job.location ?? '')
@@ -545,6 +548,7 @@ function computeLocationScore(
       score: score + computeCategoricalLocationScore(prefs, job, cfg),
       distanceMiles: null,
       withinRadius: false,
+      parsed: jobNorm.parsed,
     }
   }
 
@@ -559,6 +563,7 @@ function computeLocationScore(
       score: score + computeCategoricalLocationScore(prefs, job, cfg),
       distanceMiles: null,
       withinRadius: false,
+      parsed: jobNorm.parsed,
     }
   }
 
@@ -593,7 +598,7 @@ function computeLocationScore(
     score += cfg.locationWeights.relocationAllowed
   }
 
-  return { score, distanceMiles: minDistance, withinRadius }
+  return { score, distanceMiles: minDistance, withinRadius, parsed: jobNorm.parsed }
 }
 
 function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
@@ -684,6 +689,7 @@ export interface MatchJobsDebugPayload {
     excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
+    excludedByRecency: number
     includedAfterFilters: number
   }
   scores: {
@@ -715,6 +721,7 @@ export function matchJobsWithDebug(
   let excludedByRole = 0
   let excludedByRemoteOptOut = 0
   let excludedByLocation = 0
+  let excludedByRecency = 0
 
   const ranked: RankedJob[] = []
 
@@ -750,7 +757,12 @@ export function matchJobsWithDebug(
     }
 
     const payScore = computePayScore(prefs, job, cfg)
-    const { score: locationScore, distanceMiles, withinRadius } = computeLocationScore(
+    const {
+      score: locationScore,
+      distanceMiles,
+      withinRadius,
+      parsed: locationParsed,
+    } = computeLocationScore(
       prefs,
       job,
       cfg,
@@ -758,7 +770,7 @@ export function matchJobsWithDebug(
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
 
     if (recencyScore === -Infinity) {
-      excludedByLocation += 1
+      excludedByRecency += 1
       continue
     }
 
@@ -779,6 +791,7 @@ export function matchJobsWithDebug(
       matchedRoleKeywords,
       locationDistanceMiles: distanceMiles,
       withinRadius,
+      locationParsed,
     }
 
     ranked.push(rankedJob)
@@ -817,6 +830,7 @@ export function matchJobsWithDebug(
       excludedByRole,
       excludedByRemoteOptOut,
       excludedByLocation,
+      excludedByRecency,
       includedAfterFilters: count,
     },
     scores: {

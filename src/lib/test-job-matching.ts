@@ -21,6 +21,7 @@ export interface RankedJob {
   matchedRoleKeywords?: string[]
   locationDistanceMiles?: number | null
   withinRadius?: boolean
+  locationParsed?: boolean
 }
 
 export interface MatchJobsDebugPayload {
@@ -29,6 +30,7 @@ export interface MatchJobsDebugPayload {
     excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
+    excludedByRecency: number
     includedAfterFilters: number
   }
   scores: {
@@ -83,6 +85,12 @@ export interface MatchConfigLocationWeights {
   remotePreferred?: number
   relocationAllowed?: number
   otherLocationPenalty?: number
+  distance0to10?: number
+  distance10to25?: number
+  distance25to50?: number
+  distance50to100?: number
+  distanceBeyond100?: number
+  withinRadiusBonus?: number
 }
 
 export interface MatchConfigRecencyWeights {
@@ -129,6 +137,12 @@ export const DEFAULT_TEST_MATCH_CONFIG: MatchConfigOverride = {
     remotePreferred: 3,
     relocationAllowed: 1,
     otherLocationPenalty: -3,
+    distance0to10: 4,
+    distance10to25: 3,
+    distance25to50: 2,
+    distance50to100: 1,
+    distanceBeyond100: 0,
+    withinRadiusBonus: 3,
   },
   recencyWeights: {
     baseRecency: 3,

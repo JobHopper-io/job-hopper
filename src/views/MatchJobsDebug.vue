@@ -355,45 +355,99 @@ onMounted(async () => {
                     v-model.number="configForm.locationWeights!.sameMetro"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when job location matches a preferred location (metro)"
+                    title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job location matches a preferred location (metro)">sameMetro</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)">sameMetro</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input
                     v-model.number="configForm.locationWeights!.sameState"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when job is in same state/region as a preferred location"
+                    title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is in same state/region as a preferred location">sameState</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location">sameState</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input
                     v-model.number="configForm.locationWeights!.remotePreferred"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when job is remote and you are open to remote"
+                    title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is remote and you are open to remote">remotePreferred</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)">remotePreferred</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input
                     v-model.number="configForm.locationWeights!.relocationAllowed"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Score when job is outside preferred locations but you are open to relocation"
+                    title="Applied when job is outside preferred locations and far away but you are open to relocation"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job is outside preferred locations but you are open to relocation">relocationAllowed</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Applied when job is outside preferred locations and far away but you are open to relocation">relocationAllowed</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input
                     v-model.number="configForm.locationWeights!.otherLocationPenalty"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Penalty when job is in a non-preferred location and you are not open to relocation"
+                    title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job is in a non-preferred location and you are not open to relocation">otherLocationPenalty</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation">otherLocationPenalty</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.distance0to10"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 0–10 miles">distance0to10</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.distance10to25"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 10–25 miles">distance10to25</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.distance25to50"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 25–50 miles">distance25to50</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.distance50to100"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 50–100 miles">distance50to100</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.distanceBeyond100"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is more than 100 miles away">distanceBeyond100</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="configForm.locationWeights!.withinRadiusBonus"
+                    type="number"
+                    class="input w-20 text-sm"
+                    title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
+                  >
+                  <span class="text-[11px] text-neutral-body truncate" title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)">withinRadiusBonus</span>
                 </div>
               </div>
             </div>
@@ -545,8 +599,12 @@ onMounted(async () => {
               <span>{{ debug.filters.excludedByRemoteOptOut }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by location/recency:</span>
+              <span class="font-semibold">Excluded by location:</span>
               <span>{{ debug.filters.excludedByLocation }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by recency:</span>
+              <span>{{ debug.filters.excludedByRecency }}</span>
             </p>
           </div>
 
@@ -662,6 +720,7 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Title</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Company</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Created</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
                   Role / Location / Recency
@@ -693,6 +752,21 @@ onMounted(async () => {
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   {{ job.location || '—' }}
+                </td>
+                <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
+                  <span v-if="job.locationParsed === false">
+                    Unparsed (categorical fallback)
+                  </span>
+                  <span v-else-if="job.locationParsed && job.locationDistanceMiles != null">
+                    Distance
+                    ({{ job.locationDistanceMiles.toFixed(1) }} mi
+                    <span v-if="job.withinRadius">, within radius</span>
+                    <span v-else>, outside radius</span>)
+                  </span>
+                  <span v-else-if="job.locationParsed">
+                    Parsed (categorical only)
+                  </span>
+                  <span v-else>—</span>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   {{ new Date(job.createdAt).toLocaleString() }}
