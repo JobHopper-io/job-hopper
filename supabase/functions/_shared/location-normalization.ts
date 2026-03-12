@@ -1,0 +1,89 @@
+import zipcodes from 'npm:zipcodes'
+import { STATE_NAME_TO_ABBREV } from './state-abbreviations.ts'
+
+export interface NormalizedLocationResult {
+  normalized: string | null
+  error: string | null
+}
+
+const STATE_ABBREVS = new Set<string>(Object.values(STATE_NAME_TO_ABBREV))
+
+function titleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function normalizeState(stateRaw: string): string | null {
+  const cleaned = stateRaw.trim().toLowerCase()
+  if (!cleaned) return null
+
+  if (cleaned.length === 2 && /^[a-z]{2}$/.test(cleaned)) {
+    const upper = cleaned.toUpperCase()
+    return STATE_ABBREVS.has(upper) ? upper : null
+  }
+
+  if (!/^[a-z\s]+$/.test(cleaned)) return null
+  const abbrev = STATE_NAME_TO_ABBREV[cleaned]
+  return abbrev ?? null
+}
+
+export function normalizeLocationInput(raw: string | null | undefined): NormalizedLocationResult {
+  const trimmed = (raw ?? '').trim()
+  if (!trimmed) return { normalized: null, error: null }
+
+  const zipPattern = /^\d{5}$/
+  if (zipPattern.test(trimmed)) {
+    const result = zipcodes.lookup(trimmed)
+    if (!result) {
+      return { normalized: null, error: 'Please enter a valid US ZIP code.' }
+    }
+    const city = titleCase(result.city)
+    const state = String(result.state || '').toUpperCase()
+    if (!STATE_ABBREVS.has(state)) {
+      return { normalized: null, error: 'Resolved ZIP did not map to a valid US state.' }
+    }
+    return { normalized: `${city}, ${state}`, error: null }
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    return { normalized: null, error: 'ZIP codes must be 5 digits.' }
+  }
+
+  const commaParts = trimmed.split(',')
+  if (commaParts.length === 2) {
+    const cityPart = commaParts[0].trim()
+    const statePart = commaParts[1].trim()
+    if (!cityPart || !statePart) {
+      return { normalized: null, error: 'Please enter "City, State" or a ZIP code.' }
+    }
+    if (!/^[A-Za-z\s.'-]+$/.test(cityPart)) {
+      return { normalized: null, error: 'City should contain only letters and spaces.' }
+    }
+    if (!/^[A-Za-z\s]+$/.test(statePart)) {
+      return { normalized: null, error: 'State should contain only letters.' }
+    }
+    const stateAbbrev = normalizeState(statePart)
+    if (!stateAbbrev) {
+      return { normalized: null, error: 'Please enter a valid US state or state abbreviation.' }
+    }
+    const city = titleCase(cityPart)
+    return { normalized: `${city}, ${stateAbbrev}`, error: null }
+  }
+
+  if (!/^[A-Za-z\s]+$/.test(trimmed)) {
+    return {
+      normalized: null,
+      error: 'Please enter "City, State", a state name/abbreviation, or a 5-digit ZIP code.',
+    }
+  }
+  const stateAbbrev = normalizeState(trimmed)
+  if (!stateAbbrev) {
+    return { normalized: null, error: 'Please enter a valid US state or state abbreviation.' }
+  }
+  return { normalized: stateAbbrev, error: null }
+}
+

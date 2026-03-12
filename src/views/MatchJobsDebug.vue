@@ -13,6 +13,7 @@ import {
   type MatchConfigOverride,
 } from '@/lib/test-job-matching'
 import type { Profile } from '@/types/database'
+import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -25,7 +26,7 @@ const prefsForm = reactive<{
   currentIndustry: string
   payRangeMin: string
   payRangeMax: string
-  preferredLocations: string
+  preferredLocations: string[]
   openToRelocation: boolean
   openToRemote: boolean
 }>({
@@ -34,7 +35,7 @@ const prefsForm = reactive<{
   currentIndustry: '',
   payRangeMin: '',
   payRangeMax: '',
-  preferredLocations: '',
+  preferredLocations: [],
   openToRelocation: false,
   openToRemote: false,
 })
@@ -82,18 +83,14 @@ function profileToPrefsForm(p: Profile | null) {
   prefsForm.payRangeMin = p.desired_salary_min != null ? String(p.desired_salary_min) : ''
   prefsForm.payRangeMax = p.desired_salary_max != null ? String(p.desired_salary_max) : ''
   prefsForm.preferredLocations = Array.isArray(p.preferred_locations)
-    ? (p.preferred_locations as string[]).join(', ')
-    : ''
+    ? (p.preferred_locations as string[]).slice()
+    : []
   prefsForm.openToRelocation = p.open_to_relocation === true
   prefsForm.openToRemote = p.open_to_remote === true
 }
 
 function buildPreferencesOverride(): SubscriberPreferencesOverride {
   const roles = prefsForm.roles
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const preferredLocations = prefsForm.preferredLocations
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
@@ -109,7 +106,8 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
       prefsForm.payRangeMax !== '' && !Number.isNaN(Number(prefsForm.payRangeMax))
         ? Number(prefsForm.payRangeMax)
         : undefined,
-    preferredLocations: preferredLocations.length ? preferredLocations : undefined,
+    preferredLocations:
+      prefsForm.preferredLocations.length > 0 ? prefsForm.preferredLocations : undefined,
     openToRelocation: prefsForm.openToRelocation,
     openToRemote: prefsForm.openToRemote,
   }
@@ -235,13 +233,11 @@ onMounted(async () => {
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Preferred locations (comma-separated)</label>
-              <input
+              <PreferredLocationsInput
                 v-model="prefsForm.preferredLocations"
-                type="text"
-                class="input w-full"
-                placeholder="e.g. San Francisco, NYC"
-              >
+                label="Preferred locations"
+                input-id="debug-preferred-locations"
+              />
             </div>
             <div class="flex items-center gap-4">
               <label class="flex items-center gap-2 cursor-pointer">
@@ -431,12 +427,12 @@ onMounted(async () => {
                 </div>
                 <div class="flex items-center gap-2">
                   <input
-                    v-model.number="configForm.thresholds!.hardRoleMismatchPenalty"
+                    v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
                     type="number"
                     class="input w-20 text-sm"
-                    title="Penalty applied when no role keyword matches (job is excluded if score drops below half this)"
+                    title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)"
                   >
-                  <span class="text-[11px] text-neutral-body truncate" title="Penalty applied when no role keyword matches (job is excluded if score drops below half this)">hardRoleMismatchPenalty</span>
+                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)">noKeywordMatchPenalty</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input

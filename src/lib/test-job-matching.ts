@@ -90,7 +90,7 @@ export interface MatchConfigRecencyWeights {
 
 export interface MatchConfigThresholds {
   minTotalScore?: number
-  hardRoleMismatchPenalty?: number
+  noKeywordMatchPenalty?: number
   overPayTolerancePct?: number
   underPayTolerancePct?: number
 }
@@ -134,7 +134,7 @@ export const DEFAULT_TEST_MATCH_CONFIG: MatchConfigOverride = {
   },
   thresholds: {
     minTotalScore: 5,
-    hardRoleMismatchPenalty: -100,
+    noKeywordMatchPenalty: -100,
     overPayTolerancePct: 0.25,
     underPayTolerancePct: 0.15,
   },

@@ -8,6 +8,7 @@ import type { JobMatchEmailFrequency, NotificationSettingsUpdate } from '@/types
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
+import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -306,12 +307,10 @@ watch(
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Preferred locations</label>
-              <input
-                v-model="preferredLocations[0]"
-                type="text"
-                class="input"
-                placeholder="City, State or ZIP"
+              <PreferredLocationsInput
+                v-model="preferredLocations"
+                label="Preferred locations"
+                input-id="profile-preferred-locations"
               />
             </div>
 

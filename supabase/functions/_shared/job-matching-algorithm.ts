@@ -1,3 +1,5 @@
+import { normalizeLocationInput } from './location-normalization.ts'
+
 export interface SubscriberPreferences {
   roles: string[]
   currentJobTitle: string | null
@@ -54,7 +56,8 @@ export interface MatchConfigRecencyWeights {
 
 export interface MatchConfigThresholds {
   minTotalScore: number
-  hardRoleMismatchPenalty: number
+  /** When user has title/industry keywords but job matches none, this penalty is applied so the job is excluded. */
+  noKeywordMatchPenalty: number
   overPayTolerancePct: number
   underPayTolerancePct: number
 }
@@ -108,7 +111,7 @@ export const defaultConfig: MatchConfig = {
   },
   thresholds: {
     minTotalScore: 5,
-    hardRoleMismatchPenalty: -100,
+    noKeywordMatchPenalty: -100,
     overPayTolerancePct: 0.25,
     underPayTolerancePct: 0.15,
   },
@@ -283,7 +286,7 @@ function computeRoleScore(
   if (titleKeywords.length > 0 || industryKeywords.length > 0) {
     const anyOverlap = score > 0
     if (!anyOverlap) {
-      score += cfg.thresholds.hardRoleMismatchPenalty
+      score += cfg.thresholds.noKeywordMatchPenalty
     }
   }
 
@@ -327,7 +330,7 @@ function computeRoleScoreWithKeywords(
   if (titleKeywords.length > 0 || industryKeywords.length > 0) {
     const anyOverlap = score > 0
     if (!anyOverlap) {
-      score += cfg.thresholds.hardRoleMismatchPenalty
+      score += cfg.thresholds.noKeywordMatchPenalty
     }
   }
 
@@ -410,13 +413,13 @@ function computeLocationScore(
   job: JobRecord,
   cfg: MatchConfig,
 ): number {
-  const normalizedJobLocation = normalizeText(job.location)
+  const normalizedJobLocation = normalizeLocationInput(job.location ?? '').normalized ?? ''
   const isRemote = job.isRemote
   const prefersRemote = !!prefs.openToRemote
 
   const preferredLocations = (prefs.preferredLocations ?? [])
-    .filter((loc) => loc)
-    .map((loc) => loc.toLowerCase())
+    .map((loc) => normalizeLocationInput(loc ?? '').normalized ?? '')
+    .filter((loc) => loc.length > 0)
 
   let score = 0
 
@@ -496,7 +499,7 @@ export function matchJobs(
     }
 
     const roleScore = computeRoleScore(prefs, job, cfg)
-    if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
+    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       continue
     }
 
@@ -607,7 +610,7 @@ export function matchJobsWithDebug(
 
     const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
 
-    if (roleScore <= cfg.thresholds.hardRoleMismatchPenalty / 2) {
+    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       continue
     }
 

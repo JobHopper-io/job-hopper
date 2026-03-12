@@ -6,6 +6,7 @@ import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import ResumeUploader from '@/components/ResumeUploader.vue'
+import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
@@ -25,7 +26,7 @@ const currentIndustry = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
 const desiredSalaryMin = ref<number | null>(null)
 const desiredSalaryMax = ref<number | null>(null)
-const preferredLocation = ref('')
+const preferredLocations = ref<string[]>([])
 const locationRadius = ref(25)
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
@@ -54,7 +55,7 @@ const canProceedStep1 = computed(() => {
 })
 
 const canProceedStep2 = computed(() => {
-  return targetRoleCategories.value.length > 0 && preferredLocation.value
+  return targetRoleCategories.value.length > 0 && preferredLocations.value.length > 0
 })
 
 const canProceedStep4 = computed(() => {
@@ -92,7 +93,7 @@ function populateFromProfile() {
   targetRoleCategories.value = validCategories
   desiredSalaryMin.value = p.desired_salary_min ?? null
   desiredSalaryMax.value = p.desired_salary_max ?? null
-  preferredLocation.value = p.preferred_locations?.[0] ?? ''
+  preferredLocations.value = p.preferred_locations ?? []
   openToRelocation.value = p.open_to_relocation ?? false
   openToRemote.value = p.open_to_remote ?? false
 
@@ -183,7 +184,7 @@ const handleProceedToCheckout = async () => {
       target_role_categories: targetRoleCategories.value,
       desired_salary_min: desiredSalaryMin.value ?? undefined,
       desired_salary_max: desiredSalaryMax.value ?? undefined,
-      preferred_locations: preferredLocation.value ? [preferredLocation.value] : undefined,
+      preferred_locations: preferredLocations.value.length > 0 ? preferredLocations.value : undefined,
       open_to_relocation: openToRelocation.value,
       open_to_remote: openToRemote.value
     })
@@ -387,14 +388,10 @@ const handleProceedToCheckout = async () => {
             </div>
 
             <div>
-              <label for="preferredLocation" class="block text-sm font-medium text-brand-charcoal mb-2">Location preferences</label>
-              <input
-                id="preferredLocation"
-                v-model="preferredLocation"
-                type="text"
-                required
-                class="input mb-2"
-                placeholder="City, State, or ZIP"
+              <PreferredLocationsInput
+                v-model="preferredLocations"
+                label="Location preferences"
+                input-id="preferredLocations"
               />
               <div class="flex items-center gap-4 mt-2">
                 <label class="flex items-center">
