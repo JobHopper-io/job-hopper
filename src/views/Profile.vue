@@ -50,6 +50,7 @@ const preferredLocations = ref<string[]>([])
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
 const locationRadiusMiles = ref<number | null>(null)
+const requiresUsSponsorship = ref<boolean | null>(null)
 
 
 function syncFormFromProfile() {
@@ -70,6 +71,8 @@ function syncFormFromProfile() {
     typeof p.location_radius_miles === 'number' && !Number.isNaN(p.location_radius_miles)
       ? p.location_radius_miles
       : null
+  requiresUsSponsorship.value =
+    typeof p.requires_us_sponsorship === 'boolean' ? p.requires_us_sponsorship : null
 }
 
 watch(profile, (p) => {
@@ -166,6 +169,8 @@ const saveProfile = async () => {
       open_to_relocation: openToRelocation.value,
       open_to_remote: openToRemote.value,
       location_radius_miles: locationRadiusMiles.value ?? undefined,
+      requires_us_sponsorship:
+        requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
     })
 
     saveSuccess.value = true
@@ -197,6 +202,7 @@ watch(
     openToRelocation: openToRelocation.value,
     openToRemote: openToRemote.value,
     locationRadiusMiles: locationRadiusMiles.value,
+    requiresUsSponsorship: requiresUsSponsorship.value,
   }),
   () => {
     if (initialLoadDone.value && !isSyncingFromProfile.value) debouncedSave()
@@ -265,6 +271,31 @@ watch(
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Current industry</label>
               <input v-model="currentIndustry" type="text" class="input" />
+            </div>
+            <div>
+              <p class="block text-sm font-medium text-brand-charcoal mb-2">
+                Do you require sponsorship to work in the United States?
+              </p>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <label class="inline-flex items-center gap-2">
+                  <input
+                    v-model="requiresUsSponsorship"
+                    type="radio"
+                    :value="true"
+                    class="w-4 h-4"
+                  />
+                  <span class="text-sm text-neutral-body">Yes, I require sponsorship</span>
+                </label>
+                <label class="inline-flex items-center gap-2">
+                  <input
+                    v-model="requiresUsSponsorship"
+                    type="radio"
+                    :value="false"
+                    class="w-4 h-4"
+                  />
+                  <span class="text-sm text-neutral-body">No, I do not require sponsorship</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>

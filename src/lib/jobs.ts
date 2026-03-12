@@ -31,7 +31,8 @@ const JOB_HOPPER_LIVE_SELECT = `
   pay_type,
   employee_count,
   posted_date,
-  is_remote
+  is_remote,
+  sponsorship_likelihood
 ` as const
 
 function toMatchedJob(
@@ -62,6 +63,7 @@ function toMatchedJob(
     employeeCount: job?.employee_count ?? null,
     postedDate: job?.posted_date ?? null,
     isRemote: job?.is_remote ?? null,
+    sponsorshipLikelihood: job?.sponsorship_likelihood ?? null,
   }
 }
 

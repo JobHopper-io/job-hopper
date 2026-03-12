@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -15,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const tailoringLoading = ref(false)
 const tailoringError = ref<string | null>(null)
@@ -31,6 +34,14 @@ const tailoringStatusText = computed<string | null>(() => {
   if (p.status === 'pending') return 'Tailoring in progress'
   if (p.status === 'complete') return 'Tailored resume ready'
   return null
+})
+
+const showSponsorshipBadge = computed(() => {
+  const profile = userStore.profile
+  const value = props.job.sponsorshipLikelihood
+  if (!profile || profile.requires_us_sponsorship !== true) return false
+  if (!value || value === 'N/A') return false
+  return true
 })
 
 function handleViewDetails() {
@@ -102,6 +113,10 @@ async function handleTailoringCheckout() {
             >
               Match score: {{ job.score.toFixed(0) }}
             </span>
+            <JobSponsorshipBadge
+              v-if="showSponsorshipBadge"
+              :value="job.sponsorshipLikelihood"
+            />
           </div>
         </div>
         <button

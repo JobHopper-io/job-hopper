@@ -25,6 +25,7 @@ export type ProfileUserEditable = Pick<
   | 'open_to_relocation'
   | 'open_to_remote'
   | 'location_radius_miles'
+  | 'requires_us_sponsorship'
 >
 
 // Subscription and product types from DB schema
@@ -46,6 +47,7 @@ export type SavedJob = Tables<'saved_jobs'>
 export type JobHopperLive = Tables<'job_hopper_live'>
 export type PayType = Enums<'pay_type'>
 export type RoleCategory = Enums<'role_category'>
+export type SponsorshipLikelihood = Enums<'sponsorship_likelihood'>
 
 /** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
 export interface JobContact {
@@ -80,6 +82,7 @@ export interface MatchedJob {
   employeeCount: number | null
   postedDate: string | null
   isRemote: boolean | null
+  sponsorshipLikelihood: SponsorshipLikelihood | null
   contacts?: JobContact[]
 }
 

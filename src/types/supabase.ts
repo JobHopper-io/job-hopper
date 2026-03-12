@@ -197,6 +197,7 @@ export type Database = {
           posted_date: string | null
           role_category: Database["public"]["Enums"]["role_category"]
           schedules: string[] | null
+          sponsorship_likelihood: Database["public"]["Enums"]["sponsorship_likelihood"]
           subscription_tier: string
         }
         Insert: {
@@ -217,6 +218,7 @@ export type Database = {
           posted_date?: string | null
           role_category: Database["public"]["Enums"]["role_category"]
           schedules?: string[] | null
+          sponsorship_likelihood?: Database["public"]["Enums"]["sponsorship_likelihood"]
           subscription_tier: string
         }
         Update: {
@@ -237,6 +239,7 @@ export type Database = {
           posted_date?: string | null
           role_category?: Database["public"]["Enums"]["role_category"]
           schedules?: string[] | null
+          sponsorship_likelihood?: Database["public"]["Enums"]["sponsorship_likelihood"]
           subscription_tier?: string
         }
         Relationships: [
@@ -383,6 +386,7 @@ export type Database = {
           open_to_remote: boolean | null
           phone_number: string | null
           preferred_locations: string[] | null
+          requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
           target_role_categories: string[] | null
@@ -406,6 +410,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
           target_role_categories?: string[] | null
@@ -429,6 +434,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
           target_role_categories?: string[] | null
@@ -823,6 +829,7 @@ export type Database = {
         | "executive"
         | "other"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
+      sponsorship_likelihood: "Low" | "Medium" | "High" | "N/A"
       subscription_status: "trial" | "active" | "canceled"
     }
     CompositeTypes: {
@@ -984,6 +991,7 @@ export const Constants = {
         "other",
       ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
+      sponsorship_likelihood: ["Low", "Medium", "High", "N/A"],
       subscription_status: ["trial", "active", "canceled"],
     },
   },

@@ -5,6 +5,7 @@ import { jobsAPI } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, ResumeProduct } from '@/types/database'
+import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,6 +91,14 @@ const tailoringStatusLabel = computed(() => {
 
 const hasPremiumInsights = computed(() => userStore.hasAddon('premium_insights'))
 const hasInterviewPrep = computed(() => userStore.hasAddon('interview_prep'))
+
+const showSponsorshipBadge = computed(() => {
+  const profile = userStore.profile
+  const value = job.value?.sponsorshipLikelihood ?? null
+  if (!profile || profile.requires_us_sponsorship !== true) return false
+  if (!value || value === 'N/A') return false
+  return true
+})
 
 const tierTagLabel = computed(() => {
   return job.value?.subscriptionTierDisplayName ?? null
@@ -263,6 +272,10 @@ async function handleTailoringCheckout() {
                     <font-awesome-icon :icon="['fas', 'location-dot']" class="shrink-0 opacity-70" aria-hidden="true" />
                     {{ job.location }}
                   </span>
+                  <JobSponsorshipBadge
+                    v-if="showSponsorshipBadge"
+                    :value="job.sponsorshipLikelihood"
+                  />
                 </div>
               </div>
               <button
