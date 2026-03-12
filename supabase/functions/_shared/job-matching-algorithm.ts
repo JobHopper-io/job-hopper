@@ -475,11 +475,13 @@ function computeCategoricalLocationScore(
   }
 
   let matchedPreferred = false
-  for (const pref of preferredLocations) {
-    if (normalizedJobLocation.includes(pref) || pref.includes(normalizedJobLocation)) {
-      matchedPreferred = true
-      score += cfg.locationWeights.sameMetro
-      break
+  if (normalizedJobLocation) {
+    for (const pref of preferredLocations) {
+      if (normalizedJobLocation.includes(pref) || pref.includes(normalizedJobLocation)) {
+        matchedPreferred = true
+        score += cfg.locationWeights.sameMetro
+        break
+      }
     }
   }
 

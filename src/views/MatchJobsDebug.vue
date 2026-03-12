@@ -90,8 +90,7 @@ function profileToPrefsForm(p: Profile | null) {
   prefsForm.openToRelocation = p.open_to_relocation === true
   prefsForm.openToRemote = p.open_to_remote === true
   prefsForm.locationRadiusMiles =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (p as any).location_radius_miles != null ? String((p as any).location_radius_miles) : ''
+    p.location_radius_miles != null ? String(p.location_radius_miles) : ''
 }
 
 function buildPreferencesOverride(): SubscriberPreferencesOverride {
