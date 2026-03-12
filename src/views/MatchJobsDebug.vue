@@ -349,105 +349,155 @@ onMounted(async () => {
             </div>
             <div class="space-y-2">
               <p class="text-xs font-semibold text-neutral-body">Location weights</p>
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.sameMetro"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)">sameMetro</span>
+              <div class="space-y-3">
+                <div class="space-y-1">
+                  <p class="text-[11px] font-semibold text-neutral-body">
+                    Fallback (string-based only)
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.sameMetro"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
+                    >sameMetro</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.sameState"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
+                    >sameState</span>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.sameState"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location">sameState</span>
+
+                <div class="space-y-1">
+                  <p class="text-[11px] font-semibold text-neutral-body">
+                    Shared (categorical & distance)
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.remotePreferred"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
+                    >remotePreferred</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.relocationAllowed"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
+                    >relocationAllowed</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.otherLocationPenalty"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
+                    >otherLocationPenalty</span>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.remotePreferred"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)">remotePreferred</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.relocationAllowed"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Applied when job is outside preferred locations and far away but you are open to relocation"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Applied when job is outside preferred locations and far away but you are open to relocation">relocationAllowed</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.otherLocationPenalty"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation">otherLocationPenalty</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.distance0to10"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 0–10 miles">distance0to10</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.distance10to25"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 10–25 miles">distance10to25</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.distance25to50"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 25–50 miles">distance25to50</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.distance50to100"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is within 50–100 miles">distance50to100</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.distanceBeyond100"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Distance-based mode: score added when the closest preferred location is more than 100 miles away">distanceBeyond100</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.locationWeights!.withinRadiusBonus"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)">withinRadiusBonus</span>
+
+                <div class="space-y-1">
+                  <p class="text-[11px] font-semibold text-neutral-body">
+                    Distance-based bands
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.distance0to10"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
+                    >distance0to10</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.distance10to25"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
+                    >distance10to25</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.distance25to50"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
+                    >distance25to50</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.distance50to100"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
+                    >distance50to100</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.distanceBeyond100"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
+                    >distanceBeyond100</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.withinRadiusBonus"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
+                    >withinRadiusBonus</span>
+                  </div>
                 </div>
               </div>
             </div>
