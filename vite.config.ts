@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import { resolve } from 'node:path'
 
 import { defineConfig, type PluginOption } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -25,7 +26,8 @@ export default defineConfig(async ({ command }) => {
     },
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url))
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+        '@shared': resolve(__dirname, 'supabase/functions/_shared'),
       },
     },
   }

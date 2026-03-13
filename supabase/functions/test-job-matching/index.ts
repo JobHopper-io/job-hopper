@@ -178,7 +178,9 @@ serve(async (req) => {
           pay_max,
           pay_type,
           created_at,
-          posted_date
+          posted_date,
+          employee_count,
+          sponsorship_likelihood
         `,
         )
         .order('created_at', { ascending: false })
@@ -216,6 +218,8 @@ serve(async (req) => {
       payType: row.pay_type,
       createdAt: row.created_at,
       postedDate: row.posted_date,
+      employeeCount: row.employee_count ?? null,
+      sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))
 
     const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, body.matchConfigOverride)

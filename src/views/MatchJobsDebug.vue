@@ -778,6 +778,7 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Title</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Company</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Sponsorship</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Created</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
@@ -810,6 +811,20 @@ onMounted(async () => {
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   {{ job.location || '—' }}
+                </td>
+                <td class="px-3 py-2 whitespace-nowrap">
+                  <span
+                    v-if="job.effectiveSponsorshipLikelihood"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                    :class="{
+                      'bg-green-100 text-green-800': job.effectiveSponsorshipLikelihood === 'High',
+                      'bg-amber-100 text-amber-800': job.effectiveSponsorshipLikelihood === 'Medium',
+                      'bg-red-100 text-red-800': job.effectiveSponsorshipLikelihood === 'Low',
+                    }"
+                  >
+                    {{ job.effectiveSponsorshipLikelihood }}
+                  </span>
+                  <span v-else class="text-neutral-body">—</span>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   <span v-if="job.locationParsed === false">

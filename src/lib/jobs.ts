@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
+import { getEffectiveSponsorshipLikelihood } from '@shared/infer-sponsorship-likelihood'
 import type {
   JobMatch,
   SavedJob,
@@ -40,6 +41,23 @@ function toMatchedJob(
   job: JobHopperLive | null,
   isSaved: boolean,
 ): MatchedJob {
+  const storedSponsorship = job?.sponsorship_likelihood ?? null
+  const jobData = job
+    ? {
+        title: job.job_title ?? null,
+        companyName: job.company_name ?? null,
+        roleCategory: job.role_category ?? null,
+        location: job.location ?? null,
+        description: job.description ?? null,
+        aiBriefing: job.ai_job_briefing ?? null,
+        employeeCount: job.employee_count ?? null,
+      }
+    : null
+  const effectiveSponsorship =
+    jobData != null
+      ? getEffectiveSponsorshipLikelihood(storedSponsorship ?? 'N/A', jobData)
+      : null
+
   return {
     matchId: match.id,
     jobId: (match.job_id as string) ?? '',
@@ -63,7 +81,7 @@ function toMatchedJob(
     employeeCount: job?.employee_count ?? null,
     postedDate: job?.posted_date ?? null,
     isRemote: job?.is_remote ?? null,
-    sponsorshipLikelihood: job?.sponsorship_likelihood ?? null,
+    sponsorshipLikelihood: effectiveSponsorship ?? storedSponsorship,
   }
 }
 

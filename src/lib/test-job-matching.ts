@@ -22,6 +22,8 @@ export interface RankedJob {
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
+  /** Effective sponsorship likelihood: stored value if not N/A, else inferred from job data */
+  effectiveSponsorshipLikelihood?: 'Low' | 'Medium' | 'High'
 }
 
 export interface MatchJobsDebugPayload {

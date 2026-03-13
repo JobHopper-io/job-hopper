@@ -1,4 +1,11 @@
 import { normalizeLocationInput } from './location-normalization.ts'
+import {
+  getEffectiveSponsorshipLikelihood,
+  inferSponsorshipLikelihood,
+  type JobDataForInference,
+} from './infer-sponsorship-likelihood.ts'
+
+export { getEffectiveSponsorshipLikelihood, inferSponsorshipLikelihood }
 
 export interface SubscriberPreferences {
   roles: string[]
@@ -27,6 +34,10 @@ export interface JobRecord {
   payType: string | null
   createdAt: string
   postedDate: string | null
+  /** Optional: used for sponsorship inference when sponsorshipLikelihood is N/A */
+  employeeCount?: number | null
+  /** Optional: stored value from DB; when N/A, inference is used */
+  sponsorshipLikelihood?: 'Low' | 'Medium' | 'High' | 'N/A' | null
 }
 
 export interface MatchConfigKeywordWeights {
@@ -94,6 +105,8 @@ export interface RankedJob extends JobRecord {
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
+  /** Effective sponsorship likelihood: stored value if not N/A, else inferred from job data */
+  effectiveSponsorshipLikelihood?: 'Low' | 'Medium' | 'High'
 }
 
 export const defaultConfig: MatchConfig = {
@@ -171,6 +184,18 @@ export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined):
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase()
+}
+
+function toJobDataForInference(job: JobRecord): JobDataForInference {
+  return {
+    title: job.title,
+    companyName: job.companyName,
+    roleCategory: job.roleCategory,
+    location: job.location,
+    description: job.description,
+    aiBriefing: job.aiBriefing,
+    employeeCount: job.employeeCount ?? null,
+  }
 }
 
 const AUXILIARY_KEYWORDS = new Set<string>([
@@ -650,9 +675,15 @@ export function matchJobs(
       continue
     }
 
+    const effectiveSponsorship = getEffectiveSponsorshipLikelihood(
+      job.sponsorshipLikelihood ?? 'N/A',
+      toJobDataForInference(job),
+    )
+
     const base: RankedJob = {
       ...job,
       score: totalScore,
+      effectiveSponsorshipLikelihood: effectiveSponsorship,
     }
 
     if (cfg.debug.includeReasonBreakdown) {
@@ -785,6 +816,11 @@ export function matchJobsWithDebug(
       continue
     }
 
+    const effectiveSponsorship = getEffectiveSponsorshipLikelihood(
+      job.sponsorshipLikelihood ?? 'N/A',
+      toJobDataForInference(job),
+    )
+
     const rankedJob: RankedJob = {
       ...job,
       score: totalScore,
@@ -798,6 +834,7 @@ export function matchJobsWithDebug(
       locationDistanceMiles: distanceMiles,
       withinRadius,
       locationParsed,
+      effectiveSponsorshipLikelihood: effectiveSponsorship,
     }
 
     ranked.push(rankedJob)
