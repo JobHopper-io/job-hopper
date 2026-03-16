@@ -4,13 +4,6 @@
 
 [[redirects]]
   from = "/*"
-  to = "https://job-hopper.io/:splat"
-  status = 301
-  force = true
-  conditions = { Host = ["job-hopper.co", "www.job-hopper.co", "job-hopper.net", "www.job-hopper.net"] }
-
-[[redirects]]
-  from = "/*"
   to = "/index.html"
   status = 200
  
