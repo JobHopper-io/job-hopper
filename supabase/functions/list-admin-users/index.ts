@@ -78,19 +78,21 @@ serve(async (req) => {
       })
     }
 
-    const { data: isAdmin, error: adminCheckError } = await userClient.rpc("current_user_has_role", {
-      role_name: "admin",
-    })
+    const [{ data: isAdmin, error: adminCheckError }, { data: isSuperAdmin, error: superAdminError }] =
+      await Promise.all([
+        userClient.rpc("current_user_has_role", { role_name: "admin" }),
+        userClient.rpc("current_user_has_role", { role_name: "super_admin" }),
+      ])
 
-    if (adminCheckError) {
-      console.error("list-admin-users: admin check failed", adminCheckError)
+    if (adminCheckError || superAdminError) {
+      console.error("list-admin-users: role check failed", adminCheckError ?? superAdminError)
       return new Response(JSON.stringify({ error: "Failed to verify admin status" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       })
     }
 
-    if (!isAdmin) {
+    if (!isAdmin && !isSuperAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 403,
@@ -119,7 +121,7 @@ serve(async (req) => {
 
     const profileIds = (profiles ?? []).map((p) => p.id as string)
 
-    let rolesByProfile = new Map<string, string[]>()
+    const rolesByProfile = new Map<string, string[]>()
 
     if (profileIds.length > 0) {
       const { data: roleRows, error: rolesError } = await serviceClient

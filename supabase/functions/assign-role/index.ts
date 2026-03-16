@@ -85,20 +85,20 @@ serve(async (req) => {
       })
     }
 
-    const { data: isAdmin, error: adminCheckError } = await userClient.rpc("current_user_has_role", {
-      role_name: "admin",
-    })
+    const [{ data: isSuperAdmin, error: superAdminError }] = await Promise.all([
+      userClient.rpc("current_user_has_role", { role_name: "super_admin" }),
+    ])
 
-    if (adminCheckError) {
-      console.error("assign-role: admin check failed", adminCheckError)
-      return new Response(JSON.stringify({ error: "Failed to verify admin status" }), {
+    if (superAdminError) {
+      console.error("assign-role: super_admin check failed", superAdminError)
+      return new Response(JSON.stringify({ error: "Failed to verify super_admin status" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       })
     }
 
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
+    if (!isSuperAdmin) {
+      return new Response(JSON.stringify({ error: "Only super_admin can manage roles" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 403,
       })
@@ -139,6 +139,34 @@ serve(async (req) => {
       })
     }
 
+    // Prevent a super_admin from revoking their own super_admin role.
+    if (
+      action === "revoke" &&
+      roleName === "super_admin"
+      // Compare the target profile to the caller by auth_user_id
+    ) {
+      const { data: callerProfile, error: callerProfileError } = await serviceClient
+        .from("profiles")
+        .select("id, auth_user_id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle()
+
+      if (callerProfileError) {
+        console.error("assign-role: error loading caller profile", callerProfileError)
+        return new Response(JSON.stringify({ error: "Failed to load caller profile" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        })
+      }
+
+      if (callerProfile && callerProfile.id === profile.id) {
+        return new Response(JSON.stringify({ error: "You cannot revoke your own super_admin role" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        })
+      }
+    }
+
     if (action === "grant") {
       const { error: upsertError } = await serviceClient
         .from("profile_roles")
@@ -169,12 +197,10 @@ serve(async (req) => {
       }
     }
 
-    const { data: hasRole, error: statusError } = await serviceClient
+    const { data: roleRows, error: statusError } = await serviceClient
       .from("profile_roles")
-      .select("profile_id")
+      .select("roles(name)")
       .eq("profile_id", profile.id)
-      .eq("role_id", roleRow.id)
-      .maybeSingle()
 
     if (statusError) {
       console.error("assign-role: status check failed", statusError)
@@ -184,7 +210,13 @@ serve(async (req) => {
       })
     }
 
-    const isNowAdmin = !!hasRole
+    const roles: string[] =
+      (roleRows ?? [])
+        .map((row: { roles: { name: string } | null }) => row.roles?.name)
+        .filter((name): name is string => typeof name === "string") ?? []
+
+    const isNowAdmin = roles.includes("admin")
+    const isNowSuperAdmin = roles.includes("super_admin")
 
     return new Response(
       JSON.stringify({
@@ -193,7 +225,9 @@ serve(async (req) => {
           first_name: profile.first_name,
           last_name: profile.last_name,
         },
+        roles,
         isAdmin: isNowAdmin,
+        isSuperAdmin: isNowSuperAdmin,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

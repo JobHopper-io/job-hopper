@@ -8,7 +8,7 @@
 
     <section class="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
       <router-link
-        to="/admin/admins"
+        to="/admin/admin-management"
         class="group rounded-2xl border border-neutral-border bg-white/60 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
       >
         <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">

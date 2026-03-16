@@ -26,7 +26,13 @@ export const publicPaths = [
 ]
 
 /** Routes that require the user to be an admin. */
-const adminPaths = ['/admin', '/admin/dashboard', '/admin/admins', '/admin/job-matching', '/admin/settings']
+const adminPaths = [
+  '/admin',
+  '/admin/dashboard',
+  '/admin/admin-management',
+  '/admin/job-matching',
+  '/admin/settings',
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -141,7 +147,7 @@ const router = createRouter({
       component: () => import('../views/AdminDashboard.vue'),
     },
     {
-      path: '/admin/admins',
+      path: '/admin/admin-management',
       name: 'admin-management',
       component: () => import('../views/AdminAdmins.vue'),
     },
@@ -258,10 +264,19 @@ router.beforeEach(async (to) => {
     return '/dashboard'
   }
 
-  // Admin routes require the user to have the admin role.
+  // Admin routes require the user to have appropriate admin roles.
   if (adminPaths.includes(targetPath)) {
-    const isAdmin = await profileAPI.hasRole('admin')
-    if (!isAdmin) {
+    const [isAdmin, isSuperAdmin] = await Promise.all([
+      profileAPI.hasRole('admin'),
+      profileAPI.hasRole('super_admin'),
+    ])
+
+    // Admin Management page is restricted to super_admin only.
+    if (targetPath === '/admin/admin-management') {
+      if (!isSuperAdmin) {
+        return '/dashboard'
+      }
+    } else if (!isAdmin && !isSuperAdmin) {
       return '/dashboard'
     }
   }
