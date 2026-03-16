@@ -313,7 +313,7 @@ onMounted(async () => {
 
         <section class="space-y-3">
           <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-            Preferences (defaults from your profile)
+            Preferences
           </h3>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -399,11 +399,11 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="space-y-4 border-t border-neutral-border pt-4">
+        <section class="space-y-3 border-t border-neutral-border pt-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-                Match config (from active configuration)
+                Match config
               </h3>
               <p class="text-xs text-neutral-body" v-if="activeConfig">
                 <span class="font-semibold">Active config:</span>
@@ -434,151 +434,156 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-          <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-4 py-4 sm:px-5 sm:py-5 max-w-5xl mx-auto">
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
-              <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.keywordWeights!.currentJobTitleKeyword"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when a current job title keyword (comma-separated) appears in the job"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when a current job title keyword (comma-separated) appears in the job">currentJobTitleKeyword</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.keywordWeights!.currentIndustryKeyword"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when a current industry keyword (comma-separated) appears in the job"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when a current industry keyword (comma-separated) appears in the job">currentIndustryKeyword</span>
+          <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-3 py-3 sm:px-4 sm:py-4">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.keywordWeights!.currentJobTitleKeyword"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Score when a current job title keyword (comma-separated) appears in the job"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Score when a current job title keyword (comma-separated) appears in the job">currentJobTitleKeyword</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.keywordWeights!.currentIndustryKeyword"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Score when a current industry keyword (comma-separated) appears in the job"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Score when a current industry keyword (comma-separated) appears in the job">currentIndustryKeyword</span>
+                  </div>
                 </div>
               </div>
-            </div>
-              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
-              <p class="text-xs font-semibold text-neutral-body">Pay weights</p>
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.payWeights!.insideRange"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when job salary range overlaps your desired range"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job salary range overlaps your desired range">insideRange</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.payWeights!.nearRange"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when job salary is slightly above or below your range (within tolerance)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job salary is slightly above or below your range (within tolerance)">nearRange</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.payWeights!.missingSalary"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Score when job has no salary listed"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Score when job has no salary listed">missingSalary</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.payWeights!.belowRangePenalty"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Penalty when job salary is below your range (beyond tolerance)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when job salary is below your range (beyond tolerance)">belowRangePenalty</span>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Pay weights</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.payWeights!.insideRange"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Score when job salary range overlaps your desired range"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Score when job salary range overlaps your desired range">insideRange</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.payWeights!.nearRange"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Score when job salary is slightly above or below your range (within tolerance)"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Score when job salary is slightly above or below your range (within tolerance)">nearRange</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.payWeights!.missingSalary"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Score when job has no salary listed"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Score when job has no salary listed">missingSalary</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.payWeights!.belowRangePenalty"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Penalty when job salary is below your range (beyond tolerance)"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Penalty when job salary is below your range (beyond tolerance)">belowRangePenalty</span>
+                  </div>
                 </div>
               </div>
-            </div>
-              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3 sm:col-span-2 lg:col-span-1">
-              <p class="text-xs font-semibold text-neutral-body">Location weights</p>
-              <div class="space-y-3">
-                <div class="space-y-1">
-                  <p class="text-[11px] font-semibold text-neutral-body">
-                    Fallback (string-based only)
-                  </p>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Recency weights</p>
+                <div class="space-y-1.5">
                   <div class="flex items-center gap-2">
                     <input
-                      v-model.number="configForm.locationWeights!.sameMetro"
+                      v-model.number="configForm.recencyWeights!.baseRecency"
                       type="number"
+                      step="0.1"
                       class="input w-20 text-sm"
-                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
+                      title="Base score for job recency; decay is applied per day"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
-                    >sameMetro</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Base score for job recency; decay is applied per day">baseRecency</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
-                      v-model.number="configForm.locationWeights!.sameState"
+                      v-model.number="configForm.recencyWeights!.perDayDecay"
+                      type="number"
+                      step="0.01"
+                      class="input w-20 text-sm"
+                      title="Amount subtracted from recency score per day since posted"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Amount subtracted from recency score per day since posted">perDayDecay</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.recencyWeights!.maxAgeDays"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
+                      title="Jobs older than this many days are excluded (recency score becomes -Infinity)"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
-                    >sameState</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded (recency score becomes -Infinity)">maxAgeDays</span>
                   </div>
                 </div>
+              </div>
 
-                <div class="space-y-1">
-                  <p class="text-[11px] font-semibold text-neutral-body">
-                    Shared (categorical & distance)
-                  </p>
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Thresholds</p>
+                <div class="space-y-1.5">
                   <div class="flex items-center gap-2">
                     <input
-                      v-model.number="configForm.locationWeights!.remotePreferred"
+                      v-model.number="configForm.thresholds!.minTotalScore"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
+                      title="Minimum total score for a job to be included in results"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
-                    >remotePreferred</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Minimum total score for a job to be included in results">minTotalScore</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
-                      v-model.number="configForm.locationWeights!.relocationAllowed"
+                      v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
+                      title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
-                    >relocationAllowed</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)">noKeywordMatchPenalty</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
-                      v-model.number="configForm.locationWeights!.otherLocationPenalty"
+                      v-model.number="configForm.thresholds!.overPayTolerancePct"
                       type="number"
+                      step="0.01"
                       class="input w-20 text-sm"
-                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
+                      title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
-                    >otherLocationPenalty</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange">overPayTolerancePct</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.thresholds!.underPayTolerancePct"
+                      type="number"
+                      step="0.01"
+                      class="input w-20 text-sm"
+                      title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange"
+                    >
+                    <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
                   </div>
                 </div>
+              </div>
 
-                <div class="space-y-1">
-                  <p class="text-[11px] font-semibold text-neutral-body">
-                    Distance-based bands
-                  </p>
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Location - Distance</p>
+                <div class="space-y-1.5">
                   <div class="flex items-center gap-2">
                     <input
                       v-model.number="configForm.locationWeights!.distance0to10"
@@ -653,84 +658,78 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
-            </div>
-              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
-              <p class="text-xs font-semibold text-neutral-body">Recency weights</p>
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.recencyWeights!.baseRecency"
-                    type="number"
-                    step="0.1"
-                    class="input w-20 text-sm"
-                    title="Base score for job recency; decay is applied per day"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Base score for job recency; decay is applied per day">baseRecency</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.recencyWeights!.perDayDecay"
-                    type="number"
-                    step="0.01"
-                    class="input w-20 text-sm"
-                    title="Amount subtracted from recency score per day since posted"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Amount subtracted from recency score per day since posted">perDayDecay</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.recencyWeights!.maxAgeDays"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Jobs older than this many days are excluded (recency score becomes -Infinity)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded (recency score becomes -Infinity)">maxAgeDays</span>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Location - Categorical (Fallback)</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.sameMetro"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
+                    >sameMetro</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.sameState"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
+                    >sameState</span>
+                  </div>
                 </div>
               </div>
-            </div>
-              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
-              <p class="text-xs font-semibold text-neutral-body">Thresholds</p>
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.thresholds!.minTotalScore"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Minimum total score for a job to be included in results"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Minimum total score for a job to be included in results">minTotalScore</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
-                    type="number"
-                    class="input w-20 text-sm"
-                    title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)">noKeywordMatchPenalty</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.thresholds!.overPayTolerancePct"
-                    type="number"
-                    step="0.01"
-                    class="input w-20 text-sm"
-                    title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange">overPayTolerancePct</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model.number="configForm.thresholds!.underPayTolerancePct"
-                    type="number"
-                    step="0.01"
-                    class="input w-20 text-sm"
-                    title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange"
-                  >
-                  <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
+                <p class="text-xs font-semibold text-neutral-body">Location - Shared</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.remotePreferred"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
+                    >remotePreferred</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.relocationAllowed"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
+                    >relocationAllowed</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model.number="configForm.locationWeights!.otherLocationPenalty"
+                      type="number"
+                      class="input w-20 text-sm"
+                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
+                    >
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
+                    >otherLocationPenalty</span>
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           </div>
         </section>
