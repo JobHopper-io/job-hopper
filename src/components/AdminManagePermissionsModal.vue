@@ -2,16 +2,10 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
     <div class="w-full max-w-md rounded-2xl bg-white/95 backdrop-blur shadow-2xl border border-neutral-border/70">
       <header class="flex items-start gap-3 border-b border-neutral-border/80 px-6 py-4">
-        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary text-sm font-semibold">
-          AP
-        </div>
         <div class="flex-1 min-w-0">
           <h2 class="text-lg font-heading font-semibold text-brand-charcoal truncate">
             Manage permissions
           </h2>
-          <p class="mt-1 text-xs text-neutral-body">
-            Choose which admin capabilities this user should have. <span class="font-medium text-brand-charcoal">Super admin</span> always includes <span class="font-medium text-brand-charcoal">admin</span>.
-          </p>
         </div>
       </header>
 
@@ -26,9 +20,6 @@
                 {{ user.email }}
               </div>
             </div>
-            <span class="hidden sm:inline-flex shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-neutral-muted border border-neutral-border/70">
-              Admin access
-            </span>
           </div>
         </div>
 
@@ -69,10 +60,6 @@
               </span>
             </span>
           </label>
-
-          <p class="mt-1 text-xs text-neutral-muted">
-            Note: Selecting <span class="font-medium text-brand-charcoal">Super admin</span> will automatically keep <span class="font-medium text-brand-charcoal">Admin</span> selected.
-          </p>
         </div>
 
         <p
@@ -101,9 +88,6 @@
       </section>
 
       <footer class="border-t border-neutral-border/80 px-6 py-3.5 flex items-center justify-between gap-3">
-        <p class="hidden sm:block text-[11px] text-neutral-muted">
-          Changes apply immediately for this user.
-        </p>
         <div class="flex justify-end gap-2 w-full sm:w-auto">
           <button
             type="button"
@@ -123,7 +107,7 @@
               Saving…
             </span>
             <span v-else>
-              Save changes
+              Save
             </span>
           </button>
         </div>
