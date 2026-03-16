@@ -6,12 +6,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
-  
+ 
+[[redirects]]
   from = "https://job-hopper.net/*"
   to = "https://job-hopper.io/:splat"
+  status = 301
 
+[[redirects]]
   from = "https://job-hopper.co/*"
   to = "https://job-hopper.io/:splat"
+  status = 301
 
 [[headers]]
   for = "/manifest.webmanifest"
