@@ -94,6 +94,7 @@
                     type="button"
                     class="btn-primary text-xs"
                     :disabled="isCurrentUser(user) || mutatingId === user.id"
+                    :title="isCurrentUser(user) ? 'You can’t edit your own permissions' : undefined"
                     @click="openPermissions(user)"
                   >
                     <span v-if="mutatingId === user.id">
@@ -103,12 +104,6 @@
                       Manage permissions
                     </span>
                   </button>
-                  <span
-                    v-if="isCurrentUser(user)"
-                    class="text-[11px] text-neutral-muted"
-                  >
-                    You can’t edit your own permissions
-                  </span>
                 </div>
               </td>
             </tr>
