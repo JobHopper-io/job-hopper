@@ -8,6 +8,7 @@
 
     <section class="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
       <router-link
+        v-if="isSuperAdmin"
         to="/admin/admin-management"
         class="group rounded-2xl border border-neutral-border bg-white/60 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
       >
@@ -47,5 +48,19 @@
   </main>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { profileAPI } from '@/lib/profile'
+
+const isSuperAdmin = ref(false)
+
+onMounted(async () => {
+  try {
+    isSuperAdmin.value = await profileAPI.hasRole('super_admin')
+  } catch (error) {
+    console.error('Error checking super_admin role in AdminDashboard:', error)
+    isSuperAdmin.value = false
+  }
+})
+</script>
 

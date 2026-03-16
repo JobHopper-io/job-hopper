@@ -2,6 +2,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
+import { profileAPI } from '@/lib/profile'
 import { useUserStore } from '@/stores/user'
 import jobHopperFullLogo from '@/assets/job-hopper-logo.png'
 import jobHopperWordsLogo from '@/assets/job-hopper-words.png'
@@ -12,8 +13,26 @@ const userStore = useUserStore()
 
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
+const isAdmin = ref(false)
+const isSuperAdmin = ref(false)
 
 const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
+const canAccessAdmin = computed(() => isAdmin.value || isSuperAdmin.value)
+
+const loadAdminRoles = async () => {
+  try {
+    const [admin, superAdmin] = await Promise.all([
+      profileAPI.hasRole('admin'),
+      profileAPI.hasRole('super_admin'),
+    ])
+    isAdmin.value = admin
+    isSuperAdmin.value = superAdmin
+  } catch (error) {
+    console.error('Error loading admin roles:', error)
+    isAdmin.value = false
+    isSuperAdmin.value = false
+  }
+}
 
 // Load profile + subscription once when user becomes authenticated
 watch(isAuthenticated, (authenticated) => {
@@ -21,9 +40,12 @@ watch(isAuthenticated, (authenticated) => {
     void Promise.all([
       userStore.refreshProfile(),
       userStore.refreshSubscription(),
+      loadAdminRoles(),
     ])
   } else {
     userStore.clear()
+    isAdmin.value = false
+    isSuperAdmin.value = false
   }
 })
 
@@ -61,6 +83,8 @@ const handleSignOut = async () => {
     const { error } = await authAPI.signOut()
     if (error) throw error
     userStore.clear()
+    isAdmin.value = false
+    isSuperAdmin.value = false
     router.push('/')
   } catch (error) {
     console.error('Error signing out:', error)
@@ -151,6 +175,13 @@ const handleSignOutAndCloseMenu = async () => {
                   class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Billing
+                </router-link>
+                <router-link
+                  v-if="canAccessAdmin"
+                  to="/admin/dashboard"
+                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Admin
                 </router-link>
                 <button
                   @click="handleSignOut"
@@ -251,6 +282,14 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Billing
+                </router-link>
+                <router-link
+                  v-if="canAccessAdmin"
+                  to="/admin/dashboard"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Admin
                 </router-link>
                 <button
                   @click="handleSignOutAndCloseMenu"
