@@ -23,7 +23,7 @@
         <div class="space-y-2">
           <label class="flex items-start gap-2 text-sm">
             <input
-              v-model="localRolesState.admin"
+              v-model="adminChecked"
               type="checkbox"
               class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
               :disabled="isSelf || isSaving"
@@ -38,7 +38,7 @@
 
           <label class="flex items-start gap-2 text-sm">
             <input
-              v-model="localRolesState.super_admin"
+              v-model="superAdminChecked"
               type="checkbox"
               class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
               :disabled="isSelf || isSaving"
@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   user: {
@@ -119,39 +119,38 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const localRolesState = reactive({
-  admin: computed({
-    get: () => props.roles.includes('admin'),
-    set: (value: boolean) => {
-      // If admin is unchecked while super_admin is active, also drop super_admin.
-      if (!value && localRolesState.super_admin) {
-        localRolesState.super_admin = false
-      }
-    },
-  }),
-  super_admin: computed({
-    get: () => props.roles.includes('super_admin'),
-    set: (value: boolean) => {
-      // If super_admin is checked, ensure admin is also checked.
-      if (value && !localRolesState.admin) {
-        localRolesState.admin = true
-      }
-    },
-  }),
-})
+const adminChecked = ref(false)
+const superAdminChecked = ref(false)
 
+// Sync local checkbox state from incoming roles whenever the modal is opened
+// or the parent updates the roles after a save.
 watch(
   () => props.roles,
-  () => {
-    // The computed getters will derive from props.roles; this watcher exists
-    // to ensure reactivity when the parent updates roles after a save.
+  (roles) => {
+    adminChecked.value = roles.includes('admin')
+    superAdminChecked.value = roles.includes('super_admin')
   },
+  { immediate: true },
 )
+
+// Enforce super_admin ⇒ admin at the UI level.
+watch(superAdminChecked, (value) => {
+  if (value && !adminChecked.value) {
+    adminChecked.value = true
+  }
+})
+
+// If admin is turned off while super_admin is on, drop super_admin too.
+watch(adminChecked, (value) => {
+  if (!value && superAdminChecked.value) {
+    superAdminChecked.value = false
+  }
+})
 
 const handleSave = () => {
   const nextRoles: string[] = []
-  if (localRolesState.admin) nextRoles.push('admin')
-  if (localRolesState.super_admin) nextRoles.push('super_admin')
+  if (adminChecked.value) nextRoles.push('admin')
+  if (superAdminChecked.value) nextRoles.push('super_admin')
   emit('save', nextRoles)
 }
 </script>
