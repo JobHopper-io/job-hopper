@@ -9,6 +9,7 @@ import {
   type MatchJobsDebugPayload,
   type SubscriberPreferencesOverride,
   type MatchConfigOverride,
+  type AdminMatchingConfig,
 } from '@/lib/admin-job-matching-algorithm'
 import type { Profile } from '@/types/database'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
@@ -16,6 +17,17 @@ import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
 const result = ref<MatchJobsResponse | null>(null)
+
+const isConfigLoading = ref(false)
+const activeConfig = ref<AdminMatchingConfig | null>(null)
+const configs = ref<AdminMatchingConfig[]>([])
+const isConfigModalOpen = ref(false)
+const isSaveConfigModalOpen = ref(false)
+const isOverrideWarningOpen = ref(false)
+const configToOverride = ref<AdminMatchingConfig | null>(null)
+const saveConfigName = ref('')
+const saveConfigMakeActive = ref(true)
+const overrideConfirmationText = ref('')
 
 // Preferences form (defaults from user profile)
 const prefsForm = reactive<{
@@ -132,11 +144,90 @@ function buildMatchConfigOverride(): MatchConfigOverride {
 async function resetToDefaults() {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
-  configForm.keywordWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights }
-  configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
-  configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
-  configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
-  configForm.thresholds = { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds }
+  if (activeConfig.value) {
+    configForm.keywordWeights = { ...(activeConfig.value.config.keywordWeights ?? {}) }
+    configForm.payWeights = { ...(activeConfig.value.config.payWeights ?? {}) }
+    configForm.locationWeights = { ...(activeConfig.value.config.locationWeights ?? {}) }
+    configForm.recencyWeights = { ...(activeConfig.value.config.recencyWeights ?? {}) }
+    configForm.thresholds = { ...(activeConfig.value.config.thresholds ?? {}) }
+  } else {
+    configForm.keywordWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights }
+    configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
+    configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
+    configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
+    configForm.thresholds = { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds }
+  }
+}
+
+function applyConfigToForm(cfg: MatchConfigOverride | undefined) {
+  if (!cfg) return
+  configForm.keywordWeights = { ...(cfg.keywordWeights ?? {}) }
+  configForm.payWeights = { ...(cfg.payWeights ?? {}) }
+  configForm.locationWeights = { ...(cfg.locationWeights ?? {}) }
+  configForm.recencyWeights = { ...(cfg.recencyWeights ?? {}) }
+  configForm.thresholds = { ...(cfg.thresholds ?? {}) }
+}
+
+async function openConfigModal() {
+  isConfigLoading.value = true
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.listConfigs()
+  if (!error) {
+    configs.value = data
+    activeConfig.value = data.find((c) => c.active) ?? activeConfig.value
+  }
+  isConfigLoading.value = false
+  isConfigModalOpen.value = true
+}
+
+function applyConfigFromList(cfg: AdminMatchingConfig) {
+  applyConfigToForm(cfg.config)
+  isConfigModalOpen.value = false
+}
+
+function openSaveConfigModal() {
+  saveConfigName.value = activeConfig.value?.name ?? ''
+  saveConfigMakeActive.value = true
+  isSaveConfigModalOpen.value = true
+}
+
+async function saveCurrentAsConfig() {
+  if (!saveConfigName.value.trim()) return
+  const override = buildMatchConfigOverride()
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.createConfigFromOverride(
+    saveConfigName.value.trim(),
+    override,
+    saveConfigMakeActive.value,
+  )
+  if (!error && data) {
+    activeConfig.value = data.active ? data : activeConfig.value
+    isSaveConfigModalOpen.value = false
+  }
+}
+
+function openOverrideWarning(cfg: AdminMatchingConfig) {
+  configToOverride.value = cfg
+  overrideConfirmationText.value = ''
+  isOverrideWarningOpen.value = true
+}
+
+async function confirmOverrideActiveConfig() {
+  const target = configToOverride.value
+  if (!target) return
+  if (overrideConfirmationText.value.trim().toUpperCase() !== 'OVERRIDE') {
+    return
+  }
+  const override = buildMatchConfigOverride()
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.updateConfigFromOverride(
+    target.id,
+    target.name,
+    override,
+    undefined,
+  )
+  if (!error && data) {
+    activeConfig.value = data
+    isOverrideWarningOpen.value = false
+    isConfigModalOpen.value = false
+  }
 }
 
 async function loadMatches() {
@@ -162,6 +253,18 @@ async function loadMatches() {
 onMounted(async () => {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
+
+  isConfigLoading.value = true
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.listConfigs()
+  if (!error) {
+    configs.value = data
+    const active = data.find((c) => c.active) ?? null
+    if (active) {
+      activeConfig.value = active
+      applyConfigToForm(active.config)
+    }
+  }
+  isConfigLoading.value = false
 })
 </script>
 
@@ -273,9 +376,40 @@ onMounted(async () => {
         </section>
 
         <section class="space-y-3 border-t border-neutral-border pt-4">
-          <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-            Match config (defaults from algorithm)
-          </h3>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
+                Match config (from active configuration)
+              </h3>
+              <p class="text-xs text-neutral-body" v-if="activeConfig">
+                <span class="font-semibold">Active config:</span>
+                <span>{{ activeConfig.name }}</span>
+                <span class="ml-2 text-[11px] text-neutral-subtle">
+                  (updated {{ new Date(activeConfig.updatedAt).toLocaleString() }})
+                </span>
+              </p>
+              <p class="text-xs text-neutral-body" v-else>
+                Using built-in default config (no active DB config found).
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="btn-secondary text-xs"
+                :disabled="isConfigLoading"
+                @click="openConfigModal"
+              >
+                {{ isConfigLoading ? 'Loading configs…' : 'Choose config…' }}
+              </button>
+              <button
+                type="button"
+                class="btn-secondary text-xs"
+                @click="openSaveConfigModal"
+              >
+                Save current as config…
+              </button>
+            </div>
+          </div>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div class="space-y-2">
               <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
@@ -889,6 +1023,191 @@ onMounted(async () => {
         <p class="text-sm text-neutral-body">
           No jobs matched for the current input.
         </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config picker modal -->
+  <div
+    v-if="isConfigModalOpen"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+  >
+    <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+      <div class="px-4 py-3 border-b border-neutral-border flex items-center justify-between">
+        <h2 class="text-sm font-heading font-semibold text-brand-charcoal">
+          Matching configs
+        </h2>
+        <button
+          type="button"
+          class="text-xs text-neutral-body hover:text-brand-charcoal"
+          @click="isConfigModalOpen = false"
+        >
+          Close
+        </button>
+      </div>
+      <div class="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+        <p v-if="!configs.length" class="text-xs text-neutral-body">
+          No saved configurations yet. Use “Save current as config…” to create one.
+        </p>
+        <ul v-else class="space-y-2">
+          <li
+            v-for="cfg in configs"
+            :key="cfg.id"
+            class="border border-neutral-border rounded-md p-3 flex flex-col gap-2"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-sm font-semibold text-brand-charcoal">
+                  {{ cfg.name }}
+                  <span
+                    v-if="cfg.active"
+                    class="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                  >
+                    Active
+                  </span>
+                </p>
+                <p class="text-[11px] text-neutral-body">
+                  Updated {{ new Date(cfg.updatedAt).toLocaleString() }}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="btn-secondary text-[11px] py-1 px-2"
+                  @click="applyConfigFromList(cfg)"
+                >
+                  Apply to form
+                </button>
+                <button
+                  type="button"
+                  class="btn-secondary text-[11px] py-1 px-2"
+                  v-if="cfg.active"
+                  @click="openOverrideWarning(cfg)"
+                >
+                  Override active with current values…
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[11px] text-neutral-body">
+              <div>
+                <span class="font-semibold">Min score:</span>
+                <span> {{ cfg.config.thresholds?.minTotalScore ?? '—' }}</span>
+              </div>
+              <div>
+                <span class="font-semibold">Base recency:</span>
+                <span> {{ cfg.config.recencyWeights?.baseRecency ?? '—' }}</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save config modal -->
+  <div
+    v-if="isSaveConfigModalOpen"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+  >
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+      <div class="px-4 py-3 border-b border-neutral-border flex items-center justify-between">
+        <h2 class="text-sm font-heading font-semibold text-brand-charcoal">
+          Save current config
+        </h2>
+        <button
+          type="button"
+          class="text-xs text-neutral-body hover:text-brand-charcoal"
+          @click="isSaveConfigModalOpen = false"
+        >
+          Close
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-neutral-body mb-1">
+            Configuration name
+          </label>
+          <input
+            v-model="saveConfigName"
+            type="text"
+            class="input w-full"
+            placeholder="e.g. Aggressive recent jobs"
+          >
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            v-model="saveConfigMakeActive"
+            type="checkbox"
+            class="rounded border-neutral-border"
+          >
+          <span class="text-xs text-neutral-body">
+            Make this the active configuration for the algorithm
+          </span>
+        </label>
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            @click="isSaveConfigModalOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn-primary text-xs"
+            @click="saveCurrentAsConfig"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scary override warning modal -->
+  <div
+    v-if="isOverrideWarningOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  >
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 border border-red-300">
+      <div class="px-4 py-3 border-b border-red-200 bg-red-50 flex items-center justify-between">
+        <h2 class="text-sm font-heading font-semibold text-red-800">
+          Override active configuration?
+        </h2>
+      </div>
+      <div class="p-4 space-y-3">
+        <p class="text-xs text-red-900">
+          You are about to change the <span class="font-semibold">active job-matching configuration</span>.
+          This will immediately affect how the algorithm scores jobs for all users on subsequent runs.
+          This action cannot be undone.
+        </p>
+        <p class="text-xs text-red-900">
+          To confirm, type <code class="font-mono text-[11px] bg-red-50 px-1 py-0.5 rounded">OVERRIDE</code> below and click
+          <span class="font-semibold">Override active configuration</span>.
+        </p>
+        <input
+          v-model="overrideConfirmationText"
+          type="text"
+          class="input w-full border-red-300"
+          placeholder="Type OVERRIDE to confirm"
+        >
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            @click="isOverrideWarningOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn-primary text-xs bg-red-600 hover:bg-red-700 border-red-700"
+            :disabled="overrideConfirmationText.trim().toUpperCase() !== 'OVERRIDE'"
+            @click="confirmOverrideActiveConfig"
+          >
+            Override active configuration
+          </button>
+        </div>
       </div>
     </div>
   </div>

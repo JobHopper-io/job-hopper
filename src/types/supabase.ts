@@ -291,6 +291,102 @@ export type Database = {
           },
         ]
       }
+      matching_algorithm_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          keyword_current_industry_weight: number
+          keyword_current_job_title_weight: number
+          loc_distance_0_10_weight: number
+          loc_distance_10_25_weight: number
+          loc_distance_25_50_weight: number
+          loc_distance_50_100_weight: number
+          loc_distance_beyond_100_weight: number
+          loc_other_location_penalty: number
+          loc_relocation_allowed_weight: number
+          loc_remote_preferred_weight: number
+          loc_same_metro_weight: number
+          loc_same_state_weight: number
+          loc_within_radius_bonus_weight: number
+          name: string
+          pay_below_range_penalty: number
+          pay_inside_range_weight: number
+          pay_missing_salary_weight: number
+          pay_near_range_weight: number
+          recency_base_weight: number
+          recency_max_age_days: number
+          recency_per_day_decay: number
+          threshold_min_total_score: number
+          threshold_no_keyword_match_penalty: number
+          threshold_over_pay_tolerance_pct: number
+          threshold_under_pay_tolerance_pct: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          keyword_current_industry_weight: number
+          keyword_current_job_title_weight: number
+          loc_distance_0_10_weight: number
+          loc_distance_10_25_weight: number
+          loc_distance_25_50_weight: number
+          loc_distance_50_100_weight: number
+          loc_distance_beyond_100_weight: number
+          loc_other_location_penalty: number
+          loc_relocation_allowed_weight: number
+          loc_remote_preferred_weight: number
+          loc_same_metro_weight: number
+          loc_same_state_weight: number
+          loc_within_radius_bonus_weight: number
+          name: string
+          pay_below_range_penalty: number
+          pay_inside_range_weight: number
+          pay_missing_salary_weight: number
+          pay_near_range_weight: number
+          recency_base_weight: number
+          recency_max_age_days: number
+          recency_per_day_decay: number
+          threshold_min_total_score: number
+          threshold_no_keyword_match_penalty: number
+          threshold_over_pay_tolerance_pct: number
+          threshold_under_pay_tolerance_pct: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          keyword_current_industry_weight?: number
+          keyword_current_job_title_weight?: number
+          loc_distance_0_10_weight?: number
+          loc_distance_10_25_weight?: number
+          loc_distance_25_50_weight?: number
+          loc_distance_50_100_weight?: number
+          loc_distance_beyond_100_weight?: number
+          loc_other_location_penalty?: number
+          loc_relocation_allowed_weight?: number
+          loc_remote_preferred_weight?: number
+          loc_same_metro_weight?: number
+          loc_same_state_weight?: number
+          loc_within_radius_bonus_weight?: number
+          name?: string
+          pay_below_range_penalty?: number
+          pay_inside_range_weight?: number
+          pay_missing_salary_weight?: number
+          pay_near_range_weight?: number
+          recency_base_weight?: number
+          recency_max_age_days?: number
+          recency_per_day_decay?: number
+          threshold_min_total_score?: number
+          threshold_no_keyword_match_penalty?: number
+          threshold_over_pay_tolerance_pct?: number
+          threshold_under_pay_tolerance_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_settings: {
         Row: {
           created_at: string

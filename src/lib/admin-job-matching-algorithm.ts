@@ -116,6 +116,15 @@ export interface MatchConfigOverride {
   thresholds?: MatchConfigThresholds
 }
 
+export interface AdminMatchingConfig {
+  id: string
+  name: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+  config: MatchConfigOverride
+}
+
 export interface GetAdminMatchesOptions {
   preferencesOverride?: SubscriberPreferencesOverride
   matchConfigOverride?: MatchConfigOverride
@@ -185,6 +194,160 @@ export const jobMatchingAlgorithmAdminAPI = {
     }
 
     return { data: data ?? null, error: null }
+  },
+
+  async listConfigs(): Promise<{ data: AdminMatchingConfig[]; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      configs: {
+        id: string
+        name: string
+        active: boolean
+        created_at: string
+        updated_at: string
+        config: MatchConfigOverride
+      }[]
+    }>('admin-matching-configs', {
+      method: 'POST',
+      body: { action: 'list' },
+    })
+
+    if (error) {
+      return { data: [], error: new Error(error.message) }
+    }
+
+    const rows = data?.configs ?? []
+    const mapped: AdminMatchingConfig[] = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      active: row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      config: row.config ?? {},
+    }))
+
+    return { data: mapped, error: null }
+  },
+
+  async createConfigFromOverride(
+    name: string,
+    values: MatchConfigOverride,
+    makeActive: boolean,
+  ): Promise<{ data: AdminMatchingConfig | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      config: {
+        id: string
+        name: string
+        active: boolean
+        created_at: string
+        updated_at: string
+        config: MatchConfigOverride
+      }
+    }>('admin-matching-configs', {
+      method: 'POST',
+      body: {
+        action: 'create',
+        name,
+        makeActive,
+        config: values,
+      },
+    })
+
+    if (error || !data?.config) {
+      return { data: null, error: error ? new Error(error.message) : new Error('No config returned') }
+    }
+
+    const row = data.config
+    return {
+      data: {
+        id: row.id,
+        name: row.name,
+        active: row.active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        config: row.config ?? {},
+      },
+      error: null,
+    }
+  },
+
+  async updateConfigFromOverride(
+    id: string,
+    name: string | undefined,
+    values: MatchConfigOverride,
+    makeActive: boolean | undefined,
+  ): Promise<{ data: AdminMatchingConfig | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      config: {
+        id: string
+        name: string
+        active: boolean
+        created_at: string
+        updated_at: string
+        config: MatchConfigOverride
+      }
+    }>('admin-matching-configs', {
+      method: 'POST',
+      body: {
+        action: 'update',
+        id,
+        name,
+        makeActive,
+        config: values,
+      },
+    })
+
+    if (error || !data?.config) {
+      return { data: null, error: error ? new Error(error.message) : new Error('No config returned') }
+    }
+
+    const row = data.config
+    return {
+      data: {
+        id: row.id,
+        name: row.name,
+        active: row.active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        config: row.config ?? {},
+      },
+      error: null,
+    }
+  },
+
+  async activateConfig(id: string): Promise<{ data: AdminMatchingConfig | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      config: {
+        id: string
+        name: string
+        active: boolean
+        created_at: string
+        updated_at: string
+        config: MatchConfigOverride
+      }
+    }>('admin-matching-configs', {
+      method: 'POST',
+      body: {
+        action: 'activate',
+        id,
+      },
+    })
+
+    if (error || !data?.config) {
+      return { data: null, error: error ? new Error(error.message) : new Error('No config returned') }
+    }
+
+    const row = data.config
+    return {
+      data: {
+        id: row.id,
+        name: row.name,
+        active: row.active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        config: row.config ?? {},
+      },
+      error: null,
+    }
   },
 }
 

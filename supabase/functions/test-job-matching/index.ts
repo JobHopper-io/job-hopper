@@ -17,6 +17,96 @@ interface TestJobMatchingBody {
   matchConfigOverride?: Partial<MatchConfig>
 }
 
+function configRowToOverride(row: any): Partial<MatchConfig> {
+  const keywordWeights = {
+    currentJobTitleKeyword: row.keyword_current_job_title_weight,
+    currentIndustryKeyword: row.keyword_current_industry_weight,
+  }
+
+  const payWeights = {
+    insideRange: row.pay_inside_range_weight,
+    nearRange: row.pay_near_range_weight,
+    missingSalary: row.pay_missing_salary_weight,
+    belowRangePenalty: row.pay_below_range_penalty,
+  }
+
+  const locationWeights = {
+    sameMetro: row.loc_same_metro_weight,
+    sameState: row.loc_same_state_weight,
+    remotePreferred: row.loc_remote_preferred_weight,
+    relocationAllowed: row.loc_relocation_allowed_weight,
+    otherLocationPenalty: row.loc_other_location_penalty,
+    distance0to10: row.loc_distance_0_10_weight,
+    distance10to25: row.loc_distance_10_25_weight,
+    distance25to50: row.loc_distance_25_50_weight,
+    distance50to100: row.loc_distance_50_100_weight,
+    distanceBeyond100: row.loc_distance_beyond_100_weight,
+    withinRadiusBonus: row.loc_within_radius_bonus_weight,
+  }
+
+  const recencyWeights = {
+    baseRecency: row.recency_base_weight,
+    perDayDecay: row.recency_per_day_decay,
+    maxAgeDays: row.recency_max_age_days,
+  }
+
+  const thresholds = {
+    minTotalScore: row.threshold_min_total_score,
+    noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
+    overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
+    underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
+  }
+
+  return {
+    keywordWeights,
+    payWeights,
+    locationWeights,
+    recencyWeights,
+    thresholds,
+  }
+}
+
+function mergeConfigOverrides(
+  base: Partial<MatchConfig> | null | undefined,
+  override: Partial<MatchConfig> | null | undefined,
+): Partial<MatchConfig> | undefined {
+  if (!base && !override) return undefined
+  if (!base && override) return override
+  if (base && !override) return base
+
+  const b = base as Partial<MatchConfig>
+  const o = override as Partial<MatchConfig>
+
+  return {
+    ...b,
+    ...o,
+    keywordWeights: {
+      ...(b.keywordWeights ?? {}),
+      ...(o.keywordWeights ?? {}),
+    },
+    payWeights: {
+      ...(b.payWeights ?? {}),
+      ...(o.payWeights ?? {}),
+    },
+    locationWeights: {
+      ...(b.locationWeights ?? {}),
+      ...(o.locationWeights ?? {}),
+    },
+    recencyWeights: {
+      ...(b.recencyWeights ?? {}),
+      ...(o.recencyWeights ?? {}),
+    },
+    thresholds: {
+      ...(b.thresholds ?? {}),
+      ...(o.thresholds ?? {}),
+    },
+    debug: {
+      ...(b.debug ?? {}),
+      ...(o.debug ?? {}),
+    },
+  }
+}
+
 function mergePreferences(
   base: SubscriberPreferences,
   overrides: Partial<SubscriberPreferences> | null | undefined,
@@ -75,6 +165,33 @@ serve(async (req) => {
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
+        },
+      )
+    }
+
+    const [{ data: isAdmin, error: adminCheckError }, { data: isSuperAdmin, error: superAdminError }] =
+      await Promise.all([
+        supabaseUserClient.rpc('current_user_has_role', { role_name: 'admin' }),
+        supabaseUserClient.rpc('current_user_has_role', { role_name: 'super_admin' }),
+      ])
+
+    if (adminCheckError || superAdminError) {
+      console.error('test-job-matching: role check failed', adminCheckError ?? superAdminError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify admin status' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        },
+      )
+    }
+
+    if (!isAdmin && !isSuperAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
         },
       )
     }
@@ -146,6 +263,18 @@ serve(async (req) => {
         },
       },
     )
+
+    const { data: activeConfig, error: configError } = await supabaseAdminClient
+      .from('matching_algorithm_config')
+      .select('*')
+      .eq('active', true)
+      .maybeSingle()
+
+    if (configError) {
+      console.error('test-job-matching: failed to load active matching config', {
+        message: configError.message,
+      })
+    }
 
     const allJobs: any[] = []
     const pageSize = 1000
@@ -222,7 +351,10 @@ serve(async (req) => {
       sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))
 
-    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, body.matchConfigOverride)
+    const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
+    const combinedOverride = mergeConfigOverrides(dbOverride, body.matchConfigOverride ?? null)
+
+    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride)
 
     return new Response(
       JSON.stringify({

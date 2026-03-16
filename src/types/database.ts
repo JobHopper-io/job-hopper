@@ -115,3 +115,8 @@ export type EmailEventType = Enums<'email_event_type'>
 export type EmailEventStatus = Enums<'email_event_status'>
 export type SystemAnnouncement = Tables<'system_announcements'>
 export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>
+
+// Job matching algorithm configuration
+export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>
+export type MatchingAlgorithmConfigInsert = TablesInsert<'matching_algorithm_config'>
+export type MatchingAlgorithmConfigUpdate = TablesUpdate<'matching_algorithm_config'>
