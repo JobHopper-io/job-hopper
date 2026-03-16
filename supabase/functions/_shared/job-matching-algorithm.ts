@@ -274,7 +274,7 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
 
 /**
  * Highest possible total score for the given prefs and config (theoretical maximum).
- * Used to show score as percentage of max on the test page.
+ * Used to show score as percentage of max on the admin job-matching page.
  */
 export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
   const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)

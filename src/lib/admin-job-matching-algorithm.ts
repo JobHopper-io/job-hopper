@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase'
 
-// __TEST_ONLY_START__ — Entire file is for test-job-matching debug view only. Remove this file, MatchJobsDebug.vue, and the debug route before production.
-
 export interface RankedJob {
   id: string
   title: string | null
@@ -68,7 +66,7 @@ export interface SubscriberPreferencesOverride {
   preferredLocations?: string[]
   openToRelocation?: boolean | null
   openToRemote?: boolean | null
-   locationRadiusMiles?: number | null
+  locationRadiusMiles?: number | null
 }
 
 export interface MatchConfigKeywordWeights {
@@ -118,13 +116,13 @@ export interface MatchConfigOverride {
   thresholds?: MatchConfigThresholds
 }
 
-export interface GetTestMatchesOptions {
+export interface GetAdminMatchesOptions {
   preferencesOverride?: SubscriberPreferencesOverride
   matchConfigOverride?: MatchConfigOverride
 }
 
-/** Default match config values (mirror of backend defaultConfig). Used for form defaults and reset. */
-export const DEFAULT_TEST_MATCH_CONFIG: MatchConfigOverride = {
+/** Default admin match config values (mirror of backend defaultConfig). Used for form defaults and reset. */
+export const DEFAULT_ADMIN_MATCH_CONFIG: MatchConfigOverride = {
   keywordWeights: {
     currentJobTitleKeyword: 2,
     currentIndustryKeyword: 1,
@@ -161,14 +159,15 @@ export const DEFAULT_TEST_MATCH_CONFIG: MatchConfigOverride = {
   },
 }
 
-export const jobMatchingTestAPI = {
-  // TEMPORARY TEST METHOD – DO NOT SHIP TO PRODUCTION
-  async getTestMatches(options: GetTestMatchesOptions = {}): Promise<{
+export const jobMatchingAlgorithmAdminAPI = {
+  async getAdminMatches(options: GetAdminMatchesOptions = {}): Promise<{
     data: MatchJobsResponse | null
     error: Error | null
   }> {
-    const body: { preferencesOverride?: SubscriberPreferencesOverride; matchConfigOverride?: MatchConfigOverride } =
-      {}
+    const body: {
+      preferencesOverride?: SubscriberPreferencesOverride
+      matchConfigOverride?: MatchConfigOverride
+    } = {}
     if (options.preferencesOverride && Object.keys(options.preferencesOverride).length > 0) {
       body.preferencesOverride = options.preferencesOverride
     }
@@ -188,6 +187,4 @@ export const jobMatchingTestAPI = {
     return { data: data ?? null, error: null }
   },
 }
-
-// __TEST_ONLY_END__
 

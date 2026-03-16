@@ -30,7 +30,7 @@ const adminPaths = [
   '/admin',
   '/admin/dashboard',
   '/admin/admin-management',
-  '/admin/job-matching',
+  '/admin/job-matching-algorithm',
   '/admin/settings',
 ]
 
@@ -152,9 +152,9 @@ const router = createRouter({
       component: () => import('../views/AdminAdmins.vue'),
     },
     {
-      path: '/admin/job-matching',
-      name: 'admin-job-matching',
-      component: () => import('../views/AdminJobMatching.vue'),
+      path: '/admin/job-matching-algorithm',
+      name: 'admin-job-matching-algorithm',
+      component: () => import('../views/AdminJobMatchingAlgorithm.vue'),
     },
     {
       path: '/admin/settings',
@@ -166,13 +166,6 @@ const router = createRouter({
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
     },
-    // __TEST_ONLY_START__ — Debug route for test-job-matching; remove this block, MatchJobsDebug.vue, and src/lib/test-job-matching.ts before production
-    {
-      path: '/__debug/match-jobs',
-      name: 'debug-match-jobs',
-      component: () => import('../views/MatchJobsDebug.vue'),
-    },
-    // __TEST_ONLY_END__
   ],
   scrollBehavior(_to, _from, savedPosition) {
     // Back/forward: restore browser's saved position

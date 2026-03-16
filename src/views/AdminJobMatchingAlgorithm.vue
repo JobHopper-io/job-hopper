@@ -1,17 +1,15 @@
 <script setup lang="ts">
-// __TEST_ONLY_START__ — Entire view is for test-job-matching debugging. Remove this file, the route in router, and src/lib/test-job-matching.ts before production.
-
 import { ref, onMounted, computed, reactive } from 'vue'
 import { profileAPI } from '@/lib/profile'
 import {
-  jobMatchingTestAPI,
-  DEFAULT_TEST_MATCH_CONFIG,
+  jobMatchingAlgorithmAdminAPI,
+  DEFAULT_ADMIN_MATCH_CONFIG,
   type MatchJobsResponse,
   type RankedJob,
   type MatchJobsDebugPayload,
   type SubscriberPreferencesOverride,
   type MatchConfigOverride,
-} from '@/lib/test-job-matching'
+} from '@/lib/admin-job-matching-algorithm'
 import type { Profile } from '@/types/database'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 
@@ -42,13 +40,13 @@ const prefsForm = reactive<{
   locationRadiusMiles: '',
 })
 
-// Match config form (defaults from DEFAULT_TEST_MATCH_CONFIG)
+// Match config form (defaults from DEFAULT_ADMIN_MATCH_CONFIG)
 const configForm = reactive<MatchConfigOverride>({
-  keywordWeights: { ...DEFAULT_TEST_MATCH_CONFIG.keywordWeights },
-  payWeights: { ...DEFAULT_TEST_MATCH_CONFIG.payWeights },
-  locationWeights: { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights },
-  recencyWeights: { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights },
-  thresholds: { ...DEFAULT_TEST_MATCH_CONFIG.thresholds },
+  keywordWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights },
+  payWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights },
+  locationWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights },
+  recencyWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights },
+  thresholds: { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds },
 })
 
 const JOBS_PER_PAGE = 25
@@ -134,18 +132,18 @@ function buildMatchConfigOverride(): MatchConfigOverride {
 async function resetToDefaults() {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
-  configForm.keywordWeights = { ...DEFAULT_TEST_MATCH_CONFIG.keywordWeights }
-  configForm.payWeights = { ...DEFAULT_TEST_MATCH_CONFIG.payWeights }
-  configForm.locationWeights = { ...DEFAULT_TEST_MATCH_CONFIG.locationWeights }
-  configForm.recencyWeights = { ...DEFAULT_TEST_MATCH_CONFIG.recencyWeights }
-  configForm.thresholds = { ...DEFAULT_TEST_MATCH_CONFIG.thresholds }
+  configForm.keywordWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights }
+  configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
+  configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
+  configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
+  configForm.thresholds = { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds }
 }
 
 async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
 
-  const { data, error } = await jobMatchingTestAPI.getTestMatches({
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.getAdminMatches({
     preferencesOverride: buildPreferencesOverride(),
     matchConfigOverride: buildMatchConfigOverride(),
   })
@@ -165,24 +163,20 @@ onMounted(async () => {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
 })
-// __TEST_ONLY_END__
 </script>
 
 <template>
-  <!-- TEMPORARY TEST PAGE – DO NOT SHIP TO PRODUCTION -->
   <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-6xl mx-auto space-y-6">
-      <!-- Big warning banner -->
-      <div class="rounded-xl border-2 border-red-600 bg-red-50 px-4 py-3 sm:px-6">
-        <h1 class="text-xl sm:text-2xl font-heading font-bold text-red-800 mb-1">
-          TEMPORARY MATCHING DEBUG PAGE – DO NOT SHIP TO PRODUCTION
+      <header class="mb-2">
+        <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal mb-1">
+          Admin · Job Matching Algorithm
         </h1>
-        <p class="text-sm sm:text-base text-red-800">
-          This screen is for internal testing of the <code>test-job-matching</code> Edge Function and
-          should be removed before launch. Do not link to this page from any user-facing
-          navigation.
+        <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
+          Inspect how the job-matching algorithm scores jobs for a given subscriber, tweak weights,
+          and view detailed debug output. Changes here affect how matches are computed for users.
         </p>
-      </div>
+      </header>
 
       <!-- Preferences & config form -->
       <div class="card p-4 sm:p-6 space-y-6">
@@ -254,7 +248,7 @@ onMounted(async () => {
               <PreferredLocationsInput
                 v-model="prefsForm.preferredLocations"
                 label="Preferred locations"
-                input-id="debug-preferred-locations"
+                input-id="admin-preferred-locations"
               />
             </div>
             <div class="flex items-center gap-4">
@@ -605,7 +599,7 @@ onMounted(async () => {
       <!-- Error state -->
       <div v-if="errorMessage" class="card border border-red-300 bg-red-50 p-4 sm:p-6">
         <h2 class="text-lg font-heading font-semibold text-red-800 mb-2">
-          Error invoking <code>test-job-matching</code>
+          Error invoking job-matching function
         </h2>
         <p class="text-sm text-red-800 whitespace-pre-line">
           {{ errorMessage }}
@@ -899,3 +893,4 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
