@@ -20,6 +20,23 @@ A table-driven scheduler runs edge functions at approximately a given time. Use 
 - For how AI should use them, see Cursor rule: `.cursor/rules/db-schema.mdc`.
 - **User-editable subsets**: When an API or form should only allow updating a subset of columns (e.g. to avoid letting callers change `role`, `organization_id`, or other sensitive fields), define a narrowed type in `src/types/database.ts`—e.g. `ProfileUserEditable` as `Pick<ProfileUpdate, ...>`—and use that for the public API. This keeps the allowed-field set in one place and documents the boundary next to the other profile types.
 
+### Admin roles and permissions
+
+We use two application-level roles, backed by the `roles` / `profile_roles` tables:
+
+- **`admin`**
+  - Can access internal admin tools and dashboards (e.g. `/admin/dashboard`, job matching configuration, settings).
+  - Intended for operational and support tasks, not for managing other admins.
+  - **Cannot** access the admin-management page or change any user’s roles/permissions.
+
+- **`super_admin`**
+  - A strictly higher-privilege role used **only** for:
+    - Gating access to the admin-management page (`/admin/admin-management`).
+    - Calling role/permissions management edge functions (`assign-role`, `list-admin-users`).
+  - Can view all users and manage their admin-related permissions (currently `admin` and `super_admin`) via the admin-management UI.
+  - **Cannot** be assigned without `admin` also being present on the same user (the backend enforces `super_admin ⇒ admin`).
+  - Users are **not allowed** to modify their own permissions; edge functions reject attempts where caller and target refer to the same profile, and the UI disables the “Manage permissions” control on the current user’s row.
+
 ### Email notifications
 
 Edge functions send transactional emails (job match digests, subscription updates, system announcements) via a provider-agnostic `sendEmail` helper in `supabase/functions/_shared/`, backed by Mailtrap’s Email Sending HTTP API.

@@ -89,19 +89,27 @@
                 </div>
               </td>
               <td class="px-4 sm:px-6 py-3 align-top text-right">
-                <button
-                  type="button"
-                  class="btn-primary text-xs"
-                  :disabled="mutatingId === user.id"
-                  @click="toggleAdmin(user)"
-                >
-                  <span v-if="mutatingId === user.id">
-                    Updating…
+                <div class="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    class="btn-primary text-xs"
+                    :disabled="isCurrentUser(user) || mutatingId === user.id"
+                    @click="openPermissions(user)"
+                  >
+                    <span v-if="mutatingId === user.id">
+                      Opening…
+                    </span>
+                    <span v-else>
+                      Manage permissions
+                    </span>
+                  </button>
+                  <span
+                    v-if="isCurrentUser(user)"
+                    class="text-[11px] text-neutral-muted"
+                  >
+                    You can’t edit your own permissions
                   </span>
-                  <span v-else>
-                    {{ user.roles.includes('admin') ? 'Revoke admin' : 'Grant admin' }}
-                  </span>
-                </button>
+                </div>
               </td>
             </tr>
             <tr v-if="!loading && users.length === 0">
@@ -149,12 +157,25 @@
         </div>
       </div>
     </section>
+
+    <AdminManagePermissionsModal
+      v-if="activeUser"
+      :user="activeUser"
+      :roles="activeUser.roles"
+      :is-self="isCurrentUser(activeUser)"
+      :is-saving="savingPermissions"
+      :error="modalError"
+      @save="handleSavePermissions"
+      @cancel="closePermissions"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { adminAPI } from '@/lib/admin'
+import { profileAPI } from '@/lib/profile'
+import AdminManagePermissionsModal from '@/components/AdminManagePermissionsModal.vue'
 
 interface AdminUserRow {
   id: string
@@ -172,6 +193,10 @@ const page = ref(0)
 const pageSize = 25
 const total = ref(0)
 const mutatingId = ref<string | null>(null)
+const currentUserEmail = ref<string | null>(null)
+const activeUser = ref<AdminUserRow | null>(null)
+const savingPermissions = ref(false)
+const modalError = ref<string | null>(null)
 
 const fetchUsers = async () => {
   loading.value = true
@@ -206,40 +231,53 @@ const goToPage = async (newPage: number) => {
   page.value = newPage
   await fetchUsers()
 }
+const isCurrentUser = (user: AdminUserRow) => {
+  return currentUserEmail.value != null && user.email.toLowerCase() === currentUserEmail.value.toLowerCase()
+}
 
-const toggleAdmin = async (user: AdminUserRow) => {
-  error.value = null
+const openPermissions = (user: AdminUserRow) => {
+  modalError.value = null
   mutatingId.value = user.id
+  activeUser.value = { ...user }
+  mutatingId.value = null
+}
+
+const closePermissions = () => {
+  activeUser.value = null
+  modalError.value = null
+}
+
+const handleSavePermissions = async (roles: string[]) => {
+  if (!activeUser.value) return
+  savingPermissions.value = true
+  modalError.value = null
 
   try {
-    const makeAdmin = !user.roles.includes('admin')
-    const { data, error: apiError } = await adminAPI.setAdminStatus(user.email, makeAdmin)
+    const { data, error: apiError } = await adminAPI.setUserRoles(activeUser.value.email, roles)
     if (apiError) {
-      error.value = apiError.message
+      modalError.value = apiError.message
       return
     }
     if (!data) return
 
-    const idx = users.value.findIndex((u) => u.id === user.id)
+    const idx = users.value.findIndex((u) => u.id === activeUser.value?.id)
     if (idx !== -1) {
-      const roles = new Set(users.value[idx].roles)
-      if (makeAdmin) {
-        roles.add('admin')
-      } else {
-        roles.delete('admin')
-      }
       users.value[idx] = {
         ...users.value[idx],
-        roles: Array.from(roles),
+        roles: data.roles,
       }
     }
+
+    closePermissions()
   } finally {
-    mutatingId.value = null
+    savingPermissions.value = false
   }
 }
 
-onMounted(() => {
-  void fetchUsers()
+onMounted(async () => {
+  const { data: profile } = await profileAPI.getCurrentUserProfile()
+  currentUserEmail.value = profile?.email ?? null
+  await fetchUsers()
 })
 </script>
 

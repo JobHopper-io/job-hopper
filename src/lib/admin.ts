@@ -1,23 +1,5 @@
 import { supabase } from '@/lib/supabase'
 
-interface AdminRoleProfile {
-  email: string
-  first_name: string
-  last_name: string | null
-}
-
-interface AdminRolePayload {
-  profile: AdminRoleProfile
-  isAdmin: boolean
-}
-
-interface AdminRoleResponse {
-  data: AdminRolePayload | null
-  error: Error | null
-}
-
-type AssignRoleAction = 'status' | 'grant' | 'revoke'
-
 interface AdminUserRow {
   id: string
   email: string
@@ -36,29 +18,29 @@ interface ListUsersResponse {
   error: Error | null
 }
 
-async function invokeAssignRole(email: string, action: AssignRoleAction): Promise<AdminRoleResponse> {
-  const { data, error } = await supabase.functions.invoke('assign-role', {
-    body: {
-      email,
-      role: 'admin',
-      action,
-    },
-  })
-
-  if (error) {
-    return { data: null, error }
+interface SetUserRolesPayload {
+  profile: {
+    email: string
+    first_name: string
+    last_name: string | null
   }
-
-  return { data: data as AdminRolePayload, error: null }
+  roles: string[]
 }
 
 export const adminAPI = {
-  async getAdminStatus(email: string): Promise<AdminRoleResponse> {
-    return invokeAssignRole(email, 'status')
-  },
+  async setUserRoles(email: string, roles: string[]): Promise<{ data: SetUserRolesPayload | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('assign-role', {
+      body: {
+        email,
+        roles,
+      },
+    })
 
-  async setAdminStatus(email: string, makeAdmin: boolean): Promise<AdminRoleResponse> {
-    return invokeAssignRole(email, makeAdmin ? 'grant' : 'revoke')
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as SetUserRolesPayload, error: null }
   },
 
   async listUsers(params: {

@@ -78,22 +78,20 @@ serve(async (req) => {
       })
     }
 
-    const [{ data: isAdmin, error: adminCheckError }, { data: isSuperAdmin, error: superAdminError }] =
-      await Promise.all([
-        userClient.rpc("current_user_has_role", { role_name: "admin" }),
-        userClient.rpc("current_user_has_role", { role_name: "super_admin" }),
-      ])
+    const { data: isSuperAdmin, error: superAdminError } = await userClient.rpc("current_user_has_role", {
+      role_name: "super_admin",
+    })
 
-    if (adminCheckError || superAdminError) {
-      console.error("list-admin-users: role check failed", adminCheckError ?? superAdminError)
-      return new Response(JSON.stringify({ error: "Failed to verify admin status" }), {
+    if (superAdminError) {
+      console.error("list-admin-users: role check failed", superAdminError)
+      return new Response(JSON.stringify({ error: "Failed to verify super_admin status" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       })
     }
 
-    if (!isAdmin && !isSuperAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
+    if (!isSuperAdmin) {
+      return new Response(JSON.stringify({ error: "Only super_admin can list admin users" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 403,
       })
