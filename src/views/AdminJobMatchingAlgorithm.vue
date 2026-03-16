@@ -230,6 +230,30 @@ async function confirmOverrideActiveConfig() {
   }
 }
 
+async function overrideConfigWithoutWarning(cfg: AdminMatchingConfig) {
+  const override = buildMatchConfigOverride()
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.updateConfigFromOverride(
+    cfg.id,
+    cfg.name,
+    override,
+    undefined,
+  )
+  if (!error && data) {
+    if (data.active) {
+      activeConfig.value = data
+    }
+    isConfigModalOpen.value = false
+  }
+}
+
+function handleOverrideClick(cfg: AdminMatchingConfig) {
+  if (cfg.active) {
+    openOverrideWarning(cfg)
+  } else {
+    void overrideConfigWithoutWarning(cfg)
+  }
+}
+
 async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
@@ -375,7 +399,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="space-y-3 border-t border-neutral-border pt-4">
+        <section class="space-y-4 border-t border-neutral-border pt-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
@@ -399,7 +423,7 @@ onMounted(async () => {
                 :disabled="isConfigLoading"
                 @click="openConfigModal"
               >
-                'Choose config…'
+                Choose config…
               </button>
               <button
                 type="button"
@@ -410,8 +434,9 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div class="space-y-2">
+          <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-4 py-4 sm:px-5 sm:py-5 max-w-5xl mx-auto">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
               <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -434,7 +459,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-            <div class="space-y-2">
+              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
               <p class="text-xs font-semibold text-neutral-body">Pay weights</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -475,7 +500,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-            <div class="space-y-2">
+              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3 sm:col-span-2 lg:col-span-1">
               <p class="text-xs font-semibold text-neutral-body">Location weights</p>
               <div class="space-y-3">
                 <div class="space-y-1">
@@ -629,7 +654,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-            <div class="space-y-2">
+              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
               <p class="text-xs font-semibold text-neutral-body">Recency weights</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -663,7 +688,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-            <div class="space-y-2">
+              <div class="space-y-2 bg-white rounded-xl shadow-sm px-3 py-3">
               <p class="text-xs font-semibold text-neutral-body">Thresholds</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -705,6 +730,7 @@ onMounted(async () => {
                   <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </section>
@@ -1079,12 +1105,11 @@ onMounted(async () => {
                   Apply to form
                 </button>
                 <button
-                  v-if="cfg.active"
                   type="button"
                   class="btn-secondary text-[11px] py-1 px-2"
-                  @click="openOverrideWarning(cfg)"
+                  @click="handleOverrideClick(cfg)"
                 >
-                  Override active with current values…
+                  Override with current values…
                 </button>
               </div>
             </div>
