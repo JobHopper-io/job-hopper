@@ -90,20 +90,26 @@
               </td>
               <td class="px-4 sm:px-6 py-3 align-top text-right">
                 <div class="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    class="btn-primary text-xs"
-                    :disabled="isCurrentUser(user) || mutatingId === user.id"
-                    :title="isCurrentUser(user) ? 'You can’t edit your own permissions' : undefined"
-                    @click="openPermissions(user)"
-                  >
-                    <span v-if="mutatingId === user.id">
-                      Opening…
+                  <template v-if="isCurrentUser(user)">
+                    <span class="text-[11px] text-neutral-muted">
+                      You can’t edit your own permissions
                     </span>
-                    <span v-else>
-                      Manage permissions
-                    </span>
-                  </button>
+                  </template>
+                  <template v-else>
+                    <button
+                      type="button"
+                      class="btn-primary text-xs"
+                      :disabled="mutatingId === user.id"
+                      @click="openPermissions(user)"
+                    >
+                      <span v-if="mutatingId === user.id">
+                        Opening…
+                      </span>
+                      <span v-else>
+                        Manage permissions
+                      </span>
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
