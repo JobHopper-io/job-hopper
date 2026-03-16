@@ -368,6 +368,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_roles: {
+        Row: {
+          created_at: string
+          profile_id: string
+          role_id: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          role_id: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_roles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           auth_user_id: string | null
@@ -551,6 +584,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      roles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       saved_jobs: {
         Row: {
@@ -794,6 +845,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_user_has_role: { Args: { role_name: string }; Returns: boolean }
       enable_premium_addon: {
         Args: { addon_type: string; user_id: string }
         Returns: boolean

@@ -144,5 +144,71 @@ export const profileAPI = {
 
     return { data, error }
   },
+
+  /** Returns the role names assigned to the current user (e.g. ['admin']). */
+  async getCurrentUserRoles(): Promise<{ data: string[]; error: Error | null }> {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return { data: [], error: new Error('Not authenticated') }
+    }
+
+    // Resolve the current user's profile id first, then load roles for that profile.
+    const {
+      data: profileRow,
+      error: profileError,
+    } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle<{ id: string }>()
+
+    if (profileError || !profileRow) {
+      return { data: [], error: profileError ?? new Error('Profile not found') }
+    }
+
+    const { data, error } = await supabase
+      .from('profile_roles')
+      .select(
+        `
+        roles (
+          name
+        )
+      `,
+      )
+      .eq('profile_id', profileRow.id)
+
+    if (error) {
+      return { data: [], error }
+    }
+
+    const roleRows = (data ?? []) as unknown as Array<{ roles: { name: string } }>
+    const roleNames = roleRows
+      .map((row) => row.roles?.name)
+      .filter((name): name is string => typeof name === 'string')
+
+    return { data: roleNames, error: null }
+  },
+
+  /** Lightweight check that uses the server-side helper to see if the current user has a role. */
+  async hasRole(roleName: string): Promise<boolean> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return false
+
+    const { data, error } = await supabase.rpc('current_user_has_role', {
+      role_name: roleName,
+    })
+
+    if (error) {
+      console.error('Error checking user role via RPC:', error)
+      return false
+    }
+
+    return data === true
+  },
 }
 

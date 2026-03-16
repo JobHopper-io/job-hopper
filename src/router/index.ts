@@ -25,6 +25,9 @@ export const publicPaths = [
   '/unsubscribe-success',
 ]
 
+/** Routes that require the user to be an admin. */
+const adminPaths = ['/admin', '/admin/dashboard']
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   // Search for __TEST_ONLY__ to find test-only routes and related code to remove before production.
@@ -129,6 +132,15 @@ const router = createRouter({
       component: () => import('../views/ManageSubscription.vue'),
     },
     {
+      path: '/admin',
+      redirect: '/admin/dashboard',
+    },
+    {
+      path: '/admin/dashboard',
+      name: 'admin-dashboard',
+      component: () => import('../views/AdminDashboard.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
@@ -229,6 +241,14 @@ router.beforeEach(async (to) => {
   // If onboarding is complete, prevent access back to `/onboarding`
   if (targetPath === '/onboarding') {
     return '/dashboard'
+  }
+
+  // Admin routes require the user to have the admin role.
+  if (adminPaths.includes(targetPath)) {
+    const isAdmin = await profileAPI.hasRole('admin')
+    if (!isAdmin) {
+      return '/dashboard'
+    }
   }
 
   return true

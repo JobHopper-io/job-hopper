@@ -35,6 +35,11 @@ export type Product = Tables<'products'>
 export type ProductCategory = Enums<'product_category'>
 export type SubscriptionProduct = Tables<'subscription_product'>
 
+// Roles and profile_roles (application-level roles such as admin)
+export type Role = Tables<'roles'>
+export type ProfileRole = Tables<'profile_roles'>
+export type ProfileRoleInsert = TablesInsert<'profile_roles'>
+
 // Scheduled jobs (run by run-scheduled-jobs edge function; only service_role accesses this table)
 export type ScheduledJob = Tables<'scheduled_jobs'>
 export type ScheduledJobStatus = Enums<'scheduled_job_status'>
