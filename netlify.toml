@@ -6,6 +6,12 @@
   from = "/*"
   to = "/index.html"
   status = 200
+  
+  from = "https://job-hopper.net/*"
+  to = "https://job-hopper.io/:splat"
+
+  from = "https://job-hopper.co/*"
+  to = "https://job-hopper.io/:splat"
 
 [[headers]]
   for = "/manifest.webmanifest"
