@@ -26,7 +26,7 @@ const isSaveConfigModalOpen = ref(false)
 const isOverrideWarningOpen = ref(false)
 const configToOverride = ref<AdminMatchingConfig | null>(null)
 const saveConfigName = ref('')
-const saveConfigMakeActive = ref(true)
+const saveConfigMakeActive = ref(false)
 const overrideConfirmationText = ref('')
 
 // Preferences form (defaults from user profile)
@@ -399,7 +399,7 @@ onMounted(async () => {
                 :disabled="isConfigLoading"
                 @click="openConfigModal"
               >
-                {{ isConfigLoading ? 'Loading configs…' : 'Choose config…' }}
+                'Choose config…'
               </button>
               <button
                 type="button"
@@ -1079,23 +1079,13 @@ onMounted(async () => {
                   Apply to form
                 </button>
                 <button
+                  v-if="cfg.active"
                   type="button"
                   class="btn-secondary text-[11px] py-1 px-2"
-                  v-if="cfg.active"
                   @click="openOverrideWarning(cfg)"
                 >
                   Override active with current values…
                 </button>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 text-[11px] text-neutral-body">
-              <div>
-                <span class="font-semibold">Min score:</span>
-                <span> {{ cfg.config.thresholds?.minTotalScore ?? '—' }}</span>
-              </div>
-              <div>
-                <span class="font-semibold">Base recency:</span>
-                <span> {{ cfg.config.recencyWeights?.baseRecency ?? '—' }}</span>
               </div>
             </div>
           </li>
