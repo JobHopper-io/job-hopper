@@ -1,52 +1,52 @@
 <template>
-  <main class="admin-dashboard">
-    <header class="admin-dashboard__header">
-      <h1 class="admin-dashboard__title">Admin Dashboard</h1>
-      <p class="admin-dashboard__subtitle">
-        Restricted area. Only users with the <strong>admin</strong> role can access this page.
-      </p>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <header class="mb-8">
+      <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal mb-2">
+        Admin Dashboard
+      </h1>
     </header>
 
-    <section class="admin-dashboard__content">
-      <p>
-        This is a placeholder for future admin tools and reports. If you can see this page, your account
-        has been granted the <code>admin</code> role via the secure role system.
-      </p>
+    <section class="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <router-link
+        to="/admin/admins"
+        class="group rounded-2xl border border-neutral-border bg-white/60 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Admin Management
+        </h2>
+        <p class="text-sm text-neutral-body">
+          View users and manage who has admin access.
+        </p>
+      </router-link>
+
+      <router-link
+        to="/admin/job-matching"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Job Matching
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Configure and monitor matching behavior.
+          <span class="font-medium text-amber-600">Coming soon</span>.
+        </p>
+      </router-link>
+
+      <router-link
+        to="/admin/settings"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          System Settings
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Global configuration and toggles.
+          <span class="font-medium text-amber-600">Coming soon</span>.
+        </p>
+      </router-link>
     </section>
   </main>
 </template>
 
 <script setup lang="ts"></script>
-
-<style scoped>
-.admin-dashboard {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
-}
-
-.admin-dashboard__header {
-  margin-bottom: 1.5rem;
-}
-
-.admin-dashboard__title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.admin-dashboard__subtitle {
-  color: #4b5563;
-  font-size: 0.95rem;
-}
-
-.admin-dashboard__content {
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-</style>
 

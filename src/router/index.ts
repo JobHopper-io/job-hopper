@@ -26,7 +26,7 @@ export const publicPaths = [
 ]
 
 /** Routes that require the user to be an admin. */
-const adminPaths = ['/admin', '/admin/dashboard']
+const adminPaths = ['/admin', '/admin/dashboard', '/admin/admins', '/admin/job-matching', '/admin/settings']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -139,6 +139,21 @@ const router = createRouter({
       path: '/admin/dashboard',
       name: 'admin-dashboard',
       component: () => import('../views/AdminDashboard.vue'),
+    },
+    {
+      path: '/admin/admins',
+      name: 'admin-management',
+      component: () => import('../views/AdminAdmins.vue'),
+    },
+    {
+      path: '/admin/job-matching',
+      name: 'admin-job-matching',
+      component: () => import('../views/AdminJobMatching.vue'),
+    },
+    {
+      path: '/admin/settings',
+      name: 'admin-settings',
+      component: () => import('../views/AdminSettings.vue'),
     },
     {
       path: '/:pathMatch(.*)*',
