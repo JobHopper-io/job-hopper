@@ -42,7 +42,8 @@ export function formatProductLineLabel(product: Product): string {
   return `${base} (+$${price}/month)`
 }
 
-const productColumns = 'id, key, display_name, description, category, price_cents'
+const productColumns =
+  'id, key, display_name, description, category, price_cents, available_for_purchase'
 
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
@@ -109,6 +110,7 @@ export const subscriptionAPI = {
       .from('products')
       .select(productColumns)
       .in('category', ['subscription_addon', 'one_time_addon'])
+      .eq('available_for_purchase', true)
     if (error) return { data: null, error: new Error(error.message) }
     return { data: (data ?? []) as Product[], error: null }
   },
@@ -118,6 +120,7 @@ export const subscriptionAPI = {
       .from('products')
       .select(productColumns)
       .eq('category', 'base_plan')
+      .eq('available_for_purchase', true)
     if (error) return { data: null, error: new Error(error.message) }
     return { data: (data ?? []) as Product[], error: null }
   },

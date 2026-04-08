@@ -29,7 +29,7 @@
 
 ### products
 - **Meaning**: Catalog of products used for display, pricing, and gating. The catalog is **DB-only**; Supabase products are the source of truth, and each product may have a canonical Stripe Product referenced by `stripe_product_id`. Stripe products/prices are created as a projection of this table and are looked up by `stripe_product_id`.
-- **Columns**: `id`, `key`, `display_name`, `description` (text), `price_cents` (integer), `category` (enum `product_category`), `stripe_product_id` (text, nullable).
+- **Columns**: `id`, `key`, `display_name`, `description` (text), `price_cents` (integer), `category` (enum `product_category`), `stripe_product_id` (text, nullable), `available_for_purchase` (boolean, default `true`).
 - **Key relationships**:
   - Referenced by `subscription_product` (products on a subscription) and `resume_products` (resume upgrade and per-job tailoring purchases).
 - **Non‑obvious rules**:
@@ -39,6 +39,7 @@
   - `category = 'one_time_item'` for one-time purchase products that are not conceptually part of a subscription bundle.
   - For billing semantics, `base_plan` and `subscription_addon` map to recurring Stripe prices; `one_time_addon` and `one_time_item` map to one-time prices.
   - `stripe_product_id` is **derived** and used only as an operational mapping to Stripe. Supabase remains the source of truth for the catalog; Stripe is a projection/cache.
+  - `available_for_purchase`: when `false`, the product is hidden from catalog UIs (`getBasePlanProducts` / `getAddonProducts` filter) and rejected by `create-checkout-session` and `modify-subscription` so it cannot be newly purchased; rows are retained for existing subscribers and Stripe ID mapping (e.g. retired subscription add-ons such as `premium_insights` / `interview_prep`).
   - Frontend derives tier (base plan) and addons from these rows; use `key`, `display_name`, `description`, and `price_cents` from the DB. Use `getBasePlanProducts()` and `subscriptionAPI.getAddonProducts()` to list products for the UI. Checkout accepts our product ids; the create-checkout-session Edge Function loads products by id, ensures a canonical Stripe Product per Supabase product, and builds Stripe line items with `price_data.product = stripe_product_id`. The Stripe webhook maps subscription items and one-time lines back to Supabase products by joining on `products.stripe_product_id`.
 
 ### subscription_product

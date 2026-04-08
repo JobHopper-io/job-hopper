@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     q: "Do you apply to jobs for me?",
-    a: "No. You stay in control of your applications. Job-Hopper surfaces opportunities, provides context and (optionally) premium contact and prep insights, and you decide where, how, and when to apply."
+    a: "No. You stay in control of your applications. Job-Hopper surfaces opportunities and context for each role, and you decide where, how, and when to apply."
   },
   {
     q: "Can you guarantee I'll get a job?",
@@ -57,8 +57,8 @@ const faqs = [
     a: "Every base plan starts with a free trial. During the trial, you get access to your job feed and email alerts so you can judge the quality and relevance of your matches for yourself. If you don't want to continue, simply cancel before the trial ends and you won't be charged."
   },
   {
-    q: "Are premium add-ons included in the free trial?",
-    a: "Your free trial focuses on the core Job-Hopper experience: curated matches, your personal feed, and email alerts. Premium features—such as hiring contact insights, interview prep tools, and resume upgrades—are optional add-ons that are billed separately once you choose to enable them."
+    q: "Are resume add-ons included in the free trial?",
+    a: "Your free trial focuses on the core Job-Hopper experience: curated matches, your personal feed, and email alerts. Optional resume services—such as a one-time resume upgrade or per-job tailoring—are billed separately when you purchase them."
   },
   {
     q: "Why are there different base plans?",
@@ -66,7 +66,7 @@ const faqs = [
   },
   {
     q: "Do higher-priced tiers come with different features?",
-    a: "No. All three tiers share the same core Job-Hopper experience: curated matches, your job feed, and email delivery of new opportunities. Optional upgrades like contact insights, interview prep, and resume improvements are separate add-ons you can attach to any plan."
+    a: "No. All three tiers share the same core Job-Hopper experience: curated matches, your job feed, and email delivery of new opportunities. Optional resume services are separate add-ons you can purchase when you want them."
   },
   {
     q: "Can I change plans later?",
@@ -74,7 +74,7 @@ const faqs = [
   },
   {
     q: "Do I have to buy add-ons to get value?",
-    a: "No. The base plans are designed to stand on their own. Most users will see strong value from curated, well-matched opportunities alone. Add-ons are there if you want extra support with outreach, interview strategy, or refreshing your resume."
+    a: "No. The base plans are designed to stand on their own. Most users will see strong value from curated, well-matched opportunities alone. Resume add-ons are there if you want help refreshing your resume or tailoring it for a specific role."
   },
   {
     q: "What happens if I find a job?",

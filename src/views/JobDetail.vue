@@ -89,9 +89,6 @@ const tailoringStatusLabel = computed(() => {
   return null
 })
 
-const hasPremiumInsights = computed(() => userStore.hasAddon('premium_insights'))
-const hasInterviewPrep = computed(() => userStore.hasAddon('interview_prep'))
-
 const showSponsorshipBadge = computed(() => {
   const profile = userStore.profile
   const value = job.value?.sponsorshipLikelihood ?? null
@@ -431,58 +428,6 @@ async function handleTailoringCheckout() {
           >
             Apply on company site
           </button>
-        </div>
-
-        <!-- Hiring insights & contacts (Premium) -->
-        <div
-          v-if="hasPremiumInsights && job.contacts?.length"
-          class="card p-6"
-        >
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Hiring insights & contacts</h2>
-          <p class="text-neutral-body mb-4">
-            Based on our research, hiring decisions for this role may involve:
-          </p>
-          <ul class="space-y-3 text-neutral-body">
-            <li
-              v-for="(c, idx) in job.contacts"
-              :key="idx"
-            >
-              <span class="font-medium text-brand-charcoal">{{ c.name }}</span>
-              <span v-if="c.title"> – {{ c.title }}</span>
-              <span v-if="c.location"> – {{ c.location }}</span>
-              <p
-                v-if="c.note"
-                class="mt-1 text-sm"
-              >
-                {{ c.note }}
-              </p>
-              <p
-                v-else
-                class="mt-1 text-sm text-neutral-body/80"
-              >
-                Potential contact for this role
-              </p>
-            </li>
-          </ul>
-          <p class="mt-4 text-sm text-neutral-body">
-            Use this information respectfully and professionally. Start with a short, targeted introduction.
-          </p>
-        </div>
-
-        <!-- Interview prep tips -->
-        <div
-          v-if="hasInterviewPrep"
-          class="card p-6"
-        >
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Interview prep tips for this role</h2>
-          <ul class="list-disc pl-5 space-y-2 text-neutral-body">
-            <li>Key themes to highlight in your experience</li>
-            <li>Example questions you might be asked</li>
-            <li>Smart questions you can ask them</li>
-          </ul>
-          <p class="mt-3 text-sm text-neutral-body">
-            We’ll expand this section with tailored tips in a future update.
-          </p>
         </div>
 
         <!-- Full description -->

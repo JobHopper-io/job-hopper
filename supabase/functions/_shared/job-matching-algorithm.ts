@@ -753,7 +753,7 @@ export function matchJobsWithDebug(
 
   let excludedByRole = 0
   let excludedByRemoteOptOut = 0
-  let excludedByLocation = 0
+  const excludedByLocation = 0
   let excludedByRecency = 0
   let excludedByNoKeywordMatch = 0
   let excludedByMinTotalScore = 0

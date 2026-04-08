@@ -5,6 +5,8 @@ import type { Product } from '@/types/database'
 
 const faqOpen = ref<number | null>(null)
 const basePlanProducts = ref<Product[]>([])
+const resumeUpgradeProduct = ref<Product | null>(null)
+const resumeTailoringProduct = ref<Product | null>(null)
 
 /** Base plans in display order (by price from DB; no hardcoded tier keys). */
 const orderedBasePlans = computed(() =>
@@ -12,8 +14,17 @@ const orderedBasePlans = computed(() =>
 )
 
 onMounted(async () => {
-  const res = await subscriptionAPI.getBasePlanProducts()
-  if (res.data) basePlanProducts.value = res.data
+  const [baseRes, addonRes] = await Promise.all([
+    subscriptionAPI.getBasePlanProducts(),
+    subscriptionAPI.getAddonProducts(),
+  ])
+  if (baseRes.data) basePlanProducts.value = baseRes.data
+  if (addonRes.data) {
+    resumeUpgradeProduct.value =
+      addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
+    resumeTailoringProduct.value =
+      addonRes.data.find((p) => p.key === 'resume_tailoring') ?? null
+  }
 })
 
 const toggleFaq = (index: number) => {
@@ -27,7 +38,7 @@ const pricingFaq = [
   },
   {
     q: "Do higher-priced tiers come with different features?",
-    a: "All three tiers include the same core Job-Hopper experience. The main difference is the level of roles we're matching you with. Premium tools like contact insights, interview prep, and resume upgrades are optional add-ons you can attach to any plan."
+    a: "All three tiers include the same core Job-Hopper experience. The main difference is the level of roles we're matching you with. Optional resume services—such as a one-time resume upgrade and per-job resume tailoring—are available as separate add-ons when you want them."
   },
   {
     q: "Can I change tiers later?",
@@ -35,7 +46,7 @@ const pricingFaq = [
   },
   {
     q: "Do I have to buy add-ons to get value?",
-    a: "No. The base plans are designed to stand on their own. Add-ons are there if you want extra support with outreach, interviews, or updating your resume."
+    a: "No. The base plans are designed to stand on their own. Resume add-ons are there if you want help refreshing your resume or tailoring it for a specific role."
   },
   {
     q: "Is there a free trial?",
@@ -43,7 +54,7 @@ const pricingFaq = [
   },
   {
     q: "How do billing and cancellation work?",
-    a: "Plans are billed monthly. You can cancel at any time in just a couple of clicks from your account settings. Add-ons follow the same monthly billing cycle, except for the one-time resume upgrade."
+    a: "Plans are billed monthly. You can cancel at any time in just a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges."
   }
 ]
 </script>
@@ -57,7 +68,7 @@ const pricingFaq = [
           Simple plans based on where you are in your career.
         </h1>
         <p class="text-xl text-neutral-body mb-4">
-          Pick the level that matches the roles you're targeting. Add premium tools only if you want them.
+          Pick the level that matches the roles you're targeting. Add resume services only if you want them.
         </p>
         <p class="text-neutral-body max-w-3xl mx-auto">
           Job-Hopper is priced by career stage and job type, not just by features. Every plan starts with the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by our advanced automation engine and human vetting.
@@ -130,70 +141,44 @@ const pricingFaq = [
         </div>
       </section>
 
-      <!-- Premium Add-ons -->
+      <!-- Resume add-ons -->
       <section class="mb-16">
         <h2 class="text-brand-charcoal mb-4 text-center">
-          Optional upgrades you can add to any plan.
+          Optional resume services you can add to any plan.
         </h2>
         <p class="text-neutral-body mb-8 text-center">
-          Keep it simple with the base service, or stack on extra tools when you're ready to go deeper.
+          Keep it simple with the base service, or add a one-time resume upgrade or per-job tailoring when you need it.
         </p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           <div class="card p-6">
-            <h3 class="text-lg font-heading font-semibold mb-2">Premium Insights & Contact Access</h3>
-            <p class="text-xl font-bold text-brand-primary mb-4">From +$30<span class="text-sm font-normal text-neutral-body">/month</span></p>
-            <p class="text-sm text-neutral-body mb-4">Unlock an additional layer of competitive insight. Where available, you'll receive:</p>
-            <ul class="space-y-2 text-sm text-neutral-body">
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Hiring contact details or key decision-maker information</span>
-              </li>
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Suggested outreach messages</span>
-              </li>
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Extra context on role fit</span>
-              </li>
-            </ul>
+            <h3 class="text-lg font-heading font-semibold mb-2">
+              {{ resumeUpgradeProduct?.display_name ?? 'Resume upgrade' }}
+            </h3>
+            <p class="text-xl font-bold text-brand-primary mb-4">
+              <template v-if="resumeUpgradeProduct">
+                ${{ getProductPrice(resumeUpgradeProduct).toFixed(2) }}<span class="text-sm font-normal text-neutral-body"> one-time</span>
+              </template>
+              <template v-else>—</template>
+            </p>
+            <p class="text-sm text-neutral-body mb-4">
+              {{ resumeUpgradeProduct?.description ?? 'Have your resume professionally refreshed and aligned to the types of roles you are targeting through Job-Hopper.' }}
+            </p>
+            <p class="text-sm text-neutral-body">One-time purchase at checkout—no ongoing charges.</p>
           </div>
           <div class="card p-6">
-            <h3 class="text-lg font-heading font-semibold mb-2">Interview Prep & Strategy</h3>
-            <p class="text-xl font-bold text-brand-primary mb-4">From +$30<span class="text-sm font-normal text-neutral-body">/month</span></p>
-            <p class="text-sm text-neutral-body mb-4">Get guidance to show up prepared and confident. This add-on includes:</p>
-            <ul class="space-y-2 text-sm text-neutral-body">
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Role-specific talking points and themes</span>
-              </li>
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Suggested questions to ask</span>
-              </li>
-              <li class="flex items-start">
-                <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Tips based on what hiring teams look for</span>
-              </li>
-            </ul>
-          </div>
-          <div class="card p-6">
-            <h3 class="text-lg font-heading font-semibold mb-2">Resume Upgrade</h3>
-            <p class="text-xl font-bold text-brand-primary mb-4">$19.95<span class="text-sm font-normal text-neutral-body"> one-time</span></p>
-            <p class="text-sm text-neutral-body mb-4">Have your resume professionally refreshed and aligned to the types of roles you're targeting through Job-Hopper.</p>
-            <p class="text-sm text-neutral-body">Optimized for clarity, impact, and modern hiring workflows. Added once at checkout — no ongoing charges.</p>
+            <h3 class="text-lg font-heading font-semibold mb-2">
+              {{ resumeTailoringProduct?.display_name ?? 'Per-job resume tailoring' }}
+            </h3>
+            <p class="text-xl font-bold text-brand-primary mb-4">
+              <template v-if="resumeTailoringProduct">
+                ${{ getProductPrice(resumeTailoringProduct).toFixed(2) }}<span class="text-sm font-normal text-neutral-body"> per job</span>
+              </template>
+              <template v-else>—</template>
+            </p>
+            <p class="text-sm text-neutral-body mb-4">
+              {{ resumeTailoringProduct?.description ?? 'Purchase tailoring for a specific matched role from your dashboard or job detail view.' }}
+            </p>
+            <p class="text-sm text-neutral-body">Billed per job when you choose to tailor—great for roles you are seriously pursuing.</p>
           </div>
         </div>
       </section>

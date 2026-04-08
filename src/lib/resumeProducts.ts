@@ -7,7 +7,8 @@ import { profileAPI } from '@/lib/profile'
 import { subscriptionAPI } from '@/lib/subscription'
 import type { Product, ResumeProduct } from '@/types/database'
 
-const productColumns = 'id, key, display_name, description, category, price_cents'
+const productColumns =
+  'id, key, display_name, description, category, price_cents, available_for_purchase'
 
 async function getCurrentProfileId(): Promise<string> {
   const { data, error } = await profileAPI.getCurrentUserProfile()
@@ -24,6 +25,7 @@ export const resumeProductsAPI = {
       .from('products')
       .select(productColumns)
       .eq('key', 'resume_upgrade')
+      .eq('available_for_purchase', true)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
     return { data: data as Product | null, error: null }
@@ -37,6 +39,7 @@ export const resumeProductsAPI = {
       .from('products')
       .select(productColumns)
       .eq('key', 'resume_tailoring')
+      .eq('available_for_purchase', true)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
     return { data: data as Product | null, error: null }

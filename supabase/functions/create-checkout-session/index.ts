@@ -85,7 +85,9 @@ serve(async (req) => {
 
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
-      .select('id, key, display_name, category, price_cents, stripe_product_id')
+      .select(
+        'id, key, display_name, category, price_cents, stripe_product_id, available_for_purchase',
+      )
       .in('id', productIds)
 
     if (productsError || !products?.length) {
@@ -94,6 +96,10 @@ serve(async (req) => {
 
     if (products.length !== productIds.length) {
       throw new Error('Some product ids are invalid')
+    }
+
+    if (products.some((p) => p.available_for_purchase === false)) {
+      throw new Error('One or more selected products are not available for purchase.')
     }
 
     const tailoringProduct = products.find((p) => p.key === 'resume_tailoring')

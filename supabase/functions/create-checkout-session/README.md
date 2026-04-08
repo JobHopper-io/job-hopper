@@ -11,22 +11,23 @@ This Supabase Edge Function creates a Stripe checkout session for subscription a
 
 ## Usage
 
-Call this function from your frontend:
+Call this function from your frontend with Supabase product UUIDs (from the `products` table):
 
 ```typescript
 const { data, error } = await supabase.functions.invoke('create-checkout-session', {
   body: {
-    tier: 'entry_mid' | 'senior_management' | 'director_vp_c_level',
-    addons: {
-      premium_insights?: boolean,
-      interview_prep?: boolean,
-      resume_upgrade?: boolean
-    },
+    productIds: string[],
     successUrl?: string,
-    cancelUrl?: string
-  }
+    cancelUrl?: string,
+    trialEnd?: number,
+    jobMatchId?: string,
+  },
 })
 ```
+
+`jobMatchId` is optional and used only when purchasing per-job resume tailoring (`resume_tailoring`), so the webhook can attach `resume_products.job_match_id`.
+
+Products with `available_for_purchase = false` in the database are rejected.
 
 The function returns a checkout session URL that you can redirect the user to.
 

@@ -33,9 +33,7 @@
             <li>Matching based on user profile and preferences</li>
             <li>Notifications of new opportunities</li>
             <li>Job insights and summaries</li>
-            <li>Hiring contact information (where available)</li>
-            <li>Resume improvement tools (optional add-on)</li>
-            <li>Interview preparation suggestions (optional add-on)</li>
+            <li>Resume improvement and per-job resume tailoring (optional add-ons)</li>
             <li>Other related features</li>
           </ul>
           <p>
@@ -105,12 +103,10 @@
             <li>Senior &amp; Management</li>
             <li>Director / Executive</li>
           </ul>
-          <p>Optional Add-Ons may include:</p>
+          <p>Optional add-ons may include:</p>
           <ul class="list-disc pl-6 space-y-1">
-            <li>Premium Insights</li>
-            <li>Contact Information</li>
-            <li>Interview Preparation</li>
-            <li>Resume Upgrade</li>
+            <li>Resume upgrade (one-time)</li>
+            <li>Per-job resume tailoring (one-time per role)</li>
           </ul>
           <p>Prices may change with notice.</p>
         </section>

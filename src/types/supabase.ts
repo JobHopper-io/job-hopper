@@ -436,6 +436,7 @@ export type Database = {
       }
       products: {
         Row: {
+          available_for_purchase: boolean
           category: Database["public"]["Enums"]["product_category"]
           description: string
           display_name: string
@@ -445,6 +446,7 @@ export type Database = {
           stripe_product_id: string | null
         }
         Insert: {
+          available_for_purchase?: boolean
           category: Database["public"]["Enums"]["product_category"]
           description?: string
           display_name: string
@@ -454,6 +456,7 @@ export type Database = {
           stripe_product_id?: string | null
         }
         Update: {
+          available_for_purchase?: boolean
           category?: Database["public"]["Enums"]["product_category"]
           description?: string
           display_name?: string
