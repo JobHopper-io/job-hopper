@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { profileAPI } from '@/lib/profile'
-import { useUserStore } from '@/stores/user'
 
 interface Props {
   resumeBucketKey?: string | null
@@ -20,8 +19,6 @@ const emit = defineEmits<{
   'uploaded': []
   'error': [error: string]
 }>()
-
-const userStore = useUserStore()
 
 const resumeViewUrl = ref<string | null>(null)
 const resumeFile = ref<File | null>(null)
