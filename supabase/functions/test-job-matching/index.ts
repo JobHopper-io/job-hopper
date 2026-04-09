@@ -6,6 +6,7 @@ import {
   type SubscriberPreferences,
   matchJobsWithDebug,
 } from '../_shared/job-matching-algorithm.ts'
+import type { JobHopperLiveJobRow, MatchingAlgorithmConfigRow } from '../_shared/db-row-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ interface TestJobMatchingBody {
   matchConfigOverride?: Partial<MatchConfig>
 }
 
-function configRowToOverride(row: any): Partial<MatchConfig> {
+function configRowToOverride(row: MatchingAlgorithmConfigRow): Partial<MatchConfig> {
   const keywordWeights = {
     currentJobTitleKeyword: row.keyword_current_job_title_weight,
     currentIndustryKeyword: row.keyword_current_industry_weight,
@@ -276,7 +277,7 @@ serve(async (req) => {
       })
     }
 
-    const allJobs: any[] = []
+    const allJobs: JobHopperLiveJobRow[] = []
     const pageSize = 1000
     let offset = 0
 
@@ -332,7 +333,7 @@ serve(async (req) => {
       offset += effectivePageSize
     }
 
-    const jobRecords: JobRecord[] = allJobs.map((row: any) => ({
+    const jobRecords: JobRecord[] = allJobs.map((row) => ({
       id: row.id,
       title: row.job_title ?? null,
       companyName: row.company_name ?? null,

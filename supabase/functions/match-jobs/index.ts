@@ -7,6 +7,7 @@ import {
   type SubscriberPreferences,
   matchJobs,
 } from '../_shared/job-matching-algorithm.ts'
+import type { JobHopperLiveJobRow, MatchingAlgorithmConfigRow } from '../_shared/db-row-types.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderJobMatchDigest,
@@ -24,7 +25,7 @@ interface MatchJobsPayload {
   limit?: number
 }
 
-function configRowToOverride(row: any): Partial<MatchConfig> {
+function configRowToOverride(row: MatchingAlgorithmConfigRow): Partial<MatchConfig> {
   const keywordWeights = {
     currentJobTitleKeyword: row.keyword_current_job_title_weight,
     currentIndustryKeyword: row.keyword_current_industry_weight,
@@ -232,25 +233,6 @@ serve(async (req) => {
       locationRadiusMiles: profile.location_radius_miles ?? null,
     }
 
-    type JobRow = {
-      id: string
-      job_title: string | null
-      company_name: string | null
-      role_category: string | null
-      location: string | null
-      is_remote: boolean | null
-      description: string | null
-      ai_job_briefing: string | null
-      apply_link: string | null
-      pay_min: number | null
-      pay_max: number | null
-      pay_type: string | null
-      created_at: string
-      posted_date: string | null
-      employee_count: number | null
-      sponsorship_likelihood: 'Low' | 'Medium' | 'High' | 'N/A' | null
-    }
-
     const { data: activeConfig, error: configError } = await supabaseAdminClient
       .from('matching_algorithm_config')
       .select('*')
@@ -301,7 +283,7 @@ serve(async (req) => {
       )
     }
 
-    const allJobs = (data ?? []) as JobRow[]
+    const allJobs = (data ?? []) as JobHopperLiveJobRow[]
 
     const jobRecords: JobRecord[] = allJobs.map((row) => ({
       id: row.id,

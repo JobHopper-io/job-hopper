@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import type { MatchingAlgorithmConfigRow } from "../_shared/db-row-types.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,13 +92,13 @@ function overrideToDbColumns(input: NonNullable<AdminMatchingConfigsRequest["con
   return cols
 }
 
-function rowToConfig(row: any) {
+function rowToConfig(row: MatchingAlgorithmConfigRow) {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    active: row.active as boolean,
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
+    id: row.id,
+    name: row.name,
+    active: row.active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
     config: {
       keywordWeights: {
         currentJobTitleKeyword: row.keyword_current_job_title_weight,
