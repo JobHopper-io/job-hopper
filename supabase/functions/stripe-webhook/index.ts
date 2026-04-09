@@ -1,6 +1,8 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderSubscriptionStarted,
@@ -261,20 +263,39 @@ serve(async (req) => {
               continue
             }
 
-            const { error: resumeProductError } = await supabaseAdmin
+            const { data: resumeRow, error: resumeProductError } = await supabaseAdmin
               .from('resume_products')
               .upsert(
                 {
                   profile_id: profileId,
                   product_id: resolved.id,
-                  job_match_id: jobMatchId || null,
+                  job_match_id:
+                    resolved.key === 'resume_tailoring' ? (jobMatchId || null) : null,
                 },
                 { onConflict: 'profile_id,job_match_id,product_id' },
               )
+              .select('id')
+              .maybeSingle()
             if (resumeProductError) {
               console.error(
                 'checkout.session.completed: failed to upsert resume_products',
                 resumeProductError,
+              )
+            } else if (resumeRow?.id) {
+              EdgeRuntime.waitUntil(
+                fulfillResumeProductViaN8n({
+                  supabaseAdmin,
+                  resumeProductId: resumeRow.id,
+                  productKey: resolved.key,
+                  profileId,
+                  jobMatchId:
+                    resolved.key === 'resume_tailoring' ? (jobMatchId ?? null) : null,
+                }).catch((err) =>
+                  console.error('checkout.session.completed: resume n8n fulfillment error', {
+                    resumeProductId: resumeRow.id,
+                    message: err instanceof Error ? err.message : String(err),
+                  }),
+                ),
               )
             }
           }
