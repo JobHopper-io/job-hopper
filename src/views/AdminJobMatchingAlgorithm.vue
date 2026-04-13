@@ -30,6 +30,9 @@ const saveConfigName = ref('')
 const saveConfigMakeActive = ref(false)
 const overrideConfirmationText = ref('')
 
+/** `products.key` for all base_plan rows; shown in the subscription tier field label. */
+const basePlanProductKeyOptions = ref<string[]>([])
+
 // Preferences form (defaults from user profile)
 const prefsForm = reactive<{
   subscriptionTierProductKeys: string
@@ -91,6 +94,11 @@ function goToPage(page: number) {
 async function loadSubscriptionTierKeys(profileId: string) {
   const { data } = await subscriptionAPI.getSubscriptionTierProductKeysForProfile(profileId)
   prefsForm.subscriptionTierProductKeys = (data ?? []).join(', ')
+}
+
+async function loadBasePlanProductKeyOptions() {
+  const { data } = await subscriptionAPI.listBasePlanProductKeys()
+  basePlanProductKeyOptions.value = data ?? []
 }
 
 function profileToPrefsForm(p: Profile | null) {
@@ -297,6 +305,7 @@ async function loadMatches() {
 }
 
 onMounted(async () => {
+  await loadBasePlanProductKeyOptions()
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
   if (profile?.id) {
@@ -344,6 +353,9 @@ onMounted(async () => {
             <div class="sm:col-span-2">
               <label class="block text-xs font-medium text-neutral-body mb-1">
                 Subscription tier product keys (comma-separated, optional override)
+                <span v-if="basePlanProductKeyOptions.length" class="font-normal">
+                  ({{ basePlanProductKeyOptions.join(', ') }})
+                </span>
               </label>
               <input
                 v-model="prefsForm.subscriptionTierProductKeys"

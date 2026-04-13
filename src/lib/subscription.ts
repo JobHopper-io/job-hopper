@@ -128,6 +128,27 @@ export const subscriptionAPI = {
     return { data: (data ?? []) as Product[], error: null }
   },
 
+  /**
+   * All `products.key` values for base plans (including not currently for sale), for admin UI and matching hints.
+   */
+  async listBasePlanProductKeys(): Promise<{ data: string[]; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('key')
+      .eq('category', 'base_plan')
+      .order('key')
+
+    if (error) {
+      return { data: [], error: new Error(error.message) }
+    }
+
+    const keys = (data ?? [])
+      .map((row) => row.key)
+      .filter((k): k is string => typeof k === 'string' && k.length > 0)
+
+    return { data: keys, error: null }
+  },
+
   async createBillingPortalSession(returnUrl?: string) {
     const { data, error } = await supabase.functions.invoke('create-billing-portal', {
       body: {
