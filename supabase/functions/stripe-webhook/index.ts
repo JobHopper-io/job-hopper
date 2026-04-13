@@ -20,6 +20,11 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
+/** Grep-friendly prefix for all webhook logs. */
+const LOG_PREFIX = '[stripe-webhook]'
+/** Grep-friendly prefix for resume_products + n8n path inside checkout.session.completed. */
+const RESUME_LOG = `${LOG_PREFIX}[resume]`
+
 function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
   if (stripeStatus === 'active' || stripeStatus === 'past_due') return 'active'
@@ -53,6 +58,7 @@ async function loadProfileAndCheckSubscriptionEmailAllowed(
 serve(async (req) => {
   const signature = req.headers.get('stripe-signature')
   if (!signature) {
+    console.warn(`${LOG_PREFIX} missing stripe-signature header`)
     return new Response('No signature', { status: 400 })
   }
 
@@ -71,16 +77,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
+    console.log(`${LOG_PREFIX} received`, {
+      id: event.id,
+      type: event.type,
+      livemode: event.livemode,
+    })
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const profileId = session.metadata?.profile_id
         if (!profileId) {
-          console.error('checkout.session.completed: missing profile_id in metadata')
+          console.error(
+            `${LOG_PREFIX} checkout.session.completed: missing profile_id in metadata`,
+            { sessionId: session.id, mode: session.mode },
+          )
           break
         }
 
         const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
+        console.log(`${LOG_PREFIX} checkout.session.completed`, {
+          sessionId: session.id,
+          profileId,
+          mode: session.mode,
+          hasSubscription: Boolean(session.subscription),
+          hasCustomer: Boolean(customerId),
+        })
+
         if (customerId) {
           const { error: profileUpdateError } = await supabaseAdmin
             .from('profiles')
@@ -91,7 +114,16 @@ serve(async (req) => {
             .eq('id', profileId)
           if (profileUpdateError) {
             console.error('Failed to update profile stripe_customer_id/onboarding_completed:', profileUpdateError)
+          } else {
+            console.log(`${LOG_PREFIX} profile updated with stripe_customer_id and onboarding_completed`, {
+              profileId,
+            })
           }
+        } else {
+          console.warn(`${LOG_PREFIX} checkout.session.completed: no customer id on session`, {
+            sessionId: session.id,
+            profileId,
+          })
         }
 
         if (session.subscription) {
@@ -122,6 +154,12 @@ serve(async (req) => {
           }
 
           const subscriptionId = subRow.id
+          console.log(`${LOG_PREFIX} subscription row inserted`, {
+            subscriptionId,
+            profileId,
+            stripeSubscriptionId: stripeSubscription.id,
+            status: subscriptionStatus,
+          })
 
           const stripeProductIds = new Set<string>()
           for (const item of stripeSubscription.items.data) {
@@ -189,6 +227,11 @@ serve(async (req) => {
                 { onConflict: 'subscription_id,product_id' },
               )
           }
+        } else {
+          console.log(`${LOG_PREFIX} checkout.session.completed: session has no subscription (one-time or non-subscription checkout)`, {
+            sessionId: session.id,
+            profileId,
+          })
         }
 
         const lineItems = await stripe.checkout.sessions.listLineItems(
@@ -212,7 +255,22 @@ serve(async (req) => {
         }
 
         const oneTimeStripeProductIdArray = Array.from(oneTimeStripeProductIds)
+        if (oneTimeStripeProductIdArray.length === 0) {
+          console.log(`${LOG_PREFIX} checkout.session.completed: no one-time (non-recurring) line items`, {
+            sessionId: session.id,
+            profileId,
+            lineItemCount: lineItems.data.length,
+          })
+        }
         if (oneTimeStripeProductIdArray.length > 0) {
+          const jobMatchId = session.metadata?.job_match_id ?? null
+          console.log(`${RESUME_LOG} one-time line items`, {
+            checkoutSessionId: session.id,
+            profileId,
+            stripeOneTimeProductIdCount: oneTimeStripeProductIdArray.length,
+            jobMatchIdFromMetadata: jobMatchId,
+          })
+
           const { data: oneTimeProducts, error: oneTimeProductsError } =
             await supabaseAdmin
               .from('products')
@@ -233,7 +291,10 @@ serve(async (req) => {
             }
           }
 
-          const jobMatchId = session.metadata?.job_match_id ?? null
+          console.log(`${RESUME_LOG} resolved Supabase products for Stripe one-time IDs`, {
+            checkoutSessionId: session.id,
+            mappedKeys: [...(oneTimeProducts ?? [])].map((r) => r.key),
+          })
 
           for (const line of lineItems.data) {
             const price = line.price
@@ -263,6 +324,16 @@ serve(async (req) => {
               continue
             }
 
+            console.log(`${RESUME_LOG} handling resume product line`, {
+              checkoutSessionId: session.id,
+              profileId,
+              productKey: resolved.key,
+              supabaseProductId: resolved.id,
+              stripeProductId,
+              isPerJobResume,
+              jobMatchId: isPerJobResume ? jobMatchId : null,
+            })
+
             const { data: resumeRow, error: resumeProductError } = await supabaseAdmin
               .from('resume_products')
               .upsert(
@@ -277,10 +348,29 @@ serve(async (req) => {
               .maybeSingle()
             if (resumeProductError) {
               console.error(
-                'checkout.session.completed: failed to upsert resume_products',
-                resumeProductError,
+                `${RESUME_LOG} failed to upsert resume_products`,
+                {
+                  checkoutSessionId: session.id,
+                  productKey: resolved.key,
+                  error: resumeProductError,
+                },
               )
-            } else if (resumeRow?.id) {
+            } else if (!resumeRow?.id) {
+              console.warn(`${RESUME_LOG} upsert returned no row id`, {
+                checkoutSessionId: session.id,
+                productKey: resolved.key,
+              })
+            } else {
+              console.log(`${RESUME_LOG} resume_products row ready`, {
+                checkoutSessionId: session.id,
+                resumeProductId: resumeRow.id,
+                productKey: resolved.key,
+              })
+              console.log(`${RESUME_LOG} scheduling n8n fulfillment (EdgeRuntime.waitUntil)`, {
+                checkoutSessionId: session.id,
+                resumeProductId: resumeRow.id,
+                productKey: resolved.key,
+              })
               EdgeRuntime.waitUntil(
                 fulfillResumeProductViaN8n({
                   supabaseAdmin,
@@ -289,8 +379,10 @@ serve(async (req) => {
                   profileId,
                   jobMatchId: isPerJobResume ? (jobMatchId ?? null) : null,
                 }).catch((err) =>
-                  console.error('checkout.session.completed: resume n8n fulfillment error', {
+                  console.error(`${RESUME_LOG} n8n fulfillment rejected`, {
+                    checkoutSessionId: session.id,
                     resumeProductId: resumeRow.id,
+                    productKey: resolved.key,
                     message: err instanceof Error ? err.message : String(err),
                   }),
                 ),
@@ -310,6 +402,8 @@ serve(async (req) => {
           })
         if (scheduleError) {
           console.error('checkout.session.completed: failed to schedule match-jobs:', scheduleError)
+        } else {
+          console.log(`${LOG_PREFIX} scheduled match-jobs`, { profileId, runAt })
         }
 
         // Welcome / subscription started email (if allowed by notification settings).
@@ -332,9 +426,15 @@ serve(async (req) => {
               payload: null,
               supabase: supabaseAdmin,
             })
+            console.log(`${LOG_PREFIX} welcome email sent`, { profileId, sessionId: session.id })
           } catch (err) {
             console.error('checkout.session.completed: welcome email failed', { profileId, message: err instanceof Error ? err.message : String(err) })
           }
+        } else {
+          console.log(`${LOG_PREFIX} welcome email skipped (no recipient or subscription email disabled / unsubscribed)`, {
+            profileId,
+            sessionId: session.id,
+          })
         }
         break
       }
@@ -345,13 +445,24 @@ serve(async (req) => {
           expand: ['items.data.price.product'],
         })
 
+        console.log(`${LOG_PREFIX} customer.subscription.updated`, {
+          stripeSubscriptionId: stripeSub.id,
+          status: expanded.status,
+          cancelAtPeriodEnd: expanded.cancel_at_period_end,
+        })
+
         const { data: existingSub } = await supabaseAdmin
           .from('subscriptions')
           .select('id, profile_id')
           .eq('stripe_subscription_id', stripeSub.id)
           .single()
 
-        if (!existingSub) break
+        if (!existingSub) {
+          console.warn(`${LOG_PREFIX} customer.subscription.updated: no matching subscriptions row`, {
+            stripeSubscriptionId: stripeSub.id,
+          })
+          break
+        }
 
         const subscriptionStatus = mapStripeStatus(expanded.status)
         const currentPeriodEnd = expanded.current_period_end
@@ -440,6 +551,14 @@ serve(async (req) => {
             .eq('product_id', row.product_id)
         }
 
+        console.log(`${LOG_PREFIX} customer.subscription.updated: synced subscription_product`, {
+          subscriptionId: existingSub.id,
+          profileId: existingSub.profile_id,
+          stripeSubscriptionId: stripeSub.id,
+          mappedProductCount: productIdsInStripe.length,
+          removedProductLinks: toRemove.length,
+        })
+
         // Subscription updated email: plan name and next billing date, or cancellation scheduled notice.
         const profileIdUpdated = existingSub.profile_id
         if (profileIdUpdated) {
@@ -474,6 +593,10 @@ serve(async (req) => {
                   payload: { cancelAtDate },
                   supabase: supabaseAdmin,
                 })
+                console.log(`${LOG_PREFIX} subscription update email sent (cancel scheduled)`, {
+                  profileId: profileIdUpdated,
+                  stripeSubscriptionId: stripeSub.id,
+                })
               } else {
                 const { html, text } = renderSubscriptionUpdated({
                   recipientName: recipient.firstName,
@@ -492,26 +615,63 @@ serve(async (req) => {
                   payload: { planName, nextBillingDate: nextBilling },
                   supabase: supabaseAdmin,
                 })
+                console.log(`${LOG_PREFIX} subscription update email sent (updated)`, {
+                  profileId: profileIdUpdated,
+                  stripeSubscriptionId: stripeSub.id,
+                })
               }
             } catch (err) {
               console.error('customer.subscription.updated: email failed', { profileId: profileIdUpdated, message: err instanceof Error ? err.message : String(err) })
             }
+          } else {
+            console.log(`${LOG_PREFIX} customer.subscription.updated: subscription email skipped (no recipient or prefs)`, {
+              profileId: profileIdUpdated,
+              stripeSubscriptionId: stripeSub.id,
+            })
           }
+        } else {
+          console.warn(`${LOG_PREFIX} customer.subscription.updated: subscriptions row has no profile_id`, {
+            subscriptionId: existingSub.id,
+            stripeSubscriptionId: stripeSub.id,
+          })
         }
         break
       }
 
       case 'customer.subscription.deleted': {
         const stripeSub = event.data.object as Stripe.Subscription
+        console.log(`${LOG_PREFIX} customer.subscription.deleted`, {
+          stripeSubscriptionId: stripeSub.id,
+        })
+
         const { data: deletedSub } = await supabaseAdmin
           .from('subscriptions')
           .select('profile_id')
           .eq('stripe_subscription_id', stripeSub.id)
           .single()
-        await supabaseAdmin
+        const { error: canceledUpdateError } = await supabaseAdmin
           .from('subscriptions')
           .update({ status: 'canceled' })
           .eq('stripe_subscription_id', stripeSub.id)
+
+        if (canceledUpdateError) {
+          console.error(`${LOG_PREFIX} customer.subscription.deleted: failed to set status canceled`, {
+            stripeSubscriptionId: stripeSub.id,
+            error: canceledUpdateError,
+          })
+        } else {
+          console.log(`${LOG_PREFIX} customer.subscription.deleted: subscriptions row marked canceled`, {
+            stripeSubscriptionId: stripeSub.id,
+            hadLocalRow: Boolean(deletedSub?.profile_id),
+          })
+        }
+
+        if (!deletedSub?.profile_id) {
+          console.warn(`${LOG_PREFIX} customer.subscription.deleted: no subscriptions row with profile_id`, {
+            stripeSubscriptionId: stripeSub.id,
+          })
+        }
+
         if (deletedSub?.profile_id) {
           const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, deletedSub.profile_id)
           if (recipient) {
@@ -532,15 +692,28 @@ serve(async (req) => {
                 payload: null,
                 supabase: supabaseAdmin,
               })
+              console.log(`${LOG_PREFIX} subscription canceled email sent`, {
+                profileId: deletedSub.profile_id,
+                stripeSubscriptionId: stripeSub.id,
+              })
             } catch (err) {
               console.error('customer.subscription.deleted: email failed', { profileId: deletedSub.profile_id, message: err instanceof Error ? err.message : String(err) })
             }
+          } else {
+            console.log(`${LOG_PREFIX} customer.subscription.deleted: canceled email skipped (no recipient or prefs)`, {
+              profileId: deletedSub.profile_id,
+              stripeSubscriptionId: stripeSub.id,
+            })
           }
         }
         break
       }
 
       default:
+        console.log(`${LOG_PREFIX} ignored event type (no handler)`, {
+          type: event.type,
+          id: event.id,
+        })
         break
     }
 

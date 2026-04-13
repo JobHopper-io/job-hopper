@@ -2,6 +2,9 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type AdminClient = SupabaseClient
 
+/** Grep-friendly prefix for resume n8n fulfillment logs. */
+const LOG = '[resume-n8n]'
+
 const TAILORING_URL = () => Deno.env.get('N8N_RESUME_ADVICE_WEBHOOK_URL') ?? ''
 const UPGRADE_URL = () => Deno.env.get('N8N_RESUME_UPGRADE_WEBHOOK_URL') ?? ''
 const API_KEY = () => Deno.env.get('N8N_WEBHOOK_API_KEY') ?? ''
@@ -30,7 +33,7 @@ async function downloadResumeBytes(
 ): Promise<Uint8Array | null> {
   const { data, error } = await supabaseAdmin.storage.from('resumes').download(bucketKey)
   if (error || !data) {
-    console.error('n8n resume: storage download failed', { bucketKey, message: error?.message })
+    console.error(`${LOG} storage download failed`, { bucketKey, message: error?.message })
     return null
   }
   return new Uint8Array(await data.arrayBuffer())
@@ -51,11 +54,11 @@ async function bytesToResumePlainText(
       const s = (text ?? '').trim()
       return s || null
     } catch (e) {
-      console.error('n8n resume: PDF text extraction failed', e)
+      console.error(`${LOG} PDF text extraction failed`, e)
       return null
     }
   }
-  console.warn('n8n resume: unsupported resume file type (use PDF or TXT)', { bucketKey })
+  console.warn(`${LOG} unsupported resume file type (use PDF or TXT)`, { bucketKey })
   return null
 }
 
@@ -72,7 +75,7 @@ async function loadJobDescriptionForMatch(
     .maybeSingle()
 
   if (matchError || !match?.job_id) {
-    console.error('n8n resume: job match not found for per-job resume', {
+    console.error(`${LOG} job match not found for per-job resume`, {
       jobMatchId,
       profileId,
       message: matchError?.message,
@@ -87,7 +90,7 @@ async function loadJobDescriptionForMatch(
     .maybeSingle()
 
   if (jobError) {
-    console.error('n8n resume: failed to load job description', { message: jobError.message })
+    console.error(`${LOG} failed to load job description`, { message: jobError.message })
     return null
   }
 
@@ -96,9 +99,35 @@ async function loadJobDescriptionForMatch(
   return null
 }
 
-async function postN8n(url: string, apiKey: string, body: Record<string, unknown>): Promise<string | null> {
+function logWebhookTarget(url: string): { host: string; path: string } {
+  try {
+    const u = new URL(url)
+    return { host: u.host, path: u.pathname }
+  } catch {
+    return { host: '(invalid-url)', path: '' }
+  }
+}
+
+async function postN8n(
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  logContext: { resumeProductId: string },
+): Promise<string | null> {
   const controller = new AbortController()
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  const target = logWebhookTarget(url)
+  const resumeLen =
+    typeof body.resume === 'string' ? body.resume.length : 0
+  const jdLen =
+    typeof body.jobDescription === 'string' ? body.jobDescription.length : 0
+  console.log(`${LOG} POST webhook`, {
+    resumeProductId: logContext.resumeProductId,
+    host: target.host,
+    path: target.path,
+    bodyResumeChars: resumeLen,
+    bodyJobDescriptionChars: jdLen,
+  })
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -111,7 +140,8 @@ async function postN8n(url: string, apiKey: string, body: Record<string, unknown
     })
     const raw = await res.text()
     if (!res.ok) {
-      console.error('n8n resume: webhook HTTP error', {
+      console.error(`${LOG} webhook HTTP error`, {
+        resumeProductId: logContext.resumeProductId,
         status: res.status,
         bodyPreview: raw.slice(0, 500),
       })
@@ -121,18 +151,35 @@ async function postN8n(url: string, apiKey: string, body: Record<string, unknown
     try {
       parsed = JSON.parse(raw) as unknown
     } catch {
-      console.error('n8n resume: webhook response is not JSON', { rawPreview: raw.slice(0, 200) })
+      console.error(`${LOG} webhook response is not JSON`, {
+        resumeProductId: logContext.resumeProductId,
+        rawPreview: raw.slice(0, 200),
+      })
       return null
     }
     if (parsed && typeof parsed === 'object' && 'improvements' in parsed) {
       const v = (parsed as { improvements: unknown }).improvements
-      if (typeof v === 'string' && v.trim()) return v.trim()
+      if (typeof v === 'string' && v.trim()) {
+        const trimmed = v.trim()
+        console.log(`${LOG} webhook OK`, {
+          resumeProductId: logContext.resumeProductId,
+          status: res.status,
+          improvementsChars: trimmed.length,
+          responseBodyChars: raw.length,
+        })
+        return trimmed
+      }
     }
-    console.error('n8n resume: missing improvements string in JSON response')
+    console.error(`${LOG} missing improvements string in JSON response`, {
+      resumeProductId: logContext.resumeProductId,
+    })
     return null
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    console.error('n8n resume: webhook request failed', { message })
+    console.error(`${LOG} webhook request failed`, {
+      resumeProductId: logContext.resumeProductId,
+      message,
+    })
     return null
   } finally {
     clearTimeout(t)
@@ -154,28 +201,41 @@ export type FulfillResumeN8nParams = {
 export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams): Promise<void> {
   const { supabaseAdmin, resumeProductId, productKey, profileId, jobMatchId } = params
 
+  console.log(`${LOG} fulfill start`, {
+    resumeProductId,
+    productKey,
+    profileId,
+    jobMatchId: jobMatchId ?? null,
+  })
+
   const { data: rowState } = await supabaseAdmin
     .from('resume_products')
     .select('status')
     .eq('id', resumeProductId)
     .maybeSingle()
   if (rowState?.status === 'complete') {
+    console.log(`${LOG} skip: resume_products already complete`, { resumeProductId, status: rowState.status })
     return
   }
 
   const url = webhookUrlForProductKey(productKey)
   const apiKey = API_KEY()
   if (!url || !apiKey) {
-    console.warn('n8n resume: skip fulfillment (set N8N_WEBHOOK_API_KEY and product webhook URL)', {
+    console.warn(`${LOG} skip: missing env (N8N_WEBHOOK_API_KEY and product webhook URL)`, {
+      resumeProductId,
       productKey,
       hasUrl: Boolean(url),
       hasKey: Boolean(apiKey),
+      webhookEnv:
+        productKey === 'resume_upgrade'
+          ? 'N8N_RESUME_UPGRADE_WEBHOOK_URL'
+          : 'N8N_RESUME_ADVICE_WEBHOOK_URL',
     })
     return
   }
 
   if (isPerJobResumeProduct(productKey) && (!jobMatchId || !jobMatchId.trim())) {
-    console.error('n8n resume: per-job purchase missing job_match_id metadata')
+    console.error(`${LOG} skip: per-job purchase missing job_match_id`, { resumeProductId, productKey })
     return
   }
 
@@ -186,35 +246,45 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
     .maybeSingle()
 
   if (profileError || !profile?.resume_bucket_key?.trim()) {
-    console.error('n8n resume: profile has no resume on file', {
+    console.error(`${LOG} skip: profile has no resume on file`, {
+      resumeProductId,
       profileId,
       message: profileError?.message,
     })
     return
   }
 
-  const bytes = await downloadResumeBytes(supabaseAdmin, profile.resume_bucket_key.trim())
+  const bucketKey = profile.resume_bucket_key.trim()
+  console.log(`${LOG} loading resume from storage`, { resumeProductId, bucketKeySuffix: bucketKey.slice(-24) })
+
+  const bytes = await downloadResumeBytes(supabaseAdmin, bucketKey)
   if (!bytes) return
 
-  const resumeText = await bytesToResumePlainText(profile.resume_bucket_key.trim(), bytes)
+  const resumeText = await bytesToResumePlainText(bucketKey, bytes)
   if (!resumeText) {
-    console.error('n8n resume: could not extract plain text from resume file')
+    console.error(`${LOG} skip: could not extract plain text from resume file`, { resumeProductId, bucketKey })
     return
   }
+
+  console.log(`${LOG} resume text extracted`, { resumeProductId, charCount: resumeText.length })
 
   const body: Record<string, unknown> = { resume: resumeText }
 
   if (isPerJobResumeProduct(productKey)) {
     const jd = await loadJobDescriptionForMatch(supabaseAdmin, profileId, jobMatchId as string)
     if (!jd) {
-      console.error('n8n resume: no job description for per-job resume; skipping webhook')
+      console.error(`${LOG} skip: no job description for per-job resume`, { resumeProductId, jobMatchId })
       return
     }
     body.jobDescription = jd
+    console.log(`${LOG} job description loaded`, { resumeProductId, charCount: jd.length })
   }
 
-  const improvements = await postN8n(url, apiKey, body)
-  if (!improvements) return
+  const improvements = await postN8n(url, apiKey, body, { resumeProductId })
+  if (!improvements) {
+    console.warn(`${LOG} abort: no improvements from webhook`, { resumeProductId })
+    return
+  }
 
   const completedAt = new Date().toISOString()
   const fulfillmentUpdate = {
@@ -228,9 +298,18 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
     .eq('id', resumeProductId)
 
   if (updateError) {
-    console.error('n8n resume: failed to persist improvements', {
+    console.error(`${LOG} failed to persist improvements`, {
       resumeProductId,
       message: updateError.message,
     })
+    return
   }
+
+  console.log(`${LOG} fulfill done`, {
+    resumeProductId,
+    productKey,
+    profileId,
+    improvementsChars: improvements.length,
+    completedAt,
+  })
 }
