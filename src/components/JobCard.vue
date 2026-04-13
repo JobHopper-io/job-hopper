@@ -39,7 +39,7 @@ const showResumeAdviceButton = computed(() => {
 const adviceStatusText = computed<string | null>(() => {
   const p = props.advicePurchase
   if (!p || p.status === 'cancelled') return null
-  if (p.status === 'pending') return 'Resume advice in progress'
+  if (p.status === 'pending') return 'Generating resume advice'
   return null
 })
 

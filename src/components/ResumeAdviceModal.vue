@@ -96,7 +96,7 @@ onUnmounted(() => {
               class="text-2xl text-brand-primary"
               aria-hidden="true"
             />
-            <p>Your advice is being prepared. Check back in a few minutes.</p>
+            <p>Your advice is being generated. Check back in a few minutes.</p>
           </div>
         </div>
         <div class="border-t border-neutral-border px-6 py-4">
