@@ -833,12 +833,12 @@ onMounted(async () => {
               <span>{{ debug.filters.totalJobs }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by subscription tier:</span>
-              <span>{{ debug.filters.excludedBySubscriptionTier ?? 0 }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
               <span class="font-semibold">After filters:</span>
               <span>{{ debug.filters.includedAfterFilters }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by subscription tier:</span>
+              <span>{{ debug.filters.excludedBySubscriptionTier ?? 0 }}</span>
             </p>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by role:</span>
