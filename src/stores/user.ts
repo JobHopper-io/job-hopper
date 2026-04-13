@@ -187,11 +187,6 @@ export const useUserStore = defineStore('user', () => {
     subscriptionProducts.value = []
   }
 
-  // Helper Functions
-  function hasAddon(key: string): boolean {
-    return addonProducts.value.some((p) => p.key === key)
-  }
-
   return {
     profile,
     subscriptions,
@@ -209,7 +204,6 @@ export const useUserStore = defineStore('user', () => {
     trialProducts,
     nextBillingAt,
     trialEndsAt,
-    hasAddon,
     subscriptionStatusLabel
   }
 })

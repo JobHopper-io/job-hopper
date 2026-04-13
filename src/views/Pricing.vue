@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
+import { resumeProductsAPI } from '@/lib/resumeProducts'
 import type { Product } from '@/types/database'
 
 const faqOpen = ref<number | null>(null)
@@ -14,16 +15,18 @@ const orderedBasePlans = computed(() =>
 )
 
 onMounted(async () => {
-  const [baseRes, addonRes] = await Promise.all([
+  const [baseRes, addonRes, adviceRes] = await Promise.all([
     subscriptionAPI.getBasePlanProducts(),
     subscriptionAPI.getAddonProducts(),
+    resumeProductsAPI.getResumeAdviceProduct(),
   ])
   if (baseRes.data) basePlanProducts.value = baseRes.data
   if (addonRes.data) {
     resumeUpgradeProduct.value =
       addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
-    resumeTailoringProduct.value =
-      addonRes.data.find((p) => p.key === 'per_job_resume_advice') ?? null
+  }
+  if (!adviceRes.error) {
+    resumeTailoringProduct.value = adviceRes.data
   }
 })
 

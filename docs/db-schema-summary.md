@@ -35,12 +35,12 @@
 - **Non‑obvious rules**:
   - `category = 'base_plan'` for recurring base subscription plans.
   - `category = 'subscription_addon'` for recurring add-ons attached to a subscription (billed monthly alongside the base plan).
-  - `category = 'one_time_addon'` for one-time purchase add-ons that complement a subscription/profile (e.g. resume upgrade, per-job resume advice).
-  - `category = 'one_time_item'` for one-time purchase products that are not conceptually part of a subscription bundle.
+  - `category = 'one_time_addon'` for one-time purchase add-ons that complement a subscription/profile (e.g. resume upgrade).
+  - `category = 'one_time_item'` for one-time purchase products that are not conceptually part of a subscription bundle (e.g. per-job resume advice, bought from a job match with `job_match_id` in checkout metadata).
   - For billing semantics, `base_plan` and `subscription_addon` map to recurring Stripe prices; `one_time_addon` and `one_time_item` map to one-time prices.
   - `stripe_product_id` is **derived** and used only as an operational mapping to Stripe. Supabase remains the source of truth for the catalog; Stripe is a projection/cache.
   - `available_for_purchase`: when `false`, the product is hidden from catalog UIs (`getBasePlanProducts` / `getAddonProducts` filter) and rejected by `create-checkout-session` and `modify-subscription` so it cannot be newly purchased; rows are retained for existing subscribers and Stripe ID mapping (e.g. retired subscription add-ons such as `premium_insights` / `interview_prep`).
-  - Frontend derives tier (base plan) and addons from these rows; use `key`, `display_name`, `description`, and `price_cents` from the DB. Use `getBasePlanProducts()` and `subscriptionAPI.getAddonProducts()` to list products for the UI. Checkout accepts our product ids; the create-checkout-session Edge Function loads products by id, ensures a canonical Stripe Product per Supabase product, and builds Stripe line items with `price_data.product = stripe_product_id`. The Stripe webhook maps subscription items and one-time lines back to Supabase products by joining on `products.stripe_product_id`.
+  - Frontend derives tier (base plan) and addons from these rows; use `key`, `display_name`, `description`, and `price_cents` from the DB. Use `getBasePlanProducts()` and `subscriptionAPI.getAddonProducts()` for subscription bundle catalog; use `resumeProductsAPI.getResumeAdviceProduct()` for the per-job resume advice row (`one_time_item`). Checkout accepts our product ids; the create-checkout-session Edge Function loads products by id, ensures a canonical Stripe Product per Supabase product, and builds Stripe line items with `price_data.product = stripe_product_id`. The Stripe webhook maps subscription items and one-time lines back to Supabase products by joining on `products.stripe_product_id`.
 
 ### subscription_product
 - **Meaning**: Join table: which products are on each subscription (one row per subscription × product).

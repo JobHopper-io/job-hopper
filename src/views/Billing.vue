@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { Product } from '@/types/database'
 import { subscriptionAPI, formatProductLineLabel, getProductPrice } from '@/lib/subscription'
@@ -11,10 +11,17 @@ const {
   basePlan,
   subscriptionAddonProducts,
   oneTimeAddonProducts,
+  oneTimeItems,
   nextBillingAt,
   trialEndsAt,
   isLoading,
 } = storeToRefs(userStore)
+
+/** One-time add-ons plus one-time items (e.g. per-job resume advice) from profile entitlements. */
+const oneTimePurchaseProducts = computed(() => [
+  ...oneTimeAddonProducts.value,
+  ...oneTimeItems.value,
+])
 
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
@@ -129,9 +136,9 @@ const handleManageBilling = async () => {
               <h3 class="text-sm font-semibold text-brand-charcoal mb-2">
                 One-time purchases
               </h3>
-              <div v-if="oneTimeAddonProducts.length" class="space-y-2">
+              <div v-if="oneTimePurchaseProducts.length" class="space-y-2">
                 <p
-                  v-for="product in oneTimeAddonProducts"
+                  v-for="product in oneTimePurchaseProducts"
                   :key="product.id"
                   class="text-neutral-body"
                 >

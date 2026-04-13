@@ -104,7 +104,10 @@ export const subscriptionAPI = {
     return { data, error: null }
   },
 
-  /** Fetch products that are add-ons (recurring or one-time) */
+  /**
+   * Subscription bundle add-ons: recurring add-ons and one-time add-ons (e.g. resume upgrade).
+   * Excludes `one_time_item` products such as `per_job_resume_advice` (load via `resumeProductsAPI.getResumeAdviceProduct()`).
+   */
   async getAddonProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
     const { data, error } = await supabase
       .from('products')
