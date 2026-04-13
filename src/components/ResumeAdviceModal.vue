@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 
 const props = defineProps<{
@@ -14,6 +16,14 @@ const emit = defineEmits<{
 const hasAdvice = computed(() => {
   const t = props.adviceText
   return typeof t === 'string' && t.trim().length > 0
+})
+
+const adviceHtml = computed(() => {
+  const t = props.adviceText
+  if (typeof t !== 'string' || !t.trim()) return ''
+  const raw = marked(t.trim(), { async: false })
+  if (typeof raw !== 'string') return ''
+  return DOMPurify.sanitize(raw)
 })
 
 function onBackdropClick() {
@@ -74,9 +84,11 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          <div v-if="hasAdvice" class="text-neutral-body whitespace-pre-wrap text-sm leading-relaxed">
-            {{ adviceText }}
-          </div>
+          <div
+            v-if="hasAdvice"
+            class="prose prose-sm max-w-none break-words text-neutral-body prose-headings:font-heading prose-headings:text-brand-charcoal prose-strong:text-brand-charcoal"
+            v-html="adviceHtml"
+          ></div>
           <div v-else class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm">
             <font-awesome-icon
               :icon="['fas', 'spinner']"
