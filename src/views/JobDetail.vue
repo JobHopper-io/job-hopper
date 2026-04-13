@@ -6,6 +6,7 @@ import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,10 +17,11 @@ const job = ref<MatchedJob | null>(null)
 const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 
-const tailoringPurchase = ref<ResumeProduct | null>(null)
+const advicePurchase = ref<ResumeProduct | null>(null)
 const tailoringLoading = ref(false)
-const tailoringCheckoutLoading = ref(false)
+const adviceCheckoutLoading = ref(false)
 const tailoringError = ref<string | null>(null)
+const adviceModalOpen = ref(false)
 
 async function loadTailoringPurchase(matchId: string) {
   tailoringLoading.value = true
@@ -28,10 +30,10 @@ async function loadTailoringPurchase(matchId: string) {
   tailoringLoading.value = false
   if (error) {
     tailoringError.value = error.message
-    tailoringPurchase.value = null
+    advicePurchase.value = null
     return
   }
-  tailoringPurchase.value = data
+  advicePurchase.value = data
 }
 
 onMounted(async () => {
@@ -75,17 +77,22 @@ function handleApplyClick() {
   window.open(job.value.applyLink, '_blank', 'noopener,noreferrer')
 }
 
-const canPurchaseTailoring = computed(() => {
-  const p = tailoringPurchase.value
+const canPurchaseAdvice = computed(() => {
+  const p = advicePurchase.value
   if (!p) return true
   return p.status === 'cancelled'
 })
 
+const showResumeAdviceButton = computed(() => {
+  const p = advicePurchase.value
+  if (!p || p.status === 'cancelled') return false
+  return true
+})
+
 const tailoringStatusLabel = computed(() => {
-  const p = tailoringPurchase.value
-  if (!p) return null
-  if (p.status === 'pending') return 'Tailoring in progress'
-  if (p.status === 'complete') return 'Tailored resume ready'
+  const p = advicePurchase.value
+  if (!p || p.status === 'cancelled') return null
+  if (p.status === 'pending') return 'Resume advice in progress'
   return null
 })
 
@@ -195,12 +202,12 @@ const whyFitBullets = computed(() => {
 
 async function handleTailoringCheckout() {
   if (!job.value) return
-  tailoringCheckoutLoading.value = true
+  adviceCheckoutLoading.value = true
   tailoringError.value = null
   const returnPath = route.path
-  const { data, error } = await resumeProductsAPI.startTailoringCheckout(job.value.matchId, returnPath)
+  const { data, error } = await resumeProductsAPI.startAdviceCheckout(job.value.matchId, returnPath)
   if (error) {
-    tailoringCheckoutLoading.value = false
+    adviceCheckoutLoading.value = false
     tailoringError.value = error.message
     return
   }
@@ -208,7 +215,7 @@ async function handleTailoringCheckout() {
     window.location.href = data.url
     return
   }
-  tailoringCheckoutLoading.value = false
+  adviceCheckoutLoading.value = false
 }
 </script>
 
@@ -318,43 +325,50 @@ async function handleTailoringCheckout() {
                   Apply on company site
                 </button>
                 <button
-                  v-if="canPurchaseTailoring"
+                  v-if="canPurchaseAdvice"
                   type="button"
                   class="btn-secondary inline-flex w-[11.5rem] items-center justify-center gap-2"
-                  :disabled="tailoringCheckoutLoading || tailoringLoading"
+                  :disabled="adviceCheckoutLoading || tailoringLoading"
                   @click="handleTailoringCheckout"
                 >
                   <font-awesome-icon
-                    v-if="tailoringCheckoutLoading"
+                    v-if="adviceCheckoutLoading"
                     :icon="['fas', 'spinner']"
                     spin
                     aria-hidden="true"
                   />
-                  {{ tailoringCheckoutLoading ? 'Redirecting…' : 'Tailor Resume' }}
+                  {{ adviceCheckoutLoading ? 'Redirecting…' : 'Get resume advice' }}
+                </button>
+                <button
+                  v-if="showResumeAdviceButton"
+                  type="button"
+                  class="btn-secondary inline-flex w-[11.5rem] items-center justify-center gap-2"
+                  :disabled="tailoringLoading"
+                  @click="adviceModalOpen = true"
+                >
+                  View resume advice
                 </button>
               </div>
             </div>
-            <!-- Tailoring status and error (below actions; does not affect button layout) -->
+            <ResumeAdviceModal
+              :open="adviceModalOpen"
+              :advice-text="advicePurchase?.improvements_text"
+              @close="adviceModalOpen = false"
+            />
+            <!-- Purchase status and error (below actions; does not affect button layout) -->
             <div
               v-if="tailoringLoading || tailoringStatusLabel || tailoringError"
               class="mt-3 text-xs text-neutral-body"
             >
               <div v-if="tailoringLoading" class="flex items-center gap-2">
                 <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
-                <span>Checking tailoring status…</span>
+                <span>Checking resume advice status…</span>
               </div>
               <div
                 v-else-if="tailoringStatusLabel"
                 class="flex items-center gap-2"
               >
                 <font-awesome-icon
-                  v-if="tailoringPurchase?.status === 'complete'"
-                  :icon="['fas', 'check']"
-                  class="text-green-600 shrink-0"
-                  aria-hidden="true"
-                />
-                <font-awesome-icon
-                  v-else
                   :icon="['fas', 'spinner']"
                   spin
                   class="shrink-0"

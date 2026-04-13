@@ -31,11 +31,11 @@
 - **Meaning**: Catalog of products used for display, pricing, and gating. The catalog is **DB-only**; Supabase products are the source of truth, and each product may have a canonical Stripe Product referenced by `stripe_product_id`. Stripe products/prices are created as a projection of this table and are looked up by `stripe_product_id`.
 - **Columns**: `id`, `key`, `display_name`, `description` (text), `price_cents` (integer), `category` (enum `product_category`), `stripe_product_id` (text, nullable), `available_for_purchase` (boolean, default `true`).
 - **Key relationships**:
-  - Referenced by `subscription_product` (products on a subscription) and `resume_products` (resume upgrade and per-job tailoring purchases).
+  - Referenced by `subscription_product` (products on a subscription) and `resume_products` (resume upgrade and per-job resume advice purchases).
 - **Non‑obvious rules**:
   - `category = 'base_plan'` for recurring base subscription plans.
   - `category = 'subscription_addon'` for recurring add-ons attached to a subscription (billed monthly alongside the base plan).
-  - `category = 'one_time_addon'` for one-time purchase add-ons that complement a subscription/profile (e.g. resume upgrade, per-job resume tailoring).
+  - `category = 'one_time_addon'` for one-time purchase add-ons that complement a subscription/profile (e.g. resume upgrade, per-job resume advice).
   - `category = 'one_time_item'` for one-time purchase products that are not conceptually part of a subscription bundle.
   - For billing semantics, `base_plan` and `subscription_addon` map to recurring Stripe prices; `one_time_addon` and `one_time_item` map to one-time prices.
   - `stripe_product_id` is **derived** and used only as an operational mapping to Stripe. Supabase remains the source of truth for the catalog; Stripe is a projection/cache.
@@ -51,13 +51,14 @@
   - Stores `stripe_subscription_item_id` for each `(subscription_id, product_id)` so Stripe subscription items can be updated or cancelled individually without treating Stripe as a source of truth.
 
 ### resume_products
-- **Meaning**: Lifecycle records for resume-related one-time purchases: initial resume overhaul and per-job resume tailoring. Each row represents a single purchase and its status through fulfillment.
+- **Meaning**: Lifecycle records for resume-related one-time purchases: initial resume overhaul (`resume_upgrade`) and per-job resume advice (`per_job_resume_advice`). Each row represents a single purchase and its status through fulfillment.
 - **Key relationships**:
   - `profile_id` → `profiles.id`, `product_id` → `products.id`, `job_match_id` → `job_matches.id` (nullable).
-  - UNIQUE(`profile_id`, `job_match_id`, `product_id`): at most one tailoring purchase per job per profile; resume upgrade uses `job_match_id` null.
+  - UNIQUE(`profile_id`, `job_match_id`, `product_id`): at most one per-job purchase per job per profile; resume upgrade uses `job_match_id` null.
 - **Non‑obvious rules**:
-  - Populated by webhook `checkout.session.completed` from one-time line items for products with `key IN ('resume_upgrade', 'resume_tailoring')`; `job_match_id` comes from session metadata for tailoring.
-  - `status` enum: `pending` | `complete` | `cancelled`; default `pending`. `completed_at` set when status becomes `complete`.
+  - Populated by webhook `checkout.session.completed` from one-time line items for products with `key IN ('resume_upgrade', 'per_job_resume_advice')`. For `per_job_resume_advice`, `job_match_id` is set from session metadata; for `resume_upgrade` it stays null.
+  - `improvements_text` stores plain-text LLM output from n8n for **both** product types: the `stripe-webhook` function invokes `fulfillResumeProductViaN8n` (background) which calls the appropriate n8n URL, then updates the row with `improvements_text`, `status = 'complete'`, and `completed_at`.
+  - `status` enum: `pending` | `complete` | `cancelled`; default `pending`. `completed_at` set when fulfillment completes.
   - Only service_role (e.g. edge functions) writes; authenticated users can SELECT their own rows via RLS.
 
 ## Job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)

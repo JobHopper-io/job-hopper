@@ -33,7 +33,7 @@ function dismissProfileCompletion() {
 }
 
 const matches = ref<MatchedJob[]>([])
-const tailoringByMatchId = ref<Record<string, ResumeProduct>>({})
+const adviceByMatchId = ref<Record<string, ResumeProduct>>({})
 const isLoadingMatches = ref(false)
 const matchesError = ref<string | null>(null)
 
@@ -130,9 +130,9 @@ async function loadMatchesAndStats() {
     }
 
     if (!tailoringResult.error) {
-      tailoringByMatchId.value = tailoringResult.data
+      adviceByMatchId.value = tailoringResult.data
     } else {
-      tailoringByMatchId.value = {}
+      adviceByMatchId.value = {}
     }
   } finally {
     isLoadingMatches.value = false
@@ -378,7 +378,7 @@ onMounted(() => {
           v-for="job in filteredMatches"
           :key="job.matchId"
           :job="job"
-          :tailoring-purchase="tailoringByMatchId[job.matchId] ?? null"
+          :advicePurchase="adviceByMatchId[job.matchId] ?? null"
           @toggle-save="handleToggleSave"
         />
       </div>

@@ -47,7 +47,7 @@ const productColumns =
 
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
-  /** For per-job resume tailoring; passed to Stripe session metadata and webhook. */
+  /** For per-job resume advice; passed to Stripe session metadata and webhook. */
   jobMatchId?: string
 }
 

@@ -1,23 +1,15 @@
-import { supabase } from '@/lib/supabase'
+import {
+  normalizeLocationInput,
+  type NormalizedLocationResult,
+} from '@shared/location-normalization'
 
-export interface NormalizedLocationResult {
-  normalized: string | null
-  error: string | null
-}
+export type { NormalizedLocationResult }
 
+/**
+ * Normalizes on the client using the same logic as the `normalize-location` Edge Function.
+ * Avoids a round-trip to Functions (local Docker often returns 503 when Deno cannot resolve npm registry DNS).
+ */
 export async function normalizeLocation(input: string): Promise<NormalizedLocationResult> {
-  const { data, error } = await supabase.functions.invoke<NormalizedLocationResult>('normalize-location', {
-    body: { input },
-  })
-
-  if (error) {
-    console.error('normalizeLocation error:', error)
-    return {
-      normalized: null,
-      error: 'We could not validate this location. Please try again.',
-    }
-  }
-
-  return data ?? { normalized: null, error: null }
+  return normalizeLocationInput(input)
 }
 

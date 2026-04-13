@@ -50,7 +50,6 @@ async function loadProfileAndCheckSubscriptionEmailAllowed(
   return { email: profile.email, firstName: profile.first_name?.trim() || 'there' }
 }
 
-
 serve(async (req) => {
   const signature = req.headers.get('stripe-signature')
   if (!signature) {
@@ -259,7 +258,8 @@ serve(async (req) => {
               continue
             }
 
-            if (resolved.key !== 'resume_upgrade' && resolved.key !== 'resume_tailoring') {
+            const isPerJobResume = resolved.key === 'per_job_resume_advice'
+            if (resolved.key !== 'resume_upgrade' && !isPerJobResume) {
               continue
             }
 
@@ -269,8 +269,7 @@ serve(async (req) => {
                 {
                   profile_id: profileId,
                   product_id: resolved.id,
-                  job_match_id:
-                    resolved.key === 'resume_tailoring' ? (jobMatchId || null) : null,
+                  job_match_id: isPerJobResume ? (jobMatchId || null) : null,
                 },
                 { onConflict: 'profile_id,job_match_id,product_id' },
               )
@@ -288,8 +287,7 @@ serve(async (req) => {
                   resumeProductId: resumeRow.id,
                   productKey: resolved.key,
                   profileId,
-                  jobMatchId:
-                    resolved.key === 'resume_tailoring' ? (jobMatchId ?? null) : null,
+                  jobMatchId: isPerJobResume ? (jobMatchId ?? null) : null,
                 }).catch((err) =>
                   console.error('checkout.session.completed: resume n8n fulfillment error', {
                     resumeProductId: resumeRow.id,

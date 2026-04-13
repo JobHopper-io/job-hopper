@@ -1,5 +1,5 @@
 /**
- * Resume products API: product lookups, resume_products lifecycle, and per-job tailoring checkout.
+ * Resume products API: product lookups, resume_products lifecycle, and per-job resume advice checkout.
  */
 
 import { supabase } from '@/lib/supabase'
@@ -14,6 +14,15 @@ async function getCurrentProfileId(): Promise<string> {
   const { data, error } = await profileAPI.getCurrentUserProfile()
   if (error || !data) throw new Error('Not authenticated')
   return data.id
+}
+
+async function getPerJobResumeAdviceProductId(): Promise<string | null> {
+  const { data } = await supabase
+    .from('products')
+    .select('id')
+    .eq('key', 'per_job_resume_advice')
+    .maybeSingle()
+  return data?.id ?? null
 }
 
 export const resumeProductsAPI = {
@@ -31,14 +40,14 @@ export const resumeProductsAPI = {
     return { data: data as Product | null, error: null }
   },
 
-  async getResumeTailoringProduct(): Promise<{
+  async getResumeAdviceProduct(): Promise<{
     data: Product | null
     error: Error | null
   }> {
     const { data, error } = await supabase
       .from('products')
       .select(productColumns)
-      .eq('key', 'resume_tailoring')
+      .eq('key', 'per_job_resume_advice')
       .eq('available_for_purchase', true)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
@@ -64,11 +73,16 @@ export const resumeProductsAPI = {
     error: Error | null
   }> {
     const profileId = await getCurrentProfileId()
+    const productId = await getPerJobResumeAdviceProductId()
+    if (!productId) {
+      return { data: null, error: null }
+    }
     const { data, error } = await supabase
       .from('resume_products')
       .select('*')
       .eq('profile_id', profileId)
       .eq('job_match_id', matchId)
+      .eq('product_id', productId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -76,22 +90,26 @@ export const resumeProductsAPI = {
     return { data: data as ResumeProduct | null, error: null }
   },
 
-  /** Returns a map of job_match_id → tailoring purchase for all matches that have one (any status). Uses the full list of resume products for the profile and filters to per-job tailoring (job_match_id not null). */
+  /** Returns a map of job_match_id → per-job resume advice purchase for all matches that have one (any status). */
   async getTailoringPurchasesByMatchId(): Promise<{
     data: Record<string, ResumeProduct>
     error: Error | null
   }> {
+    const productId = await getPerJobResumeAdviceProductId()
     const { data: allResumeProducts, error } =
       await resumeProductsAPI.getResumeProductsForProfile()
     if (error) return { data: {}, error }
+    if (!productId) return { data: {}, error: null }
     const byMatchId: Record<string, ResumeProduct> = {}
     for (const row of allResumeProducts ?? []) {
-      if (row.job_match_id) byMatchId[row.job_match_id] = row
+      if (row.job_match_id && row.product_id === productId) {
+        byMatchId[row.job_match_id] = row
+      }
     }
     return { data: byMatchId, error: null }
   },
 
-  async startTailoringCheckout(
+  async startAdviceCheckout(
     matchId: string,
     returnPath?: string,
   ): Promise<{
@@ -106,16 +124,16 @@ export const resumeProductsAPI = {
     if (existing && existing.status !== 'cancelled') {
       return {
         data: null,
-        error: new Error('You have already purchased resume tailoring for this job.'),
+        error: new Error('You have already purchased resume advice for this job.'),
       }
     }
 
     const { data: product, error: productError } =
-      await resumeProductsAPI.getResumeTailoringProduct()
+      await resumeProductsAPI.getResumeAdviceProduct()
     if (productError || !product) {
       return {
         data: null,
-        error: productError ?? new Error('Resume tailoring product not found'),
+        error: productError ?? new Error('Resume advice product not found'),
       }
     }
     const base = window.location.origin

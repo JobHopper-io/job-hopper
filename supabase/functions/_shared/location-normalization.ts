@@ -1,4 +1,8 @@
-import zipcodes from 'npm:zipcodes'
+/**
+ * Avoid `npm:zipcodes` in Edge Functions: resolving registry.npmjs.org often fails inside
+ * local Supabase Docker (503 / "name resolution failed"). esm.sh serves a prebuilt ESM bundle.
+ */
+import zipcodes from 'https://esm.sh/zipcodes@8.0.0'
 import { STATE_NAME_TO_ABBREV } from './state-abbreviations.ts'
 
 export interface NormalizedLocationResult {

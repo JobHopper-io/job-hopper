@@ -98,7 +98,8 @@ export interface MatchingStats {
   avgMatchScore: number | null
 }
 
-// Resume products (upgrade and per-job tailoring lifecycle)
+// Resume products (upgrade and per-job resume advice; per-job product key is per_job_resume_advice).
+// improvements_text holds n8n LLM output for fulfilled rows (upgrade and per-job).
 export type ResumeProduct = Tables<'resume_products'>
 export type ResumeProductStatus = Enums<'resume_product_status'>
 export type ResumeProductInsert = TablesInsert<'resume_products'>

@@ -637,6 +637,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          improvements_text: string | null
           job_match_id: string | null
           product_id: string
           profile_id: string
@@ -646,6 +647,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          improvements_text?: string | null
           job_match_id?: string | null
           product_id: string
           profile_id: string
@@ -655,6 +657,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          improvements_text?: string | null
           job_match_id?: string | null
           product_id?: string
           profile_id?: string
@@ -771,6 +774,60 @@ export type Database = {
           run_at?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["scheduled_job_status"]
+        }
+        Relationships: []
+      }
+      scraper_raw_jobs: {
+        Row: {
+          apply_link: string | null
+          company_name: string
+          date_scraped: string
+          description: string | null
+          employment_types: string[] | null
+          id: string
+          is_remote: boolean
+          job_title: string
+          location: string | null
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          posted_date: string | null
+          schedules: string[] | null
+          status: Database["public"]["Enums"]["scraper_raw_job_status"]
+        }
+        Insert: {
+          apply_link?: string | null
+          company_name: string
+          date_scraped?: string
+          description?: string | null
+          employment_types?: string[] | null
+          id?: string
+          is_remote?: boolean
+          job_title: string
+          location?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          posted_date?: string | null
+          schedules?: string[] | null
+          status?: Database["public"]["Enums"]["scraper_raw_job_status"]
+        }
+        Update: {
+          apply_link?: string | null
+          company_name?: string
+          date_scraped?: string
+          description?: string | null
+          employment_types?: string[] | null
+          id?: string
+          is_remote?: boolean
+          job_title?: string
+          location?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          posted_date?: string | null
+          schedules?: string[] | null
+          status?: Database["public"]["Enums"]["scraper_raw_job_status"]
         }
         Relationships: []
       }
@@ -980,6 +1037,7 @@ export type Database = {
         | "executive"
         | "other"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
+      scraper_raw_job_status: "pending" | "processed"
       sponsorship_likelihood: "Low" | "Medium" | "High" | "N/A"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -1142,6 +1200,7 @@ export const Constants = {
         "other",
       ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
+      scraper_raw_job_status: ["pending", "processed"],
       sponsorship_likelihood: ["Low", "Medium", "High", "N/A"],
       subscription_status: ["trial", "active", "canceled"],
     },

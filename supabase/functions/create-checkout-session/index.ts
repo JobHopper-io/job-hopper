@@ -102,22 +102,22 @@ serve(async (req) => {
       throw new Error('One or more selected products are not available for purchase.')
     }
 
-    const tailoringProduct = products.find((p) => p.key === 'resume_tailoring')
+    const resumeAdviceProduct = products.find((p) => p.key === 'per_job_resume_advice')
     if (
       typeof jobMatchId === 'string' &&
       jobMatchId &&
-      tailoringProduct
+      resumeAdviceProduct
     ) {
-      const { data: existingTailoring } = await supabaseClient
+      const { data: existingPerJob } = await supabaseClient
         .from('resume_products')
         .select('id')
         .eq('profile_id', profile.id)
         .eq('job_match_id', jobMatchId)
-        .eq('product_id', tailoringProduct.id)
+        .eq('product_id', resumeAdviceProduct.id)
         .neq('status', 'cancelled')
         .maybeSingle()
-      if (existingTailoring) {
-        throw new Error('You have already purchased resume tailoring for this job.')
+      if (existingPerJob) {
+        throw new Error('You have already purchased resume advice for this job.')
       }
     }
 

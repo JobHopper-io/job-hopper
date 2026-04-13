@@ -2,14 +2,18 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type AdminClient = SupabaseClient
 
-const TAILORING_URL = () => Deno.env.get('N8N_RESUME_TAILORING_WEBHOOK_URL') ?? ''
+const TAILORING_URL = () => Deno.env.get('N8N_RESUME_ADVICE_WEBHOOK_URL') ?? ''
 const UPGRADE_URL = () => Deno.env.get('N8N_RESUME_UPGRADE_WEBHOOK_URL') ?? ''
 const API_KEY = () => Deno.env.get('N8N_WEBHOOK_API_KEY') ?? ''
 
 const FETCH_TIMEOUT_MS = 120_000
 
+function isPerJobResumeProduct(key: string): boolean {
+  return key === 'per_job_resume_advice'
+}
+
 function webhookUrlForProductKey(key: string): string | null {
-  if (key === 'resume_tailoring') {
+  if (isPerJobResumeProduct(key)) {
     const u = TAILORING_URL()
     return u || null
   }
@@ -68,7 +72,7 @@ async function loadJobDescriptionForMatch(
     .maybeSingle()
 
   if (matchError || !match?.job_id) {
-    console.error('n8n resume: job match not found for tailoring', {
+    console.error('n8n resume: job match not found for per-job resume', {
       jobMatchId,
       profileId,
       message: matchError?.message,
@@ -140,7 +144,7 @@ export type FulfillResumeN8nParams = {
   resumeProductId: string
   productKey: string
   profileId: string
-  /** Required for resume_tailoring */
+  /** Required for per-job product (per_job_resume_advice) */
   jobMatchId: string | null
 }
 
@@ -170,8 +174,8 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
     return
   }
 
-  if (productKey === 'resume_tailoring' && (!jobMatchId || !jobMatchId.trim())) {
-    console.error('n8n resume: tailoring purchase missing job_match_id metadata')
+  if (isPerJobResumeProduct(productKey) && (!jobMatchId || !jobMatchId.trim())) {
+    console.error('n8n resume: per-job purchase missing job_match_id metadata')
     return
   }
 
@@ -200,10 +204,10 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
 
   const body: Record<string, unknown> = { resume: resumeText }
 
-  if (productKey === 'resume_tailoring') {
+  if (isPerJobResumeProduct(productKey)) {
     const jd = await loadJobDescriptionForMatch(supabaseAdmin, profileId, jobMatchId as string)
     if (!jd) {
-      console.error('n8n resume: no job description for tailoring; skipping webhook')
+      console.error('n8n resume: no job description for per-job resume; skipping webhook')
       return
     }
     body.jobDescription = jd
@@ -220,8 +224,6 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
   }
   const { error: updateError } = await supabaseAdmin
     .from('resume_products')
-    // After migration `20260408222747_add_resume_products_improvements_text` is applied, run `npm run db:types` and remove the next line.
-    // @ts-expect-error improvements_text column added in migration 20260408222747 (not yet in generated Database types).
     .update(fulfillmentUpdate)
     .eq('id', resumeProductId)
 

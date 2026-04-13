@@ -23,7 +23,10 @@ const tailoringPurchaseCount = ref<number | null>(null)
 function formatOneTimeLine(product: Product, tailoringCount: number | null): string {
   const price = getProductPrice(product)
   const suffix = `($${price.toFixed(2)} one-time)`
-  if (product.key === 'resume_tailoring' && tailoringCount !== null) {
+  if (
+    product.key === 'per_job_resume_advice' &&
+    tailoringCount !== null
+  ) {
     return `${product.display_name} ${suffix} ✖ ${tailoringCount}`
   }
   return `${product.display_name} ${suffix}`

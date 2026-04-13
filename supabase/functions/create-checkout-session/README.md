@@ -25,7 +25,7 @@ const { data, error } = await supabase.functions.invoke('create-checkout-session
 })
 ```
 
-`jobMatchId` is optional and used only when purchasing per-job resume tailoring (`resume_tailoring`), so the webhook can attach `resume_products.job_match_id`.
+`jobMatchId` is optional and used only when purchasing per-job resume advice (`per_job_resume_advice`), so the webhook can attach `resume_products.job_match_id`.
 
 Products with `available_for_purchase = false` in the database are rejected.
 

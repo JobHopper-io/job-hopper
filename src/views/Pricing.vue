@@ -23,7 +23,7 @@ onMounted(async () => {
     resumeUpgradeProduct.value =
       addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
     resumeTailoringProduct.value =
-      addonRes.data.find((p) => p.key === 'resume_tailoring') ?? null
+      addonRes.data.find((p) => p.key === 'per_job_resume_advice') ?? null
   }
 })
 
@@ -167,7 +167,7 @@ const pricingFaq = [
           </div>
           <div class="card p-6">
             <h3 class="text-lg font-heading font-semibold mb-2">
-              {{ resumeTailoringProduct?.display_name ?? 'Per-job resume tailoring' }}
+              {{ resumeTailoringProduct?.display_name ?? 'Per-job resume advice' }}
             </h3>
             <p class="text-xl font-bold text-brand-primary mb-4">
               <template v-if="resumeTailoringProduct">
@@ -176,7 +176,7 @@ const pricingFaq = [
               <template v-else>—</template>
             </p>
             <p class="text-sm text-neutral-body mb-4">
-              {{ resumeTailoringProduct?.description ?? 'Purchase tailoring for a specific matched role from your dashboard or job detail view.' }}
+              {{ resumeTailoringProduct?.description ?? 'Purchase advice for a specific matched role from your dashboard or job detail view.' }}
             </p>
             <p class="text-sm text-neutral-body">Billed per job when you choose to tailor—great for roles you are seriously pursuing.</p>
           </div>

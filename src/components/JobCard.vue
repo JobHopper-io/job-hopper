@@ -6,10 +6,11 @@ import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 
 const props = defineProps<{
   job: MatchedJob
-  tailoringPurchase?: ResumeProduct | null
+  advicePurchase?: ResumeProduct | null
 }>()
 
 const emit = defineEmits<{
@@ -19,20 +20,26 @@ const emit = defineEmits<{
 const router = useRouter()
 const userStore = useUserStore()
 
-const tailoringLoading = ref(false)
-const tailoringError = ref<string | null>(null)
+const adviceLoading = ref(false)
+const adviceError = ref<string | null>(null)
+const adviceModalOpen = ref(false)
 
-const showTailorButton = computed(() => {
-  const p = props.tailoringPurchase
+const showAdviceButton = computed(() => {
+  const p = props.advicePurchase
   if (!p) return true
   return p.status === 'cancelled'
 })
 
-const tailoringStatusText = computed<string | null>(() => {
-  const p = props.tailoringPurchase
+const showResumeAdviceButton = computed(() => {
+  const p = props.advicePurchase
+  if (!p || p.status === 'cancelled') return false
+  return true
+})
+
+const adviceStatusText = computed<string | null>(() => {
+  const p = props.advicePurchase
   if (!p || p.status === 'cancelled') return null
-  if (p.status === 'pending') return 'Tailoring in progress'
-  if (p.status === 'complete') return 'Tailored resume ready'
+  if (p.status === 'pending') return 'Resume advice in progress'
   return null
 })
 
@@ -58,29 +65,29 @@ function handleToggleSave() {
   emit('toggle-save', props.job.matchId, props.job.isSaved)
 }
 
-async function handleTailoringCheckout() {
-  tailoringLoading.value = true
-  tailoringError.value = null
+async function handleAdviceCheckout() {
+  adviceLoading.value = true
+  adviceError.value = null
   try {
-    const { data, error } = await resumeProductsAPI.startTailoringCheckout(
+    const { data, error } = await resumeProductsAPI.startAdviceCheckout(
       props.job.matchId,
       '/dashboard',
     )
     if (error) {
-      tailoringLoading.value = false
-      tailoringError.value = error.message
+      adviceLoading.value = false
+      adviceError.value = error.message
       return
     }
     if (data?.url) {
       window.location.href = data.url
       return
     }
-    tailoringLoading.value = false
-    tailoringError.value = 'Unable to start checkout. Please try again.'
+    adviceLoading.value = false
+    adviceError.value = 'Unable to start checkout. Please try again.'
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error starting checkout'
-    tailoringLoading.value = false
-    tailoringError.value = message
+    adviceLoading.value = false
+    adviceError.value = message
   }
 }
 </script>
@@ -163,27 +170,40 @@ async function handleTailoringCheckout() {
           Apply
         </button>
         <button
-          v-if="showTailorButton"
+          v-if="showAdviceButton"
           type="button"
           class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-          :disabled="tailoringLoading"
-          @click="handleTailoringCheckout"
+          :disabled="adviceLoading"
+          @click="handleAdviceCheckout"
         >
           <font-awesome-icon
-            v-if="tailoringLoading"
+            v-if="adviceLoading"
             :icon="['fas', 'spinner']"
             spin
             class="mr-1.5"
             aria-hidden="true"
           />
-          {{ tailoringLoading ? 'Redirecting…' : 'Tailor Resume' }}
+          {{ adviceLoading ? 'Redirecting…' : 'Get resume advice' }}
+        </button>
+        <button
+          v-if="showResumeAdviceButton"
+          type="button"
+          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
+          @click="adviceModalOpen = true"
+        >
+          View resume advice
         </button>
       </div>
-      <p v-if="tailoringStatusText" class="mt-2 text-xs text-neutral-body">
-        {{ tailoringStatusText }}
+      <ResumeAdviceModal
+        :open="adviceModalOpen"
+        :advice-text="advicePurchase?.improvements_text"
+        @close="adviceModalOpen = false"
+      />
+      <p v-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">
+        {{ adviceStatusText }}
       </p>
-      <p v-else-if="tailoringError" class="mt-2 text-xs text-red-600">
-        {{ tailoringError }}
+      <p v-else-if="adviceError" class="mt-2 text-xs text-red-600">
+        {{ adviceError }}
       </p>
     </div>
   </article>

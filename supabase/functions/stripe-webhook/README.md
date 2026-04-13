@@ -11,7 +11,7 @@ This Supabase Edge Function handles Stripe webhook events to keep subscription s
 
 **Optional — resume add-on fulfillment (n8n):** if unset, `resume_products` rows are still created but no HTTP call is made.
 
-- `N8N_RESUME_TAILORING_WEBHOOK_URL` — per-job tailoring webhook (JSON body: `resume`, `jobDescription`).
+- `N8N_RESUME_ADVICE_WEBHOOK_URL` — per-job resume advice webhook (JSON body: `resume`, `jobDescription`).
 - `N8N_RESUME_UPGRADE_WEBHOOK_URL` — general resume upgrade webhook (JSON body: `resume` only).
 - `N8N_WEBHOOK_API_KEY` — sent as header `x-api-key` to both URLs. Responses must be JSON with string field `improvements`.
 
