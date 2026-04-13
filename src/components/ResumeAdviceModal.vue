@@ -3,11 +3,18 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 
-const props = defineProps<{
-  open: boolean
-  /** Raw advice text; empty or missing means still generating */
-  adviceText: string | null | undefined
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    /** Raw advice text; empty or missing means still generating */
+    adviceText: string | null | undefined
+    /** Dialog heading (e.g. job-specific vs profile-wide resume advice). */
+    modalTitle?: string
+  }>(),
+  {
+    modalTitle: 'Resume advice for this job',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -72,7 +79,7 @@ onUnmounted(() => {
             id="resume-advice-modal-title"
             class="text-xl font-heading font-semibold text-brand-charcoal"
           >
-            Resume advice for this job
+            {{ modalTitle }}
           </h2>
           <button
             type="button"

@@ -13,6 +13,7 @@ import type {
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
+import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 
@@ -58,6 +59,7 @@ const locationRadiusMiles = ref<number | null>(null)
 const requiresUsSponsorship = ref<boolean | null>(null)
 
 const resumeUpgradePurchase = ref<ResumeProduct | null>(null)
+const resumeUpgradeModalOpen = ref(false)
 
 async function loadResumeUpgradePurchase() {
   const { data, error } = await resumeProductsAPI.getResumeUpgradePurchase()
@@ -66,9 +68,19 @@ async function loadResumeUpgradePurchase() {
   }
 }
 
-const showResumeUpgradeProcessing = computed(
-  () => resumeUpgradePurchase.value?.status === 'pending',
-)
+/** Same rules as job cards: purchased and not cancelled → show View + modal. */
+const showResumeUpgradeAdviceButton = computed(() => {
+  const p = resumeUpgradePurchase.value
+  if (!p || p.status === 'cancelled') return false
+  return true
+})
+
+const resumeUpgradeAdviceStatusText = computed<string | null>(() => {
+  const p = resumeUpgradePurchase.value
+  if (!p || p.status === 'cancelled') return null
+  if (p.status === 'pending') return 'Generating resume advice'
+  return null
+})
 
 function syncFormFromProfile() {
   const p = profile.value
@@ -329,20 +341,29 @@ watch(
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
           <div
-            v-if="showResumeUpgradeProcessing"
-            class="mb-4 flex gap-3 rounded-[12px] border border-brand-primary/20 bg-brand-primary/5 p-4 text-sm text-neutral-body"
-            role="status"
+            v-if="showResumeUpgradeAdviceButton"
+            class="mb-4 flex flex-wrap items-center gap-2"
           >
-            <font-awesome-icon
-              :icon="['fas', 'spinner']"
-              spin
-              class="mt-0.5 h-4 w-4 shrink-0 text-brand-primary"
-              aria-hidden="true"
-            />
-            <p>
-              Your resume upgrade is being generated. Check back in a few minutes.
+            <button
+              type="button"
+              class="btn-secondary text-sm"
+              @click="resumeUpgradeModalOpen = true"
+            >
+              View resume advice
+            </button>
+            <p
+              v-if="resumeUpgradeAdviceStatusText"
+              class="text-xs text-neutral-body"
+            >
+              {{ resumeUpgradeAdviceStatusText }}
             </p>
           </div>
+          <ResumeAdviceModal
+            :open="resumeUpgradeModalOpen"
+            modal-title="Your resume advice"
+            :advice-text="resumeUpgradePurchase?.improvements_text"
+            @close="resumeUpgradeModalOpen = false"
+          />
           <ResumeUploader
             :resume-bucket-key="profile?.resume_bucket_key ?? null"
             :auto-upload="true"
