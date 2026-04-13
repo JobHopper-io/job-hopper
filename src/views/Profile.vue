@@ -340,9 +340,14 @@ watch(
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
+          <ResumeUploader
+            :resume-bucket-key="profile?.resume_bucket_key ?? null"
+            :auto-upload="true"
+            input-id="profile-resume-upload"
+          />
           <div
             v-if="showResumeUpgradeAdviceButton"
-            class="mb-4 flex flex-wrap items-center gap-2"
+            class="mt-6 flex flex-wrap items-center gap-2 border-t border-neutral-border pt-6"
           >
             <button
               type="button"
@@ -363,11 +368,6 @@ watch(
             modal-title="Your resume advice"
             :advice-text="resumeUpgradePurchase?.improvements_text"
             @close="resumeUpgradeModalOpen = false"
-          />
-          <ResumeUploader
-            :resume-bucket-key="profile?.resume_bucket_key ?? null"
-            :auto-upload="true"
-            input-id="profile-resume-upload"
           />
         </div>
 
