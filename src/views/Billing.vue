@@ -25,7 +25,7 @@ const oneTimePurchaseProducts = computed(() => [
 
 const billingPortalLoading = ref(false)
 const billingPortalError = ref<string | null>(null)
-const tailoringPurchaseCount = ref<number | null>(null)
+const purchaseCount = ref<number | null>(null)
 
 function formatOneTimeLine(product: Product, tailoringCount: number | null): string {
   const price = getProductPrice(product)
@@ -43,9 +43,9 @@ onMounted(async () => {
   const { data, error } = await resumeProductsAPI.getTailoringPurchasesByMatchId()
   if (!error && data) {
     const nonCancelled = Object.values(data).filter((p) => p.status !== 'cancelled')
-    tailoringPurchaseCount.value = nonCancelled.length
+    purchaseCount.value = nonCancelled.length
   } else {
-    tailoringPurchaseCount.value = 0
+    purchaseCount.value = 0
   }
 })
 
@@ -142,7 +142,7 @@ const handleManageBilling = async () => {
                   :key="product.id"
                   class="text-neutral-body"
                 >
-                  ✓ {{ formatOneTimeLine(product, tailoringPurchaseCount) }}
+                  ✓ {{ formatOneTimeLine(product, purchaseCount) }}
                 </p>
               </div>
               <p v-else class="text-neutral-body">No one-time purchases</p>

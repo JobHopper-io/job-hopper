@@ -25,6 +25,15 @@ async function getPerJobResumeAdviceProductId(): Promise<string | null> {
   return data?.id ?? null
 }
 
+async function getResumeUpgradeProductId(): Promise<string | null> {
+  const { data } = await supabase
+    .from('products')
+    .select('id')
+    .eq('key', 'resume_upgrade')
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 export const resumeProductsAPI = {
   async getResumeUpgradeProduct(): Promise<{
     data: Product | null
@@ -66,6 +75,29 @@ export const resumeProductsAPI = {
       .order('created_at', { ascending: false })
     if (error) return { data: null, error: new Error(error.message) }
     return { data: (data ?? []) as ResumeProduct[], error: null }
+  },
+
+  /** Latest resume overhaul purchase for this profile (`job_match_id` null). */
+  async getResumeUpgradePurchase(): Promise<{
+    data: ResumeProduct | null
+    error: Error | null
+  }> {
+    const profileId = await getCurrentProfileId()
+    const productId = await getResumeUpgradeProductId()
+    if (!productId) {
+      return { data: null, error: null }
+    }
+    const { data, error } = await supabase
+      .from('resume_products')
+      .select('*')
+      .eq('profile_id', profileId)
+      .eq('product_id', productId)
+      .is('job_match_id', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data: data as ResumeProduct | null, error: null }
   },
 
   async getTailoringPurchaseForMatch(matchId: string): Promise<{

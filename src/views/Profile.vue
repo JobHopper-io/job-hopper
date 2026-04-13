@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { ref, onMounted, onActivated, watch, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { profileAPI } from '@/lib/profile'
+import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { notificationsAPI, JOB_MATCH_FREQUENCY_OPTIONS } from '@/lib/notifications'
-import type { JobMatchEmailFrequency, NotificationSettingsUpdate } from '@/types/database'
+import type {
+  JobMatchEmailFrequency,
+  NotificationSettingsUpdate,
+  ResumeProduct,
+} from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
@@ -52,6 +57,18 @@ const openToRemote = ref(false)
 const locationRadiusMiles = ref<number | null>(null)
 const requiresUsSponsorship = ref<boolean | null>(null)
 
+const resumeUpgradePurchase = ref<ResumeProduct | null>(null)
+
+async function loadResumeUpgradePurchase() {
+  const { data, error } = await resumeProductsAPI.getResumeUpgradePurchase()
+  if (!error) {
+    resumeUpgradePurchase.value = data
+  }
+}
+
+const showResumeUpgradeProcessing = computed(
+  () => resumeUpgradePurchase.value?.status === 'pending',
+)
 
 function syncFormFromProfile() {
   const p = profile.value
@@ -91,6 +108,11 @@ onMounted(() => {
     initialLoadDone.value = true
   })
   loadNotificationSettings()
+  void loadResumeUpgradePurchase()
+})
+
+onActivated(() => {
+  void loadResumeUpgradePurchase()
 })
 
 async function loadNotificationSettings() {
@@ -306,6 +328,21 @@ watch(
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
+          <div
+            v-if="showResumeUpgradeProcessing"
+            class="mb-4 flex gap-3 rounded-[12px] border border-brand-primary/20 bg-brand-primary/5 p-4 text-sm text-neutral-body"
+            role="status"
+          >
+            <font-awesome-icon
+              :icon="['fas', 'spinner']"
+              spin
+              class="mt-0.5 h-4 w-4 shrink-0 text-brand-primary"
+              aria-hidden="true"
+            />
+            <p>
+              Your resume upgrade is being generated. Check back in a few minutes.
+            </p>
+          </div>
           <ResumeUploader
             :resume-bucket-key="profile?.resume_bucket_key ?? null"
             :auto-upload="true"
