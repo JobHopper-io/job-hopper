@@ -69,6 +69,7 @@
   - `bd_leads` rows consist of `id`, `created_at`, `company_name`, and `status`, with a unique constraint on `company_name`. `status` uses the `bd_leads_status` enum (see enum values in `supabase.ts`); default is `'Ready to Process'`.
   - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows. Each row consists of `id`, `created_at`, and `company_name`, with a unique constraint on `company_name`.
   - `enriched_lead` and `raw_jobs` often contain semi‑structured JSON metadata (`apollo_metadata`, `icypeas_meta_data`, `"apollo data"`, `"Meta Data"`); downstream logic should treat these as opaque blobs unless there is explicit parsing logic.
+  - `job_hopper_live.subscription_tier` references `products.key` (which base-plan bucket the posting belongs to). The job-matching algorithm only considers jobs whose tier equals at least one `products.key` for a `base_plan` row on the profile’s trial/active subscriptions.
 
 ### job_matches
 - **Meaning**: Records which jobs have been matched to which profile over time; this is the primary source for the user-facing “Recent job matches” and Job Browsing UI.

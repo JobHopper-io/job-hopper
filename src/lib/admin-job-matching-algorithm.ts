@@ -27,6 +27,7 @@ export interface RankedJob {
 export interface MatchJobsDebugPayload {
   filters: {
     totalJobs: number
+    excludedBySubscriptionTier: number
     excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
@@ -58,6 +59,7 @@ export interface MatchJobsResponse {
 }
 
 export interface SubscriberPreferencesOverride {
+  subscriptionTierProductKeys?: string[]
   roles?: string[]
   currentJobTitle?: string | null
   currentIndustry?: string | null

@@ -8,6 +8,8 @@ import {
 export { getEffectiveSponsorshipLikelihood, inferSponsorshipLikelihood }
 
 export interface SubscriberPreferences {
+  /** `products.key` for base_plan rows on the subscriber's active subscriptions; must align with `job_hopper_live.subscription_tier`. */
+  subscriptionTierProductKeys: string[]
   roles: string[]
   currentJobTitle: string | null
   currentIndustry: string | null
@@ -34,6 +36,8 @@ export interface JobRecord {
   payType: string | null
   createdAt: string
   postedDate: string | null
+  /** `job_hopper_live.subscription_tier` → `products.key` */
+  subscriptionTier: string | null
   /** Optional: used for sponsorship inference when sponsorshipLikelihood is N/A */
   employeeCount?: number | null
   /** Optional: stored value from DB; when N/A, inference is used */
@@ -262,6 +266,18 @@ function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
   for (const kw of commaSeparatedKeywords(prefs.currentJobTitle)) set.add(kw)
   for (const kw of commaSeparatedKeywords(prefs.currentIndustry)) set.add(kw)
   return Array.from(set)
+}
+
+/** True if the job's catalog tier matches one of the subscriber's base plan product keys. */
+function jobMatchesSubscriptionTier(job: JobRecord, prefs: SubscriberPreferences): boolean {
+  if (prefs.subscriptionTierProductKeys.length === 0) {
+    return false
+  }
+  const tier = job.subscriptionTier
+  if (tier == null || tier === '') {
+    return false
+  }
+  return prefs.subscriptionTierProductKeys.includes(tier)
 }
 
 /** True if job is in scope: user has no target roles, or job's role_category is one of them. */
@@ -554,12 +570,12 @@ function computeLocationScore(
     score += cfg.locationWeights.remotePreferred
   }
 
+  const jobNorm = normalizeWithCoords(job.location ?? '')
+
   const preferredLocationsRaw = prefs.preferredLocations ?? []
   if (preferredLocationsRaw.length === 0) {
     return { score, distanceMiles: null, withinRadius: false, parsed: jobNorm.parsed }
   }
-
-  const jobNorm = normalizeWithCoords(job.location ?? '')
   const preferred = preferredLocationsRaw
     .map((loc) => normalizeWithCoords(loc))
     .filter((loc) => loc.normalized)
@@ -653,6 +669,10 @@ export function matchJobs(
   const ranked: RankedJob[] = []
 
   for (const job of jobs) {
+    if (!jobMatchesSubscriptionTier(job, prefs)) {
+      continue
+    }
+
     if (!jobMatchesTargetRoles(job, prefs)) {
       continue
     }
@@ -717,6 +737,7 @@ export function matchJobs(
 export interface MatchJobsDebugPayload {
   filters: {
     totalJobs: number
+    excludedBySubscriptionTier: number
     excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
@@ -751,6 +772,7 @@ export function matchJobsWithDebug(
   })
   const nowMs = Date.now()
 
+  let excludedBySubscriptionTier = 0
   let excludedByRole = 0
   let excludedByRemoteOptOut = 0
   const excludedByLocation = 0
@@ -774,6 +796,11 @@ export function matchJobsWithDebug(
   }
 
   for (const job of jobs) {
+    if (!jobMatchesSubscriptionTier(job, prefs)) {
+      excludedBySubscriptionTier += 1
+      continue
+    }
+
     if (!jobMatchesTargetRoles(job, prefs)) {
       excludedByRole += 1
       continue
@@ -870,6 +897,7 @@ export function matchJobsWithDebug(
   const debug: MatchJobsDebugPayload = {
     filters: {
       totalJobs: jobs.length,
+      excludedBySubscriptionTier,
       excludedByRole,
       excludedByRemoteOptOut,
       excludedByLocation,

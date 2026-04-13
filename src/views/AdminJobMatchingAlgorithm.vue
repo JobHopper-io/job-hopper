@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue'
 import { profileAPI } from '@/lib/profile'
+import { subscriptionAPI } from '@/lib/subscription'
 import {
   jobMatchingAlgorithmAdminAPI,
   DEFAULT_ADMIN_MATCH_CONFIG,
@@ -31,6 +32,7 @@ const overrideConfirmationText = ref('')
 
 // Preferences form (defaults from user profile)
 const prefsForm = reactive<{
+  subscriptionTierProductKeys: string
   roles: string
   currentJobTitle: string
   currentIndustry: string
@@ -41,6 +43,7 @@ const prefsForm = reactive<{
   openToRemote: boolean
   locationRadiusMiles: string
 }>({
+  subscriptionTierProductKeys: '',
   roles: '',
   currentJobTitle: '',
   currentIndustry: '',
@@ -85,6 +88,11 @@ function goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, totalPages.value))
 }
 
+async function loadSubscriptionTierKeys(profileId: string) {
+  const { data } = await subscriptionAPI.getSubscriptionTierProductKeysForProfile(profileId)
+  prefsForm.subscriptionTierProductKeys = (data ?? []).join(', ')
+}
+
 function profileToPrefsForm(p: Profile | null) {
   if (!p) return
   prefsForm.roles = Array.isArray(p.target_role_categories)
@@ -108,7 +116,18 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+  const tierRaw = prefsForm.subscriptionTierProductKeys.trim()
+  const subscriptionTierProductKeys =
+    tierRaw.length > 0
+      ? tierRaw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined
   return {
+    ...(subscriptionTierProductKeys !== undefined && subscriptionTierProductKeys.length > 0
+      ? { subscriptionTierProductKeys }
+      : {}),
     roles: roles.length ? roles : undefined,
     currentJobTitle: prefsForm.currentJobTitle || null,
     currentIndustry: prefsForm.currentIndustry || null,
@@ -144,6 +163,9 @@ function buildMatchConfigOverride(): MatchConfigOverride {
 async function resetToDefaults() {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
+  if (profile?.id) {
+    await loadSubscriptionTierKeys(profile.id)
+  }
   if (activeConfig.value) {
     configForm.keywordWeights = { ...(activeConfig.value.config.keywordWeights ?? {}) }
     configForm.payWeights = { ...(activeConfig.value.config.payWeights ?? {}) }
@@ -277,6 +299,9 @@ async function loadMatches() {
 onMounted(async () => {
   const { data: profile } = await profileAPI.getCurrentUserProfile()
   profileToPrefsForm(profile ?? null)
+  if (profile?.id) {
+    await loadSubscriptionTierKeys(profile.id)
+  }
 
   isConfigLoading.value = true
   const { data, error } = await jobMatchingAlgorithmAdminAPI.listConfigs()
@@ -316,6 +341,20 @@ onMounted(async () => {
             Preferences
           </h3>
           <div class="grid gap-4 sm:grid-cols-2">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-neutral-body mb-1">
+                Subscription tier product keys (comma-separated, optional override)
+              </label>
+              <input
+                v-model="prefsForm.subscriptionTierProductKeys"
+                type="text"
+                class="input w-full"
+                placeholder="Empty = use keys from your active base plan (same as production matching)"
+              >
+              <p class="text-xs text-neutral-body mt-1">
+                Must match <code class="text-xs">job_hopper_live.subscription_tier</code> for a job to be scored.
+              </p>
+            </div>
             <div>
               <label class="block text-xs font-medium text-neutral-body mb-1">Target roles (comma-separated)</label>
               <input
@@ -779,6 +818,10 @@ onMounted(async () => {
           {{ result.total }}
           <span v-if="result.total > 0">(showing {{ pageRangeLabel }} of {{ result.total }})</span>
         </p>
+        <p v-if="debug" class="text-sm text-neutral-body">
+          <span class="font-semibold">Excluded by subscription tier (hard filter):</span>
+          {{ debug.filters.excludedBySubscriptionTier ?? 0 }}
+        </p>
 
         <div v-if="debug" class="mt-4 grid gap-4 sm:grid-cols-2">
           <div class="space-y-2">
@@ -788,6 +831,10 @@ onMounted(async () => {
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Jobs fetched:</span>
               <span>{{ debug.filters.totalJobs }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by subscription tier:</span>
+              <span>{{ debug.filters.excludedBySubscriptionTier ?? 0 }}</span>
             </p>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">After filters:</span>

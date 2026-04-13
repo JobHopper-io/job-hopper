@@ -6,6 +6,7 @@ import {
   type SubscriberPreferences,
   matchJobsWithDebug,
 } from '../_shared/job-matching-algorithm.ts'
+import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -113,6 +114,10 @@ function mergePreferences(
 ): SubscriberPreferences {
   if (!overrides) return base
   return {
+    subscriptionTierProductKeys:
+      overrides.subscriptionTierProductKeys !== undefined
+        ? overrides.subscriptionTierProductKeys
+        : base.subscriptionTierProductKeys,
     roles: overrides.roles ?? base.roles,
     currentJobTitle: overrides.currentJobTitle !== undefined ? overrides.currentJobTitle : base.currentJobTitle,
     currentIndustry: overrides.currentIndustry !== undefined ? overrides.currentIndustry : base.currentIndustry,
@@ -219,7 +224,28 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceRoleKey) {
+      throw new Error('Service role key not configured')
+    }
+
+    const supabaseAdminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      serviceRoleKey,
+      {
+        auth: {
+          persistSession: false,
+        },
+      },
+    )
+
+    const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+      supabaseAdminClient,
+      profile.id,
+    )
+
     const basePreferences: SubscriberPreferences = {
+      subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
@@ -248,21 +274,6 @@ serve(async (req) => {
       limitParam != null && !Number.isNaN(Number(limitParam))
         ? Math.max(1, Math.floor(Number(limitParam)))
         : null
-
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!serviceRoleKey) {
-      throw new Error('Service role key not configured')
-    }
-
-    const supabaseAdminClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      serviceRoleKey,
-      {
-        auth: {
-          persistSession: false,
-        },
-      },
-    )
 
     const { data: activeConfig, error: configError } = await supabaseAdminClient
       .from('matching_algorithm_config')
@@ -308,6 +319,7 @@ serve(async (req) => {
           pay_type,
           created_at,
           posted_date,
+          subscription_tier,
           employee_count,
           sponsorship_likelihood
         `,
@@ -347,6 +359,7 @@ serve(async (req) => {
       payType: row.pay_type,
       createdAt: row.created_at,
       postedDate: row.posted_date,
+      subscriptionTier: row.subscription_tier ?? null,
       employeeCount: row.employee_count ?? null,
       sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))

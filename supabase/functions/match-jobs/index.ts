@@ -7,6 +7,7 @@ import {
   type SubscriberPreferences,
   matchJobs,
 } from '../_shared/job-matching-algorithm.ts'
+import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderJobMatchDigest,
@@ -220,7 +221,13 @@ serve(async (req) => {
       )
     }
 
+    const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+      supabaseAdminClient,
+      profile.id,
+    )
+
     const preferences: SubscriberPreferences = {
+      subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
@@ -247,6 +254,7 @@ serve(async (req) => {
       pay_type: string | null
       created_at: string
       posted_date: string | null
+      subscription_tier: string
       employee_count: number | null
       sponsorship_likelihood: 'Low' | 'Medium' | 'High' | 'N/A' | null
     }
@@ -282,6 +290,7 @@ serve(async (req) => {
         pay_type,
         created_at,
         posted_date,
+        subscription_tier,
         employee_count,
         sponsorship_likelihood
       `,
@@ -318,6 +327,7 @@ serve(async (req) => {
       payType: row.pay_type,
       createdAt: row.created_at,
       postedDate: row.posted_date,
+      subscriptionTier: row.subscription_tier ?? null,
       employeeCount: row.employee_count ?? null,
       sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))

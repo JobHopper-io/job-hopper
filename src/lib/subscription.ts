@@ -234,4 +234,57 @@ export const subscriptionAPI = {
       error: null,
     }
   },
+
+  /**
+   * Base plan `products.key` values for the profile's trial/active subscriptions (matches job_hopper_live.subscription_tier).
+   */
+  async getSubscriptionTierProductKeysForProfile(
+    profileId: string,
+  ): Promise<{ data: string[]; error: Error | null }> {
+    const { data: subs, error: subsError } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('profile_id', profileId)
+      .in('status', ['trial', 'active'])
+
+    if (subsError) {
+      return { data: [], error: new Error(subsError.message) }
+    }
+    if (!subs?.length) {
+      return { data: [], error: null }
+    }
+
+    const subIds = subs.map((s) => s.id)
+    const { data: subProducts, error: spError } = await supabase
+      .from('subscription_product')
+      .select('product_id')
+      .in('subscription_id', subIds)
+
+    if (spError) {
+      return { data: [], error: new Error(spError.message) }
+    }
+    if (!subProducts?.length) {
+      return { data: [], error: null }
+    }
+
+    const productIds = [...new Set(subProducts.map((sp) => sp.product_id))]
+    const { data: baseProducts, error: pError } = await supabase
+      .from('products')
+      .select('key')
+      .in('id', productIds)
+      .eq('category', 'base_plan')
+
+    if (pError) {
+      return { data: [], error: new Error(pError.message) }
+    }
+
+    const keys = [
+      ...new Set(
+        (baseProducts ?? [])
+          .map((p) => p.key)
+          .filter((k): k is string => typeof k === 'string' && k.length > 0),
+      ),
+    ]
+    return { data: keys, error: null }
+  },
 }
