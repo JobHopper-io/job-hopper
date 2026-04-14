@@ -22,6 +22,9 @@ dependencies = [
 job-processor-api = "job_processor.main:run_api"
 job-processor = "job_processor.cli:main"
 
+[tool.fastapi]
+entrypoint = "job_processor.api:app"
+
 [tool.hatch.build.targets.wheel]
 packages = ["job_processor"]
 
