@@ -401,13 +401,13 @@ function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: numb
     return { min: null, max: null }
   }
 
-  const type = payType ?? 'annual'
+  const type = payType ?? 'year'
   const multiplier =
-    type === 'hourly'
+    type === 'hour' || type === 'hourly'
       ? 2080
-      : type === 'weekly'
+      : type === 'week' || type === 'weekly'
         ? 52
-        : type === 'monthly'
+        : type === 'month' || type === 'monthly'
           ? 12
           : 1
 
