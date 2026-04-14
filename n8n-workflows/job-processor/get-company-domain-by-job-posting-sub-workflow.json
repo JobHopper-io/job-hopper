@@ -1,0 +1,395 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "const job_title = $('Start').item.json.job_title;\nconst company_name = $('Start').item.json.company_name;\nconst url = $json.url;\nconst error = $json.error;\n\nconsole.log(`Error: ${error}\\nURL: ${url}\\nCompany Name: ${company_name}\\njob_title:${job_title}`)\n\nreturn { json: {error: error, url: url, company_name: company_name, job_title: job_title} };"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          1008
+        ],
+        "id": "386e7982-38bd-48b1-836e-99aa5b51b910",
+        "name": "Log Error"
+      },
+      {
+        "parameters": {
+          "jsCode": "const urls = new Set();\n\nif ($input.first().json.web.results) {\n  for (const result of $input.first().json.web.results) {\n    if (result.url) urls.add(result.url);\n  }\n}\n\nreturn Array.from(urls).map(url => ({\n  json: { url }\n}));"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -240,
+          832
+        ],
+        "id": "c9167fad-aeab-4e08-8583-4f7995b953f9",
+        "name": "Extract URLs from Search Result"
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          -48,
+          832
+        ],
+        "id": "98b65eab-17ac-452d-bcc9-2f86480ba3bc",
+        "name": "Get possible official website",
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "// For n8n Code node – HTML from input or hardcoded\nconst html = $json.data;\n\nfunction stripHtmlToText(htmlString) {\n  if (!htmlString || typeof htmlString !== 'string') return '';\n\n  return htmlString\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<head[^>]*>[\\s\\S]*?<\\/head>/gi, '')\n    .replace(/<noscript[^>]*>[\\s\\S]*?<\\/noscript>/gi, '')\n    .replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '')\n    .replace(/<\\s*\\/\\s*(p|div|li|tr|h[1-6]|section|article|header|footer|nav|main|ul|ol)[^>]*>/gi, ' ')\n    .replace(/<\\s*br\\s*\\/?>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#8217;|&#39;/g, \"'\")\n    .replace(/&#8211;|&#45;/g, '-')\n    .replace(/&#038;/g, '&')\n    .replace(/&raquo;/g, '»')\n    .replace(/[\\s\\n\\r\\t]+/g, ' ')   // collapse all whitespace including \\n into single space\n    .trim();\n}\n\nconst text = stripHtmlToText(html);\n\nreturn { json: { text } };"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          160,
+          832
+        ],
+        "id": "9270b213-146e-4569-b4b1-b1e79e5edc41",
+        "name": "Remove HTML bloat"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor(let i = 0; i < $input.all().length; i++) {\n  $input.all()[i].json.url = $('Extract URLs from Search Result').itemMatching(i).json.url\n}\n\nreturn $input.all();"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          352,
+          832
+        ],
+        "id": "556a13a2-3349-4517-b2b8-cc94898bc99a",
+        "name": "Normalize data for prompt"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "return { json: { company_name: $json.company_name.replace(/ /g, \"+\") } }"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -928,
+          816
+        ],
+        "id": "d3f2c856-a90b-4790-9541-aed136f8b4ec",
+        "name": "Make company name URL friendly"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          -672,
+          816
+        ],
+        "id": "626986ec-a754-429a-9aae-a30daa1cd7b4",
+        "name": "Loop Over Items"
+      },
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "company_name"
+              },
+              {
+                "name": "location"
+              },
+              {
+                "name": "job_title"
+              }
+            ]
+          }
+        },
+        "id": "b115ed18-acf2-4665-aef4-db0b7f309a5e",
+        "typeVersion": 1.1,
+        "name": "Start",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "position": [
+          -1136,
+          816
+        ]
+      },
+      {
+        "parameters": {
+          "query": "={{ $('Loop Over Items').item.json.company_name }} official website",
+          "additionalParameters": {}
+        },
+        "type": "@brave/n8n-nodes-brave-search.braveSearch",
+        "typeVersion": 1,
+        "position": [
+          -432,
+          832
+        ],
+        "id": "57d6ed7a-7dc7-42b5-a608-02c8cf9ecd82",
+        "name": "Brave Search",
+        "credentials": {
+          "braveSearchApi": {
+            "id": "vbQ7mCfo9hbjCwsV",
+            "name": "Brave Search account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "EXAONE 4.0 32B (8bit)",
+            "mode": "list",
+            "cachedResultName": "EXAONE 4.0 32B (8BIT)"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "=You will be given a list of website content, with the HTML removed. Find the ONE offical website, if it exists. For reference here is a job posting by the company:\n\nOUTPUT:\nA single URL, or null. Do not include any additional comments or explanations."
+              },
+              {
+                "content": "=Job Title: {{ $('Start').item.json.job_title }}\nCompany Name: {{ $('Start').item.json.company_name }}\nLocation: {{ $('Start').item.json.location }}\n\n\nPOSSIBLE WEBSITES:\n{{ $input.all().map(x => `URL: ${x.json.url} \\nWebsite Content: ${x.json.text}`).join(\"\\n\\n\") }}\n"
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          544,
+          832
+        ],
+        "id": "e61f4ae3-54d3-4e26-b8b0-efbee876b307",
+        "name": "Find Official Domain",
+        "executeOnce": true,
+        "retryOnFail": true,
+        "credentials": {
+          "openAiApi": {
+            "id": "nbP8zWegiiA6B19g",
+            "name": "Courier"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "261b4a2c-b104-4540-82e9-3c7c64f4ac3b",
+                "leftValue": "={{ $json.output[0].content[0].text }}",
+                "rightValue": "={{ $('Extract URLs from Search Result').first().json.url }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          912,
+          816
+        ],
+        "id": "8a45a253-e4d2-4cd9-8594-675b81e558ad",
+        "name": "If"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "702c9ade-f7a5-4dd2-a86e-bc3d913b88dd",
+                "name": "company_domain",
+                "value": "={{ $json.output[0].content[0].text }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1152,
+          816
+        ],
+        "id": "41f80ac9-3044-44a3-88d4-df8be4b5b49b",
+        "name": "Edit Fields"
+      }
+    ],
+    "connections": {
+      "Log Error": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract URLs from Search Result": {
+        "main": [
+          [
+            {
+              "node": "Get possible official website",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get possible official website": {
+        "main": [
+          [
+            {
+              "node": "Remove HTML bloat",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Remove HTML bloat": {
+        "main": [
+          [
+            {
+              "node": "Normalize data for prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize data for prompt": {
+        "main": [
+          [
+            {
+              "node": "Find Official Domain",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Make company name URL friendly": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Items": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Brave Search",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "Make company name URL friendly",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Brave Search": {
+        "main": [
+          [
+            {
+              "node": "Extract URLs from Search Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Official Domain": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Log Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "Edit Fields",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Edit Fields",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Edit Fields": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "ced2f137e50be93dadf473086a596688f0d2e428370938821c9b14262dad7716"
+    }
+  }

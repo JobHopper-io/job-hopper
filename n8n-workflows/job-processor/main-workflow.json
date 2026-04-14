@@ -1,0 +1,1669 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "url": "https://api.apollo.io/api/v1/organizations/enrich",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "domain",
+                "value": "={{ $json.company_domain }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          704,
+          912
+        ],
+        "id": "f2a62ee4-4376-4f75-9ac1-33f16adf621c",
+        "name": "Get Apollo Data",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "tXRcYJVTTj1f6IMV",
+            "name": "apollo api key"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "tableId": "exclusion_lists",
+          "fieldsUi": {
+            "fieldValues": [
+              {
+                "fieldId": "company_name",
+                "fieldValue": "={{ $('Normalize Fields').item.json.company_name }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          3632,
+          640
+        ],
+        "id": "18fe8d5b-683c-4962-8815-4fda5e25a904",
+        "name": "Insert excluded companies to excluded_lists",
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "tableId": "bd_leads",
+          "fieldsUi": {
+            "fieldValues": [
+              {
+                "fieldId": "company_name",
+                "fieldValue": "={{ $('Normalize Fields').item.json.company_name }}"
+              },
+              {
+                "fieldId": "status",
+                "fieldValue": "Ready to Process"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          3376,
+          1456
+        ],
+        "id": "165cf36a-4dc3-40c4-87cb-4626bda3c556",
+        "name": "Insert lead companies to bd_leads",
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "combineBySql",
+          "query": "SELECT *\nFROM input1\nLEFT JOIN input2\n  ON input1.company_name = input2.company_name\nWHERE\n  input2.id is null;",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          2960,
+          1456
+        ],
+        "id": "fe7470c1-5b19-4055-80c1-3db97f1683a0",
+        "name": "Filter out existing leads",
+        "executeOnce": false
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "tableId": "bd_leads",
+          "returnAll": true,
+          "filterType": "none"
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          2608,
+          1520
+        ],
+        "id": "469e47d5-5f50-4cf8-bb33-0aaab113d446",
+        "name": "Get bd leads",
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "EXAONE 4.0 32B (8bit)",
+            "mode": "list",
+            "cachedResultName": "EXAONE 4.0 32B (8BIT)"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "=You are an enrichment engine for job + company records.\n\n━━━━━━━━━━━━━━━━━━━━━━━\nYOUR TASK\n━━━━━━━━━━━━━━━━━━━━━━━\n\nAnalyze and determine the following attributes about a given job:\n\n- Job Type\n- Job Tier\n- Job Briefing\n\nYou are given the following INPUT fields below, and must conform your output to the OUTPUT section EXACTLY!\nEach Task has additional clarification below.\n\n━━━━━━━━━━━━━━━━━━━━━━━\nOUTPUT SCHEMA\n━━━━━━━━━━━━━━━━━━━━━━━\n\n{\n  \"type\": \"object\",\n  \"properties\": {\n    \"job_type\": {\n      \"type\": \"string\",\n      \"enum\": [\"operations\", \"maintenance\", \"engineering\", \"management\", \"executive\", \"other\"]\n    },\n    \"job_tier\": {\n      \"type\": \"string\",\n      \"enum\": [\"entry_mid\", \"senior_management\", \"director_vp_c_level\"]\n    },\n    \"job_briefing\": {\n      \"type\": \"string\"\n    }\n  },\n  \"additionalProperties\": false,\n  \"required\": [\"job_type\", \"job_tier\", \"job_briefing\"]\n}\n\n━━━━━━━━━━━━━━━━━━━━━━━\n1. Job Type\n━━━━━━━━━━━━━━━━━━━━━━━\n\nJobs can be one of the following types:\n- operations\n- maintenance\n- engineering\n- management\n- executive\n- other\n\nSort each job into exactly one of the types that best fits it.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n2. Job Tier\n━━━━━━━━━━━━━━━━━━━━━━━\n\nJobs can be one of the following tiers:\n- Entry & Mid Level (Associated Output: entry_mid)\n- Senior & Management (Associated Output: senior_management)\n- Director, VP & C-Level (Associated Output: director_vp_c_level)\n\nSort each job into exactly one of the tiers that best fits it.\n\nTier Definitions:\n\nEntry & Mid Level: hourly, administrative, and early-career salaried positions.\nSenior & Management: Experienced professionals and people leaders, including salaried, supervisory and management positions with greater responsibility, broader scope, and stronger compensation alignment.\nDirector, VP & C-Level: Executive and leadership-level opportunities aligned with strategic responsibility, organizational impact, and compensation range.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n3. Job Briefing\n━━━━━━━━━━━━━━━━━━━━━━━\n\nThe briefing should include the following:\n- Company history and background\n- Company size and industry information\n- Employee count (If provided)\n- Job-specific insights and details\n\n━━━━━━━━━━━━━━━━━━━━━━━\nFINAL INSTRUCTIONS (CRITICAL)\n━━━━━━━━━━━━━━━━━━━━━━━\n\n• Do NOT add additional explanations\n• Do NOT add additional comments\n• Output must be a valid JSON object with the specified structure, nothing more\n• ALL 3 output tasks must be accounted for in the final object"
+              },
+              {
+                "content": "=━━━━━━━━━━━━━━━━━━━━━━━\nINPUT\n━━━━━━━━━━━━━━━━━━━━━━━\n\nJOB TITLE: \n\n{{ $('Normalize Fields').item.json.job_title }}\n\nJOB DESCRIPTION:\n{{ $('Normalize Fields').item.json.description }}\n\nCOMPANY NAME: \n{{ $('Normalize Fields').item.json.company_name }}\n\nCOMPANY DOMAIN:\n{{ $('Normalize Fields').item.json.company_domain }}\n\nCOMPANY DESCRIPTION: \n{{ $('Normalize Fields').item.json.company_description }}\n\nEMPLOYEE COUNT:\n{{ $('Normalize Fields').item.json.employee_count }}\n\nSIC CODE:\n{{ $('Normalize Fields').item.json.sic_code }}\n\nNAICS CODE:\n{{ $('Normalize Fields').item.json.naics_code }}\n\nINDUSTRY:\n{{ $('Normalize Fields').item.json.industry }}"
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          3120,
+          1040
+        ],
+        "id": "e6a8aa81-8920-4013-ac22-14736bd5d3ce",
+        "name": "Enrich Jobs",
+        "retryOnFail": true,
+        "credentials": {
+          "openAiApi": {
+            "id": "nbP8zWegiiA6B19g",
+            "name": "Courier"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "EXAONE 4.0 32B (8bit)",
+            "mode": "list",
+            "cachedResultName": "EXAONE 4.0 32B (8BIT)"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "=You are a strict filtering engine for job + company records.\n\nYou are given structured INPUT fields below.\nYou MUST base all decisions ONLY on these fields.\nDo NOT assume missing data exists elsewhere.\n\n━━━━━━━━━━━━━━━━━━━━━━━\nYOUR TASK\n━━━━━━━━━━━━━━━━━━━━━━━\n\nAnalyze whether the company is a recruiting / staffing / HR intermediary.\n\nApply HARD filters first, then SOFT filters.\n\nReturn only a single value of one of the following:\n- job_hopper_live\n- exclusion_lists\n\n━━━━━━━━━━━━━━━━━━━━━━━\nHARD FILTER RULES (ALWAYS APPLY FIRST)\n━━━━━━━━━━━━━━━━━━━━━━━\n\nA company MUST be classified as recruiting / staffing and REJECTED if ANY of the following are true:\n\n• Company name clearly implies recruiting, staffing, or HR services\n(examples/keywords: staffing, recruiting, recruiter, talent, placements, placement, workforce, employment services, people solutions, headhunter, talent acquisition, search firm, temp agency)\n\n• Industry, SIC or NAICS clearly represents:\n\nStaffing\n\nRecruiting\n\nHR Consulting\n\nEmployment Services\n\nTalent Acquisition\n\nIf recruiting / staffing is detected:\n\noutput exclusion_lists\n\nSTOP evaluation immediately.\n\n━━━━━━━━━━━━━━━━━━━━━━━\nSOFT FILTER RULES (AI REASONING)\n━━━━━━━━━━━━━━━━━━━━━━━\n\nReject (treat as recruiting/staffing) if strong indirect indicators exist, such as:\n• Job title does not align with the company’s industry\n• Language suggests hiring on behalf of multiple clients\n• Description implies third-party candidate placement\n\nIf there is NOT enough information to resonable suspect that is in the exclusion_list category, default to job_hopper_live.\n\n━━━━━━━━━━━━━━━━━━━━━━━\nFINAL LOGIC\n━━━━━━━━━━━━━━━━━━━━━━━\n\nOutput exclusion_list if:\n\n- The company is recruiting / staffing\n\nOutput job_hopper_live if:\n\n- The company is NOT a recruiting / staffing agency AND is NOT bd_leads\n\n\n━━━━━━━━━━━━━━━━━━━━━━━\nOUTPUT REQUIREMENTS (CRITICAL)\n━━━━━━━━━━━━━━━━━━━━━━━\n\n• Output ONE of the values\n• Do NOT add explanations\n• Do NOT add comments"
+              },
+              {
+                "content": "=━━━━━━━━━━━━━━━━━━━━━━━\nINPUT\n━━━━━━━━━━━━━━━━━━━━━━━\n\nJob Title: \n{{ $json.job_title }}\n\nCompany Name: \n{{ $json.company_name }}\n\nCompany Description:\n{{ $json.company_description }}\n\nEmployee Count:\n{{ $json.employee_count }}\n\nSIC Code:\n{{ $json.sic_code }}\n\nNAICS Code:\n{{ $json.naics_code }}\n\nIndustry:\n{{ $json.industry }}\n\n"
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          1552,
+          832
+        ],
+        "id": "1c4b5edd-50bf-43f6-a90b-fc70605fb03e",
+        "name": "Filter Engine",
+        "retryOnFail": true,
+        "credentials": {
+          "openAiApi": {
+            "id": "nbP8zWegiiA6B19g",
+            "name": "Courier"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "compare": "selectedFields",
+          "fieldsToCompare": "company_name",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.removeDuplicates",
+        "typeVersion": 2,
+        "position": [
+          2624,
+          576
+        ],
+        "id": "f3e27c67-7f8c-4278-98f1-a9a9b7eed1c2",
+        "name": "Remove Duplicates"
+      },
+      {
+        "parameters": {
+          "compare": "selectedFields",
+          "fieldsToCompare": "company_name",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.removeDuplicates",
+        "typeVersion": 2,
+        "position": [
+          2720,
+          1376
+        ],
+        "id": "6750f983-4cce-4b82-ba16-7866bba0ad12",
+        "name": "Remove Duplicates1"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "088ecfa0-540c-4466-9ebb-c75a1e7bc608",
+                "leftValue": "={{ $json.output[0].content[0].text }}",
+                "rightValue": "exclusion_lists",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.2,
+        "position": [
+          1936,
+          736
+        ],
+        "id": "4544a28c-26a9-4366-81c4-f76039b8d998",
+        "name": "Exclusion List Filter"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "088ecfa0-540c-4466-9ebb-c75a1e7bc608",
+                "leftValue": "={{ $('Normalize Fields').item.json.employee_count }}",
+                "rightValue": 11,
+                "operator": {
+                  "type": "number",
+                  "operation": "gte"
+                }
+              },
+              {
+                "id": "e6a3231c-fbbd-4dec-a82f-5b7251ed6fd7",
+                "leftValue": "={{ $('Normalize Fields').item.json.employee_count }}",
+                "rightValue": 150,
+                "operator": {
+                  "type": "number",
+                  "operation": "lte"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.2,
+        "position": [
+          2224,
+          1440
+        ],
+        "id": "694b1fb2-41e5-458a-b0a3-662e73885be9",
+        "name": "BD Leads Filter"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "088ecfa0-540c-4466-9ebb-c75a1e7bc608",
+                "leftValue": "={{ $json.output[0].content[0].text }}",
+                "rightValue": "=job_hopper_live",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              },
+              {
+                "id": "4ca10044-1004-4dd1-9340-000ee364f1d9",
+                "leftValue": "={{ $json.output[0].content[0].text }}",
+                "rightValue": "bd_leads",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "or"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.2,
+        "position": [
+          2000,
+          1056
+        ],
+        "id": "168a4b27-9b95-44cf-a5f6-d71c63fabd9f",
+        "name": "Job Hopper Live Filter"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "c4c21b9d-9bb9-49fa-a032-0a0dcc06f13a",
+                "name": "company_name",
+                "value": "={{ $('Normalize Fields').item.json.company_name }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          2384,
+          576
+        ],
+        "id": "8ebe21a0-5d86-4d66-bb12-766aa6b09f40",
+        "name": "Add exclusion unique key"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "c4c21b9d-9bb9-49fa-a032-0a0dcc06f13a",
+                "name": "company_name",
+                "value": "={{ $('Normalize Fields').item.json.company_name }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          2480,
+          1376
+        ],
+        "id": "dc86c95a-da5f-44e4-8c68-c370cbda1bac",
+        "name": "Add bd_leads unique key"
+      },
+      {
+        "parameters": {
+          "compare": "selectedFields",
+          "fieldsToCompare": "job_title, company_name, apply_link",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.removeDuplicates",
+        "typeVersion": 2,
+        "position": [
+          2464,
+          976
+        ],
+        "id": "3815c43d-c3a6-4851-9361-2279a8ad7cd8",
+        "name": "Remove Duplicates3"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "function parseJsonFromCodeBlock(input) {\n  if (!input || typeof input !== \"string\") return null;\n\n  let text = input.trim();\n\n  // Strip markdown code blocks: ```json ... ``` or ``` ... ```\n  // Handles 2 or 3 backticks and optional \"json\" language tag\n  const codeBlockMatch = text.match(/^`{2,3}(?:json)?\\s*\\n?([\\s\\S]*?)\\n?`{2,3}\\s*$/);\n  if (codeBlockMatch) {\n    text = codeBlockMatch[1].trim();\n  }\n\n  try {\n    return JSON.parse(text);\n  } catch {\n    return null;\n  }\n}\n\nconst raw = $json.output[0].content[0].text\n\nreturn { json: parseJsonFromCodeBlock(raw) }"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3440,
+          1040
+        ],
+        "id": "84ab8122-a124-43db-8882-1689b9a9eec5",
+        "name": "Parse AI Ouput to JSON"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "return { json: { company_name: $('Loop Over Jobs').item.json.company_name.replace(/ /g, \"+\") } }"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -64,
+          944
+        ],
+        "id": "50a726c1-e705-4aa5-8151-db4c5c5056c9",
+        "name": "Make company name URL friendly"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "swcsLxuzlW67ng8Y",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/swcsLxuzlW67ng8Y",
+            "cachedResultName": "Get Company Domain By Job Posting"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "job_title": "={{ $('Loop Over Jobs').item.json.job_title }}",
+              "company_name": "={{ $json.company_name }}",
+              "location": "={{ $('Loop Over Jobs').item.json.location }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "company_name",
+                "displayName": "company_name",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "job_title",
+                "displayName": "job_title",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "location",
+                "displayName": "location",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "company_name_replace",
+                "displayName": "company_name_replace",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "is_remote",
+                "displayName": "is_remote",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "pay_min",
+                "displayName": "pay_min",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "pay_max",
+                "displayName": "pay_max",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "pay_type",
+                "displayName": "pay_type",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "schedules",
+                "displayName": "schedules",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "employment_types",
+                "displayName": "employment_types",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "description",
+                "displayName": "description",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "apply_link",
+                "displayName": "apply_link",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "posted_date",
+                "displayName": "posted_date",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          224,
+          944
+        ],
+        "id": "a4dbdaab-4ba1-4cb0-a2af-124768a7140c",
+        "name": "Call 'Get Company Domain By Job Posting'"
+      },
+      {
+        "parameters": {
+          "tableId": "job_hopper_live",
+          "fieldsUi": {
+            "fieldValues": [
+              {
+                "fieldId": "job_title",
+                "fieldValue": "={{ $('Normalize Fields').item.json.job_title ?? null }}"
+              },
+              {
+                "fieldId": "company_name",
+                "fieldValue": "={{ $('Normalize Fields').item.json.company_name ?? null }}"
+              },
+              {
+                "fieldId": "location",
+                "fieldValue": "={{ $('Normalize Fields').item.json.location ?? null }}"
+              },
+              {
+                "fieldId": "is_remote",
+                "fieldValue": "={{ $('Normalize Fields').item.json.is_remote ?? false }}"
+              },
+              {
+                "fieldId": "pay_min",
+                "fieldValue": "={{ $('Normalize Fields').item.json.pay_min ?? null }}"
+              },
+              {
+                "fieldId": "pay_max",
+                "fieldValue": "={{ $('Normalize Fields').item.json.pay_max ?? null }}"
+              },
+              {
+                "fieldId": "employee_count",
+                "fieldValue": "={{ $('Normalize Fields').item.json.employee_count ?? null }}"
+              },
+              {
+                "fieldId": "schedules",
+                "fieldValue": "={{ \n  Array.isArray($('Normalize Fields').item.json.schedules) \n    ? '{' + $('Normalize Fields').item.json.schedules.join(',') + '}' \n    : '{}' \n}}"
+              },
+              {
+                "fieldId": "employment_types",
+                "fieldValue": "={{ \n  Array.isArray($('Normalize Fields').item.json.employment_types) \n    ? '{' + $('Normalize Fields').item.json.employment_types.join(',') + '}' \n    : '{}' \n}}"
+              },
+              {
+                "fieldId": "description",
+                "fieldValue": "={{ $('Normalize Fields').item.json.description ?? null }}"
+              },
+              {
+                "fieldId": "apply_link",
+                "fieldValue": "={{ $('Normalize Fields').item.json.apply_link ?? null }}"
+              },
+              {
+                "fieldId": "posted_date",
+                "fieldValue": "={{ $('Normalize Fields').item.json.posted_date ?? null }}"
+              },
+              {
+                "fieldId": "ai_job_briefing",
+                "fieldValue": "={{ $json.job_briefing ?? \"\" }}"
+              },
+              {
+                "fieldId": "role_category",
+                "fieldValue": "={{ $json.job_type ?? null }}"
+              },
+              {
+                "fieldId": "subscription_tier",
+                "fieldValue": "={{ $json.job_tier ?? null }}"
+              },
+              {
+                "fieldId": "pay_type",
+                "fieldValue": "={{ $('Normalize Fields').item.json.pay_type ?? null }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          3632,
+          1040
+        ],
+        "id": "13f53879-b101-40a5-864c-33128c69a2a4",
+        "name": "Insert jobs to job_hopper_live1",
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -1648,
+          720
+        ],
+        "id": "98cf9e78-c4e2-44a7-8ab0-f85cdfac96c2",
+        "name": "When clicking ‘Execute workflow’"
+      },
+      {
+        "parameters": {
+          "operation": "deleteRows",
+          "dataTableId": {
+            "__rl": true,
+            "value": "dLjvwjXaCVJKJJKL",
+            "mode": "list",
+            "cachedResultName": "JOB_PROCESSOR_HIT_APOLLO_LIMIT",
+            "cachedResultUrl": "/projects/TJ25TbikWqAKS5EX/datatables/dLjvwjXaCVJKJJKL"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "condition": "isNotEmpty"
+              }
+            ]
+          },
+          "options": {
+            "dryRun": false
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          -1440,
+          832
+        ],
+        "id": "14d492f4-e4b6-45f1-9769-63bd6674ca93",
+        "name": "Set Apollo Limit Bool False",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "dataTableId": {
+            "__rl": true,
+            "value": "dLjvwjXaCVJKJJKL",
+            "mode": "list",
+            "cachedResultName": "JOB_PROCESSOR_HIT_APOLLO_LIMIT",
+            "cachedResultUrl": "/projects/TJ25TbikWqAKS5EX/datatables/dLjvwjXaCVJKJJKL"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          912,
+          976
+        ],
+        "id": "59f7e25f-c289-48d8-a83a-c7e2474726be",
+        "name": "Set Apollo Limit Bool True",
+        "executeOnce": false,
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "compare": "selectedFields",
+          "fieldsToCompare": "job_title, company_name, apply_link",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.removeDuplicates",
+        "typeVersion": 2,
+        "position": [
+          -992,
+          832
+        ],
+        "id": "8afebd56-ebb2-4d8a-960e-47b80293be2f",
+        "name": "Remove Duplicates4"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "89c32219-0fc3-4c05-aee1-e639a96bb4a9",
+                "leftValue": "={{ $json.keys().length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -272,
+          848
+        ],
+        "id": "d23e0ca1-0521-4069-92e8-d47f37f5800f",
+        "name": "Out of Credits?"
+      },
+      {
+        "parameters": {
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "value": "dLjvwjXaCVJKJJKL",
+            "mode": "list",
+            "cachedResultName": "JOB_PROCESSOR_HIT_APOLLO_LIMIT",
+            "cachedResultUrl": "/projects/TJ25TbikWqAKS5EX/datatables/dLjvwjXaCVJKJJKL"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "condition": "isNotEmpty"
+              }
+            ]
+          },
+          "returnAll": true
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          -512,
+          848
+        ],
+        "id": "20f5008f-a623-440e-8680-801757f8d174",
+        "name": "Get Apollo Limit Status",
+        "alwaysOutputData": true,
+        "executeOnce": false
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "tableId": "scraper_raw_jobs",
+          "returnAll": true,
+          "matchType": "allFilters",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "status",
+                "condition": "eq",
+                "keyValue": "pending"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          -1216,
+          832
+        ],
+        "id": "8138304e-d5c1-49b9-99d0-9d9f616b7ea5",
+        "name": "Get pending jobs",
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          -736,
+          832
+        ],
+        "id": "6a721205-8e03-4e5a-b53e-e42f38f037d9",
+        "name": "Loop Over Jobs"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "01496dde-c2d4-482c-b9d9-dc4030a1dbfb",
+                "leftValue": "={{ $json.company_domain }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          496,
+          832
+        ],
+        "id": "fc85125e-50ee-4b15-9d25-836831998c62",
+        "name": "Company domain doesn't exist?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "763761b9-c77d-4287-9ecb-aec8c44ee9d8",
+                "name": "job_title",
+                "value": "={{ $('Normalize Fields').item.json.job_title }}",
+                "type": "string"
+              },
+              {
+                "id": "840d6c7b-6aad-4d7c-b2f2-e535d7b79b40",
+                "name": "company_name",
+                "value": "={{ $('Normalize Fields').item.json.company_name }}",
+                "type": "string"
+              },
+              {
+                "id": "14e885b8-2e7f-4fc7-be01-2eb12046a4df",
+                "name": "apply_link",
+                "value": "={{ $('Normalize Fields').item.json.apply_link }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          2224,
+          976
+        ],
+        "id": "ffa51b6c-b15c-4e1c-9254-0dfc1eae0b12",
+        "name": "Add job unique keys"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          -1648,
+          912
+        ],
+        "id": "58f7d928-bc10-45b7-a6d4-c240bca75ffb",
+        "name": "When Executed by Another Workflow",
+        "alwaysOutputData": false
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "tableId": "scraper_raw_jobs",
+          "matchType": "allFilters",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "id",
+                "condition": "eq",
+                "keyValue": "={{ $('Normalize Fields').item.json.id }}"
+              }
+            ]
+          },
+          "fieldsUi": {
+            "fieldValues": [
+              {
+                "fieldId": "status",
+                "fieldValue": "processed"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          4128,
+          1456
+        ],
+        "id": "eda42fd3-6393-43e3-a692-98edd5f369bc",
+        "name": "Set job status to processed",
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "tableId": "exclusion_lists",
+          "returnAll": true,
+          "filterType": "none"
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          2464,
+          816
+        ],
+        "id": "ed2ebf98-6d7c-4179-84de-f8ac099e1c1f",
+        "name": "Get excluded companies",
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "combineBySql",
+          "query": "SELECT *\nFROM input1\nLEFT JOIN input2\n  ON input1.company_name = input2.company_name\nWHERE\n  input2.id is null;",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          2864,
+          640
+        ],
+        "id": "50f6721d-ebf7-4dde-997f-9da16e6dcd4d",
+        "name": "Filter out existing excluded companies",
+        "executeOnce": false,
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "tableId": "job_hopper_live",
+          "returnAll": true,
+          "filterType": "none"
+        },
+        "type": "n8n-nodes-base.supabase",
+        "typeVersion": 1,
+        "position": [
+          2352,
+          1168
+        ],
+        "id": "b919096c-f8e2-4324-b15b-c796d8651d3c",
+        "name": "Get live jobs",
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "credentials": {
+          "supabaseApi": {
+            "id": "JpA91efhLpZnHuEb",
+            "name": "Supabase account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "combineBySql",
+          "query": "SELECT *\nFROM input1\nLEFT JOIN input2\n  ON input1.company_name = input2.company_name\n  AND input1.job_title = input2.job_title \n  AND (\n    DATEDIFF(day, COALESCE(input2.posted_date, input2.created_date), COALESCE(input1.posted_date, NOW())) < 30  -- Posted/created within same month\n    OR input1.apply_link = input2.apply_link -- With same apply link\n  )  \nWHERE\n  input2.id is null;",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          2688,
+          1056
+        ],
+        "id": "61a5c1ed-4ac5-442f-9802-60a54fde11e8",
+        "name": "Filter out live jobs",
+        "executeOnce": false,
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          1136,
+          832
+        ],
+        "id": "166b24cf-a0dc-4ca0-8a50-acc3f5f85b2f",
+        "name": "Merge"
+      },
+      {
+        "parameters": {
+          "jsCode": "// This code merges the current loop's data with any enrichment data\n// It uses .item to ensure we get the correct data regardless of the index\n\nconst currentJob = $('Loop Over Jobs').all()[0].json;\nconst apolloData = $input.all()[0].json.organization || {};\n\nreturn {\n  json: {\n    // 1. Data from the original Job record (The Loop)\n    id: currentJob.id,\n    job_title: currentJob.job_title,\n    company_name: currentJob.company_name,\n    location: currentJob.location,\n    is_remote: currentJob.is_remote,\n    pay_min: currentJob.pay_min,\n    pay_max: currentJob.pay_max,\n    pay_type: currentJob.pay_type,\n    schedules: currentJob.schedules,\n    employment_types: currentJob.employment_types,\n    description: currentJob.description,\n    apply_link: currentJob.apply_link,\n    posted_date: currentJob.posted_date,\n\n    // 2. Data from the Domain Search (The IF branch)\n    // We use ?. to prevent \"Cannot read property\" errors\n    company_domain: currentJob.website_url,\n\n    // 3. Data from Apollo (The Enrichment branch)\n    employee_count: apolloData.estimated_num_employees || 0,\n    sic_code: apolloData.sic_codes ? apolloData.sic_codes[0] : null,\n    naics_code: apolloData.naics_codes ? apolloData.naics_codes[0] : null,\n    industry: apolloData.industry || 'Unknown',\n    company_description: apolloData.short_description || ''\n  }\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1344,
+          832
+        ],
+        "id": "b24a0f97-f332-4412-a101-2b549dd69b29",
+        "name": "Normalize Fields"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "01496dde-c2d4-482c-b9d9-dc4030a1dbfb",
+                "leftValue": "={{ Object.keys($json).length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          2848,
+          1056
+        ],
+        "id": "df4cb4dd-8bdb-4ee6-9d66-5b41a4cb9a43",
+        "name": "Not filtered out?"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "01496dde-c2d4-482c-b9d9-dc4030a1dbfb",
+                "leftValue": "={{ Object.keys($json).length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          3136,
+          640
+        ],
+        "id": "20eba732-17cb-46ab-bc71-eaf8552916ca",
+        "name": "Not filtered out?1"
+      }
+    ],
+    "connections": {
+      "Get Apollo Data": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 1
+            }
+          ],
+          [
+            {
+              "node": "Set Apollo Limit Bool True",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert excluded companies to excluded_lists": {
+        "main": [
+          [
+            {
+              "node": "Set job status to processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert lead companies to bd_leads": {
+        "main": [
+          [
+            {
+              "node": "Set job status to processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter out existing leads": {
+        "main": [
+          [
+            {
+              "node": "Insert lead companies to bd_leads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get bd leads": {
+        "main": [
+          [
+            {
+              "node": "Filter out existing leads",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Enrich Jobs": {
+        "main": [
+          [
+            {
+              "node": "Parse AI Ouput to JSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Engine": {
+        "main": [
+          [
+            {
+              "node": "Job Hopper Live Filter",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Exclusion List Filter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Remove Duplicates": {
+        "main": [
+          [
+            {
+              "node": "Filter out existing excluded companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Remove Duplicates1": {
+        "main": [
+          [
+            {
+              "node": "Filter out existing leads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Exclusion List Filter": {
+        "main": [
+          [
+            {
+              "node": "Add exclusion unique key",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get excluded companies",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BD Leads Filter": {
+        "main": [
+          [
+            {
+              "node": "Get bd leads",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Add bd_leads unique key",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Job Hopper Live Filter": {
+        "main": [
+          [
+            {
+              "node": "Add job unique keys",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "BD Leads Filter",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get live jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Add exclusion unique key": {
+        "main": [
+          [
+            {
+              "node": "Remove Duplicates",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Add bd_leads unique key": {
+        "main": [
+          [
+            {
+              "node": "Remove Duplicates1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Remove Duplicates3": {
+        "main": [
+          [
+            {
+              "node": "Filter out live jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse AI Ouput to JSON": {
+        "main": [
+          [
+            {
+              "node": "Insert jobs to job_hopper_live1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Make company name URL friendly": {
+        "main": [
+          [
+            {
+              "node": "Call 'Get Company Domain By Job Posting'",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Call 'Get Company Domain By Job Posting'": {
+        "main": [
+          [
+            {
+              "node": "Company domain doesn't exist?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert jobs to job_hopper_live1": {
+        "main": [
+          [
+            {
+              "node": "Set job status to processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "When clicking ‘Execute workflow’": {
+        "main": [
+          [
+            {
+              "node": "Set Apollo Limit Bool False",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Apollo Limit Bool False": {
+        "main": [
+          [
+            {
+              "node": "Get pending jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Apollo Limit Bool True": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Remove Duplicates4": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Out of Credits?": {
+        "main": [
+          [
+            {
+              "node": "Company domain doesn't exist?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Make company name URL friendly",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Apollo Limit Status": {
+        "main": [
+          [
+            {
+              "node": "Out of Credits?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get pending jobs": {
+        "main": [
+          [
+            {
+              "node": "Remove Duplicates4",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Jobs": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Get Apollo Limit Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Company domain doesn't exist?": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Apollo Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Add job unique keys": {
+        "main": [
+          [
+            {
+              "node": "Remove Duplicates3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "When Executed by Another Workflow": {
+        "main": [
+          [
+            {
+              "node": "Set Apollo Limit Bool False",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set job status to processed": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Jobs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get excluded companies": {
+        "main": [
+          [
+            {
+              "node": "Filter out existing excluded companies",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Filter out existing excluded companies": {
+        "main": [
+          [
+            {
+              "node": "Not filtered out?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get live jobs": {
+        "main": [
+          [
+            {
+              "node": "Filter out live jobs",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Filter out live jobs": {
+        "main": [
+          [
+            {
+              "node": "Not filtered out?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge": {
+        "main": [
+          [
+            {
+              "node": "Normalize Fields",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Fields": {
+        "main": [
+          [
+            {
+              "node": "Filter Engine",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Not filtered out?": {
+        "main": [
+          [
+            {
+              "node": "Enrich Jobs",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set job status to processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Not filtered out?1": {
+        "main": [
+          [
+            {
+              "node": "Insert excluded companies to excluded_lists",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set job status to processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "ced2f137e50be93dadf473086a596688f0d2e428370938821c9b14262dad7716"
+    }
+  }

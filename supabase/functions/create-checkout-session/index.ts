@@ -195,6 +195,7 @@ serve(async (req) => {
         payment_method_types: ['card'],
         line_items: lineItems,
         mode: 'subscription',
+        allow_promotion_codes: true,
         success_url:
           successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
@@ -209,6 +210,7 @@ serve(async (req) => {
         payment_method_types: ['card'],
         line_items: lineItems,
         mode: 'payment',
+        allow_promotion_codes: true,
         success_url:
           successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
