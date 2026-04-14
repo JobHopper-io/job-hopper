@@ -49,7 +49,9 @@ function schedulePreview(value: string) {
   }, 300)
 }
 
-function onInputBlur() {
+let addLocationInFlight = false
+
+function commitLocationInput() {
   if (previewTimeout !== null) {
     window.clearTimeout(previewTimeout)
     previewTimeout = null
@@ -57,33 +59,43 @@ function onInputBlur() {
   void addLocation()
 }
 
-async function addLocation() {
-  validationError.value = null
-  const trimmed = inputValue.value.trim()
-  if (!trimmed) {
-    previewNormalized.value = null
-    previewError.value = null
-    return
-  }
+function onInputBlur() {
+  commitLocationInput()
+}
 
-  const { normalized, error } = await normalizeLocation(trimmed)
-  if (error) {
-    validationError.value = error
-    previewError.value = error
-    previewNormalized.value = null
-    return
-  }
-  if (!normalized) return
-  if (isDuplicate(normalized)) {
+async function addLocation() {
+  if (addLocationInFlight) return
+  addLocationInFlight = true
+  try {
+    validationError.value = null
+    const trimmed = inputValue.value.trim()
+    if (!trimmed) {
+      previewNormalized.value = null
+      previewError.value = null
+      return
+    }
+
+    const { normalized, error } = await normalizeLocation(trimmed)
+    if (error) {
+      validationError.value = error
+      previewError.value = error
+      previewNormalized.value = null
+      return
+    }
+    if (!normalized) return
+    if (isDuplicate(normalized)) {
+      inputValue.value = ''
+      previewNormalized.value = null
+      previewError.value = null
+      return
+    }
+    emit('update:modelValue', [...props.modelValue, normalized])
     inputValue.value = ''
     previewNormalized.value = null
     previewError.value = null
-    return
+  } finally {
+    addLocationInFlight = false
   }
-  emit('update:modelValue', [...props.modelValue, normalized])
-  inputValue.value = ''
-  previewNormalized.value = null
-  previewError.value = null
 }
 
 function removeLocation(index: number) {
@@ -94,7 +106,7 @@ function removeLocation(index: number) {
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter') {
     event.preventDefault()
-    void addLocation()
+    commitLocationInput()
   }
 }
 
@@ -136,13 +148,16 @@ const listAriaLabel = computed(() =>
         v-model="inputValue"
         type="text"
         class="input min-w-[12rem] flex-1 border-0 p-1 shadow-none focus:ring-0"
-        placeholder="City, State or ZIP — tab away or press Enter to add"
+        placeholder="City, State or ZIP — tab away, Enter, or Add Location"
         autocomplete="off"
         @blur="onInputBlur"
         @keydown="onKeydown"
         @input="schedulePreview(inputValue)"
       />
     </div>
+    <button type="button" class="btn-secondary text-sm" @click="commitLocationInput">
+      Add Location
+    </button>
     <div class="min-h-[1.25rem]">
       <p
         v-if="previewNormalized && !validationError && !previewError"
