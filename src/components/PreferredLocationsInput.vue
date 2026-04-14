@@ -49,6 +49,14 @@ function schedulePreview(value: string) {
   }, 300)
 }
 
+function onInputFocus() {
+  if (previewTimeout !== null) {
+    window.clearTimeout(previewTimeout)
+    previewTimeout = null
+  }
+  void runPreview(inputValue.value)
+}
+
 async function addLocation() {
   validationError.value = null
   const trimmed = inputValue.value.trim()
@@ -126,6 +134,7 @@ const listAriaLabel = computed(() =>
         class="input min-w-[12rem] flex-1 border-0 p-1 shadow-none focus:ring-0"
         placeholder="City, State or ZIP — press Enter to add"
         autocomplete="off"
+        @focus="onInputFocus"
         @keydown="onKeydown"
         @input="schedulePreview(inputValue)"
       />
