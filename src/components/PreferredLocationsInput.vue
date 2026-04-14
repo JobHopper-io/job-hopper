@@ -49,10 +49,22 @@ function schedulePreview(value: string) {
   }, 300)
 }
 
+function onInputBlur() {
+  if (previewTimeout !== null) {
+    window.clearTimeout(previewTimeout)
+    previewTimeout = null
+  }
+  void addLocation()
+}
+
 async function addLocation() {
   validationError.value = null
   const trimmed = inputValue.value.trim()
-  if (!trimmed) return
+  if (!trimmed) {
+    previewNormalized.value = null
+    previewError.value = null
+    return
+  }
 
   const { normalized, error } = await normalizeLocation(trimmed)
   if (error) {
@@ -124,8 +136,9 @@ const listAriaLabel = computed(() =>
         v-model="inputValue"
         type="text"
         class="input min-w-[12rem] flex-1 border-0 p-1 shadow-none focus:ring-0"
-        placeholder="City, State or ZIP — press Enter to add"
+        placeholder="City, State or ZIP — tab away or press Enter to add"
         autocomplete="off"
+        @blur="onInputBlur"
         @keydown="onKeydown"
         @input="schedulePreview(inputValue)"
       />
