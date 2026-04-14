@@ -115,10 +115,18 @@ function formatPayRange(
 ): string | null {
   if ((payMin == null && payMax == null) || !payType) return null
   const formatter = (n: number) =>
-    payType === 'hour' ? `$${n}` : `$${Math.round(n / 1000)}k`
-  if (payMin != null && payMax != null) return `${formatter(payMin)}–${formatter(payMax)}/${payType === 'hour' ? 'hr' : 'yr'}`
-  if (payMin != null) return `${formatter(payMin)}+/${payType === 'hour' ? 'hr' : 'yr'}`
-  if (payMax != null) return `Up to ${formatter(payMax)}/${payType === 'hour' ? 'hr' : 'yr'}`
+    payType === 'year' ? `$${Math.round(n / 1000)}k` : `$${n}`
+  const suffix =
+    payType === 'hour'
+      ? 'hr'
+      : payType === 'month'
+        ? 'mo'
+        : payType === 'week'
+          ? 'wk'
+          : 'yr'
+  if (payMin != null && payMax != null) return `${formatter(payMin)}–${formatter(payMax)}/${suffix}`
+  if (payMin != null) return `${formatter(payMin)}+/${suffix}`
+  if (payMax != null) return `Up to ${formatter(payMax)}/${suffix}`
   return null
 }
 
