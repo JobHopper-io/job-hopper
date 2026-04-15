@@ -30,6 +30,7 @@ const adminPaths = [
   '/admin',
   '/admin/dashboard',
   '/admin/admin-management',
+  '/admin/job-processor',
   '/admin/job-matching-algorithm',
   '/admin/settings',
 ]
@@ -152,6 +153,11 @@ const router = createRouter({
       component: () => import('../views/AdminAdmins.vue'),
     },
     {
+      path: '/admin/job-processor',
+      name: 'admin-job-processor',
+      component: () => import('../views/AdminJobProcessor.vue'),
+    },
+    {
       path: '/admin/job-matching-algorithm',
       name: 'admin-job-matching-algorithm',
       component: () => import('../views/AdminJobMatchingAlgorithm.vue'),
@@ -264,8 +270,8 @@ router.beforeEach(async (to) => {
       profileAPI.hasRole('super_admin'),
     ])
 
-    // Admin Management page is restricted to super_admin only.
-    if (targetPath === '/admin/admin-management') {
+    // Admin Management and Job processor are restricted to super_admin only.
+    if (targetPath === '/admin/admin-management' || targetPath === '/admin/job-processor') {
       if (!isSuperAdmin) {
         return '/dashboard'
       }
