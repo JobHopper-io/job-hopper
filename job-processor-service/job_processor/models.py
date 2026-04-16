@@ -13,6 +13,12 @@ class RunOptions(BaseModel):
     max_concurrent_apollo: int = Field(default=4, ge=1, le=64)
     max_concurrent_brave: int = Field(default=2, ge=1, le=32)
     max_concurrent_fetch: int = Field(default=8, ge=1, le=64)
+    max_concurrent_jobs: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        description="How many raw jobs to process in parallel (LLM/Apollo limits still apply)",
+    )
     skip_domain_resolution: bool = False
     skip_apollo: bool = False
     skip_enrichment: bool = False

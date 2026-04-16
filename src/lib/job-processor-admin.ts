@@ -10,6 +10,7 @@ export const DEFAULT_JOB_PROCESSOR_RUN_OPTIONS = {
   max_concurrent_apollo: 4,
   max_concurrent_brave: 2,
   max_concurrent_fetch: 8,
+  max_concurrent_jobs: 8,
   skip_domain_resolution: false,
   skip_apollo: false,
   skip_enrichment: false,

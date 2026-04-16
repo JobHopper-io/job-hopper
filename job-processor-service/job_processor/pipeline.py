@@ -79,6 +79,8 @@ async def process_one_job(
     excluded: list[dict[str, Any]],
     bd_leads: list[dict[str, Any]],
     live_jobs: list[dict[str, Any]],
+    shared_apollo_exhausted: list[bool],
+    dedupe_lock: asyncio.Lock,
     sem_llm: asyncio.Semaphore,
     sem_apollo: asyncio.Semaphore,
     sem_brave: asyncio.Semaphore,
@@ -97,11 +99,8 @@ async def process_one_job(
     }
     job_id = str(job["id"])
 
-    flags = await db.get_processor_flags()
-    apollo_exhausted = bool(flags.get("apollo_credits_exhausted"))
-
     company_domain: str | None = None
-    if apollo_exhausted and not options.skip_apollo:
+    if shared_apollo_exhausted[0] and not options.skip_apollo:
         pass
     elif not options.skip_domain_resolution:
         company_domain = await resolve_company_domain(
@@ -118,15 +117,18 @@ async def process_one_job(
         )
 
     apollo_body: dict[str, Any] | None = None
-    if company_domain and not options.skip_apollo and not apollo_exhausted:
+    if company_domain and not options.skip_apollo and not shared_apollo_exhausted[0]:
         async with sem_apollo:
-            apollo_body, credit_err = await apollo_organization_enrich(
-                http_client, settings, company_domain
-            )
-        if credit_err:
-            await db.set_apollo_credits_exhausted(True, options.dry_run)
-            apollo_exhausted = True
-            apollo_body = None
+            if shared_apollo_exhausted[0]:
+                apollo_body = None
+            else:
+                apollo_body, credit_err = await apollo_organization_enrich(
+                    http_client, settings, company_domain
+                )
+                if credit_err:
+                    shared_apollo_exhausted[0] = True
+                    await db.set_apollo_credits_exhausted(True, options.dry_run)
+                    apollo_body = None
 
     apollo_org = (apollo_body or {}).get("organization") or {}
     if not isinstance(apollo_org, dict):
@@ -151,11 +153,14 @@ async def process_one_job(
 
     if filter_token == "exclusion_lists":
         row = {"company_name": norm["company_name"]}
-        candidates = dedupe_by_key([row], ["company_name"])
-        candidates = anti_join_company_name(candidates, excluded)
-        if candidates:
-            await db.insert_exclusion_list(norm["company_name"], dry_run=options.dry_run)
-            deltas["inserted_exclusion"] += 1
+        async with dedupe_lock:
+            candidates = dedupe_by_key([row], ["company_name"])
+            candidates = anti_join_company_name(candidates, excluded)
+            if candidates:
+                await db.insert_exclusion_list(norm["company_name"], dry_run=options.dry_run)
+                deltas["inserted_exclusion"] += 1
+                if not options.dry_run:
+                    excluded.append({"company_name": norm["company_name"]})
         await db.update_raw_job_status(job_id, "processed", dry_run=options.dry_run)
         deltas["processed"] += 1
         return deltas
@@ -165,16 +170,17 @@ async def process_one_job(
 
     ec = norm["employee_count"]
     if 11 <= ec <= 150:
-        bd_row = {"company_name": norm["company_name"]}
-        bd_c = dedupe_by_key([bd_row], ["company_name"])
-        bd_c = anti_join_bd_leads(bd_c, bd_leads)
-        if bd_c:
-            await db.insert_bd_lead(
-                norm["company_name"], "Ready to Process", dry_run=options.dry_run
-            )
-            deltas["inserted_bd"] += 1
-            if not options.dry_run:
-                bd_leads.append({"company_name": norm["company_name"]})
+        async with dedupe_lock:
+            bd_row = {"company_name": norm["company_name"]}
+            bd_c = dedupe_by_key([bd_row], ["company_name"])
+            bd_c = anti_join_bd_leads(bd_c, bd_leads)
+            if bd_c:
+                await db.insert_bd_lead(
+                    norm["company_name"], "Ready to Process", dry_run=options.dry_run
+                )
+                deltas["inserted_bd"] += 1
+                if not options.dry_run:
+                    bd_leads.append({"company_name": norm["company_name"]})
 
     live_candidate = {
         "job_title": norm["job_title"],
@@ -182,10 +188,12 @@ async def process_one_job(
         "apply_link": norm.get("apply_link"),
         "posted_date": norm.get("posted_date"),
     }
-    live_c = dedupe_by_key([live_candidate], ["job_title", "company_name", "apply_link"])
-    live_c = anti_join_live_jobs(live_c, live_jobs)
+    async with dedupe_lock:
+        live_c = dedupe_by_key([live_candidate], ["job_title", "company_name", "apply_link"])
+        live_c = anti_join_live_jobs(live_c, live_jobs)
+        do_live = bool(live_c)
 
-    if live_c:
+    if do_live:
         if options.skip_enrichment:
             enrich: dict[str, Any] = {
                 "job_type": "other",
@@ -225,18 +233,24 @@ async def process_one_job(
             "subscription_tier": tier,
             "sponsorship_likelihood": settings.default_sponsorship_likelihood,
         }
-        await db.insert_job_hopper_live(insert_row, dry_run=options.dry_run)
-        deltas["inserted_live"] += 1
-        if not options.dry_run:
-            live_jobs.append(
-                {
-                    "company_name": norm["company_name"],
-                    "job_title": norm["job_title"],
-                    "apply_link": norm.get("apply_link"),
-                    "posted_date": norm.get("posted_date"),
-                    "created_at": datetime.now(tz=timezone.utc).isoformat(),
-                }
+        async with dedupe_lock:
+            live_c2 = dedupe_by_key(
+                [live_candidate], ["job_title", "company_name", "apply_link"]
             )
+            live_c2 = anti_join_live_jobs(live_c2, live_jobs)
+            if live_c2:
+                await db.insert_job_hopper_live(insert_row, dry_run=options.dry_run)
+                deltas["inserted_live"] += 1
+                if not options.dry_run:
+                    live_jobs.append(
+                        {
+                            "company_name": norm["company_name"],
+                            "job_title": norm["job_title"],
+                            "apply_link": norm.get("apply_link"),
+                            "posted_date": norm.get("posted_date"),
+                            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+                        }
+                    )
 
     await db.update_raw_job_status(job_id, "processed", dry_run=options.dry_run)
     deltas["processed"] += 1
@@ -257,6 +271,9 @@ async def run_pipeline(
 
     if options.force_clear_apollo_limit:
         await db.set_apollo_credits_exhausted(False, options.dry_run)
+
+    flags_row = await db.get_processor_flags()
+    shared_apollo_exhausted: list[bool] = [bool(flags_row.get("apollo_credits_exhausted"))]
 
     counts: dict[str, int] = {
         "claimed": 0,
@@ -283,6 +300,46 @@ async def run_pipeline(
     sem_apollo = asyncio.Semaphore(options.max_concurrent_apollo)
     sem_brave = asyncio.Semaphore(options.max_concurrent_brave)
     sem_fetch = asyncio.Semaphore(options.max_concurrent_fetch)
+    sem_jobs = asyncio.Semaphore(options.max_concurrent_jobs)
+    dedupe_lock = asyncio.Lock()
+    counts_lock = asyncio.Lock()
+
+    async def process_job_task(job: dict[str, Any]) -> None:
+        async with sem_jobs:
+            try:
+                d = await process_one_job(
+                    job,
+                    db=db,
+                    settings=settings,
+                    http_client=http_client,
+                    oai=oai,
+                    options=options,
+                    excluded=excluded,
+                    bd_leads=bd_leads,
+                    live_jobs=live_jobs,
+                    shared_apollo_exhausted=shared_apollo_exhausted,
+                    dedupe_lock=dedupe_lock,
+                    sem_llm=sem_llm,
+                    sem_apollo=sem_apollo,
+                    sem_brave=sem_brave,
+                    sem_fetch=sem_fetch,
+                    model_filter=model_filter,
+                    model_enrich=model_enrich,
+                    model_domain=model_domain,
+                )
+                async with counts_lock:
+                    for k, v in d.items():
+                        counts[k] = counts.get(k, 0) + v
+            except Exception:
+                logger.exception("job failed id=%s", job.get("id"))
+                async with counts_lock:
+                    counts["errors"] += 1
+                try:
+                    await db.update_raw_job_status(
+                        str(job["id"]), "pending", dry_run=options.dry_run
+                    )
+                except Exception:
+                    logger.exception("could not reset job %s", job.get("id"))
 
     try:
         total_claimed = 0
@@ -291,39 +348,13 @@ async def run_pipeline(
             jobs = await db.claim_scraper_raw_jobs(batch_limit)
             if not jobs:
                 break
-            for job in jobs:
-                total_claimed += 1
-                counts["claimed"] += 1
-                try:
-                    d = await process_one_job(
-                        job,
-                        db=db,
-                        settings=settings,
-                        http_client=http_client,
-                        oai=oai,
-                        options=options,
-                        excluded=excluded,
-                        bd_leads=bd_leads,
-                        live_jobs=live_jobs,
-                        sem_llm=sem_llm,
-                        sem_apollo=sem_apollo,
-                        sem_brave=sem_brave,
-                        sem_fetch=sem_fetch,
-                        model_filter=model_filter,
-                        model_enrich=model_enrich,
-                        model_domain=model_domain,
-                    )
-                    for k, v in d.items():
-                        counts[k] = counts.get(k, 0) + v
-                except Exception:
-                    logger.exception("job failed id=%s", job.get("id"))
-                    counts["errors"] += 1
-                    try:
-                        await db.update_raw_job_status(
-                            str(job["id"]), "pending", dry_run=options.dry_run
-                        )
-                    except Exception:
-                        logger.exception("could not reset job %s", job.get("id"))
+            n = len(jobs)
+            total_claimed += n
+            async with counts_lock:
+                counts["claimed"] += n
+                await db.update_run(run_id, counts=counts)
+            await asyncio.gather(*(process_job_task(job) for job in jobs))
+            async with counts_lock:
                 await db.update_run(run_id, counts=counts)
 
         finished = datetime.now(tz=timezone.utc).isoformat()
