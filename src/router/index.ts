@@ -32,6 +32,7 @@ const adminPaths = [
   '/admin/admin-management',
   '/admin/job-processor',
   '/admin/job-matching-algorithm',
+  '/admin/test-emails',
   '/admin/settings',
 ]
 
@@ -161,6 +162,11 @@ const router = createRouter({
       path: '/admin/job-matching-algorithm',
       name: 'admin-job-matching-algorithm',
       component: () => import('../views/AdminJobMatchingAlgorithm.vue'),
+    },
+    {
+      path: '/admin/test-emails',
+      name: 'admin-test-emails',
+      component: () => import('../views/AdminTestEmails.vue'),
     },
     {
       path: '/admin/settings',

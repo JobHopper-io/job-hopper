@@ -4,7 +4,8 @@
  */
 
 export interface JobSummary {
-  id: number
+  /** `job_hopper_live.id` (string) or legacy numeric ids */
+  id: string | number
   title: string | null
   companyName: string | null
   location: string | null
