@@ -208,10 +208,11 @@ const handleProceedToCheckout = async () => {
     }
 
     if (resumeFile.value) {
-      try {
-        await profileAPI.uploadResume(resumeFile.value)
-      } catch (resumeError) {
-        console.error('Error uploading resume:', resumeError)
+      const { error: resumeUploadError } = await profileAPI.uploadResume(resumeFile.value)
+      if (resumeUploadError) {
+        console.error('Error uploading resume:', resumeUploadError)
+        error.value = resumeUploadError.message || 'Could not upload your resume. Please try again.'
+        return
       }
     }
 

@@ -344,6 +344,7 @@ watch(
             :resume-bucket-key="profile?.resume_bucket_key ?? null"
             :auto-upload="true"
             input-id="profile-resume-upload"
+            @uploaded="userStore.refreshProfile"
           />
           <div
             v-if="showResumeUpgradeAdviceButton"

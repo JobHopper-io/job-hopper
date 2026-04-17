@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { profileAPI } from '@/lib/profile'
-import { useUserStore } from '@/stores/user'
+import { resumeFileSizeErrorIfAny, resumeMaxSizeLabel } from '@/lib/resumeUploadLimits'
+
+const maxResumeSizeLabel = resumeMaxSizeLabel()
 
 interface Props {
   resumeBucketKey?: string | null
@@ -21,55 +23,41 @@ const emit = defineEmits<{
   'error': [error: string]
 }>()
 
-const userStore = useUserStore()
-
-const resumeViewUrl = ref<string | null>(null)
 const resumeFile = ref<File | null>(null)
 const resumeFileName = ref('')
 const resumeUploading = ref(false)
 const resumeError = ref('')
 const resumeLoadError = ref<string | null>(null)
-const resumeUrlLoading = ref(false)
+const resumeOpening = ref(false)
 
-async function fetchResumeUrl(key: string): Promise<void> {
+watch(
+  () => props.resumeBucketKey,
+  () => {
+    resumeLoadError.value = null
+  },
+)
+
+async function openResumeView() {
+  const key = props.resumeBucketKey
+  if (!key) return
   resumeLoadError.value = null
-  resumeUrlLoading.value = true
+  resumeOpening.value = true
   try {
     const { data: url, error } = await profileAPI.getResumeDownloadUrl(key)
-    if (props.resumeBucketKey !== key) return
-    if (error) {
+    if (error || !url) {
       console.error('Resume load error:', error)
       resumeLoadError.value = "We couldn't load your resume. Try again or upload a new file."
-      resumeViewUrl.value = null
-    } else {
-      resumeViewUrl.value = url || null
+      return
     }
+    window.open(url, '_blank', 'noopener,noreferrer')
   } finally {
-    if (props.resumeBucketKey === key) {
-      resumeUrlLoading.value = false
-    }
+    resumeOpening.value = false
   }
 }
 
 function retryLoadResume() {
-  const key = props.resumeBucketKey
-  if (key) fetchResumeUrl(key)
+  void openResumeView()
 }
-
-// Load resume view URL when resumeBucketKey changes (only set URL if key unchanged after fetch)
-watch(
-  () => props.resumeBucketKey,
-  async (key) => {
-    if (!key) {
-      resumeViewUrl.value = null
-      resumeLoadError.value = null
-      resumeUrlLoading.value = false
-      return
-    }
-    await fetchResumeUrl(key)
-  },
-  { immediate: true }
-)
 
 const hasResume = computed(() => !!props.resumeBucketKey)
 
@@ -82,6 +70,15 @@ const handleResumeFileChange = async (event: Event) => {
   resumeFileName.value = file.name
   resumeError.value = ''
 
+  const sizeError = resumeFileSizeErrorIfAny(file)
+  if (sizeError) {
+    resumeError.value = sizeError
+    resumeFile.value = null
+    resumeFileName.value = ''
+    target.value = ''
+    return
+  }
+
   if (props.autoUpload) {
     // Auto-upload mode (Profile view)
     try {
@@ -89,13 +86,12 @@ const handleResumeFileChange = async (event: Event) => {
       const { data, error } = await profileAPI.uploadResume(file)
       if (error) {
         console.error('Resume upload error:', error)
-        resumeError.value = "We couldn't upload your resume. Please try again."
-        emit('error', error.message ?? String(error))
+        const msg = (error.message ?? String(error)).trim()
+        resumeError.value = msg || "We couldn't upload your resume. Please try again."
+        emit('error', msg)
         return
       }
       if (data) {
-        const bucketKey = data.resume_bucket_key
-        if (bucketKey) await fetchResumeUrl(bucketKey)
         resumeFile.value = null
         resumeFileName.value = ''
         target.value = ''
@@ -129,19 +125,18 @@ const handleResumeFileChange = async (event: Event) => {
           Try again
         </button>
       </template>
-      <a
+      <button
         v-else
-        :href="resumeViewUrl || '#'"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-brand-primary font-medium hover:underline inline-flex items-center gap-2"
-        :class="{ 'pointer-events-none opacity-50': !resumeViewUrl }"
+        type="button"
+        class="text-brand-primary font-medium hover:underline inline-flex items-center gap-2 disabled:pointer-events-none disabled:opacity-50"
+        :disabled="resumeOpening"
+        @click="openResumeView"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        {{ resumeViewUrl ? 'View resume' : 'Loading...' }}
-      </a>
+        {{ resumeOpening ? 'Opening…' : 'View resume' }}
+      </button>
     </div>
     <div class="space-y-3">
       <input
@@ -163,6 +158,10 @@ const handleResumeFileChange = async (event: Event) => {
         Selected: {{ resumeFileName }}
       </p>
       <p v-if="resumeError" class="text-sm text-red-600">{{ resumeError }}</p>
+      <p class="text-xs text-neutral-body">
+        Accepted formats: PDF, Word (.doc, .docx). Images are not supported—use a PDF or Word file.
+        Maximum file size: {{ maxResumeSizeLabel }}.
+      </p>
     </div>
   </div>
 </template>

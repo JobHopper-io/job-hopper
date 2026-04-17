@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { resumeFileSizeErrorIfAny } from '@/lib/resumeUploadLimits'
 import type { Profile, ProfileUpdate, ProfileUserEditable } from '@/types/database'
 
 export const profileAPI = {
@@ -41,6 +42,11 @@ export const profileAPI = {
   },
 
   async uploadResume(file: File) {
+    const sizeError = resumeFileSizeErrorIfAny(file)
+    if (sizeError) {
+      return { data: null, error: new Error(sizeError) }
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
