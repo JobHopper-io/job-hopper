@@ -16,6 +16,7 @@ export type ProfileUserEditable = Pick<
   | 'first_name'
   | 'last_name'
   | 'current_job_title'
+  | 'target_job_title'
   | 'years_of_experience'
   | 'current_industry'
   | 'target_role_categories'
@@ -116,6 +117,10 @@ export type EmailEventType = Enums<'email_event_type'>
 export type EmailEventStatus = Enums<'email_event_status'>
 export type SystemAnnouncement = Tables<'system_announcements'>
 export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>
+
+// Dashboard banner (singleton row id = 1); admins configure message and schedule
+export type DashboardBanner = Tables<'dashboard_banner'>
+export type DashboardBannerUpdate = TablesUpdate<'dashboard_banner'>
 
 // Job matching algorithm configuration
 export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>

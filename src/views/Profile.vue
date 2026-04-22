@@ -47,6 +47,7 @@ const isSyncingFromProfile = ref(false)
 
 // Profile fields
 const currentJobTitle = ref('')
+const targetJobTitle = ref('')
 const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
@@ -86,6 +87,7 @@ function syncFormFromProfile() {
   const p = profile.value
   if (!p) return
   currentJobTitle.value = p.current_job_title || ''
+  targetJobTitle.value = p.target_job_title || ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry || ''
   targetRoleCategories.value = (p.target_role_categories ?? []).filter(
@@ -194,6 +196,7 @@ const saveProfile = async () => {
 
     await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
+      target_job_title: targetJobTitle.value,
       years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
@@ -227,6 +230,7 @@ const debouncedSave = () => {
 watch(
   () => ({
     currentJobTitle: currentJobTitle.value,
+    targetJobTitle: targetJobTitle.value,
     yearsOfExperience: yearsOfExperience.value,
     currentIndustry: currentIndustry.value,
     targetRoleCategories: [...(targetRoleCategories.value ?? [])],
@@ -376,6 +380,10 @@ watch(
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Target Preferences</h2>
           <div class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
+              <input v-model="targetJobTitle" type="text" class="input" />
+            </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

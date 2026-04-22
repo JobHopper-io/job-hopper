@@ -119,6 +119,7 @@ function mergePreferences(
         ? overrides.subscriptionTierProductKeys
         : base.subscriptionTierProductKeys,
     roles: overrides.roles ?? base.roles,
+    targetJobTitle: overrides.targetJobTitle !== undefined ? overrides.targetJobTitle : base.targetJobTitle,
     currentJobTitle: overrides.currentJobTitle !== undefined ? overrides.currentJobTitle : base.currentJobTitle,
     currentIndustry: overrides.currentIndustry !== undefined ? overrides.currentIndustry : base.currentIndustry,
     payRangeMin: overrides.payRangeMin !== undefined ? overrides.payRangeMin : base.payRangeMin,
@@ -207,6 +208,7 @@ serve(async (req) => {
         `
         id,
         current_job_title,
+        target_job_title,
         current_industry,
         target_role_categories,
         desired_salary_min,
@@ -247,6 +249,7 @@ serve(async (req) => {
     const basePreferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
+      targetJobTitle: profile.target_job_title,
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
       payRangeMin: profile.desired_salary_min,

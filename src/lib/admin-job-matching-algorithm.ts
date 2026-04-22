@@ -41,6 +41,8 @@ export interface MatchJobsDebugPayload {
     maxScore: number | null
     averageScore: number | null
     averageRoleScore: number | null
+    /** Present on current API; may be absent on older deployed functions. */
+    averagePayScore?: number | null
     averageLocationScore: number | null
     averageRecencyScore: number | null
     maxPossibleScore: number
@@ -61,6 +63,8 @@ export interface MatchJobsResponse {
 export interface SubscriberPreferencesOverride {
   subscriptionTierProductKeys?: string[]
   roles?: string[]
+  /** When set (including empty string), overrides profile target title for matching. */
+  targetJobTitle?: string | null
   currentJobTitle?: string | null
   currentIndustry?: string | null
   payRangeMin?: number | null

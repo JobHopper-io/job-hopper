@@ -107,6 +107,10 @@
 - **Key columns**: `slug`, `title`, `email_subject`, `email_body_html`, `published_at`. When `published_at` is set, the announcement can be sent.
 - **Non‑obvious rules**: Only published rows are sent; target audience is derived from `notification_settings` (system_announcements_email_enabled = true and email_unsubscribed_at is null).
 
+### dashboard_banner
+- **Meaning**: Single-row table (`id = 1`) holding an optional in-app dashboard notice: `message` (Markdown in the app; rendered with sanitization) plus optional `starts_at` / `ends_at` (timestamptz).
+- **Non‑obvious rules**: Any authenticated user may read the row; only profiles with the `admin` or `super_admin` role may update it (RLS). The dashboard shows the message when it is non-empty and the current time is within `[starts_at, ends_at)` (null start means “already started”; null end means “no end yet”).
+
 ## Function scheduling (scheduled_jobs)
 
 - **Meaning**: Table of jobs to run at a given time. The `run-scheduled-jobs` edge function is invoked every 15 minutes by pg_cron + pg_net, selects pending rows (up to a limit), and HTTP-invokes the target edge function with the stored payload. Only system/cron-designed edge functions (no user JWT) should be scheduled.

@@ -35,6 +35,30 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_banner: {
+        Row: {
+          ends_at: string | null
+          id: number
+          message: string
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_events: {
         Row: {
           error_message: string | null
@@ -506,6 +530,7 @@ export type Database = {
           created_at: string | null
           current_industry: string | null
           current_job_title: string | null
+          target_job_title: string | null
           desired_salary_max: number | null
           desired_salary_min: number | null
           email: string
@@ -530,6 +555,7 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
+          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email: string
@@ -554,6 +580,7 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
+          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email?: string

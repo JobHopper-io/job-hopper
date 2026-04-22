@@ -34,6 +34,18 @@
       </router-link>
 
       <router-link
+        to="/admin/dashboard-banner"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Dashboard banner
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Schedule a temporary message on the user dashboard (maintenance, releases, etc.).
+        </p>
+      </router-link>
+
+      <router-link
         to="/admin/job-matching-algorithm"
         class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
       >

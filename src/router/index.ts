@@ -34,6 +34,7 @@ const adminPaths = [
   '/admin/job-matching-algorithm',
   '/admin/test-emails',
   '/admin/settings',
+  '/admin/dashboard-banner',
 ]
 
 const router = createRouter({
@@ -172,6 +173,11 @@ const router = createRouter({
       path: '/admin/settings',
       name: 'admin-settings',
       component: () => import('../views/AdminSettings.vue'),
+    },
+    {
+      path: '/admin/dashboard-banner',
+      name: 'admin-dashboard-banner',
+      component: () => import('../views/AdminDashboardBanner.vue'),
     },
     {
       path: '/:pathMatch(.*)*',

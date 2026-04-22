@@ -37,6 +37,7 @@ const basePlanProductKeyOptions = ref<string[]>([])
 const prefsForm = reactive<{
   subscriptionTierProductKeys: string
   roles: string
+  targetJobTitle: string
   currentJobTitle: string
   currentIndustry: string
   payRangeMin: string
@@ -48,6 +49,7 @@ const prefsForm = reactive<{
 }>({
   subscriptionTierProductKeys: '',
   roles: '',
+  targetJobTitle: '',
   currentJobTitle: '',
   currentIndustry: '',
   payRangeMin: '',
@@ -106,6 +108,7 @@ function profileToPrefsForm(p: Profile | null) {
   prefsForm.roles = Array.isArray(p.target_role_categories)
     ? (p.target_role_categories as string[]).join(', ')
     : ''
+  prefsForm.targetJobTitle = p.target_job_title ?? ''
   prefsForm.currentJobTitle = p.current_job_title ?? ''
   prefsForm.currentIndustry = p.current_industry ?? ''
   prefsForm.payRangeMin = p.desired_salary_min != null ? String(p.desired_salary_min) : ''
@@ -137,6 +140,7 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
       ? { subscriptionTierProductKeys }
       : {}),
     roles: roles.length ? roles : undefined,
+    targetJobTitle: prefsForm.targetJobTitle.trim() || null,
     currentJobTitle: prefsForm.currentJobTitle || null,
     currentIndustry: prefsForm.currentIndustry || null,
     payRangeMin:
@@ -334,8 +338,8 @@ onMounted(async () => {
           Admin · Job Matching Algorithm
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
-          Inspect how the job-matching algorithm scores jobs for a given subscriber, tweak weights,
-          and view detailed debug output. Changes here affect how matches are computed for users.
+          Run the same scoring pipeline as production: subscription tier, target role categories,
+          then role keywords from <span class="font-medium text-brand-charcoal">target job title</span> when set (else current job title) plus industry; remote roles are dropped when the subscriber is not open to remote; pay, location (distance bands with categorical fallback), and recency contribute to the total; jobs below the minimum score or with no keyword overlap are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
         </p>
       </header>
 
@@ -368,21 +372,35 @@ onMounted(async () => {
               </p>
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Target roles (comma-separated)</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">
+                Target role categories (comma-separated; must match <code class="text-[10px]">job_hopper_live.role_category</code> values)
+              </label>
               <input
                 v-model="prefsForm.roles"
                 type="text"
                 class="input w-full"
-                placeholder="e.g. Engineering, Product"
+                placeholder="e.g. maintenance, engineering"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title (comma-separated keywords)</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Target job title (comma-separated keyword phrases)</label>
+              <input
+                v-model="prefsForm.targetJobTitle"
+                type="text"
+                class="input w-full"
+                placeholder="Primary source for title keywords when filled"
+              >
+              <p class="text-[11px] text-neutral-body mt-1">
+                If empty, title keywords fall back to current job title.
+              </p>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title (fallback for title keywords)</label>
               <input
                 v-model="prefsForm.currentJobTitle"
                 type="text"
                 class="input w-full"
-                placeholder="e.g. Engineer, Manager"
+                placeholder="Used when target job title is empty"
               >
             </div>
             <div>
@@ -395,21 +413,24 @@ onMounted(async () => {
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary min</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary min (annual)</label>
               <input
                 v-model="prefsForm.payRangeMin"
                 type="number"
                 class="input w-full"
-                placeholder="Annual"
+                placeholder="Compared after normalizing job pay to annual"
               >
+              <p class="text-[11px] text-neutral-body mt-1">
+                Job pay uses <code class="text-[10px]">pay_type</code> (year, month, week, day, hour) to convert to an annual band before overlap scoring.
+              </p>
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary max</label>
+              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary max (annual)</label>
               <input
                 v-model="prefsForm.payRangeMax"
                 type="number"
                 class="input w-full"
-                placeholder="Annual"
+                placeholder="Compared after normalizing job pay to annual"
               >
             </div>
             <div>
@@ -495,9 +516,12 @@ onMounted(async () => {
                       v-model.number="configForm.keywordWeights!.currentJobTitleKeyword"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Score when a current job title keyword (comma-separated) appears in the job"
+                      title="Weight per matched title keyword (from target job title, else current job title; comma-separated phrases)"
                     >
-                    <span class="text-[11px] text-neutral-body truncate" title="Score when a current job title keyword (comma-separated) appears in the job">currentJobTitleKeyword</span>
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="DB column keyword_current_job_title_weight — applies to target-then-current title keywords"
+                    >currentJobTitleKeyword</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
@@ -605,9 +629,12 @@ onMounted(async () => {
                       v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)"
+                      title="Penalty when user has title (target else current) or industry keywords but the job matches none (job is excluded if role score drops below half this magnitude)"
                     >
-                    <span class="text-[11px] text-neutral-body truncate" title="Penalty when user has title/industry keywords but the job matches none (job is excluded if score drops below half this)">noKeywordMatchPenalty</span>
+                    <span
+                      class="text-[11px] text-neutral-body truncate"
+                      title="Penalty when user has title (target else current) or industry keywords but the job matches none (job is excluded if role score drops below half this magnitude)"
+                    >noKeywordMatchPenalty</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
@@ -830,11 +857,6 @@ onMounted(async () => {
           {{ result.total }}
           <span v-if="result.total > 0">(showing {{ pageRangeLabel }} of {{ result.total }})</span>
         </p>
-        <p v-if="debug" class="text-sm text-neutral-body">
-          <span class="font-semibold">Excluded by subscription tier (hard filter):</span>
-          {{ debug.filters.excludedBySubscriptionTier ?? 0 }}
-        </p>
-
         <div v-if="debug" class="mt-4 grid gap-4 sm:grid-cols-2">
           <div class="space-y-2">
             <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
@@ -876,6 +898,9 @@ onMounted(async () => {
               <span class="font-semibold">Excluded by minTotalScore:</span>
               <span>{{ debug.filters.excludedByMinTotalScore }}</span>
             </p>
+            <p class="text-[11px] text-neutral-subtle mt-2">
+              “Excluded by location” is reserved for future use; location is scored, not a hard filter in the current implementation.
+            </p>
           </div>
 
           <div class="space-y-2">
@@ -916,6 +941,15 @@ onMounted(async () => {
               </span>
             </p>
             <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Average pay score:</span>
+              <span>
+                <span v-if="typeof debug.scores.averagePayScore === 'number'">
+                  {{ debug.scores.averagePayScore.toFixed(2) }}
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
+            <p class="text-xs text-neutral-body">
               <span class="font-semibold">Average location score:</span>
               <span>
                 <span v-if="debug.scores.averageLocationScore !== null">
@@ -936,7 +970,7 @@ onMounted(async () => {
 
             <div class="mt-2">
               <p class="text-xs font-semibold text-neutral-body mb-1">
-                Keywords (all — from current job title + industry, comma-separated)
+                Keywords (title: target job title if set, else current — plus industry; comma-separated)
               </p>
               <ul class="text-[11px] text-neutral-body max-h-32 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
                 <li v-if="!debug.keywords.length">None</li>
@@ -994,7 +1028,7 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Created</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
-                  Role / Location / Recency
+                  Role / Pay / Location / Recency
                 </th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
                   Matched role keywords
@@ -1058,6 +1092,7 @@ onMounted(async () => {
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   <div>Role: {{ job.components?.role ?? '—' }}</div>
+                  <div>Pay: {{ job.components?.pay ?? '—' }}</div>
                   <div>Location: {{ job.components?.location ?? '—' }}</div>
                   <div>Recency: {{ job.components?.recency != null ? job.components.recency.toFixed(2) : '—' }}</div>
                 </td>

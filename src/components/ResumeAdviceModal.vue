@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
+import { markdownToSafeHtml } from '@/lib/markdown'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 
 const props = withDefaults(
@@ -25,13 +24,7 @@ const hasAdvice = computed(() => {
   return typeof t === 'string' && t.trim().length > 0
 })
 
-const adviceHtml = computed(() => {
-  const t = props.adviceText
-  if (typeof t !== 'string' || !t.trim()) return ''
-  const raw = marked(t.trim(), { async: false })
-  if (typeof raw !== 'string') return ''
-  return DOMPurify.sanitize(raw)
-})
+const adviceHtml = computed(() => markdownToSafeHtml(props.adviceText))
 
 function onBackdropClick() {
   emit('close')

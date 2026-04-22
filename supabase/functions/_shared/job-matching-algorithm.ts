@@ -11,6 +11,8 @@ export interface SubscriberPreferences {
   /** `products.key` for base_plan rows on the subscriber's active subscriptions; must align with `job_hopper_live.subscription_tier`. */
   subscriptionTierProductKeys: string[]
   roles: string[]
+  /** When set (non-empty), title keywords are derived from this; otherwise {@link currentJobTitle} is used. */
+  targetJobTitle: string | null
   currentJobTitle: string | null
   currentIndustry: string | null
   payRangeMin: number | null
@@ -288,10 +290,24 @@ function commaSeparatedKeywords(input: string | null | undefined): string[] {
   return Array.from(set)
 }
 
-/** All keywords used for role matching: union of current job title and industry. */
+/**
+ * Text used for job-title keyword extraction: trimmed target title when present,
+ * otherwise the subscriber's current job title (unchanged string if non-empty after trim).
+ */
+export function effectiveJobTitleForKeywords(prefs: SubscriberPreferences): string | null {
+  const target = (prefs.targetJobTitle ?? '').trim()
+  if (target.length > 0) {
+    return target
+  }
+  const current = prefs.currentJobTitle
+  if (current == null) return null
+  return String(current).trim().length > 0 ? current : null
+}
+
+/** All keywords used for role matching: union of effective job title (target else current) and industry. */
 function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
   const set = new Set<string>()
-  for (const kw of commaSeparatedKeywords(prefs.currentJobTitle)) set.add(kw)
+  for (const kw of commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))) set.add(kw)
   for (const kw of commaSeparatedKeywords(prefs.currentIndustry)) set.add(kw)
   return Array.from(set)
 }
@@ -321,7 +337,7 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
  * Used to show score as percentage of max on the admin job-matching page.
  */
 export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
   const maxKeyword =
     titleKeywords.length * cfg.keywordWeights.currentJobTitleKeyword +
@@ -348,7 +364,7 @@ function computeRoleScore(
   const briefing = normalizeText(job.aiBriefing)
   const combined = `${title} ${description} ${briefing}`.trim()
 
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
@@ -389,7 +405,7 @@ function computeRoleScoreWithKeywords(
   const briefing = normalizeText(job.aiBriefing)
   const combined = `${title} ${description} ${briefing}`.trim()
 
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
@@ -712,6 +728,10 @@ export function matchJobs(
       continue
     }
 
+    if (job.isRemote && prefs.openToRemote === false) {
+      continue
+    }
+
     const payScore = computePayScore(prefs, job, cfg)
     const { score: locationScore } = computeLocationScore(prefs, job, cfg)
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
@@ -781,6 +801,7 @@ export interface MatchJobsDebugPayload {
     maxScore: number | null
     averageScore: number | null
     averageRoleScore: number | null
+    averagePayScore: number | null
     averageLocationScore: number | null
     averageRecencyScore: number | null
     maxPossibleScore: number
@@ -816,6 +837,7 @@ export function matchJobsWithDebug(
   let maxScore: number | null = null
   let sumScore = 0
   let sumRoleScore = 0
+  let sumPayScore = 0
   let sumLocationScore = 0
   let sumRecencyScore = 0
 
@@ -900,6 +922,7 @@ export function matchJobsWithDebug(
     if (maxScore === null || totalScore > maxScore) maxScore = totalScore
     sumScore += totalScore
     sumRoleScore += roleScore
+    sumPayScore += payScore
     sumLocationScore += locationScore
     sumRecencyScore += recencyScore
 
@@ -941,6 +964,7 @@ export function matchJobsWithDebug(
       maxScore,
       averageScore: count > 0 ? sumScore / count : null,
       averageRoleScore: count > 0 ? sumRoleScore / count : null,
+      averagePayScore: count > 0 ? sumPayScore / count : null,
       averageLocationScore: count > 0 ? sumLocationScore / count : null,
       averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
       maxPossibleScore,

@@ -194,6 +194,7 @@ serve(async (req) => {
         first_name,
         email,
         current_job_title,
+        target_job_title,
         current_industry,
         target_role_categories,
         desired_salary_min,
@@ -229,6 +230,7 @@ serve(async (req) => {
     const preferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
+      targetJobTitle: profile.target_job_title,
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
       payRangeMin: profile.desired_salary_min,
