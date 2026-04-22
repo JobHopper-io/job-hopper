@@ -1021,7 +1021,7 @@ export type Database = {
         | "subscription_update"
         | "system_announcement"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
-      pay_type: "hour" | "year" | "month" | "week"
+      pay_type: "hour" | "year" | "month" | "week" | "day"
       product_category:
         | "base_plan"
         | "subscription_addon"
@@ -1182,7 +1182,7 @@ export const Constants = {
         "system_announcement",
       ],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
-      pay_type: ["hour", "year", "month", "week"],
+      pay_type: ["hour", "year", "month", "week", "day"],
       product_category: [
         "base_plan",
         "subscription_addon",

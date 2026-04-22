@@ -202,7 +202,8 @@ function toJobDataForInference(job: JobRecord): JobDataForInference {
   }
 }
 
-const AUXILIARY_KEYWORDS = new Set<string>([
+/** Dropped when they are the only word in an n-gram. */
+const AUXILIARY_KEYWORDS_ALONE = new Set<string>([
   'senior',
   'jr',
   'junior',
@@ -211,7 +212,34 @@ const AUXILIARY_KEYWORDS = new Set<string>([
   'middle',
   'temp',
   'temporary',
+  'vp',
+  'staff',
+  'executive',
+  'director',
+  'student',
+  'masters',
 ])
+
+/**
+ * Dropped when the first and/or last token in an n-gram (and thus alone, when length is 1).
+ * Example: n-gram "a &" or "and sales" is dropped, but "sales and marketing" is kept.
+ */
+const AUXILIARY_KEYWORDS_ENDS = new Set<string>(['&', 'and'])
+
+function isDroppedKeywordNgram(words: string[]): boolean {
+  if (words.length === 0) {
+    return true
+  }
+  const first = words[0]
+  const last = words[words.length - 1]
+  if (AUXILIARY_KEYWORDS_ENDS.has(first) || AUXILIARY_KEYWORDS_ENDS.has(last)) {
+    return true
+  }
+  if (words.length === 1 && AUXILIARY_KEYWORDS_ALONE.has(first)) {
+    return true
+  }
+  return false
+}
 
 /**
  * Generate keyword phrases from a comma-separated field.
@@ -219,7 +247,7 @@ const AUXILIARY_KEYWORDS = new Set<string>([
  * For each comma-separated segment, we:
  * - split into words
  * - generate all contiguous left-to-right n-grams (length 1..N)
- * - drop single-word n-grams that are purely auxiliary (e.g. "senior", "junior", "mid", "temp")
+ * - drop n-grams per {@link isDroppedKeywordNgram}
  *
  * Example: "Senior Electrical Engineer" →
  * - "senior electrical engineer"
@@ -249,7 +277,7 @@ function commaSeparatedKeywords(input: string | null | undefined): string[] {
     for (let len = n; len >= 1; len -= 1) {
       for (let start = 0; start + len <= n; start += 1) {
         const slice = words.slice(start, start + len)
-        if (slice.length === 1 && AUXILIARY_KEYWORDS.has(slice[0])) {
+        if (isDroppedKeywordNgram(slice)) {
           continue
         }
         set.add(slice.join(' '))
@@ -409,7 +437,9 @@ function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: numb
         ? 52
         : type === 'month' || type === 'monthly'
           ? 12
-          : 1
+          : type === 'day' || type === 'daily'
+            ? 260
+            : 1
 
   const rawMin = payMin ?? payMax
   const rawMax = payMax ?? payMin
