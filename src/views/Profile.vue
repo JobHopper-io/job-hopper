@@ -461,36 +461,47 @@ watch(
             </div>
             <template v-else>
               <div class="space-y-2">
-                <div class="flex items-center justify-between gap-4">
-                  <label class="flex items-center gap-3 flex-1 min-w-0">
+                <div
+                  class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                >
+                  <label class="flex w-full min-w-0 items-start gap-3 sm:flex-1">
                     <input
                       type="checkbox"
-                      class="w-4 h-4"
+                      class="mt-0.5 h-4 w-4 shrink-0"
                       :checked="notificationSettings.job_match_email_enabled"
                       :disabled="notificationSettingsSaving"
                       @change="saveNotificationSettings({ job_match_email_enabled: !notificationSettings.job_match_email_enabled })"
                     />
-                    <span class="text-sm text-brand-charcoal">Job match emails</span>
+                    <span class="min-w-0 text-sm text-brand-charcoal">Job match emails</span>
                   </label>
                   <div
                     v-if="notificationSettings.job_match_email_enabled"
-                    class="flex items-center gap-2"
+                    class="flex w-full min-w-0 flex-col gap-1.5 pl-7 sm:max-w-xs sm:flex-none sm:shrink-0 sm:pl-0"
                   >
-                    <label class="block text-xs font-medium text-neutral-body">Frequency</label>
-                    <select
-                      :value="notificationSettings.job_match_email_frequency"
-                      class="input text-sm max-w-xs"
-                      :disabled="notificationSettingsSaving"
-                      @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                    <div
+                      class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2"
                     >
-                      <option
-                        v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
-                        :key="opt.value"
-                        :value="opt.value"
+                      <label
+                        class="shrink-0 text-xs font-medium text-neutral-body sm:whitespace-nowrap"
+                        for="profile-job-match-email-frequency"
+                        >Frequency</label
                       >
-                        {{ opt.label }}
-                      </option>
-                    </select>
+                      <select
+                        id="profile-job-match-email-frequency"
+                        :value="notificationSettings.job_match_email_frequency"
+                        class="input w-full min-w-0 text-sm sm:min-w-[11rem] sm:max-w-xs"
+                        :disabled="notificationSettingsSaving"
+                        @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                      >
+                        <option
+                          v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
+                          :key="opt.value"
+                          :value="opt.value"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
