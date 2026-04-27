@@ -212,6 +212,15 @@ async function getUserWithTimeout(timeoutMs = 2000) {
   }
 }
 
+/** True when the app is running as an installed PWA (not a normal browser tab). */
+function isPwaDisplayMode(): boolean {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true
+  if (window.matchMedia?.('(display-mode: window-controls-overlay)').matches) return true
+  const nav = window.navigator as { standalone?: boolean }
+  return nav.standalone === true
+}
+
 // Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
   const targetPath = to.path
@@ -245,6 +254,16 @@ router.beforeEach(async (to) => {
 
   // Authenticated users should not see login/register; gracefully skip if Supabase is unavailable.
   if (user && publicRedirectPaths.includes(targetPath)) {
+    const userProfile = await getProfile()
+    return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
+  }
+
+  // PWA: last-opened URL can be /install-app; send users to the app instead of the install guide.
+  if (targetPath === '/install-app' && isPwaDisplayMode()) {
+    user = user ?? (await getUserWithTimeout())
+    if (!user) {
+      return '/login'
+    }
     const userProfile = await getProfile()
     return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
   }
