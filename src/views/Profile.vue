@@ -106,15 +106,21 @@ function syncFormFromProfile() {
     typeof p.requires_us_sponsorship === 'boolean' ? p.requires_us_sponsorship : null
 }
 
-watch(profile, (p) => {
-  if (p) {
+// Sync from store only when the profile row first appears or the user id changes.
+// Do not re-sync on every `profile` update: autosave + Supabase Realtime both refresh
+// the store and would overwrite local input state while the user is typing.
+watch(
+  () => profile.value?.id,
+  (id) => {
+    if (!id) return
     isSyncingFromProfile.value = true
     syncFormFromProfile()
     nextTick(() => {
       isSyncingFromProfile.value = false
     })
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   // This boolean is used to determine if the auto-save feature should be enabled.
