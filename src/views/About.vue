@@ -61,7 +61,7 @@
               Technology with a human filter
             </h3>
             <p class="text-neutral-body">
-              We use automation and AI to scan, enrich, and match roles. On top of that, our team adds human judgment—especially within manufacturing and industrial roles—to keep quality high, context grounded, and matches sensible.
+              We use automation and AI to scan, enrich, and match roles. Our team layers in human judgment—especially in high-volume areas like tech and manufacturing (analytics, engineering, and operations-adjacent roles)—so quality stays high, context stays grounded, and matches stay sensible.
             </p>
           </div>
           <div>
@@ -87,7 +87,7 @@
           We know how frustrating it can be to feel like you're shouting into the void as a candidate. We also understand how much noise hiring teams sift through on their end.
         </p>
         <p class="text-neutral-body mb-4">
-          Now we're using that perspective to build something different: a candidate-first, automation-powered matching engine that works for all serious job seekers—and is especially powerful for professionals in manufacturing and industrial environments.
+          Now we're using that perspective to build something different: a candidate-first, AI-powered job search that works for every serious professional in the U.S.—with deep strength in tech and manufacturing, from data and systems roles through engineering and plant operations.
         </p>
         <p class="text-neutral-body font-medium">
           Our goal is simple: make job hunting smarter, more focused, and a little more human, one curated match at a time.

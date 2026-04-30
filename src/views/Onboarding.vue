@@ -347,7 +347,7 @@ const handleProceedToCheckout = async () => {
                 type="text"
                 required
                 class="input"
-                placeholder="e.g., Manufacturing, Food Production"
+                placeholder="e.g., Technology, Healthcare, Manufacturing"
               />
             </div>
 

@@ -74,7 +74,7 @@ const pricingFaq = [
           Pick the level that matches the roles you're targeting. Add resume services only if you want them.
         </p>
         <p class="text-neutral-body max-w-3xl mx-auto">
-          Job-Hopper is priced by career stage and job type, not just by features. Every plan starts with the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by our advanced automation engine and human vetting.
+          Job-Hopper is priced by career stage and job type, not just by features. Every plan starts with the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by AI and human vetting.
         </p>
         <p class="text-neutral-body max-w-3xl mx-auto mt-4">
           The only difference between tiers is the type and level of roles you're using Job-Hopper to pursue - whether that's entry and mid-level positions, senior and management roles, or Director, VP, and C-level opportunities.

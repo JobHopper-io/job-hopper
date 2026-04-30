@@ -24,19 +24,19 @@ const testimonialInterval = ref<ReturnType<typeof setTimeout> | null>(null)
 
 const testimonials = [
   {
-    text: "Job-Hopper didn't magically flood me with offers, but it did cut out all the junk. I went from scrolling for hours on job boards to checking a short list of roles a few times a week. Landed a maintenance tech job in 3 weeks after nothing for months.",
-    author: "Carlos R.",
-    location: "Toledo, OH"
+    text: "The ghost listings and noise disappeared. Job-Hopper narrowed everything to a short list I could act on. I had two Data Analyst interviews within a month and accepted an offer that was a real step up.",
+    author: "Jordan M.",
+    location: "Austin, TX"
   },
   {
-    text: "Honestly I was skeptical about paying for anything while unemployed, but the free trial sold me. The matches weren't perfect every day, but two of the jobs I applied to turned into real interviews, and one into my new production supervisor role.",
+    text: "I was skeptical about paying while between roles, but the trial won me over. The matches weren't perfect every day, but two applications turned into interviews—and one into my new Process Engineer job.",
     author: "Megan T.",
     location: "Kansas City, MO"
   },
   {
-    text: "I work in healthcare administration, not manufacturing, so I wasn't sure this would fit. It still pulled in a steady trickle of roles that matched what I do. It's not a firehose of jobs, but the ones I get are actually worth applying to.",
-    author: "Jasmine K.",
-    location: "Atlanta, GA"
+    text: "I'm in retail leadership, not software or a plant floor, so I wasn't sure an AI tool would get my profile. It did. Steady, relevant roles—not a firehose—and every week I actually had time to apply well.",
+    author: "Priya S.",
+    location: "Denver, CO"
   }
 ]
 
@@ -392,29 +392,29 @@ onUnmounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h1 ref="heroTitleRef" class="text-brand-charcoal mb-6 will-change-opacity">
-              Stop applying into the void.
+              The AI that does your job search for you.
             </h1>
             <p ref="heroSubtitleRef" class="text-xl text-neutral-body mb-6 will-change-opacity">
-              Job-Hopper sends you active, curated, high-quality jobs that actually fit your background—right to your inbox and dashboard.
+              Job-Hopper is a new kind of job search for people in the United States: we scan the market, cut the junk, and deliver curated matches that fit your background—straight to your inbox and dashboard. Stop applying into the void.
             </p>
             <ul ref="heroListRef" class="space-y-3 mb-8">
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Hand-picked openings vetted for recency and quality</span>
+                <span class="text-neutral-body">AI plus human judgment surfaces active, high-quality openings</span>
               </li>
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Matched to your role, pay range, and location</span>
+                <span class="text-neutral-body">Matched to your role, pay range, and location—not random feeds</span>
               </li>
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Optional access to hiring contact details and interview prep</span>
+                <span class="text-neutral-body">Optional hiring-contact insights and interview prep on premium plans</span>
               </li>
             </ul>
             <div ref="heroButtonsRef" class="flex flex-col sm:flex-row gap-4 mb-4">
@@ -442,7 +442,7 @@ onUnmounted(() => {
                     Dashboard
                   </p>
                   <p class="text-lg font-heading font-bold text-brand-charcoal">
-                    Good morning, Carlos
+                    Good morning, Jordan
                   </p>
                   <p class="text-xs text-neutral-body">
                     Here are your latest job matches.
@@ -495,15 +495,15 @@ onUnmounted(() => {
                       Filters
                     </p>
                     <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Role type: Maintenance, Production
+                      Role type: Analytics, Engineering
                     </span>
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Location: Toledo, OH · 25 mi
+                      Location: Austin, TX · 35 mi
                     </span>
                     <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Wage: $26–$40/hr
+                      Salary: $75k–$95k
                     </span>
                     <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
                       Saved only
@@ -523,17 +523,17 @@ onUnmounted(() => {
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0 pr-6">
                         <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Maintenance Technician · Night shift
+                          Data Analyst · Hybrid
                         </p>
                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
                           <span class="font-medium text-brand-primary">
-                            Lakeside Foods
+                            Summit Metrics Co.
                           </span>
                           <span>
-                            · Toledo, OH
+                            · Austin, TX
                           </span>
                           <span>
-                            · $26–$29/hr
+                            · $78k–$88k
                           </span>
                           <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
                             92% match
@@ -561,17 +561,17 @@ onUnmounted(() => {
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0 pr-6">
                         <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Production Supervisor · 2nd shift
+                          Process Engineer · Days
                         </p>
                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
                           <span class="font-medium text-brand-primary">
-                            Heartland Manufacturing
+                            Midwest Precision Components
                           </span>
                           <span>
-                            · Kansas City, MO
+                            · Columbus, OH
                           </span>
                           <span>
-                            · $72k–$82k
+                            · $92k–$108k
                           </span>
                           <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
                             88% match
@@ -606,7 +606,7 @@ onUnmounted(() => {
           Job boards are crowded. Your time shouldn't be.
         </h2>
         <p class="text-lg text-neutral-body mb-8 text-center">
-          Most job platforms make it feel like a numbers game: hundreds of applications, endless screening questions, and almost no responses. Companies post roles they might need 'someday,' and you're left guessing which applications are actually worth your time.
+          Most job platforms make it feel like a numbers game: hundreds of applications, endless screening questions, and almost no responses. Companies post roles they might need someday, and you are left guessing which applications are actually worth your time.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div class="card p-6 problem-card card-3d will-change-transform">
@@ -667,7 +667,7 @@ onUnmounted(() => {
               <span class="text-white text-2xl font-bold">2</span>
             </div>
             <h3 class="text-xl font-heading font-semibold mb-3">We curate and match jobs in real time</h3>
-            <p class="text-neutral-body">Our team and cutting edge AI engine scan job boards and company postings, weed out the junk and pick only the most active jobs that fit YOU best, and verify them with company details and behind the scenes insights.</p>
+            <p class="text-neutral-body">Our team and a cutting-edge AI engine scan job boards and company postings, strip out the junk, prioritize active roles that fit you, and enrich each match with company context and behind-the-scenes insight.</p>
           </div>
           <div class="text-center step-card will-change-transform">
             <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">
@@ -689,10 +689,13 @@ onUnmounted(() => {
     <section class="bg-neutral-bg py-20 px-4 sm:px-6 lg:px-8">
       <div class="max-w-6xl mx-auto">
         <h2 class="text-brand-charcoal mb-6 text-center">
-          Built for serious job seekers—starting with manufacturing
+          A smarter job search for everyone in the U.S.
         </h2>
-        <p class="text-lg text-neutral-body mb-12 text-center">
-          Whether you're on the plant floor or leading operations, Job-Hopper helps you move faster toward your next role.
+        <p class="text-lg text-neutral-body mb-6 text-center max-w-3xl mx-auto">
+          Job-Hopper is not built for one industry—it is built for anyone who works for a living. The same AI-driven pipeline that saves analysts and engineers time also works for nurses, managers, tradespeople, and roles across the economy.
+        </p>
+        <p class="text-neutral-body mb-12 text-center max-w-3xl mx-auto">
+          Today we are seeing exceptional traction alongside the titles our earliest subscribers hold: analytics and engineering in tech and manufacturing—think Data Analyst, Systems Analyst, Full Stack Developer, Mechanical Engineer, Process Engineer, Supply Chain Analyst, Manufacturing Systems Analyst, IT Support Specialist, and similar roles. If your work looks like that, you will see why people are calling this the biggest upgrade to job search in years.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 who-its-for-grid">
           <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
@@ -703,7 +706,7 @@ onUnmounted(() => {
               </svg>
             </div>
             <h3 class="text-xl font-heading font-semibold mb-3">Entry & Mid Level Roles</h3>
-            <p class="text-neutral-body">Curated opportunities across hourly, administrative, and early-career salaried positions. Matched to your experience level, pay expectations, schedule preferences, and location.</p>
+            <p class="text-neutral-body">Curated opportunities from hourly and support roles through early-career professional tracks. Matched to your experience, pay expectations, schedule, and location—whether you are growing in tech, manufacturing, services, or something else entirely.</p>
           </div>
           <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
             <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
@@ -818,10 +821,10 @@ onUnmounted(() => {
       
       <div class="max-w-4xl mx-auto text-center relative z-10">
         <h2 class="text-white mb-6">
-          Ready to stop hunting and hop to the next level?
+          Ready for the new standard in job search?
         </h2>
         <p class="text-xl text-white/90 mb-8">
-          Create your profile today and start receiving curated job matches. If it's not for you, cancel anytime in just a couple of clicks.
+          Create your profile and let Job-Hopper run the heavy lifting. Curated U.S. matches, your pace, your applications—cancel anytime in a couple of clicks if it is not for you.
         </p>
         <router-link to="/register" class="cta-button btn-secondary bg-white text-brand-primary hover:bg-neutral-bg inline-block mb-4">
           Start your free trial

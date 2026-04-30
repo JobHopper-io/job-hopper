@@ -8,10 +8,10 @@
         </h1>
         <div class="prose prose-lg max-w-none text-neutral-body">
           <p class="text-lg mb-4">
-            Job-Hopper sits on top of the job market - not inside it.
+            Job-Hopper is the AI layer that runs your U.S. job search for you—so you are not stuck refreshing five sites every night.
           </p>
           <p class="mb-4">
-            We continuously scan job boards and direct company postings, then actively vet each role for freshness, legitimacy, and real hiring activity. Our cutting edge system filters out stale listings, passive resume-collecting posts, and low-activity roles before they ever reach you.
+            We continuously scan job boards and direct company postings, then actively vet each role for freshness, legitimacy, and real hiring activity. Our system filters out stale listings, passive resume-collecting posts, and low-activity roles before they ever reach you.
           </p>
           <p class="mb-4">
             From there, our team and proprietary matching engine combine your profile, preferences, and career level with enriched company data and behind-the-scenes hiring insights to deliver only the most relevant opportunities, in real time.
@@ -23,7 +23,7 @@
             The result? Fewer distractions. Better timing. Smarter matches.
           </p>
           <p class="font-medium">
-            Job-Hopper turns a chaotic job search into a focused, technology-driven advantage - built entirely around you.
+            Job-Hopper turns a chaotic job search into a focused, AI-driven advantage—the kind of upgrade people will expect from job search from here on out.
           </p>
         </div>
       </section>
