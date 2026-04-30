@@ -375,6 +375,9 @@ const handleProceedToCheckout = async () => {
                   <span class="text-sm text-neutral-body">No, I do not require sponsorship</span>
                 </label>
               </div>
+              <p class="mt-2 text-sm text-neutral-body">
+                If you select yes, Job-Hopper can surface a sponsorship-likelihood signal on postings (from metadata analysis in the Hopper). It helps you focus your time—it does not guarantee an employer will sponsor.
+              </p>
             </div>
           </div>
         </div>

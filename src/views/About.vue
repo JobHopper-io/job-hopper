@@ -30,6 +30,7 @@
           <li>We monitor new postings across job boards and company career pages.</li>
           <li>We filter out stale, low-quality, and obviously resume-collecting roles.</li>
           <li>We match opportunities to people based on their experience, preferences, and career level.</li>
+          <li>Each role in the Hopper is enriched with company context and deep metadata analysis; one optional output is a sponsorship-likelihood signal when you want to prioritize postings where employer visa sponsorship is more plausible—an estimate, not a guarantee, and only one part of a product built for every serious job seeker.</li>
         </ul>
         <p class="mb-4">
           Because Job-Hopper is paid for by subscribers, our incentives are simple: respect your time, reduce wasted effort, and surface opportunities that are actually worth your attention.
@@ -61,7 +62,7 @@
               Technology with a human filter
             </h3>
             <p class="text-neutral-body">
-              We use automation and AI to scan, enrich, and match roles. Our team layers in human judgment—especially in high-volume areas like tech and manufacturing (analytics, engineering, and operations-adjacent roles)—so quality stays high, context stays grounded, and matches stay sensible.
+              We use automation and AI to scan, enrich, and match roles—including thorough metadata analysis on each posting that powers signals such as sponsorship-likelihood when your search calls for it. Our team layers in human judgment—especially in high-volume areas like tech and manufacturing (analytics, engineering, and operations-adjacent roles)—so quality stays high, context stays grounded, and matches stay sensible.
             </p>
           </div>
           <div>

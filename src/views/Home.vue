@@ -416,6 +416,12 @@ onUnmounted(() => {
                 </svg>
                 <span class="text-neutral-body">Optional hiring-contact insights and interview prep on premium plans</span>
               </li>
+              <li class="flex items-start will-change-transform">
+                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-neutral-body">Optional sponsorship-likelihood signal—deep analysis of each posting’s metadata when you want to prioritize roles where employer visa sponsorship is more plausible (estimates only; not a guarantee)</span>
+              </li>
             </ul>
             <div ref="heroButtonsRef" class="flex flex-col sm:flex-row gap-4 mb-4">
               <router-link to="/register" class="btn-primary text-center glow-effect will-change-transform">
@@ -507,6 +513,9 @@ onUnmounted(() => {
                     </span>
                     <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
                       Saved only
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
+                      Sponsorship signal: on
                     </span>
                   </div>
                 </div>
@@ -667,7 +676,7 @@ onUnmounted(() => {
               <span class="text-white text-2xl font-bold">2</span>
             </div>
             <h3 class="text-xl font-heading font-semibold mb-3">We curate and match jobs in real time</h3>
-            <p class="text-neutral-body">Our team and a cutting-edge AI engine scan job boards and company postings, strip out the junk, prioritize active roles that fit you, and enrich each match with company context and behind-the-scenes insight.</p>
+            <p class="text-neutral-body">Our team and a cutting-edge AI engine scan job boards and company postings, strip out the junk, prioritize active roles that fit you, and enrich each match with company context and behind-the-scenes insight—including, when you need it, a sponsorship-likelihood signal from thorough metadata analysis on each role in the Hopper.</p>
           </div>
           <div class="text-center step-card will-change-transform">
             <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">

@@ -53,6 +53,10 @@ const faqs = [
     a: "Yes. You can update your target roles, salary expectations, locations, industries of interest, and other settings at any time from your Job-Hopper dashboard. Your future matches will automatically adjust as you refine your profile."
   },
   {
+    q: "What is the sponsorship-likelihood signal?",
+    a: "For roles that flow through the Hopper, Job-Hopper runs thorough analysis of posting and employer metadata to produce a sponsorship-likelihood estimate—useful when you need to prioritize openings where employer visa sponsorship (for example H-1B) is more plausible. It is a filter and a time-saver, not a guarantee that any specific role or company will sponsor. Many subscribers never turn it on; it is there when your situation calls for it."
+  },
+  {
     q: "How does the free trial work?",
     a: "Every base plan starts with a free trial. During the trial, you get access to your job feed and email alerts so you can judge the quality and relevance of your matches for yourself. If you don't want to continue, simply cancel before the trial ends and you won't be charged."
   },

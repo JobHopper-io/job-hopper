@@ -134,6 +134,12 @@ const pricingFaq = [
                     </svg>
                     <span>Email delivery of new matches</span>
                   </li>
+                  <li class="flex items-start">
+                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Sponsorship-likelihood signal from metadata analysis on each posting (estimates only)</span>
+                  </li>
                 </ul>
               </div>
               <router-link to="/register" class="btn-primary w-full text-center block">
@@ -193,6 +199,9 @@ const pricingFaq = [
         </h2>
         <p class="text-neutral-body mb-6 text-center">
           No matter which tier you choose, Job-Hopper gives you:
+        </p>
+        <p class="text-sm text-neutral-body mb-6 text-center max-w-2xl mx-auto">
+          That includes the same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood filtering when it is relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship-only service.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
           <div class="flex items-start">
