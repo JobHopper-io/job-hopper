@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue'
+import { ref, onMounted, computed, reactive, watch } from 'vue'
 import { profileAPI } from '@/lib/profile'
 import { subscriptionAPI } from '@/lib/subscription'
 import {
@@ -11,6 +11,8 @@ import {
   type SubscriberPreferencesOverride,
   type MatchConfigOverride,
   type AdminMatchingConfig,
+  type OnboardedMatchingSubscriberRow,
+  type SubscriberMatchingPreferencesPayload,
 } from '@/lib/admin-job-matching-algorithm'
 import type { Profile } from '@/types/database'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
@@ -32,6 +34,15 @@ const overrideConfirmationText = ref('')
 
 /** `products.key` for all base_plan rows; shown in the subscription tier field label. */
 const basePlanProductKeyOptions = ref<string[]>([])
+
+/** Empty string = use logged-in admin profile as match subject; otherwise profile id under test. */
+const matchSubjectProfileId = ref('')
+const suppressMatchSubjectWatch = ref(false)
+const onboardedSubscribers = ref<OnboardedMatchingSubscriberRow[]>([])
+const isOnboardedListLoading = ref(false)
+const onboardedListError = ref<string | null>(null)
+const onboardedListTruncated = ref(false)
+const isApplyingMatchSubject = ref(false)
 
 // Preferences form (defaults from user profile)
 const prefsForm = reactive<{
@@ -97,6 +108,89 @@ async function loadSubscriptionTierKeys(profileId: string) {
   const { data } = await subscriptionAPI.getSubscriptionTierProductKeysForProfile(profileId)
   prefsForm.subscriptionTierProductKeys = (data ?? []).join(', ')
 }
+
+async function loadAdminPreferencesOnly() {
+  const { data: profile } = await profileAPI.getCurrentUserProfile()
+  profileToPrefsForm(profile ?? null)
+  if (profile?.id) {
+    await loadSubscriptionTierKeys(profile.id)
+  }
+}
+
+function applySubscriberPreferencesPayloadToForm(p: SubscriberMatchingPreferencesPayload) {
+  prefsForm.subscriptionTierProductKeys = p.subscriptionTierProductKeys.join(', ')
+  prefsForm.roles = p.roles.length ? p.roles.join(', ') : ''
+  prefsForm.targetJobTitle = p.targetJobTitle ?? ''
+  prefsForm.currentJobTitle = p.currentJobTitle ?? ''
+  prefsForm.currentIndustry = p.currentIndustry ?? ''
+  prefsForm.payRangeMin = p.payRangeMin != null ? String(p.payRangeMin) : ''
+  prefsForm.payRangeMax = p.payRangeMax != null ? String(p.payRangeMax) : ''
+  prefsForm.preferredLocations = Array.isArray(p.preferredLocations) ? p.preferredLocations.slice() : []
+  prefsForm.openToRelocation = p.openToRelocation === true
+  prefsForm.openToRemote = p.openToRemote === true
+  prefsForm.locationRadiusMiles =
+    p.locationRadiusMiles != null ? String(p.locationRadiusMiles) : ''
+}
+
+async function loadSubscriberPreferencesIntoForm(profileId: string) {
+  const { data, error } =
+    await jobMatchingAlgorithmAdminAPI.getSubscriberPreferencesForMatching(profileId)
+  if (error || !data) {
+    errorMessage.value = error?.message ?? 'Failed to load subscriber preferences'
+    return
+  }
+  applySubscriberPreferencesPayloadToForm(data.preferences)
+}
+
+async function loadOnboardedSubscribers() {
+  isOnboardedListLoading.value = true
+  onboardedListError.value = null
+  const { data, error } = await jobMatchingAlgorithmAdminAPI.listOnboardedMatchingSubscribers()
+  if (error) {
+    onboardedListError.value = error.message
+    onboardedSubscribers.value = []
+    onboardedListTruncated.value = false
+  } else {
+    onboardedSubscribers.value = data?.subscribers ?? []
+    onboardedListTruncated.value = data?.truncated ?? false
+  }
+  isOnboardedListLoading.value = false
+}
+
+function displayNameForSubscriberRow(u: OnboardedMatchingSubscriberRow): string {
+  const n = [u.firstName, u.lastName].filter(Boolean).join(' ').trim()
+  if (n.length > 0) return n
+  if (u.email) return u.email
+  return u.id
+}
+
+function formatSubscriberOptionLabel(u: OnboardedMatchingSubscriberRow): string {
+  const label = displayNameForSubscriberRow(u)
+  const emailPart = u.email ? ` <${u.email}>` : ''
+  const sub = u.hasActiveSubscription ? 'Active subscription' : 'No active subscription'
+  return `${label}${emailPart} — ${sub}`
+}
+
+watch(matchSubjectProfileId, async (id) => {
+  if (suppressMatchSubjectWatch.value) return
+  isApplyingMatchSubject.value = true
+  errorMessage.value = null
+  try {
+    if (id === '') {
+      await loadAdminPreferencesOnly()
+    } else {
+      await loadSubscriberPreferencesIntoForm(id)
+    }
+  } finally {
+    isApplyingMatchSubject.value = false
+  }
+})
+
+const subscriptionTierFieldPlaceholder = computed(() =>
+  matchSubjectProfileId.value
+    ? 'Empty = use tier keys from the selected account (trial/active base plan, same as production)'
+    : 'Empty = use keys from your active base plan (same as production matching)',
+)
 
 async function loadBasePlanProductKeyOptions() {
   const { data } = await subscriptionAPI.listBasePlanProductKeys()
@@ -173,11 +267,10 @@ function buildMatchConfigOverride(): MatchConfigOverride {
 }
 
 async function resetToDefaults() {
-  const { data: profile } = await profileAPI.getCurrentUserProfile()
-  profileToPrefsForm(profile ?? null)
-  if (profile?.id) {
-    await loadSubscriptionTierKeys(profile.id)
-  }
+  suppressMatchSubjectWatch.value = true
+  matchSubjectProfileId.value = ''
+  await loadAdminPreferencesOnly()
+  suppressMatchSubjectWatch.value = false
   if (activeConfig.value) {
     configForm.keywordWeights = { ...(activeConfig.value.config.keywordWeights ?? {}) }
     configForm.payWeights = { ...(activeConfig.value.config.payWeights ?? {}) }
@@ -293,6 +386,7 @@ async function loadMatches() {
   errorMessage.value = null
 
   const { data, error } = await jobMatchingAlgorithmAdminAPI.getAdminMatches({
+    targetProfileId: matchSubjectProfileId.value || undefined,
     preferencesOverride: buildPreferencesOverride(),
     matchConfigOverride: buildMatchConfigOverride(),
   })
@@ -309,12 +403,8 @@ async function loadMatches() {
 }
 
 onMounted(async () => {
-  await loadBasePlanProductKeyOptions()
-  const { data: profile } = await profileAPI.getCurrentUserProfile()
-  profileToPrefsForm(profile ?? null)
-  if (profile?.id) {
-    await loadSubscriptionTierKeys(profile.id)
-  }
+  await Promise.all([loadBasePlanProductKeyOptions(), loadOnboardedSubscribers()])
+  await loadAdminPreferencesOnly()
 
   isConfigLoading.value = true
   const { data, error } = await jobMatchingAlgorithmAdminAPI.listConfigs()
@@ -349,6 +439,45 @@ onMounted(async () => {
           Algorithm input
         </h2>
 
+        <div class="rounded-xl border border-neutral-border/80 bg-neutral-bg/80 px-3 py-3 sm:px-4 sm:py-4 space-y-2">
+          <label class="block text-xs font-medium text-neutral-body" for="admin-match-subject">
+            Match as subscriber
+          </label>
+          <select
+            id="admin-match-subject"
+            v-model="matchSubjectProfileId"
+            class="input w-full text-sm"
+            :disabled="isOnboardedListLoading || isApplyingMatchSubject"
+          >
+            <option value="">
+              Your profile (logged-in admin)
+            </option>
+            <option
+              v-for="u in onboardedSubscribers"
+              :key="u.id"
+              :value="u.id"
+            >
+              {{ formatSubscriberOptionLabel(u) }}
+            </option>
+          </select>
+          <p v-if="isOnboardedListLoading" class="text-xs text-neutral-body">
+            Loading onboarded subscribers…
+          </p>
+          <p v-else-if="onboardedListError" class="text-xs text-red-700">
+            {{ onboardedListError }}
+          </p>
+          <p v-else-if="isApplyingMatchSubject" class="text-xs text-neutral-body">
+            Loading preferences…
+          </p>
+          <p v-else-if="onboardedListTruncated" class="text-xs text-amber-800">
+            List shows the first 10,000 onboarded profiles (alphabetically by email). Use your own records to find others if needed.
+          </p>
+          <p v-else class="text-xs text-neutral-body">
+            Choose a completed-onboarding user to load their preferences into the fields below and run matching as them.
+            Tier keys follow their trial/active subscriptions unless you override the field.
+          </p>
+        </div>
+
         <section class="space-y-3">
           <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
             Preferences
@@ -365,7 +494,7 @@ onMounted(async () => {
                 v-model="prefsForm.subscriptionTierProductKeys"
                 type="text"
                 class="input w-full"
-                placeholder="Empty = use keys from your active base plan (same as production matching)"
+                :placeholder="subscriptionTierFieldPlaceholder"
               >
               <p class="text-xs text-neutral-body mt-1">
                 Must match <code class="text-xs">job_hopper_live.subscription_tier</code> for a job to be scored.
@@ -816,7 +945,7 @@ onMounted(async () => {
           <button
             type="button"
             class="btn-primary"
-            :disabled="isLoading"
+            :disabled="isLoading || isApplyingMatchSubject"
             @click="loadMatches"
           >
             <span v-if="isLoading">Running…</span>
@@ -825,7 +954,7 @@ onMounted(async () => {
           <button
             type="button"
             class="btn-secondary"
-            :disabled="isLoading"
+            :disabled="isLoading || isApplyingMatchSubject"
             @click="resetToDefaults"
           >
             Reset to defaults

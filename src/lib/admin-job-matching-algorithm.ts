@@ -131,7 +131,48 @@ export interface AdminMatchingConfig {
   config: MatchConfigOverride
 }
 
+export interface OnboardedMatchingSubscriberRow {
+  id: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+  hasActiveSubscription: boolean
+}
+
+export interface SubscriberMatchingPreferencesPayload {
+  subscriptionTierProductKeys: string[]
+  roles: string[]
+  targetJobTitle: string | null
+  currentJobTitle: string | null
+  currentIndustry: string | null
+  payRangeMin: number | null
+  payRangeMax: number | null
+  preferredLocations: string[]
+  openToRelocation: boolean | null
+  openToRemote: boolean | null
+  locationRadiusMiles: number | null
+}
+
+export interface AdminMatchingSubscriberPreferencesResponse {
+  profileId: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+  hasActiveSubscription: boolean
+  preferences: SubscriberMatchingPreferencesPayload
+}
+
+export interface OnboardedMatchingSubscribersListResult {
+  subscribers: OnboardedMatchingSubscriberRow[]
+  truncated: boolean
+}
+
 export interface GetAdminMatchesOptions {
+  /**
+   * When set, the test-job-matching function uses this profile as the subscriber under test
+   * (must have completed onboarding). Omit or empty to use the logged-in admin’s profile as the base.
+   */
+  targetProfileId?: string | null
   preferencesOverride?: SubscriberPreferencesOverride
   matchConfigOverride?: MatchConfigOverride
 }
@@ -180,9 +221,14 @@ export const jobMatchingAlgorithmAdminAPI = {
     error: Error | null
   }> {
     const body: {
+      targetProfileId?: string
       preferencesOverride?: SubscriberPreferencesOverride
       matchConfigOverride?: MatchConfigOverride
     } = {}
+    const targetId = options.targetProfileId?.trim()
+    if (targetId) {
+      body.targetProfileId = targetId
+    }
     if (options.preferencesOverride && Object.keys(options.preferencesOverride).length > 0) {
       body.preferencesOverride = options.preferencesOverride
     }
@@ -193,6 +239,40 @@ export const jobMatchingAlgorithmAdminAPI = {
     const { data, error } = await supabase.functions.invoke<MatchJobsResponse>(
       'test-job-matching',
       { method: 'POST', body },
+    )
+
+    if (error) {
+      return { data: null, error: new Error(error.message) }
+    }
+
+    return { data: data ?? null, error: null }
+  },
+
+  async listOnboardedMatchingSubscribers(): Promise<{
+    data: OnboardedMatchingSubscribersListResult | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke<OnboardedMatchingSubscribersListResult>(
+      'admin-matching-onboarded-users',
+      { method: 'POST', body: {} },
+    )
+
+    if (error) {
+      return { data: null, error: new Error(error.message) }
+    }
+
+    return {
+      data: data ?? null,
+      error: null,
+    }
+  },
+
+  async getSubscriberPreferencesForMatching(
+    profileId: string,
+  ): Promise<{ data: AdminMatchingSubscriberPreferencesResponse | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<AdminMatchingSubscriberPreferencesResponse>(
+      'admin-matching-subscriber-preferences',
+      { method: 'POST', body: { profileId } },
     )
 
     if (error) {
