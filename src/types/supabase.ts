@@ -19,19 +19,46 @@ export type Database = {
           company_name: string | null
           created_at: string
           id: number
+          linkedin_url: string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
+        }
+        Relationships: []
+      }
+      dashboard_banner: {
+        Row: {
+          ends_at: string | null
+          id: number
+          message: string
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -254,6 +281,7 @@ export type Database = {
       }
       job_matches: {
         Row: {
+          archived_at: string | null
           created_at: string
           id: string
           job_id: string
@@ -261,6 +289,7 @@ export type Database = {
           score: number | null
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           job_id: string
@@ -268,6 +297,7 @@ export type Database = {
           score?: number | null
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           job_id?: string
@@ -290,6 +320,123 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_hiring_contacts: {
+        Row: {
+          apollo_person_id: string | null
+          apollo_raw: Json | null
+          created_at: string
+          email: string | null
+          error_message: string | null
+          external_job_key: string | null
+          full_name: string | null
+          id: string
+          job_id: string | null
+          linkedin_url: string | null
+          looked_up_by_profile_id: string | null
+          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title: string | null
+        }
+        Insert: {
+          apollo_person_id?: string | null
+          apollo_raw?: Json | null
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          external_job_key?: string | null
+          full_name?: string | null
+          id?: string
+          job_id?: string | null
+          linkedin_url?: string | null
+          looked_up_by_profile_id?: string | null
+          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title?: string | null
+        }
+        Update: {
+          apollo_person_id?: string | null
+          apollo_raw?: Json | null
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          external_job_key?: string | null
+          full_name?: string | null
+          id?: string
+          job_id?: string | null
+          linkedin_url?: string | null
+          looked_up_by_profile_id?: string | null
+          status?: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_hiring_contacts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_hopper_live"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_hiring_contacts_looked_up_by_profile_id_fkey"
+            columns: ["looked_up_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_processor_flags: {
+        Row: {
+          apollo_credits_exhausted: boolean
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          apollo_credits_exhausted?: boolean
+          id: number
+          updated_at?: string
+        }
+        Update: {
+          apollo_credits_exhausted?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_processor_runs: {
+        Row: {
+          counts: Json
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          options: Json
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at: string
+        }
+        Insert: {
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          options?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at?: string
+        }
+        Update: {
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          options?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       matching_algorithm_config: {
         Row: {
@@ -317,15 +464,21 @@ export type Database = {
           recency_base_weight: number
           recency_max_age_days: number
           recency_per_day_decay: number
+          excluded_title_keywords: string[]
+          semantic_rerank_count: number
+          semantic_rerank_enabled: boolean
+          semantic_weight: number
           threshold_min_total_score: number
           threshold_no_keyword_match_penalty: number
           threshold_over_pay_tolerance_pct: number
+          threshold_require_multi_token_title_match: boolean
           threshold_under_pay_tolerance_pct: number
           updated_at: string
         }
         Insert: {
           active?: boolean
           created_at?: string
+          excluded_title_keywords?: string[]
           id?: string
           keyword_current_industry_weight: number
           keyword_current_job_title_weight: number
@@ -348,15 +501,20 @@ export type Database = {
           recency_base_weight: number
           recency_max_age_days: number
           recency_per_day_decay: number
+          semantic_rerank_count?: number
+          semantic_rerank_enabled?: boolean
+          semantic_weight?: number
           threshold_min_total_score: number
           threshold_no_keyword_match_penalty: number
           threshold_over_pay_tolerance_pct: number
+          threshold_require_multi_token_title_match?: boolean
           threshold_under_pay_tolerance_pct: number
           updated_at?: string
         }
         Update: {
           active?: boolean
           created_at?: string
+          excluded_title_keywords?: string[]
           id?: string
           keyword_current_industry_weight?: number
           keyword_current_job_title_weight?: number
@@ -379,9 +537,13 @@ export type Database = {
           recency_base_weight?: number
           recency_max_age_days?: number
           recency_per_day_decay?: number
+          semantic_rerank_count?: number
+          semantic_rerank_enabled?: boolean
+          semantic_weight?: number
           threshold_min_total_score?: number
           threshold_no_keyword_match_penalty?: number
           threshold_over_pay_tolerance_pct?: number
+          threshold_require_multi_token_title_match?: boolean
           threshold_under_pay_tolerance_pct?: number
           updated_at?: string
         }
@@ -509,6 +671,7 @@ export type Database = {
           desired_salary_max: number | null
           desired_salary_min: number | null
           email: string
+          excluded_keywords: string[]
           first_name: string
           id: string
           last_name: string
@@ -521,6 +684,7 @@ export type Database = {
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
+          target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -533,6 +697,7 @@ export type Database = {
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email: string
+          excluded_keywords?: string[]
           first_name: string
           id?: string
           last_name: string
@@ -545,6 +710,7 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -557,6 +723,7 @@ export type Database = {
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email?: string
+          excluded_keywords?: string[]
           first_name?: string
           id?: string
           last_name?: string
@@ -569,9 +736,46 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
+        }
+        Relationships: []
+      }
+      apollo_usage_daily: {
+        Row: {
+          request_count: number
+          usage_date: string
+        }
+        Insert: {
+          request_count?: number
+          usage_date: string
+        }
+        Update: {
+          request_count?: number
+          usage_date?: string
+        }
+        Relationships: []
+      }
+      public_lookup_usage: {
+        Row: {
+          fingerprint: string
+          ip_network: string
+          successful_lookups: number
+          updated_at: string
+        }
+        Insert: {
+          fingerprint: string
+          ip_network: string
+          successful_lookups?: number
+          updated_at?: string
+        }
+        Update: {
+          fingerprint?: string
+          ip_network?: string
+          successful_lookups?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -979,6 +1183,34 @@ export type Database = {
     }
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
+      increment_apollo_usage_daily: { Args: { p_delta?: number }; Returns: number }
+      claim_scraper_raw_jobs: {
+        Args: { p_limit: number }
+        Returns: {
+          apply_link: string | null
+          company_name: string
+          date_scraped: string
+          description: string | null
+          employment_types: string[] | null
+          id: string
+          is_remote: boolean
+          job_title: string
+          location: string | null
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          posted_date: string | null
+          schedules: string[] | null
+          status: Database["public"]["Enums"]["scraper_raw_job_status"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "scraper_raw_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      clean_scraper_raw_jobs_n8n_parity: { Args: never; Returns: Json }
       create_user_profile: {
         Args: {
           first_name: string
@@ -1008,6 +1240,7 @@ export type Database = {
       }
     }
     Enums: {
+      hiring_contact_lookup_status: "found" | "not_found" | "error",
       bd_leads_status:
         | "New"
         | "Ready to Process"
@@ -1021,7 +1254,8 @@ export type Database = {
         | "subscription_update"
         | "system_announcement"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
-      pay_type: "hour" | "year" | "month" | "week"
+      job_processor_run_status: "queued" | "running" | "completed" | "failed"
+      pay_type: "hour" | "year" | "month" | "week" | "day"
       product_category:
         | "base_plan"
         | "subscription_addon"
@@ -1037,7 +1271,7 @@ export type Database = {
         | "executive"
         | "other"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
-      scraper_raw_job_status: "pending" | "processed"
+      scraper_raw_job_status: "pending" | "processed" | "processing"
       sponsorship_likelihood: "Low" | "Medium" | "High" | "N/A"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -1167,6 +1401,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      hiring_contact_lookup_status: ["found", "not_found", "error"],
       bd_leads_status: [
         "New",
         "Ready to Process",
@@ -1182,7 +1417,8 @@ export const Constants = {
         "system_announcement",
       ],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
-      pay_type: ["hour", "year", "month", "week"],
+      job_processor_run_status: ["queued", "running", "completed", "failed"],
+      pay_type: ["hour", "year", "month", "week", "day"],
       product_category: [
         "base_plan",
         "subscription_addon",
@@ -1200,7 +1436,7 @@ export const Constants = {
         "other",
       ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
-      scraper_raw_job_status: ["pending", "processed"],
+      scraper_raw_job_status: ["pending", "processed", "processing"],
       sponsorship_likelihood: ["Low", "Medium", "High", "N/A"],
       subscription_status: ["trial", "active", "canceled"],
     },

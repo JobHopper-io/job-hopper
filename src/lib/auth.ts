@@ -127,6 +127,27 @@ export const authAPI = {
     return { error }
   },
 
+  /**
+   * Passwordless email OTP (creates auth.users + profiles trigger row when needed).
+   * Used by public hiring-contact teaser before lookups run under JWT.
+   */
+  async signInWithEmailOtp(email: string) {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    })
+    return { data, error }
+  },
+
+  async verifyEmailOtp(email: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: token.trim(),
+      type: 'email',
+    })
+    return { data, error }
+  },
+
   async getCurrentUser() {
     const {
       data: { user },

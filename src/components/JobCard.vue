@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
+import HiringContactModal from '@/components/HiringContactModal.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -15,14 +17,22 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle-save', matchId: string, isSaved: boolean): void
+  (e: 'archive-match', matchId: string): void
+  (e: 'unarchive-match', matchId: string): void
 }>()
 
 const router = useRouter()
 const userStore = useUserStore()
+const { subscriptions } = storeToRefs(userStore)
 
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
 const adviceModalOpen = ref(false)
+const hiringContactModalOpen = ref(false)
+
+const hasActiveSubscription = computed(() =>
+  subscriptions.value.some((s) => s.status === 'trial' || s.status === 'active'),
+)
 
 const showAdviceButton = computed(() => {
   const p = props.advicePurchase
@@ -65,6 +75,22 @@ function handleToggleSave() {
   emit('toggle-save', props.job.matchId, props.job.isSaved)
 }
 
+function deliveredLabel(iso: string): string {
+  const ms = Date.parse(iso)
+  if (Number.isNaN(ms)) return ''
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  const diffDays = Math.round((Date.now() - ms) / 86400000)
+  return `Delivered ${rtf.format(-diffDays, 'day')}`
+}
+
+function handleArchiveClick() {
+  if (props.job.archivedAt) {
+    emit('unarchive-match', props.job.matchId)
+  } else {
+    emit('archive-match', props.job.matchId)
+  }
+}
+
 async function handleAdviceCheckout() {
   adviceLoading.value = true
   adviceError.value = null
@@ -100,7 +126,7 @@ async function handleAdviceCheckout() {
     <div class="p-5 sm:p-6">
       <!-- Title + save -->
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div class="min-w-0 flex-1 pr-11 sm:pr-0">
+        <div class="min-w-0 flex-1 pr-24 sm:pr-0">
           <h3 class="text-lg font-heading font-semibold leading-tight text-brand-charcoal sm:text-xl">
             {{ job.title ?? 'Untitled role' }}
           </h3>
@@ -120,32 +146,48 @@ async function handleAdviceCheckout() {
             >
               Match score: {{ job.score.toFixed(0) }}
             </span>
+            <span v-if="job.createdAt" class="inline-flex items-center gap-1.5 text-xs text-neutral-body">
+              <font-awesome-icon :icon="['fas', 'clock']" class="opacity-70" aria-hidden="true" />
+              {{ deliveredLabel(job.createdAt) }}
+            </span>
             <JobSponsorshipBadge
               v-if="showSponsorshipBadge"
               :value="job.sponsorshipLikelihood"
             />
           </div>
         </div>
-        <button
-          type="button"
-          class="absolute right-4 top-5 shrink-0 transition-colors sm:static sm:right-auto sm:top-auto"
-          :class="job.isSaved
-            ? 'rounded-full bg-brand-primary px-3 py-2 text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'
-            : 'rounded-full border border-neutral-border bg-neutral-bg px-3 py-2 text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'"
-          :aria-pressed="job.isSaved"
-          :aria-label="job.isSaved ? 'Unsave this job' : 'Save this job'"
-          @click="handleToggleSave"
+        <div
+          class="absolute right-4 top-5 flex items-start gap-2 sm:static sm:right-auto sm:top-auto sm:shrink-0"
         >
-          <font-awesome-icon
-            :icon="['fas', 'bookmark']"
-            :class="job.isSaved ? 'text-white' : 'text-neutral-body'"
-            class="text-sm"
-            aria-hidden="true"
-          />
-          <span class="ml-1.5 text-xs font-medium sm:inline" :class="job.isSaved ? 'text-white' : 'text-neutral-body'">
-            {{ job.isSaved ? 'Saved' : 'Save' }}
-          </span>
-        </button>
+          <button
+            type="button"
+            class="shrink-0 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-2 text-neutral-body hover:border-neutral-body/40"
+            :aria-label="job.archivedAt ? 'Restore match to feed' : 'Archive this match'"
+            @click="handleArchiveClick"
+          >
+            <font-awesome-icon :icon="['fas', 'archive']" class="text-sm" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            class="shrink-0 transition-colors"
+            :class="job.isSaved
+              ? 'rounded-full bg-brand-primary px-3 py-2 text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'
+              : 'rounded-full border border-neutral-border bg-neutral-bg px-3 py-2 text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2'"
+            :aria-pressed="job.isSaved"
+            :aria-label="job.isSaved ? 'Unsave this job' : 'Save this job'"
+            @click="handleToggleSave"
+          >
+            <font-awesome-icon
+              :icon="['fas', 'bookmark']"
+              :class="job.isSaved ? 'text-white' : 'text-neutral-body'"
+              class="text-sm"
+              aria-hidden="true"
+            />
+            <span class="ml-1.5 text-xs font-medium sm:inline" :class="job.isSaved ? 'text-white' : 'text-neutral-body'">
+              {{ job.isSaved ? 'Saved' : 'Save' }}
+            </span>
+          </button>
+        </div>
       </div>
 
       <p v-if="job.aiBriefing" class="mt-3 text-sm text-neutral-body line-clamp-2">
@@ -168,6 +210,15 @@ async function handleAdviceCheckout() {
           @click="handleApply"
         >
           Apply
+        </button>
+        <button
+          v-if="hasActiveSubscription"
+          type="button"
+          class="btn-secondary shrink-0 text-sm"
+          @click="hiringContactModalOpen = true"
+        >
+          <font-awesome-icon :icon="['fas', 'magnifying-glass']" class="mr-1.5" aria-hidden="true" />
+          Find hiring contact
         </button>
         <button
           v-if="showAdviceButton"
@@ -198,6 +249,11 @@ async function handleAdviceCheckout() {
         :open="adviceModalOpen"
         :advice-text="advicePurchase?.improvements_text"
         @close="adviceModalOpen = false"
+      />
+      <HiringContactModal
+        :open="hiringContactModalOpen"
+        :job-id="job.jobId"
+        @close="hiringContactModalOpen = false"
       />
       <p v-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">
         {{ adviceStatusText }}

@@ -2,11 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   type JobRecord,
-  type MatchConfig,
   type RankedJob,
   type SubscriberPreferences,
   matchJobs,
+  mergeConfig,
 } from '../_shared/job-matching-algorithm.ts'
+import { applySemanticRerankIfEnabled } from '../_shared/semantic-job-rerank.ts'
 import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
@@ -14,6 +15,11 @@ import {
   type JobSummary,
 } from '../_shared/email-templates.ts'
 import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import {
+  type MatchingAlgorithmConfigDbRow,
+  matchingAlgorithmConfigRowToPartial,
+  mergePartialMatchConfigs,
+} from '../_shared/matching-algorithm-config-db.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,96 +29,6 @@ const corsHeaders = {
 interface MatchJobsPayload {
   profile_id: string
   limit?: number
-}
-
-function configRowToOverride(row: any): Partial<MatchConfig> {
-  const keywordWeights = {
-    currentJobTitleKeyword: row.keyword_current_job_title_weight,
-    currentIndustryKeyword: row.keyword_current_industry_weight,
-  }
-
-  const payWeights = {
-    insideRange: row.pay_inside_range_weight,
-    nearRange: row.pay_near_range_weight,
-    missingSalary: row.pay_missing_salary_weight,
-    belowRangePenalty: row.pay_below_range_penalty,
-  }
-
-  const locationWeights = {
-    sameMetro: row.loc_same_metro_weight,
-    sameState: row.loc_same_state_weight,
-    remotePreferred: row.loc_remote_preferred_weight,
-    relocationAllowed: row.loc_relocation_allowed_weight,
-    otherLocationPenalty: row.loc_other_location_penalty,
-    distance0to10: row.loc_distance_0_10_weight,
-    distance10to25: row.loc_distance_10_25_weight,
-    distance25to50: row.loc_distance_25_50_weight,
-    distance50to100: row.loc_distance_50_100_weight,
-    distanceBeyond100: row.loc_distance_beyond_100_weight,
-    withinRadiusBonus: row.loc_within_radius_bonus_weight,
-  }
-
-  const recencyWeights = {
-    baseRecency: row.recency_base_weight,
-    perDayDecay: row.recency_per_day_decay,
-    maxAgeDays: row.recency_max_age_days,
-  }
-
-  const thresholds = {
-    minTotalScore: row.threshold_min_total_score,
-    noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
-    overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
-    underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
-  }
-
-  return {
-    keywordWeights,
-    payWeights,
-    locationWeights,
-    recencyWeights,
-    thresholds,
-  }
-}
-
-function mergeConfigOverrides(
-  base: Partial<MatchConfig> | null | undefined,
-  override: Partial<MatchConfig> | null | undefined,
-): Partial<MatchConfig> | undefined {
-  if (!base && !override) return undefined
-  if (!base && override) return override
-  if (base && !override) return base
-
-  const b = base as Partial<MatchConfig>
-  const o = override as Partial<MatchConfig>
-
-  return {
-    ...b,
-    ...o,
-    keywordWeights: {
-      ...(b.keywordWeights ?? {}),
-      ...(o.keywordWeights ?? {}),
-    },
-    payWeights: {
-      ...(b.payWeights ?? {}),
-      ...(o.payWeights ?? {}),
-    },
-    locationWeights: {
-      ...(b.locationWeights ?? {}),
-      ...(o.locationWeights ?? {}),
-    },
-    recencyWeights: {
-      ...(b.recencyWeights ?? {}),
-      ...(o.recencyWeights ?? {}),
-    },
-    thresholds: {
-      ...(b.thresholds ?? {}),
-      ...(o.thresholds ?? {}),
-    },
-    debug: {
-      ...(b.debug ?? {}),
-      ...(o.debug ?? {}),
-    },
-  }
 }
 
 serve(async (req) => {
@@ -201,7 +117,8 @@ serve(async (req) => {
         preferred_locations,
         open_to_relocation,
         open_to_remote,
-        location_radius_miles
+        location_radius_miles,
+        excluded_keywords
       `,
       )
       .eq('id', payload.profile_id)
@@ -226,11 +143,21 @@ serve(async (req) => {
       profile.id,
     )
 
+    const excludedRaw = profile.excluded_keywords as string[] | null | undefined
+    const excludedKeywords =
+      Array.isArray(excludedRaw)
+        ? excludedRaw
+          .filter((s): s is string => typeof s === 'string')
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s.length > 1)
+        : []
+
     const preferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
+      excludedKeywords,
       payRangeMin: profile.desired_salary_min,
       payRangeMax: profile.desired_salary_max,
       preferredLocations: (profile.preferred_locations ?? []) as string[],
@@ -332,8 +259,12 @@ serve(async (req) => {
       sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))
 
-    const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
-    const ranked = matchJobs(preferences, jobRecords, dbOverride ? mergeConfigOverrides(dbOverride, null) : undefined)
+    const dbOverride = activeConfig
+      ? matchingAlgorithmConfigRowToPartial(activeConfig as MatchingAlgorithmConfigDbRow)
+      : null
+    const algoOverrides = dbOverride ? mergePartialMatchConfigs(dbOverride, null) : undefined
+    let ranked = matchJobs(preferences, jobRecords, algoOverrides)
+    ranked = await applySemanticRerankIfEnabled(preferences, ranked, mergeConfig(algoOverrides))
 
     // Load existing matches for this profile so we never duplicate a job match.
     const { data: existingMatches, error: existingError } = await supabase

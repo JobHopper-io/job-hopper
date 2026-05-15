@@ -29,6 +29,8 @@ export interface MatchJobsDebugPayload {
     totalJobs: number
     excludedBySubscriptionTier: number
     excludedByRole: number
+    excludedByExcludedTitleKeywords?: number
+    excludedByMultiTokenTitle?: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
     excludedByRecency: number
@@ -63,6 +65,7 @@ export interface SubscriberPreferencesOverride {
   roles?: string[]
   currentJobTitle?: string | null
   currentIndustry?: string | null
+  excludedKeywords?: string[]
   payRangeMin?: number | null
   payRangeMax?: number | null
   preferredLocations?: string[]
@@ -108,6 +111,7 @@ export interface MatchConfigThresholds {
   noKeywordMatchPenalty?: number
   overPayTolerancePct?: number
   underPayTolerancePct?: number
+  requireMultiTokenTitleMatch?: boolean
 }
 
 export interface MatchConfigOverride {
@@ -116,6 +120,12 @@ export interface MatchConfigOverride {
   locationWeights?: MatchConfigLocationWeights
   recencyWeights?: MatchConfigRecencyWeights
   thresholds?: MatchConfigThresholds
+  excludedTitleKeywords?: string[]
+  semantic?: {
+    rerankEnabled?: boolean
+    rerankCount?: number
+    weight?: number
+  }
 }
 
 export interface AdminMatchingConfig {
@@ -167,6 +177,13 @@ export const DEFAULT_ADMIN_MATCH_CONFIG: MatchConfigOverride = {
     noKeywordMatchPenalty: -100,
     overPayTolerancePct: 0.25,
     underPayTolerancePct: 0.15,
+    requireMultiTokenTitleMatch: true,
+  },
+  excludedTitleKeywords: [],
+  semantic: {
+    rerankEnabled: false,
+    rerankCount: 30,
+    weight: 1.5,
   },
 }
 

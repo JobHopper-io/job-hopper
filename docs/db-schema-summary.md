@@ -13,7 +13,7 @@
   - Each profile has at most one `stripe_customer_id` (set when the user completes checkout or is created by the checkout flow).
   - `subscriptions` rows reference `profile_id`; there is no `profiles.subscription_id`. A profile can have **multiple active subscriptions**: all such rows are considered active; the app uses every active subscription when deriving products, tier, and addons.
 - **Non‑obvious rules**:
-  - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
+  - Profile fields (e.g. `resume_bucket_key`, preferences, target roles, **`excluded_keywords`** for title filtering) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
   - Phone number is stored on profiles and must be unique (normalized to digits for comparison).
   - `onboarding_completed` is set by the Stripe webhook when `checkout.session.completed` is received for that profile.
 
@@ -79,6 +79,7 @@
 - **Non‑obvious rules**:
   - A `(profile_id, job_id)` pair appears at most once; the matching pipeline skips any job that has already been matched in the past, even across multiple scheduled runs.
   - Rows are written only by backend edge functions (service_role), not by the frontend. Authenticated users can read only rows for their own profile.
+  - Users may update **`archived_at`** on their own rows (dashboard archive UX); archived matches are hidden from the default feed unless explicitly shown.
 
 ### saved_jobs
 - **Meaning**: Explicit favorites/saved jobs for a profile; separate from `job_matches` so that a user can star or un-star matches without affecting matching history.
@@ -115,3 +116,37 @@
   - Only the scheduler (edge function using service_role) reads and updates this table. RLS has no policies for anon/authenticated; access is via service_role only.
   - Stale jobs (left `running` after a crash or timeout) are marked `failed` at the start of each scheduler run (e.g. `started_at` older than 20 minutes).
   - Insert rows from backend code (e.g. another edge function or a server process) with `status = 'pending'` and `run_at` set to the desired execution time.
+
+## Hiring contacts & matcher tuning (May 2026)
+
+### profiles.excluded_keywords
+
+- Nullable-fixed (`text[]` default `{}`): phrases matched against **`job.title` only**; hits penalize/exclude matches per matcher rules.
+
+### job_matches.archived_at
+
+- User-archive UX only; default feeds exclude archived rows; dashboard toggle shows them again.
+
+### matching_algorithm_config (additional columns)
+
+- **`threshold_require_multi_token_title_match`**: requires overlap between multi-token phrases from the user title and `job.title` when applicable.
+- **`excluded_title_keywords`**: global title substring exclusions (same semantics as profile exclusions).
+- **Semantic re-rank**: `semantic_rerank_enabled`, `semantic_rerank_count`, `semantic_weight` — optional OpenAI head re-ordering after keyword scoring in `match-jobs` / admin test harness.
+
+### job_hiring_contacts
+
+- **Meaning**: Cache for Apollo hiring-contact lookup keyed by **`job_id`** for platform-delivered matches (one row per internal job). **`external_job_key`** is used for **public teaser / BYO** lookups (`public-find-hiring-contact`), keyed by a stable hash of company + title.
+- **Status enum**: `hiring_contact_lookup_status` — `found` | `not_found` | `error`.
+- **RLS**: Authenticated **SELECT** only if the row belongs to a job they’ve been matched to, or `looked_up_by_profile_id` is their profile. Inserts/updates are via Edge Functions (`service_role`).
+
+### public_teaser_hiring_contact_usage
+
+- **Meaning**: Per **`auth.users.id`** counter of completed teaser lookups (**`found`** / **`not_found`** after Apollo work). Incremented only via **`increment_public_teaser_hiring_contact_usage`** (`service_role`). Non-subscribers hit **`PUBLIC_TEASER_LOOKUP_LIMIT`** (Edge env, default 3); subscribers skip this quota and receive full contact fields from the same edge function.
+
+### public_lookup_usage
+
+- **Meaning**: Legacy freemium quota table (**unused** in current product); coarse **`ip_network`** + **`fingerprint`** + **`successful_lookups`**. Retained for historical rows only.
+
+### apollo_usage_daily
+
+- **Meaning**: UTC-date Apollo spend counter; optional daily ceiling via `APOLLO_DAILY_BUDGET`. Increment through **`increment_apollo_usage_daily`** (service role only).

@@ -45,6 +45,7 @@ const prefsForm = reactive<{
   openToRelocation: boolean
   openToRemote: boolean
   locationRadiusMiles: string
+  excludedKeywords: string
 }>({
   subscriptionTierProductKeys: '',
   roles: '',
@@ -56,6 +57,7 @@ const prefsForm = reactive<{
   openToRelocation: false,
   openToRemote: false,
   locationRadiusMiles: '',
+  excludedKeywords: '',
 })
 
 // Match config form (defaults from DEFAULT_ADMIN_MATCH_CONFIG)
@@ -65,6 +67,8 @@ const configForm = reactive<MatchConfigOverride>({
   locationWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights },
   recencyWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights },
   thresholds: { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds },
+  excludedTitleKeywords: [...(DEFAULT_ADMIN_MATCH_CONFIG.excludedTitleKeywords ?? [])],
+  semantic: { ...DEFAULT_ADMIN_MATCH_CONFIG.semantic },
 })
 
 const JOBS_PER_PAGE = 25
@@ -117,6 +121,9 @@ function profileToPrefsForm(p: Profile | null) {
   prefsForm.openToRemote = p.open_to_remote === true
   prefsForm.locationRadiusMiles =
     p.location_radius_miles != null ? String(p.location_radius_miles) : ''
+  prefsForm.excludedKeywords = Array.isArray(p.excluded_keywords)
+    ? p.excluded_keywords.join(', ')
+    : ''
 }
 
 function buildPreferencesOverride(): SubscriberPreferencesOverride {
@@ -155,6 +162,13 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
       prefsForm.locationRadiusMiles !== '' && !Number.isNaN(Number(prefsForm.locationRadiusMiles))
         ? Number(prefsForm.locationRadiusMiles)
         : undefined,
+    excludedKeywords:
+      prefsForm.excludedKeywords.trim().length > 0
+        ? prefsForm.excludedKeywords
+          .split(/[,|\n]+/)
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s.length > 1)
+        : undefined,
   }
 }
 
@@ -165,6 +179,8 @@ function buildMatchConfigOverride(): MatchConfigOverride {
     locationWeights: { ...configForm.locationWeights },
     recencyWeights: { ...configForm.recencyWeights },
     thresholds: { ...configForm.thresholds },
+    excludedTitleKeywords: [...(configForm.excludedTitleKeywords ?? [])],
+    semantic: { ...configForm.semantic },
   }
 }
 
@@ -180,12 +196,20 @@ async function resetToDefaults() {
     configForm.locationWeights = { ...(activeConfig.value.config.locationWeights ?? {}) }
     configForm.recencyWeights = { ...(activeConfig.value.config.recencyWeights ?? {}) }
     configForm.thresholds = { ...(activeConfig.value.config.thresholds ?? {}) }
+    configForm.excludedTitleKeywords = [...(activeConfig.value.config.excludedTitleKeywords ?? [])]
+    configForm.semantic = {
+      rerankEnabled: activeConfig.value.config.semantic?.rerankEnabled ?? false,
+      rerankCount: activeConfig.value.config.semantic?.rerankCount ?? 30,
+      weight: activeConfig.value.config.semantic?.weight ?? 1.5,
+    }
   } else {
     configForm.keywordWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights }
     configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
     configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
     configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
     configForm.thresholds = { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds }
+    configForm.excludedTitleKeywords = [...(DEFAULT_ADMIN_MATCH_CONFIG.excludedTitleKeywords ?? [])]
+    configForm.semantic = { ...DEFAULT_ADMIN_MATCH_CONFIG.semantic }
   }
 }
 
@@ -196,6 +220,20 @@ function applyConfigToForm(cfg: MatchConfigOverride | undefined) {
   configForm.locationWeights = { ...(cfg.locationWeights ?? {}) }
   configForm.recencyWeights = { ...(cfg.recencyWeights ?? {}) }
   configForm.thresholds = { ...(cfg.thresholds ?? {}) }
+  configForm.excludedTitleKeywords = [...(cfg.excludedTitleKeywords ?? [])]
+  configForm.semantic = {
+    rerankEnabled: cfg.semantic?.rerankEnabled ?? false,
+    rerankCount: cfg.semantic?.rerankCount ?? 30,
+    weight: cfg.semantic?.weight ?? 1.5,
+  }
+}
+
+function onGlobalExcludedTitlesInput(ev: Event) {
+  const el = ev.target as HTMLTextAreaElement
+  configForm.excludedTitleKeywords = el.value
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
 }
 
 async function openConfigModal() {
@@ -393,6 +431,17 @@ onMounted(async () => {
                 class="input w-full"
                 placeholder="e.g. Tech, Finance"
               >
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-neutral-body mb-1">
+                Words to avoid in job titles (profile override, comma-separated)
+              </label>
+              <textarea
+                v-model="prefsForm.excludedKeywords"
+                rows="2"
+                class="input w-full font-mono text-sm"
+                placeholder="sales, consultant"
+              />
             </div>
             <div>
               <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary min</label>
@@ -629,6 +678,57 @@ onMounted(async () => {
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
                   </div>
+                  <label class="flex items-center gap-2 pt-1">
+                    <input
+                      v-model="configForm.thresholds!.requireMultiTokenTitleMatch"
+                      type="checkbox"
+                      class="rounded border-neutral-border"
+                    >
+                    <span class="text-[11px] text-neutral-body">requireMultiTokenTitleMatch</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5 sm:col-span-2">
+                <p class="text-xs font-semibold text-neutral-body">Global title exclusions</p>
+                <textarea
+                  class="input w-full font-mono text-xs"
+                  rows="2"
+                  :value="(configForm.excludedTitleKeywords ?? []).join(', ')"
+                  placeholder="comma-separated substrings matched against job.title"
+                  @input="onGlobalExcludedTitlesInput"
+                />
+              </div>
+
+              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5 sm:col-span-2">
+                <p class="text-xs font-semibold text-neutral-body">Semantic re-rank (OpenAI)</p>
+                <label class="flex items-center gap-2 mb-2">
+                  <input
+                    v-model="configForm.semantic!.rerankEnabled"
+                    type="checkbox"
+                    class="rounded border-neutral-border"
+                  >
+                  <span class="text-xs text-neutral-body">semantic_rerank_enabled</span>
+                </label>
+                <div class="flex flex-wrap gap-3">
+                  <label class="flex items-center gap-1 text-xs">
+                    top N
+                    <input
+                      v-model.number="configForm.semantic!.rerankCount"
+                      type="number"
+                      min="1"
+                      class="input w-16 text-xs"
+                    >
+                  </label>
+                  <label class="flex items-center gap-1 text-xs">
+                    weight
+                    <input
+                      v-model.number="configForm.semantic!.weight"
+                      type="number"
+                      step="0.1"
+                      class="input w-16 text-xs"
+                    >
+                  </label>
                 </div>
               </div>
 
@@ -855,6 +955,14 @@ onMounted(async () => {
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by role:</span>
               <span>{{ debug.filters.excludedByRole }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by title keywords:</span>
+              <span>{{ debug.filters.excludedByExcludedTitleKeywords ?? 0 }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by multi-token title gate:</span>
+              <span>{{ debug.filters.excludedByMultiTokenTitle ?? 0 }}</span>
             </p>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by remote opt-out:</span>

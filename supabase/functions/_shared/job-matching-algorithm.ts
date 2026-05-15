@@ -13,6 +13,8 @@ export interface SubscriberPreferences {
   roles: string[]
   currentJobTitle: string | null
   currentIndustry: string | null
+  /** Lowercase phrases; job excluded when job.title contains any (substring match). */
+  excludedKeywords?: string[]
   payRangeMin: number | null
   payRangeMax: number | null
   preferredLocations: string[]
@@ -82,10 +84,18 @@ export interface MatchConfigThresholds {
   noKeywordMatchPenalty: number
   overPayTolerancePct: number
   underPayTolerancePct: number
+  /** When user title yields ≥1 multi-word phrase, require at least one such phrase to appear in job.title (not description-only). */
+  requireMultiTokenTitleMatch: boolean
 }
 
 export interface MatchConfigDebug {
   includeReasonBreakdown: boolean
+}
+
+export interface MatchConfigSemantic {
+  rerankEnabled: boolean
+  rerankCount: number
+  weight: number
 }
 
 export interface MatchConfig {
@@ -95,6 +105,9 @@ export interface MatchConfig {
   recencyWeights: MatchConfigRecencyWeights
   thresholds: MatchConfigThresholds
   debug: MatchConfigDebug
+  /** Admin/global phrases — excluded when job.title contains any (substring). */
+  excludedTitleKeywords?: string[]
+  semantic?: MatchConfigSemantic
 }
 
 export interface RankedJob extends JobRecord {
@@ -147,9 +160,16 @@ export const defaultConfig: MatchConfig = {
     noKeywordMatchPenalty: -100,
     overPayTolerancePct: 0.25,
     underPayTolerancePct: 0.15,
+    requireMultiTokenTitleMatch: true,
   },
   debug: {
     includeReasonBreakdown: false,
+  },
+  excludedTitleKeywords: [],
+  semantic: {
+    rerankEnabled: false,
+    rerankCount: 30,
+    weight: 1.5,
   },
 }
 
@@ -183,6 +203,12 @@ export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined):
       ...defaultConfig.debug,
       ...(overrides.debug ?? {}),
     },
+    excludedTitleKeywords:
+      overrides.excludedTitleKeywords ?? defaultConfig.excludedTitleKeywords ?? [],
+    semantic: {
+      ...defaultConfig.semantic,
+      ...(overrides.semantic ?? {}),
+    } as MatchConfigSemantic,
   }
 }
 
@@ -211,6 +237,23 @@ const AUXILIARY_KEYWORDS = new Set<string>([
   'middle',
   'temp',
   'temporary',
+  'lead',
+  'principal',
+  'staff',
+  'associate',
+  'assistant',
+  'manager',
+  'director',
+  'head',
+  'chief',
+  'vp',
+  'vice',
+  'president',
+  'specialist',
+  'consultant',
+  'coordinator',
+  'analyst',
+  'generalist',
 ])
 
 /**
@@ -310,40 +353,67 @@ export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConf
   return maxKeyword + maxPay + maxLocation + maxRecency
 }
 
+/** Job titles containing any of these normalized substrings are excluded (profile + global admin list). */
+function jobShouldExcludeByTitleKeywords(
+  job: JobRecord,
+  prefs: SubscriberPreferences,
+  cfg: MatchConfig,
+): boolean {
+  const jt = normalizeText(job.title)
+  const global = cfg.excludedTitleKeywords ?? []
+  const personal = prefs.excludedKeywords ?? []
+  for (const raw of [...global, ...personal]) {
+    const phrase = normalizeText(typeof raw === 'string' ? raw.trim() : '')
+    if (phrase.length >= 2 && jt.includes(phrase)) return true
+  }
+  return false
+}
+
 function computeRoleScore(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
 ): number {
-  const title = normalizeText(job.title)
-  const description = normalizeText(job.description)
-  const briefing = normalizeText(job.aiBriefing)
-  const combined = `${title} ${description} ${briefing}`.trim()
+  const titleNorm = normalizeText(job.title)
+  const bodyNorm = normalizeText(`${job.description ?? ''} ${job.aiBriefing ?? ''}`).trim()
 
   const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
 
-  if (combined.length > 0 && titleKeywords.length > 0) {
+  if (titleKeywords.length > 0) {
     for (const kw of titleKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentJobTitleKeyword
+      if (!kw) continue
+      if (titleNorm.includes(kw)) {
+        score += cfg.keywordWeights.currentJobTitleKeyword * 2
+      } else if (bodyNorm.includes(kw)) {
+        score += cfg.keywordWeights.currentJobTitleKeyword * 0.5
       }
     }
   }
 
-  if (combined.length > 0 && industryKeywords.length > 0) {
-    for (const kw of industryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentIndustryKeyword
+  if (industryKeywords.length > 0) {
+    const icomb = `${titleNorm} ${bodyNorm}`.trim()
+    if (icomb.length > 0) {
+      for (const kw of industryKeywords) {
+        if (kw && icomb.includes(kw)) {
+          score += cfg.keywordWeights.currentIndustryKeyword
+        }
       }
     }
   }
 
   if (titleKeywords.length > 0 || industryKeywords.length > 0) {
-    const anyOverlap = score > 0
-    if (!anyOverlap) {
+    const titleOverlap =
+      titleKeywords.some((kw) => kw && (titleNorm.includes(kw) || bodyNorm.includes(kw)))
+    const icomb = `${titleNorm} ${bodyNorm}`.trim()
+    const industryOverlap =
+      industryKeywords.length > 0 &&
+      icomb.length > 0 &&
+      industryKeywords.some((kw) => kw && icomb.includes(kw))
+
+    if (!titleOverlap && !industryOverlap) {
       score += cfg.thresholds.noKeywordMatchPenalty
     }
   }
@@ -356,10 +426,8 @@ function computeRoleScoreWithKeywords(
   job: JobRecord,
   cfg: MatchConfig,
 ): { score: number; matchedRoleKeywords: string[] } {
-  const title = normalizeText(job.title)
-  const description = normalizeText(job.description)
-  const briefing = normalizeText(job.aiBriefing)
-  const combined = `${title} ${description} ${briefing}`.trim()
+  const titleNorm = normalizeText(job.title)
+  const bodyNorm = normalizeText(`${job.description ?? ''} ${job.aiBriefing ?? ''}`).trim()
 
   const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
@@ -367,27 +435,41 @@ function computeRoleScoreWithKeywords(
   let score = 0
   const matchedRoleKeywords: string[] = []
 
-  if (combined.length > 0 && titleKeywords.length > 0) {
+  if (titleKeywords.length > 0) {
     for (const kw of titleKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentJobTitleKeyword
+      if (!kw) continue
+      if (titleNorm.includes(kw)) {
+        score += cfg.keywordWeights.currentJobTitleKeyword * 2
+        matchedRoleKeywords.push(kw)
+      } else if (bodyNorm.includes(kw)) {
+        score += cfg.keywordWeights.currentJobTitleKeyword * 0.5
         matchedRoleKeywords.push(kw)
       }
     }
   }
 
-  if (combined.length > 0 && industryKeywords.length > 0) {
-    for (const kw of industryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentIndustryKeyword
-        matchedRoleKeywords.push(kw)
+  if (industryKeywords.length > 0) {
+    const icomb = `${titleNorm} ${bodyNorm}`.trim()
+    if (icomb.length > 0) {
+      for (const kw of industryKeywords) {
+        if (kw && icomb.includes(kw)) {
+          score += cfg.keywordWeights.currentIndustryKeyword
+          matchedRoleKeywords.push(kw)
+        }
       }
     }
   }
 
   if (titleKeywords.length > 0 || industryKeywords.length > 0) {
-    const anyOverlap = score > 0
-    if (!anyOverlap) {
+    const titleOverlap =
+      titleKeywords.some((kw) => kw && (titleNorm.includes(kw) || bodyNorm.includes(kw)))
+    const icomb = `${titleNorm} ${bodyNorm}`.trim()
+    const industryOverlap =
+      industryKeywords.length > 0 &&
+      icomb.length > 0 &&
+      industryKeywords.some((kw) => kw && icomb.includes(kw))
+
+    if (!titleOverlap && !industryOverlap) {
       score += cfg.thresholds.noKeywordMatchPenalty
     }
   }
@@ -677,6 +759,23 @@ export function matchJobs(
       continue
     }
 
+    if (jobShouldExcludeByTitleKeywords(job, prefs, cfg)) {
+      continue
+    }
+
+    const titleKwGate = commaSeparatedKeywords(prefs.currentJobTitle)
+    const mtPhrases = titleKwGate.filter((kw) => kw.includes(' '))
+    if (
+      cfg.thresholds.requireMultiTokenTitleMatch &&
+      mtPhrases.length > 0 &&
+      (prefs.currentJobTitle ?? '').trim().length > 0
+    ) {
+      const nt = normalizeText(job.title)
+      if (!mtPhrases.some((p) => nt.includes(p))) {
+        continue
+      }
+    }
+
     const roleScore = computeRoleScore(prefs, job, cfg)
     if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       continue
@@ -739,6 +838,8 @@ export interface MatchJobsDebugPayload {
     totalJobs: number
     excludedBySubscriptionTier: number
     excludedByRole: number
+    excludedByExcludedTitleKeywords: number
+    excludedByMultiTokenTitle: number
     excludedByRemoteOptOut: number
     excludedByLocation: number
     excludedByRecency: number
@@ -774,6 +875,8 @@ export function matchJobsWithDebug(
 
   let excludedBySubscriptionTier = 0
   let excludedByRole = 0
+  let excludedByExcludedTitleKeywords = 0
+  let excludedByMultiTokenTitle = 0
   let excludedByRemoteOptOut = 0
   const excludedByLocation = 0
   let excludedByRecency = 0
@@ -804,6 +907,25 @@ export function matchJobsWithDebug(
     if (!jobMatchesTargetRoles(job, prefs)) {
       excludedByRole += 1
       continue
+    }
+
+    if (jobShouldExcludeByTitleKeywords(job, prefs, cfg)) {
+      excludedByExcludedTitleKeywords += 1
+      continue
+    }
+
+    const titleKwGate = commaSeparatedKeywords(prefs.currentJobTitle)
+    const mtPhrases = titleKwGate.filter((kw) => kw.includes(' '))
+    if (
+      cfg.thresholds.requireMultiTokenTitleMatch &&
+      mtPhrases.length > 0 &&
+      (prefs.currentJobTitle ?? '').trim().length > 0
+    ) {
+      const nt = normalizeText(job.title)
+      if (!mtPhrases.some((p) => nt.includes(p))) {
+        excludedByMultiTokenTitle += 1
+        continue
+      }
     }
 
     const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
@@ -899,6 +1021,8 @@ export function matchJobsWithDebug(
       totalJobs: jobs.length,
       excludedBySubscriptionTier,
       excludedByRole,
+      excludedByExcludedTitleKeywords,
+      excludedByMultiTokenTitle,
       excludedByRemoteOptOut,
       excludedByLocation,
       excludedByRecency,

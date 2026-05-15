@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import type { MatchingAlgorithmAdminDbRow } from "../_shared/matching-algorithm-config-db.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,12 +48,19 @@ interface AdminMatchingConfigsRequest {
       noKeywordMatchPenalty?: number
       overPayTolerancePct?: number
       underPayTolerancePct?: number
+      requireMultiTokenTitleMatch?: boolean
+    }
+    excludedTitleKeywords?: string[]
+    semantic?: {
+      rerankEnabled?: boolean
+      rerankCount?: number
+      weight?: number
     }
   }
 }
 
 function overrideToDbColumns(input: NonNullable<AdminMatchingConfigsRequest["config"]>) {
-  const cols: Record<string, number | null | boolean | string> = {}
+  const cols: Record<string, unknown> = {}
 
   const kw = input.keywordWeights ?? {}
   if (kw.currentJobTitleKeyword != null) cols.keyword_current_job_title_weight = kw.currentJobTitleKeyword
@@ -87,17 +95,29 @@ function overrideToDbColumns(input: NonNullable<AdminMatchingConfigsRequest["con
   if (th.noKeywordMatchPenalty != null) cols.threshold_no_keyword_match_penalty = th.noKeywordMatchPenalty
   if (th.overPayTolerancePct != null) cols.threshold_over_pay_tolerance_pct = th.overPayTolerancePct
   if (th.underPayTolerancePct != null) cols.threshold_under_pay_tolerance_pct = th.underPayTolerancePct
+  if (th.requireMultiTokenTitleMatch != null) {
+    cols.threshold_require_multi_token_title_match = th.requireMultiTokenTitleMatch
+  }
+
+  if (input.excludedTitleKeywords != null) {
+    cols.excluded_title_keywords = input.excludedTitleKeywords
+  }
+
+  const sem = input.semantic ?? {}
+  if (sem.rerankEnabled != null) cols.semantic_rerank_enabled = sem.rerankEnabled
+  if (sem.rerankCount != null) cols.semantic_rerank_count = sem.rerankCount
+  if (sem.weight != null) cols.semantic_weight = sem.weight
 
   return cols
 }
 
-function rowToConfig(row: any) {
+function rowToConfig(row: MatchingAlgorithmAdminDbRow) {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    active: row.active as boolean,
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
+    id: row.id,
+    name: row.name,
+    active: row.active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
     config: {
       keywordWeights: {
         currentJobTitleKeyword: row.keyword_current_job_title_weight,
@@ -132,6 +152,24 @@ function rowToConfig(row: any) {
         noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
         overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
         underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
+        requireMultiTokenTitleMatch:
+          typeof row.threshold_require_multi_token_title_match === "boolean"
+            ? row.threshold_require_multi_token_title_match
+            : undefined,
+      },
+      excludedTitleKeywords: Array.isArray(row.excluded_title_keywords)
+        ? row.excluded_title_keywords.filter((s: unknown) => typeof s === "string") as string[]
+        : [],
+      semantic: {
+        rerankEnabled: !!row.semantic_rerank_enabled,
+        rerankCount:
+          typeof row.semantic_rerank_count === "number" && Number.isFinite(row.semantic_rerank_count)
+            ? row.semantic_rerank_count
+            : 30,
+        weight:
+          typeof row.semantic_weight === "number" && Number.isFinite(row.semantic_weight)
+            ? row.semantic_weight
+            : 1.5,
       },
     },
   }
@@ -238,7 +276,7 @@ serve(async (req) => {
         })
       }
 
-      const configs = (data ?? []).map(rowToConfig)
+      const configs = (data ?? []).map((row) => rowToConfig(row as MatchingAlgorithmAdminDbRow))
 
       return new Response(JSON.stringify({ configs }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -272,7 +310,7 @@ serve(async (req) => {
         })
       }
 
-      const created = rowToConfig(data)
+      const created = rowToConfig(data as MatchingAlgorithmAdminDbRow)
 
       return new Response(JSON.stringify({ config: created }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -311,7 +349,7 @@ serve(async (req) => {
         })
       }
 
-      const updated = rowToConfig(data)
+      const updated = rowToConfig(data as MatchingAlgorithmAdminDbRow)
 
       return new Response(JSON.stringify({ config: updated }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -342,7 +380,7 @@ serve(async (req) => {
         })
       }
 
-      const updated = rowToConfig(data)
+      const updated = rowToConfig(data as MatchingAlgorithmAdminDbRow)
 
       return new Response(JSON.stringify({ config: updated }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

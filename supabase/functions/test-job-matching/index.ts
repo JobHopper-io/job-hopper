@@ -5,8 +5,15 @@ import {
   type MatchConfig,
   type SubscriberPreferences,
   matchJobsWithDebug,
+  mergeConfig,
 } from '../_shared/job-matching-algorithm.ts'
+import { applySemanticRerankIfEnabled } from '../_shared/semantic-job-rerank.ts'
 import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
+import {
+  type MatchingAlgorithmConfigDbRow,
+  matchingAlgorithmConfigRowToPartial,
+  mergePartialMatchConfigs,
+} from '../_shared/matching-algorithm-config-db.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,94 +25,24 @@ interface TestJobMatchingBody {
   matchConfigOverride?: Partial<MatchConfig>
 }
 
-function configRowToOverride(row: any): Partial<MatchConfig> {
-  const keywordWeights = {
-    currentJobTitleKeyword: row.keyword_current_job_title_weight,
-    currentIndustryKeyword: row.keyword_current_industry_weight,
-  }
-
-  const payWeights = {
-    insideRange: row.pay_inside_range_weight,
-    nearRange: row.pay_near_range_weight,
-    missingSalary: row.pay_missing_salary_weight,
-    belowRangePenalty: row.pay_below_range_penalty,
-  }
-
-  const locationWeights = {
-    sameMetro: row.loc_same_metro_weight,
-    sameState: row.loc_same_state_weight,
-    remotePreferred: row.loc_remote_preferred_weight,
-    relocationAllowed: row.loc_relocation_allowed_weight,
-    otherLocationPenalty: row.loc_other_location_penalty,
-    distance0to10: row.loc_distance_0_10_weight,
-    distance10to25: row.loc_distance_10_25_weight,
-    distance25to50: row.loc_distance_25_50_weight,
-    distance50to100: row.loc_distance_50_100_weight,
-    distanceBeyond100: row.loc_distance_beyond_100_weight,
-    withinRadiusBonus: row.loc_within_radius_bonus_weight,
-  }
-
-  const recencyWeights = {
-    baseRecency: row.recency_base_weight,
-    perDayDecay: row.recency_per_day_decay,
-    maxAgeDays: row.recency_max_age_days,
-  }
-
-  const thresholds = {
-    minTotalScore: row.threshold_min_total_score,
-    noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
-    overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
-    underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
-  }
-
-  return {
-    keywordWeights,
-    payWeights,
-    locationWeights,
-    recencyWeights,
-    thresholds,
-  }
-}
-
-function mergeConfigOverrides(
-  base: Partial<MatchConfig> | null | undefined,
-  override: Partial<MatchConfig> | null | undefined,
-): Partial<MatchConfig> | undefined {
-  if (!base && !override) return undefined
-  if (!base && override) return override
-  if (base && !override) return base
-
-  const b = base as Partial<MatchConfig>
-  const o = override as Partial<MatchConfig>
-
-  return {
-    ...b,
-    ...o,
-    keywordWeights: {
-      ...(b.keywordWeights ?? {}),
-      ...(o.keywordWeights ?? {}),
-    },
-    payWeights: {
-      ...(b.payWeights ?? {}),
-      ...(o.payWeights ?? {}),
-    },
-    locationWeights: {
-      ...(b.locationWeights ?? {}),
-      ...(o.locationWeights ?? {}),
-    },
-    recencyWeights: {
-      ...(b.recencyWeights ?? {}),
-      ...(o.recencyWeights ?? {}),
-    },
-    thresholds: {
-      ...(b.thresholds ?? {}),
-      ...(o.thresholds ?? {}),
-    },
-    debug: {
-      ...(b.debug ?? {}),
-      ...(o.debug ?? {}),
-    },
-  }
+interface JobHopperLiveDbRow {
+  id: string
+  job_title: string | null
+  company_name: string | null
+  role_category: string | null
+  location: string | null
+  is_remote: boolean | null
+  description: string | null
+  ai_job_briefing: string | null
+  apply_link: string | null
+  pay_min: number | null
+  pay_max: number | null
+  pay_type: string | null
+  created_at: string
+  posted_date: string | null
+  subscription_tier: string | null
+  employee_count: number | null
+  sponsorship_likelihood: 'Low' | 'Medium' | 'High' | 'N/A' | null
 }
 
 function mergePreferences(
@@ -130,6 +67,8 @@ function mergePreferences(
       overrides.locationRadiusMiles !== undefined
         ? overrides.locationRadiusMiles
         : base.locationRadiusMiles,
+    excludedKeywords:
+      overrides.excludedKeywords !== undefined ? overrides.excludedKeywords : base.excludedKeywords,
   }
 }
 
@@ -214,7 +153,8 @@ serve(async (req) => {
         preferred_locations,
         open_to_relocation,
         open_to_remote,
-        location_radius_miles
+        location_radius_miles,
+        excluded_keywords
       `,
       )
       .eq('auth_user_id', user.id)
@@ -244,11 +184,21 @@ serve(async (req) => {
       profile.id,
     )
 
+    const excludedRaw = profile.excluded_keywords as string[] | null | undefined
+    const excludedKeywords =
+      Array.isArray(excludedRaw)
+        ? excludedRaw
+          .filter((s): s is string => typeof s === 'string')
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s.length > 1)
+        : []
+
     const basePreferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
+      excludedKeywords,
       payRangeMin: profile.desired_salary_min,
       payRangeMax: profile.desired_salary_max,
       preferredLocations: (profile.preferred_locations ?? []) as string[],
@@ -287,7 +237,7 @@ serve(async (req) => {
       })
     }
 
-    const allJobs: any[] = []
+    const allJobs: JobHopperLiveDbRow[] = []
     const pageSize = 1000
     let offset = 0
 
@@ -335,7 +285,7 @@ serve(async (req) => {
         break
       }
 
-      allJobs.push(...page)
+      allJobs.push(...(page as JobHopperLiveDbRow[]))
 
       if (page.length < effectivePageSize) {
         break
@@ -344,7 +294,7 @@ serve(async (req) => {
       offset += effectivePageSize
     }
 
-    const jobRecords: JobRecord[] = allJobs.map((row: any) => ({
+    const jobRecords: JobRecord[] = allJobs.map((row: JobHopperLiveDbRow) => ({
       id: row.id,
       title: row.job_title ?? null,
       companyName: row.company_name ?? null,
@@ -364,10 +314,18 @@ serve(async (req) => {
       sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
     }))
 
-    const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
-    const combinedOverride = mergeConfigOverrides(dbOverride, body.matchConfigOverride ?? null)
+    const dbOverride = activeConfig
+      ? matchingAlgorithmConfigRowToPartial(activeConfig as MatchingAlgorithmConfigDbRow)
+      : null
+    const combinedOverride = mergePartialMatchConfigs(dbOverride, body.matchConfigOverride ?? null)
 
-    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride)
+    const { ranked: rankedInitial, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride)
+    let ranked = rankedInitial
+    ranked = await applySemanticRerankIfEnabled(
+      preferences,
+      ranked,
+      mergeConfig(combinedOverride),
+    )
 
     return new Response(
       JSON.stringify({

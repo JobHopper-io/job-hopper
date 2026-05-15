@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import { useUserStore } from '@/stores/user'
-import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
+import { jobsAPI, type MatchedJob, type MatchingStats, type JobMatchSort } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
@@ -42,6 +42,8 @@ const selectedRoleTypes = ref<RoleCategoryValue[]>([])
 const selectedLocation = ref('')
 const salaryRange = ref<[number, number]>([0, 200000])
 const showSavedOnly = ref(false)
+const showArchived = ref(false)
+const matchSort = ref<JobMatchSort>('newest')
 
 // Dynamic greeting
 const greeting = computed(() => {
@@ -113,7 +115,10 @@ async function loadMatchesAndStats() {
   matchesError.value = null
   try {
     const [matchesResult, statsResult, tailoringResult] = await Promise.all([
-      jobsAPI.getJobMatches(),
+      jobsAPI.getJobMatches({
+        includeArchived: showArchived.value,
+        sort: matchSort.value,
+      }),
       jobsAPI.getMatchingStats(),
       resumeProductsAPI.getTailoringPurchasesByMatchId(),
     ])
@@ -145,8 +150,21 @@ async function handleToggleSave(matchId: string, isSaved: boolean) {
   } else {
     await jobsAPI.saveJob(matchId)
   }
-  const { data } = await jobsAPI.getJobMatches()
-  matches.value = data
+  await loadMatchesAndStats()
+}
+
+async function handleArchiveMatch(matchId: string) {
+  const { error } = await jobsAPI.archiveMatch(matchId)
+  if (!error) {
+    await loadMatchesAndStats()
+  }
+}
+
+async function handleUnarchiveMatch(matchId: string) {
+  const { error } = await jobsAPI.unarchiveMatch(matchId)
+  if (!error) {
+    await loadMatchesAndStats()
+  }
 }
 
 watch(profile, () => {
@@ -301,7 +319,7 @@ onMounted(() => {
               />
             </div>
           </div>
-          <div class="flex items-end">
+          <div class="flex items-end flex-wrap gap-4">
             <label class="flex items-center">
               <input
                 v-model="showSavedOnly"
@@ -310,6 +328,23 @@ onMounted(() => {
               />
               <span class="text-sm text-neutral-body">Show saved jobs only</span>
             </label>
+            <label class="flex items-center">
+              <input
+                v-model="showArchived"
+                type="checkbox"
+                class="mr-2 w-4 h-4"
+                @change="loadMatchesAndStats"
+              />
+              <span class="text-sm text-neutral-body">Show archived</span>
+            </label>
+          </div>
+          <div class="md:col-span-4">
+            <label class="block text-sm font-medium text-brand-charcoal mb-2">Sort</label>
+            <select v-model="matchSort" class="input max-w-xs" @change="loadMatchesAndStats">
+              <option value="newest">Newest delivered</option>
+              <option value="best_match">Best match</option>
+              <option value="recent_saved">Recently saved</option>
+            </select>
           </div>
         </div>
         <p class="text-xs text-neutral-body mt-4">
@@ -380,6 +415,8 @@ onMounted(() => {
           :job="job"
           :advicePurchase="adviceByMatchId[job.matchId] ?? null"
           @toggle-save="handleToggleSave"
+          @archive-match="handleArchiveMatch"
+          @unarchive-match="handleUnarchiveMatch"
         />
       </div>
     </div>

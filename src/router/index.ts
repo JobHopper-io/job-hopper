@@ -23,6 +23,7 @@ export const publicPaths = [
   '/register',
   '/confirm-email',
   '/unsubscribe-success',
+  '/find-hiring-contact',
 ]
 
 /** Routes that require the user to be an admin. */
@@ -107,6 +108,11 @@ const router = createRouter({
       path: '/unsubscribe-success',
       name: 'unsubscribe-success',
       component: () => import('../views/UnsubscribeSuccess.vue'),
+    },
+    {
+      path: '/find-hiring-contact',
+      name: 'find-hiring-contact',
+      component: () => import('../views/FindHiringContact.vue'),
     },
     {
       path: '/onboarding',

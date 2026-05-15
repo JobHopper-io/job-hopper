@@ -9,9 +9,44 @@ import type {
   MatchingStats,
   PayType,
   RoleCategory,
+  JobHiringContact,
 } from '@/types/database'
 
-export type { PayType, RoleCategory, MatchedJob, MatchingStats }
+export type { PayType, RoleCategory, MatchedJob, MatchingStats, JobHiringContact }
+
+export type JobMatchSort = 'newest' | 'best_match' | 'recent_saved'
+
+export interface GetJobMatchesOptions {
+  includeArchived?: boolean
+  sort?: JobMatchSort
+}
+
+export interface HiringContactLookupResponse {
+  row: JobHiringContact | null
+  cached?: boolean
+}
+
+function sortMatchedJobs(matches: MatchedJob[], sort: JobMatchSort): MatchedJob[] {
+  const copy = [...matches]
+  if (sort === 'best_match') {
+    copy.sort((a, b) => {
+      const sa = a.score ?? Number.NEGATIVE_INFINITY
+      const sb = b.score ?? Number.NEGATIVE_INFINITY
+      if (sb !== sa) return sb - sa
+      return Date.parse(b.createdAt) - Date.parse(a.createdAt)
+    })
+  } else if (sort === 'recent_saved') {
+    copy.sort((a, b) => {
+      const ta = a.savedAt ? Date.parse(a.savedAt) : 0
+      const tb = b.savedAt ? Date.parse(b.savedAt) : 0
+      if (tb !== ta) return tb - ta
+      return Date.parse(b.createdAt) - Date.parse(a.createdAt)
+    })
+  } else {
+    copy.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  }
+  return copy
+}
 
 /** Columns selected from job_hopper_live for match list and detail (single source of truth) */
 const JOB_HOPPER_LIVE_SELECT = `
@@ -40,6 +75,7 @@ function toMatchedJob(
   match: JobMatch,
   job: JobHopperLive | null,
   isSaved: boolean,
+  savedAt: string | null,
 ): MatchedJob {
   const storedSponsorship = job?.sponsorship_likelihood ?? null
   const jobData = job
@@ -82,6 +118,8 @@ function toMatchedJob(
     postedDate: job?.posted_date ?? null,
     isRemote: job?.is_remote ?? null,
     sponsorshipLikelihood: effectiveSponsorship ?? storedSponsorship,
+    archivedAt: match.archived_at ?? null,
+    savedAt,
   }
 }
 
@@ -96,13 +134,20 @@ async function getCurrentProfileId(): Promise<string> {
 
 export const jobsAPI = {
   async getJobMatches(
+    options?: GetJobMatchesOptions,
   ): Promise<{ data: MatchedJob[]; error: Error | null }> {
-    const query = supabase
-      .from('job_matches')
-      .select('id, profile_id, job_id, score, created_at')
-      .order('created_at', { ascending: false })
+    const includeArchived = options?.includeArchived ?? false
+    const sort = options?.sort ?? 'newest'
 
-    const { data: matchesRaw, error } = await query
+    let query = supabase
+      .from('job_matches')
+      .select('id, profile_id, job_id, score, created_at, archived_at')
+
+    if (!includeArchived) {
+      query = query.is('archived_at', null)
+    }
+
+    const { data: matchesRaw, error } = await query.order('created_at', { ascending: false })
     if (error) {
       return { data: [], error }
     }
@@ -130,7 +175,7 @@ export const jobsAPI = {
           : supabase.from('job_hopper_live').select('id').limit(0),
         supabase
           .from('saved_jobs')
-          .select('match_id')
+          .select('match_id, created_at')
           .in('match_id', matchIds),
       ])
 
@@ -183,9 +228,21 @@ export const jobsAPI = {
       savedRows.map((row) => row.match_id).filter((id): id is string => !!id),
     )
 
-    const result: MatchedJob[] = matches.map((match) => {
+    const savedAtByMatchId = new Map<string, string>()
+    for (const row of savedRows) {
+      if (typeof row.match_id === 'string' && row.created_at) {
+        savedAtByMatchId.set(row.match_id, row.created_at)
+      }
+    }
+
+    const built: MatchedJob[] = matches.map((match) => {
       const job = match.job_id ? jobById.get(match.job_id) ?? null : null
-      const base = toMatchedJob(match, job, savedMatchIds.has(match.id))
+      const base = toMatchedJob(
+        match,
+        job,
+        savedMatchIds.has(match.id),
+        savedAtByMatchId.get(match.id) ?? null,
+      )
       const tierName =
         base.subscriptionTier != null
           ? tierNameByKey.get(base.subscriptionTier) ?? null
@@ -196,6 +253,8 @@ export const jobsAPI = {
       }
     })
 
+    const result = sortMatchedJobs(built, sort)
+
     return { data: result, error: null }
   },
 
@@ -204,7 +263,7 @@ export const jobsAPI = {
   ): Promise<{ data: MatchedJob | null; error: Error | null }> {
     const { data: matchRaw, error: matchError } = await supabase
       .from('job_matches')
-      .select('id, job_id, score, created_at')
+      .select('id, job_id, score, created_at, archived_at')
       .eq('job_id', jobId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -235,7 +294,7 @@ export const jobsAPI = {
           .maybeSingle(),
         supabase
           .from('saved_jobs')
-          .select('id, match_id')
+          .select('id, match_id, created_at')
           .eq('match_id', match.id)
           .maybeSingle(),
       ])
@@ -284,7 +343,12 @@ export const jobsAPI = {
         (product as { display_name?: string } | null)?.display_name ?? null
     }
 
-    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow)
+    const base = toMatchedJob(
+      match,
+      job as JobHopperLive,
+      !!savedRow,
+      savedRow?.created_at ?? null,
+    )
 
     return {
       data: {
@@ -310,6 +374,7 @@ export const jobsAPI = {
       .from('job_matches')
       .select('score, created_at')
       .eq('profile_id', profileId)
+      .is('archived_at', null)
 
     if (error || !data) {
       return {
@@ -357,6 +422,21 @@ export const jobsAPI = {
     return { data: stats, error: null }
   },
 
+  async findHiringContact(
+    jobId: string,
+  ): Promise<{ data: HiringContactLookupResponse | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<HiringContactLookupResponse>(
+      'find-hiring-contact',
+      { body: { job_id: jobId } },
+    )
+
+    if (error) {
+      return { data: null, error: new Error(error.message) }
+    }
+
+    return { data: data ?? null, error: null }
+  },
+
   async saveJob(matchId: string): Promise<{ error: Error | null }> {
     const profileId = await getCurrentProfileId()
 
@@ -383,6 +463,21 @@ export const jobsAPI = {
     }
 
     return { error: null }
+  },
+
+  async archiveMatch(matchId: string): Promise<{ error: Error | null }> {
+    const { error } = await supabase
+      .from('job_matches')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', matchId)
+
+    return { error }
+  },
+
+  async unarchiveMatch(matchId: string): Promise<{ error: Error | null }> {
+    const { error } = await supabase.from('job_matches').update({ archived_at: null }).eq('id', matchId)
+
+    return { error }
   },
 }
 

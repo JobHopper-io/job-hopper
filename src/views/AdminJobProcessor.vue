@@ -185,6 +185,45 @@
       </div>
     </section>
 
+    <!-- Hiring contact cache (Apollo) -->
+    <section class="bg-white rounded-2xl border border-neutral-border shadow-sm p-6 mb-6 space-y-4">
+      <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
+        Hiring contact cache
+      </h2>
+      <p class="text-sm text-neutral-body max-w-2xl">
+        Delete cached Apollo lookup for a <code class="text-xs bg-neutral-bg px-1 rounded">job_hopper_live.id</code>
+        so the next in-app “Find hiring contact” call re-queries Apollo.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <label class="block text-sm flex-1">
+          <span class="font-medium text-brand-charcoal">Job UUID</span>
+          <input
+            v-model="clearHcJobId"
+            type="text"
+            class="mt-1 w-full rounded-lg border border-neutral-border px-3 py-2 text-sm font-mono"
+            placeholder="job_hopper_live.id"
+          >
+        </label>
+        <button
+          type="button"
+          class="btn-secondary text-sm"
+          :disabled="clearHcLoading || !clearHcJobId.trim()"
+          @click="clearHiringContactCache"
+        >
+          <span v-if="clearHcLoading">
+            <font-awesome-icon
+              :icon="['fas', 'spinner']"
+              spin
+              class="mr-2"
+              aria-hidden="true"
+            />
+          </span>
+          Re-run lookup (clear cache)
+        </button>
+      </div>
+      <p v-if="clearHcMessage" class="text-sm text-neutral-body">{{ clearHcMessage }}</p>
+    </section>
+
     <!-- Monitor -->
     <section class="bg-white rounded-2xl border border-neutral-border shadow-sm p-6 space-y-4">
       <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
@@ -279,6 +318,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { profileAPI } from '@/lib/profile'
+import { supabase } from '@/lib/supabase'
 import {
   DEFAULT_JOB_PROCESSOR_RUN_OPTIONS,
   jobProcessorAdminAPI,
@@ -302,6 +342,10 @@ const statusLoading = ref(false)
 const statusError = ref<string | null>(null)
 const runStatus = ref<JobProcessorRunStatus | null>(null)
 const autoPoll = ref(true)
+
+const clearHcJobId = ref('')
+const clearHcLoading = ref(false)
+const clearHcMessage = ref<string | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -332,6 +376,25 @@ async function loadHealth() {
     healthResult.value = data
   } finally {
     healthLoading.value = false
+  }
+}
+
+async function clearHiringContactCache() {
+  clearHcLoading.value = true
+  clearHcMessage.value = null
+  try {
+    const id = clearHcJobId.value.trim()
+    if (!id) return
+    const { error } = await supabase.functions.invoke('admin-delete-hiring-contact-cache', {
+      body: { job_id: id },
+    })
+    if (error) {
+      clearHcMessage.value = error.message
+      return
+    }
+    clearHcMessage.value = 'Cache cleared (if a row existed).'
+  } finally {
+    clearHcLoading.value = false
   }
 }
 

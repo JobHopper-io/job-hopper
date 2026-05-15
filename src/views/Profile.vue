@@ -58,6 +58,8 @@ const openToRemote = ref(false)
 const locationRadiusMiles = ref<number | null>(null)
 const requiresUsSponsorship = ref<boolean | null>(null)
 
+const excludedKeywordsText = ref('')
+
 const resumeUpgradePurchase = ref<ResumeProduct | null>(null)
 const resumeUpgradeModalOpen = ref(false)
 
@@ -102,6 +104,9 @@ function syncFormFromProfile() {
       : null
   requiresUsSponsorship.value =
     typeof p.requires_us_sponsorship === 'boolean' ? p.requires_us_sponsorship : null
+  excludedKeywordsText.value = Array.isArray(p.excluded_keywords)
+    ? p.excluded_keywords.join(', ')
+    : ''
 }
 
 watch(profile, (p) => {
@@ -205,6 +210,10 @@ const saveProfile = async () => {
       location_radius_miles: locationRadiusMiles.value ?? undefined,
       requires_us_sponsorship:
         requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
+      excluded_keywords: excludedKeywordsText.value
+        .split(/[\n,]+/)
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 1),
     })
 
     saveSuccess.value = true
@@ -237,6 +246,7 @@ watch(
     openToRemote: openToRemote.value,
     locationRadiusMiles: locationRadiusMiles.value,
     requiresUsSponsorship: requiresUsSponsorship.value,
+    excludedKeywordsText: excludedKeywordsText.value,
   }),
   () => {
     if (initialLoadDone.value && !isSyncingFromProfile.value) debouncedSave()
@@ -297,6 +307,18 @@ watch(
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Current job title</label>
               <input v-model="currentJobTitle" type="text" class="input" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-brand-charcoal mb-2">Words to avoid in job titles</label>
+              <textarea
+                v-model="excludedKeywordsText"
+                rows="3"
+                class="input font-mono text-sm"
+                placeholder="comma or line separated, e.g. sales, consultant"
+              />
+              <p class="text-xs text-neutral-body mt-1">
+                Matches whose title contains any of these phrases are excluded from your feed.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>

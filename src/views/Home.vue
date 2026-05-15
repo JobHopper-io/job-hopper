@@ -425,6 +425,17 @@ onUnmounted(() => {
                 See how it works
               </router-link>
             </div>
+            <p class="text-sm text-neutral-body mb-2">
+              Hiring contacts are looked up for you on each matched role — right from your dashboard.
+            </p>
+            <p class="text-sm text-neutral-body mb-2">
+              <router-link
+                to="/find-hiring-contact"
+                class="text-brand-primary font-semibold hover:underline"
+              >
+                Preview a hiring contact for any role (email verify, free teaser) →
+              </router-link>
+            </p>
             <p class="text-sm text-neutral-body">
               No spam. No random jobs. Cancel anytime.
             </p>

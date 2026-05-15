@@ -26,6 +26,7 @@ export type ProfileUserEditable = Pick<
   | 'open_to_remote'
   | 'location_radius_miles'
   | 'requires_us_sponsorship'
+  | 'excluded_keywords'
 >
 
 // Subscription and product types from DB schema
@@ -88,6 +89,10 @@ export interface MatchedJob {
   postedDate: string | null
   isRemote: boolean | null
   sponsorshipLikelihood: SponsorshipLikelihood | null
+  /** Present when the user saved this match */
+  savedAt?: string | null
+  /** When set, match is archived from the default dashboard feed */
+  archivedAt?: string | null
   contacts?: JobContact[]
 }
 
@@ -121,3 +126,6 @@ export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>
 export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigInsert = TablesInsert<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigUpdate = TablesUpdate<'matching_algorithm_config'>
+
+export type JobHiringContact = Tables<'job_hiring_contacts'>
+export type HiringContactLookupStatus = Enums<'hiring_contact_lookup_status'>

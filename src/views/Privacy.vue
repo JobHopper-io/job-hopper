@@ -87,7 +87,7 @@
           </ul>
           <p>We may share:</p>
           <ul class="list-disc pl-6 space-y-1">
-            <li>With service providers (Stripe, hosting, analytics)</li>
+            <li>With service providers (Stripe, Apollo.io for hiring-contact enrichment, hosting, analytics)</li>
             <li>When legally required</li>
           </ul>
         </section>

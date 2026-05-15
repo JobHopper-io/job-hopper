@@ -12,6 +12,11 @@ import {
   faLocationDot,
   faBuilding,
   faXmark,
+  faMagnifyingGlass,
+  faEnvelope,
+  faArchive,
+  faLock,
+  faClock,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -25,6 +30,11 @@ library.add(
   faLocationDot,
   faBuilding,
   faXmark,
+  faMagnifyingGlass,
+  faEnvelope,
+  faArchive,
+  faLock,
+  faClock,
 )
 
 export function registerFontAwesome(app: App) {
