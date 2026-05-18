@@ -3,10 +3,7 @@
 import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
 // Convenience type aliases for common database types
-/** Profile row; `target_job_title` is optional here when local codegen is behind a deployed migration. */
-export type Profile = Tables<'profiles'> & {
-  target_job_title?: string | null
-}
+export type Profile = Tables<'profiles'>
 
 // Operation types for common entities
 export type ProfileInsert = TablesInsert<'profiles'>
@@ -14,11 +11,12 @@ export type ProfileUpdate = TablesUpdate<'profiles'>
 
 // Subset of profile fields that the current user is allowed to edit (self-service). Use this for
 // updateProfile and forms; use ProfileUpdate only where the full table update shape is needed.
-type ProfileUserEditableCore = Pick<
+export type ProfileUserEditable = Pick<
   ProfileUpdate,
   | 'first_name'
   | 'last_name'
   | 'current_job_title'
+  | 'target_job_title'
   | 'years_of_experience'
   | 'current_industry'
   | 'target_role_categories'
@@ -31,10 +29,6 @@ type ProfileUserEditableCore = Pick<
   | 'requires_us_sponsorship'
   | 'excluded_keywords'
 >
-
-export type ProfileUserEditable = ProfileUserEditableCore & {
-  target_job_title?: string | null
-}
 
 // Subscription and product types from DB schema
 export type Subscription = Tables<'subscriptions'>
@@ -129,19 +123,8 @@ export type EmailEventStatus = Enums<'email_event_status'>
 export type SystemAnnouncement = Tables<'system_announcements'>
 export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>
 
-// Dashboard banner (singleton row id = 1). Declared explicitly when `dashboard_banner` is not yet
-// present in generated `Database` (e.g. local types from DB without that migration).
-export interface DashboardBanner {
-  id: number
-  message: string
-  starts_at: string | null
-  ends_at: string | null
-  updated_at: string
-}
-
-export type DashboardBannerUpdate = Partial<
-  Pick<DashboardBanner, 'message' | 'starts_at' | 'ends_at' | 'updated_at'>
->
+export type DashboardBanner = Tables<'dashboard_banner'>
+export type DashboardBannerUpdate = TablesUpdate<'dashboard_banner'>
 
 // Job matching algorithm configuration
 export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>

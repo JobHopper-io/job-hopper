@@ -33,8 +33,7 @@ export const profileAPI = {
 
     const { data, error } = await supabase
       .from('profiles')
-      // `ProfileUserEditable` may include columns not yet in generated `ProfileUpdate` (local DB).
-      .update(profileData as ProfileUpdate)
+      .update(profileData)
       .eq('auth_user_id', user.id)
       .select()
       .single<Profile>()

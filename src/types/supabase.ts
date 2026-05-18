@@ -45,6 +45,30 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_banner: {
+        Row: {
+          ends_at: string | null
+          id: number
+          message: string
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ends_at?: string | null
+          id?: number
+          message?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_events: {
         Row: {
           error_message: string | null
@@ -667,6 +691,7 @@ export type Database = {
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
+          target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -692,6 +717,7 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -717,6 +743,7 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -1192,6 +1219,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      clean_scraper_raw_jobs_n8n_parity: { Args: never; Returns: Json }
       create_user_profile: {
         Args: {
           first_name: string
@@ -1244,7 +1272,7 @@ export type Database = {
       hiring_contact_lookup_status: "found" | "not_found" | "error"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
       job_processor_run_status: "queued" | "running" | "completed" | "failed"
-      pay_type: "hour" | "year" | "month" | "week"
+      pay_type: "hour" | "year" | "month" | "week" | "day"
       product_category:
         | "base_plan"
         | "subscription_addon"
@@ -1407,7 +1435,7 @@ export const Constants = {
       hiring_contact_lookup_status: ["found", "not_found", "error"],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
       job_processor_run_status: ["queued", "running", "completed", "failed"],
-      pay_type: ["hour", "year", "month", "week"],
+      pay_type: ["hour", "year", "month", "week", "day"],
       product_category: [
         "base_plan",
         "subscription_addon",
