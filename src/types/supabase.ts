@@ -7,58 +7,41 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   public: {
     Tables: {
+      apollo_usage_daily: {
+        Row: {
+          request_count: number
+          usage_date: string
+        }
+        Insert: {
+          request_count?: number
+          usage_date: string
+        }
+        Update: {
+          request_count?: number
+          usage_date?: string
+        }
+        Relationships: []
+      }
       bd_leads: {
         Row: {
           company_name: string | null
           created_at: string
           id: number
-          linkedin_url: string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
           company_name?: string | null
           created_at?: string
           id?: number
-          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
           company_name?: string | null
           created_at?: string
           id?: number
-          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
-        }
-        Relationships: []
-      }
-      dashboard_banner: {
-        Row: {
-          ends_at: string | null
-          id: number
-          message: string
-          starts_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          ends_at?: string | null
-          id?: number
-          message?: string
-          starts_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          ends_at?: string | null
-          id?: number
-          message?: string
-          starts_at?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
@@ -205,6 +188,69 @@ export type Database = {
         }
         Relationships: []
       }
+      job_hiring_contacts: {
+        Row: {
+          apollo_person_id: string | null
+          apollo_raw: Json | null
+          created_at: string
+          email: string | null
+          error_message: string | null
+          external_job_key: string | null
+          full_name: string | null
+          id: string
+          job_id: string | null
+          linkedin_url: string | null
+          looked_up_by_profile_id: string | null
+          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title: string | null
+        }
+        Insert: {
+          apollo_person_id?: string | null
+          apollo_raw?: Json | null
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          external_job_key?: string | null
+          full_name?: string | null
+          id?: string
+          job_id?: string | null
+          linkedin_url?: string | null
+          looked_up_by_profile_id?: string | null
+          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title?: string | null
+        }
+        Update: {
+          apollo_person_id?: string | null
+          apollo_raw?: Json | null
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          external_job_key?: string | null
+          full_name?: string | null
+          id?: string
+          job_id?: string | null
+          linkedin_url?: string | null
+          looked_up_by_profile_id?: string | null
+          status?: Database["public"]["Enums"]["hiring_contact_lookup_status"]
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_hiring_contacts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_hopper_live"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_hiring_contacts_looked_up_by_profile_id_fkey"
+            columns: ["looked_up_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_hopper_live: {
         Row: {
           ai_job_briefing: string
@@ -321,69 +367,6 @@ export type Database = {
           },
         ]
       }
-      job_hiring_contacts: {
-        Row: {
-          apollo_person_id: string | null
-          apollo_raw: Json | null
-          created_at: string
-          email: string | null
-          error_message: string | null
-          external_job_key: string | null
-          full_name: string | null
-          id: string
-          job_id: string | null
-          linkedin_url: string | null
-          looked_up_by_profile_id: string | null
-          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
-          title: string | null
-        }
-        Insert: {
-          apollo_person_id?: string | null
-          apollo_raw?: Json | null
-          created_at?: string
-          email?: string | null
-          error_message?: string | null
-          external_job_key?: string | null
-          full_name?: string | null
-          id?: string
-          job_id?: string | null
-          linkedin_url?: string | null
-          looked_up_by_profile_id?: string | null
-          status: Database["public"]["Enums"]["hiring_contact_lookup_status"]
-          title?: string | null
-        }
-        Update: {
-          apollo_person_id?: string | null
-          apollo_raw?: Json | null
-          created_at?: string
-          email?: string | null
-          error_message?: string | null
-          external_job_key?: string | null
-          full_name?: string | null
-          id?: string
-          job_id?: string | null
-          linkedin_url?: string | null
-          looked_up_by_profile_id?: string | null
-          status?: Database["public"]["Enums"]["hiring_contact_lookup_status"]
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_hiring_contacts_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "job_hopper_live"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_hiring_contacts_looked_up_by_profile_id_fkey"
-            columns: ["looked_up_by_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       job_processor_flags: {
         Row: {
           apollo_credits_exhausted: boolean
@@ -442,6 +425,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          excluded_title_keywords: string[]
           id: string
           keyword_current_industry_weight: number
           keyword_current_job_title_weight: number
@@ -464,7 +448,6 @@ export type Database = {
           recency_base_weight: number
           recency_max_age_days: number
           recency_per_day_decay: number
-          excluded_title_keywords: string[]
           semantic_rerank_count: number
           semantic_rerank_enabled: boolean
           semantic_weight: number
@@ -684,7 +667,6 @@ export type Database = {
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
-          target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -694,7 +676,6 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
-          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email: string
@@ -736,25 +717,9 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
-          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
-        }
-        Relationships: []
-      }
-      apollo_usage_daily: {
-        Row: {
-          request_count: number
-          usage_date: string
-        }
-        Insert: {
-          request_count?: number
-          usage_date: string
-        }
-        Update: {
-          request_count?: number
-          usage_date?: string
         }
         Relationships: []
       }
@@ -774,6 +739,24 @@ export type Database = {
         Update: {
           fingerprint?: string
           ip_network?: string
+          successful_lookups?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      public_teaser_hiring_contact_usage: {
+        Row: {
+          auth_user_id: string
+          successful_lookups: number
+          updated_at: string
+        }
+        Insert: {
+          auth_user_id: string
+          successful_lookups?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_user_id?: string
           successful_lookups?: number
           updated_at?: string
         }
@@ -1183,7 +1166,6 @@ export type Database = {
     }
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
-      increment_apollo_usage_daily: { Args: { p_delta?: number }; Returns: number }
       claim_scraper_raw_jobs: {
         Args: { p_limit: number }
         Returns: {
@@ -1210,7 +1192,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      clean_scraper_raw_jobs_n8n_parity: { Args: never; Returns: Json }
       create_user_profile: {
         Args: {
           first_name: string
@@ -1238,9 +1219,16 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      increment_apollo_usage_daily: {
+        Args: { p_delta?: number }
+        Returns: number
+      }
+      increment_public_teaser_hiring_contact_usage: {
+        Args: { p_auth_user_id: string }
+        Returns: number
+      }
     }
     Enums: {
-      hiring_contact_lookup_status: "found" | "not_found" | "error",
       bd_leads_status:
         | "New"
         | "Ready to Process"
@@ -1253,9 +1241,10 @@ export type Database = {
         | "job_match_digest"
         | "subscription_update"
         | "system_announcement"
+      hiring_contact_lookup_status: "found" | "not_found" | "error"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
       job_processor_run_status: "queued" | "running" | "completed" | "failed"
-      pay_type: "hour" | "year" | "month" | "week" | "day"
+      pay_type: "hour" | "year" | "month" | "week"
       product_category:
         | "base_plan"
         | "subscription_addon"
@@ -1401,7 +1390,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      hiring_contact_lookup_status: ["found", "not_found", "error"],
       bd_leads_status: [
         "New",
         "Ready to Process",
@@ -1416,9 +1404,10 @@ export const Constants = {
         "subscription_update",
         "system_announcement",
       ],
+      hiring_contact_lookup_status: ["found", "not_found", "error"],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
       job_processor_run_status: ["queued", "running", "completed", "failed"],
-      pay_type: ["hour", "year", "month", "week", "day"],
+      pay_type: ["hour", "year", "month", "week"],
       product_category: [
         "base_plan",
         "subscription_addon",
@@ -1442,3 +1431,4 @@ export const Constants = {
     },
   },
 } as const
+
