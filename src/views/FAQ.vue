@@ -10,7 +10,7 @@ const toggleFaq = (index: number) => {
 const faqs = [
   {
     q: "What is Job-Hopper?",
-    a: "Job-Hopper is a subscription-based job matching service and web app built for job seekers—not employers. We continuously scan and curate roles from across the web, then use your profile, preferences, and career level to send you only the opportunities that make sense for you."
+    a: "Job-Hopper is a subscription-based job matching service and web app built for job seekers—not employers. Think of it as the AI tool that does your job search for you: we continuously scan and curate roles from across the web, then use your profile, preferences, and career level to deliver only the opportunities that make sense for you."
   },
   {
     q: "How is this different from job boards like Indeed or LinkedIn?",
@@ -33,12 +33,12 @@ const faqs = [
     a: "We pull from public job boards, direct company career pages, and other online sources. Our automation engine continuously scans for new postings, then our rules and team review them for freshness, legitimacy, and signs of real hiring activity before they ever reach your feed."
   },
   {
-    q: "Is Job-Hopper only for manufacturing professionals?",
-    a: "Job-Hopper is built to work for all job seekers, and it performs especially well for manufacturing, industrial, and related roles. Our automation engine actively searches and matches across industries based on your profile and preferences. Right now, our human team focuses the majority of manual vetting and curation on manufacturing and industrial jobs to keep quality extremely high in that space. For other common roles—like nurses, office staff, retail managers, banking, construction, hospitality, and more—the automation engine still works very effectively, but there may be less human oversight than for manufacturing positions. Highly obscure or unusual roles may naturally generate fewer matches, but the system will still search on your behalf."
+    q: "Is Job-Hopper only for certain industries?",
+    a: "No. Job-Hopper is built for anyone in the United States who is serious about their next move. Our automation engine searches and matches across industries from your profile and preferences. We add extra human vetting where we see the densest, noisiest markets—today that includes manufacturing and tech, especially analytics and engineering-heavy roles—so matches stay sharp. For other fields (healthcare, retail leadership, logistics, professional services, and more) the same engine still works effectively; niche or highly unusual titles may see fewer postings simply because the market is thinner, but we keep searching on your behalf."
   },
   {
     q: "Which industries do you cover today?",
-    a: "Our initial core is manufacturing and industrial roles in the United States—everything from entry-level plant-floor positions to engineering, management, and executive leadership. That said, Job-Hopper can also support a wide range of more common roles outside manufacturing (for example: healthcare, admin/office, construction, logistics, retail and hospitality, banking, and similar fields) through our automation engine. As the platform grows, we'll expand formal, human-curated coverage into additional industries—without compromising quality."
+    a: "Today the product spans the economy—from desk jobs to the plant floor and everything in between. We are seeing standout results for people in tech and manufacturing, particularly analytics and engineering paths such as Data Analyst, Systems Analyst, Full Stack Developer, Mechanical Engineer, Process Engineer, Supply Chain Analyst, Manufacturing Systems Analyst, and IT Support Specialist. In those busy segments we pair AI matching with extra human review to keep signal high. Healthcare, logistics, retail leadership, professional services, and other sectors already run on the same engine, and we keep deepening coverage as we grow."
   },
   {
     q: "Which locations do you support?",
@@ -51,6 +51,10 @@ const faqs = [
   {
     q: "Can I change my preferences later?",
     a: "Yes. You can update your target roles, salary expectations, locations, industries of interest, and other settings at any time from your Job-Hopper dashboard. Your future matches will automatically adjust as you refine your profile."
+  },
+  {
+    q: "What is the sponsorship-likelihood signal?",
+    a: "For roles that flow through the Hopper, Job-Hopper runs thorough analysis of posting and employer metadata to produce a sponsorship-likelihood estimate—useful when you need to prioritize openings where employer visa sponsorship (for example H-1B) is more plausible. It is a filter and a time-saver, not a guarantee that any specific role or company will sponsor. Many subscribers never turn it on; it is there when your situation calls for it."
   },
   {
     q: "How does the free trial work?",

@@ -4,7 +4,8 @@
  */
 
 export interface JobSummary {
-  id: number
+  /** `job_hopper_live.id` (string) or legacy numeric ids */
+  id: string | number
   title: string | null
   companyName: string | null
   location: string | null
@@ -50,13 +51,16 @@ export function renderJobMatchDigest(params: {
 
   const jobBlocks = jobs
     .map(
-      (j) => `
+      (j) => {
+        const preview = jobMatchDigestPreview(j)
+        return `
   <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
     <h3 style="margin: 0 0 0.25rem 0; font-size: 1.1rem;">${escapeHtml(j.title ?? "Job")} at ${escapeHtml(j.companyName ?? "Company")}</h3>
     <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #555;">${escapeHtml(j.location ?? "")}</p>
-    ${j.description ? `<p style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">${escapeHtml(truncate(j.description, 200))}</p>` : ""}
+    ${preview ? `<p style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">${escapeHtml(preview)}</p>` : ""}
     <a href="${escapeHtml(j.applyLink ?? "#")}" style="display: inline-block; padding: 0.5rem 1rem; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">Apply</a>
   </div>`
+      }
     )
     .join("")
 
@@ -77,12 +81,16 @@ export function renderJobMatchDigest(params: {
     `Hi ${recipientName},`,
     "Here are new job matches for you.",
     "",
-    ...jobs.flatMap((j) => [
-      `${j.title ?? "Job"} at ${j.companyName ?? "Company"}`,
-      j.location ?? "",
-      `Apply: ${j.applyLink ?? ""}`,
-      "",
-    ]),
+    ...jobs.flatMap((j) => {
+      const preview = jobMatchDigestPreview(j)
+      const lines = [
+        `${j.title ?? "Job"} at ${j.companyName ?? "Company"}`,
+        j.location ?? "",
+      ]
+      if (preview) lines.push(preview)
+      lines.push(`Apply: ${j.applyLink ?? ""}`, "")
+      return lines
+    }),
     `View all: ${dashboardUrl}`,
     "",
     "Manage preferences: " + prefsUrl,
@@ -264,6 +272,19 @@ export function wrapAnnouncementWithFooter(
   ${footerHtml({ preferencesUrl: prefsUrl, unsubscribeUrl: unsubUrl })}
 </body>
 </html>`
+}
+
+/** Short blurb for digest: prefer AI briefing over raw job description (often HTML). */
+function jobMatchDigestPreview(j: JobSummary): string | null {
+  const briefing = j.aiBriefing?.trim()
+  if (briefing) return truncate(briefing, 200)
+  const plain = j.description?.trim()
+  if (plain) return truncate(stripHtmlToPlain(plain), 200)
+  return null
+}
+
+function stripHtmlToPlain(html: string): string {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
 }
 
 function escapeHtml(s: string): string {

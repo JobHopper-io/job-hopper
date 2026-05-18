@@ -21,15 +21,14 @@
       </router-link>
 
       <router-link
-        v-if="isSuperAdmin"
-        to="/admin/job-processor"
-        class="group rounded-2xl border border-neutral-border bg-white/60 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+        to="/admin/dashboard-banner"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
       >
         <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
-          Job processor
+          Dashboard banner
         </h2>
         <p class="text-sm text-neutral-body">
-          Start pipeline runs and monitor status (scraped jobs → enrichment → live).
+          Schedule a temporary message on the user dashboard (maintenance, releases, etc.).
         </p>
       </router-link>
 
@@ -42,6 +41,18 @@
         </h2>
         <p class="text-sm text-neutral-body">
           Configure and monitor the algorithm that powers job matches.
+        </p>
+      </router-link>
+
+      <router-link
+        to="/admin/test-emails"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Test emails
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Send sample transactional emails to a user for QA (job digests, subscription, announcements).
         </p>
       </router-link>
 

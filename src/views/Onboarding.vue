@@ -25,6 +25,7 @@ const currentIndustry = ref('')
 const requiresUsSponsorship = ref<boolean | null>(null)
 
 // Step 2: Targets
+const targetJobTitle = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
 const desiredSalaryMin = ref<number | null>(null)
 const desiredSalaryMax = ref<number | null>(null)
@@ -57,7 +58,11 @@ const canProceedStep1 = computed(() => {
 })
 
 const canProceedStep2 = computed(() => {
-  return targetRoleCategories.value.length > 0 && preferredLocations.value.length > 0
+  return (
+    targetJobTitle.value.trim().length > 0 &&
+    targetRoleCategories.value.length > 0 &&
+    preferredLocations.value.length > 0
+  )
 })
 
 const canProceedStep4 = computed(() => {
@@ -89,6 +94,7 @@ function populateFromProfile() {
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry ?? ''
 
+  targetJobTitle.value = p.target_job_title ?? ''
   const validCategories = (p.target_role_categories ?? []).filter(
     (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
   )
@@ -188,6 +194,7 @@ const handleProceedToCheckout = async () => {
       first_name: firstName.value.trim() || undefined,
       last_name: lastName.value.trim() || undefined,
       current_job_title: currentJobTitle.value,
+      target_job_title: targetJobTitle.value.trim(),
       years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
@@ -208,10 +215,11 @@ const handleProceedToCheckout = async () => {
     }
 
     if (resumeFile.value) {
-      try {
-        await profileAPI.uploadResume(resumeFile.value)
-      } catch (resumeError) {
-        console.error('Error uploading resume:', resumeError)
+      const { error: resumeUploadError } = await profileAPI.uploadResume(resumeFile.value)
+      if (resumeUploadError) {
+        console.error('Error uploading resume:', resumeUploadError)
+        error.value = resumeUploadError.message || 'Could not upload your resume. Please try again.'
+        return
       }
     }
 
@@ -339,7 +347,7 @@ const handleProceedToCheckout = async () => {
                 type="text"
                 required
                 class="input"
-                placeholder="e.g., Manufacturing, Food Production"
+                placeholder="e.g., Technology, Healthcare, Manufacturing"
               />
             </div>
 
@@ -367,6 +375,9 @@ const handleProceedToCheckout = async () => {
                   <span class="text-sm text-neutral-body">No, I do not require sponsorship</span>
                 </label>
               </div>
+              <p class="mt-2 text-sm text-neutral-body">
+                If you select yes, Job-Hopper can surface a sponsorship-likelihood signal on postings (from metadata analysis in the Hopper). It helps you focus your time—it does not guarantee an employer will sponsor.
+              </p>
             </div>
           </div>
         </div>
@@ -381,6 +392,17 @@ const handleProceedToCheckout = async () => {
           </p>
 
           <div class="space-y-6">
+            <div>
+              <label for="targetJobTitle" class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
+              <input
+                id="targetJobTitle"
+                v-model="targetJobTitle"
+                type="text"
+                required
+                class="input"
+                placeholder="e.g., Maintenance Supervisor"
+              />
+            </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories (select all that apply)</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

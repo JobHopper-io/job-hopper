@@ -7,6 +7,9 @@ import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats, type JobMatchSort } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import { dashboardBannerAPI, isDashboardBannerActive } from '@/lib/dashboardBanner'
+import { markdownToSafeHtml } from '@/lib/markdown'
+import type { DashboardBanner } from '@/types/database'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 
 const PROFILE_COMPLETION_DISMISSED_KEY = 'profileCompletionCardDismissed'
@@ -37,6 +40,11 @@ const adviceByMatchId = ref<Record<string, ResumeProduct>>({})
 const isLoadingMatches = ref(false)
 const matchesError = ref<string | null>(null)
 
+const dashboardBanner = ref<DashboardBanner | null>(null)
+const showDashboardBanner = computed(() => isDashboardBannerActive(dashboardBanner.value))
+
+const dashboardBannerMessageHtml = computed(() => markdownToSafeHtml(dashboardBanner.value?.message))
+
 // Filters
 const selectedRoleTypes = ref<RoleCategoryValue[]>([])
 const selectedLocation = ref('')
@@ -64,11 +72,12 @@ const activeAddonsForDisplay = computed(() =>
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
   const p = profile.value
-  if (!p) return { filled: 0, total: 7, percent: 0 }
+  if (!p) return { filled: 0, total: 8, percent: 0 }
   const fields = [
     !!p.first_name?.trim(),
     !!p.last_name?.trim(),
     !!p.current_job_title?.trim(),
+    !!p.target_job_title?.trim(),
     (p.target_role_categories?.length ?? 0) > 0,
     (p.desired_salary_min != null || p.desired_salary_max != null) || (p.preferred_locations?.length ?? 0) > 0,
     p.years_of_experience != null,
@@ -171,14 +180,36 @@ watch(profile, () => {
   // Filters start neutral; do not auto-populate from profile.
 })
 
+async function loadDashboardBanner() {
+  const { data } = await dashboardBannerAPI.get()
+  dashboardBanner.value = data
+}
+
 onMounted(() => {
   void loadMatchesAndStats()
+  void loadDashboardBanner()
 })
 </script>
 
 <template>
   <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto">
+      <div
+        v-if="showDashboardBanner && dashboardBanner"
+        class="mb-8 rounded-2xl bg-brand-primary shadow-lg ring-1 ring-black/5"
+        role="region"
+        aria-label="Announcement"
+      >
+        <div
+          class="px-5 py-4 sm:px-8 sm:py-5 text-center font-heading [&_a]:text-white [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-white/70 hover:[&_a]:decoration-white"
+        >
+          <div
+            class="prose prose-invert prose-sm sm:prose-base max-w-none mx-auto text-center text-white [text-wrap:balance] prose-headings:font-heading prose-headings:font-semibold prose-headings:text-white prose-p:text-white prose-p:leading-snug prose-p:my-2 prose-li:text-white prose-li:marker:text-white prose-strong:text-white prose-em:text-white prose-a:text-white prose-blockquote:text-white prose-code:text-white prose-pre:text-white first:prose-p:mt-0 last:prose-p:mb-0"
+            v-html="dashboardBannerMessageHtml"
+          />
+        </div>
+      </div>
+
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">

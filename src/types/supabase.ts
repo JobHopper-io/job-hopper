@@ -694,6 +694,7 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
+          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email: string
@@ -710,7 +711,6 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
-          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null

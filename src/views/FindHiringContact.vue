@@ -39,8 +39,8 @@ async function refreshSession() {
 
 const {
   data: { subscription: authTeaserListener },
-} = onAuthStateChange(() => {
-  void refreshSession()
+} = onAuthStateChange(async () => {
+  await refreshSession()
 })
 
 const canSendCode = computed(

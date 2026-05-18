@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import {
   type JobRecord,
   type RankedJob,
@@ -110,6 +110,7 @@ serve(async (req) => {
         first_name,
         email,
         current_job_title,
+        target_job_title,
         current_industry,
         target_role_categories,
         desired_salary_min,
@@ -155,6 +156,7 @@ serve(async (req) => {
     const preferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
+      targetJobTitle: profile.target_job_title,
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
       excludedKeywords,

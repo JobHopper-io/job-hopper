@@ -31,9 +31,10 @@ const adminPaths = [
   '/admin',
   '/admin/dashboard',
   '/admin/admin-management',
-  '/admin/job-processor',
   '/admin/job-matching-algorithm',
+  '/admin/test-emails',
   '/admin/settings',
+  '/admin/dashboard-banner',
 ]
 
 const router = createRouter({
@@ -160,8 +161,7 @@ const router = createRouter({
     },
     {
       path: '/admin/job-processor',
-      name: 'admin-job-processor',
-      component: () => import('../views/AdminJobProcessor.vue'),
+      redirect: '/admin/dashboard',
     },
     {
       path: '/admin/job-matching-algorithm',
@@ -169,9 +169,19 @@ const router = createRouter({
       component: () => import('../views/AdminJobMatchingAlgorithm.vue'),
     },
     {
+      path: '/admin/test-emails',
+      name: 'admin-test-emails',
+      component: () => import('../views/AdminTestEmails.vue'),
+    },
+    {
       path: '/admin/settings',
       name: 'admin-settings',
       component: () => import('../views/AdminSettings.vue'),
+    },
+    {
+      path: '/admin/dashboard-banner',
+      name: 'admin-dashboard-banner',
+      component: () => import('../views/AdminDashboardBanner.vue'),
     },
     {
       path: '/:pathMatch(.*)*',
@@ -204,6 +214,15 @@ async function getUserWithTimeout(timeoutMs = 2000) {
     console.error('Router guard auth timeout/failure:', error)
     return null
   }
+}
+
+/** True when the app is running as an installed PWA (not a normal browser tab). */
+function isPwaDisplayMode(): boolean {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true
+  if (window.matchMedia?.('(display-mode: window-controls-overlay)').matches) return true
+  const nav = window.navigator as { standalone?: boolean }
+  return nav.standalone === true
 }
 
 // Router guard to enforce authentication and handle redirects
@@ -243,6 +262,16 @@ router.beforeEach(async (to) => {
     return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
   }
 
+  // PWA: last-opened URL can be /install-app; send users to the app instead of the install guide.
+  if (targetPath === '/install-app' && isPwaDisplayMode()) {
+    user = user ?? (await getUserWithTimeout())
+    if (!user) {
+      return '/login'
+    }
+    const userProfile = await getProfile()
+    return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
+  }
+
   // Public paths don't require authentication; never block these on Supabase.
   if (isPublicPath) {
     return true
@@ -277,7 +306,7 @@ router.beforeEach(async (to) => {
     ])
 
     // Admin Management and Job processor are restricted to super_admin only.
-    if (targetPath === '/admin/admin-management' || targetPath === '/admin/job-processor') {
+    if (targetPath === '/admin/admin-management') {
       if (!isSuperAdmin) {
         return '/dashboard'
       }

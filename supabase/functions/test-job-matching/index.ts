@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import {
   type JobRecord,
   type MatchConfig,
@@ -21,6 +21,8 @@ const corsHeaders = {
 }
 
 interface TestJobMatchingBody {
+  /** When set, base subscriber preferences and `profile_id` in the response use this profile (must have completed onboarding). */
+  targetProfileId?: string
   preferencesOverride?: Partial<SubscriberPreferences>
   matchConfigOverride?: Partial<MatchConfig>
 }
@@ -56,6 +58,7 @@ function mergePreferences(
         ? overrides.subscriptionTierProductKeys
         : base.subscriptionTierProductKeys,
     roles: overrides.roles ?? base.roles,
+    targetJobTitle: overrides.targetJobTitle !== undefined ? overrides.targetJobTitle : base.targetJobTitle,
     currentJobTitle: overrides.currentJobTitle !== undefined ? overrides.currentJobTitle : base.currentJobTitle,
     currentIndustry: overrides.currentIndustry !== undefined ? overrides.currentIndustry : base.currentIndustry,
     payRangeMin: overrides.payRangeMin !== undefined ? overrides.payRangeMin : base.payRangeMin,
@@ -140,28 +143,13 @@ serve(async (req) => {
       )
     }
 
-    const { data: profile, error: profileError } = await supabaseUserClient
-      .from('profiles')
-      .select(
-        `
-        id,
-        current_job_title,
-        current_industry,
-        target_role_categories,
-        desired_salary_min,
-        desired_salary_max,
-        preferred_locations,
-        open_to_relocation,
-        open_to_remote,
-        location_radius_miles,
-        excluded_keywords
-      `,
-      )
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (profileError || !profile) {
-      throw new Error('User profile not found')
+    let body: TestJobMatchingBody = {}
+    if (req.method === 'POST' && req.headers.get('Content-Type')?.includes('application/json')) {
+      try {
+        body = (await req.json()) as TestJobMatchingBody
+      } catch {
+        // ignore invalid JSON; use empty overrides
+      }
     }
 
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -178,6 +166,87 @@ serve(async (req) => {
         },
       },
     )
+
+    const targetProfileId =
+      typeof body.targetProfileId === 'string' ? body.targetProfileId.trim() : ''
+
+    let profile: {
+      id: string
+      current_job_title: string | null
+      target_job_title: string | null
+      current_industry: string | null
+      target_role_categories: unknown
+      desired_salary_min: number | null
+      desired_salary_max: number | null
+      preferred_locations: unknown
+      open_to_relocation: boolean | null
+      open_to_remote: boolean | null
+      location_radius_miles: number | null
+    }
+
+    if (targetProfileId.length > 0) {
+      const { data: targetProfile, error: targetProfileError } = await supabaseAdminClient
+        .from('profiles')
+        .select(
+          `
+        id,
+        onboarding_completed,
+        current_job_title,
+        target_job_title,
+        current_industry,
+        target_role_categories,
+        desired_salary_min,
+        desired_salary_max,
+        preferred_locations,
+        open_to_relocation,
+        open_to_remote,
+        location_radius_miles
+      `,
+        )
+        .eq('id', targetProfileId)
+        .eq('onboarding_completed', true)
+        .single()
+
+      if (targetProfileError || !targetProfile) {
+        return new Response(
+          JSON.stringify({
+            error: 'Target profile not found or has not completed onboarding',
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          },
+        )
+      }
+
+      profile = targetProfile
+    } else {
+      const { data: selfProfile, error: profileError } = await supabaseUserClient
+        .from('profiles')
+        .select(
+          `
+        id,
+        current_job_title,
+        target_job_title,
+        current_industry,
+        target_role_categories,
+        desired_salary_min,
+        desired_salary_max,
+        preferred_locations,
+        open_to_relocation,
+        open_to_remote,
+        location_radius_miles
+      `,
+        )
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (profileError || !selfProfile) {
+        throw new Error('User profile not found')
+      }
+
+      profile = selfProfile
+    }
 
     const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
       supabaseAdminClient,
@@ -196,6 +265,7 @@ serve(async (req) => {
     const basePreferences: SubscriberPreferences = {
       subscriptionTierProductKeys,
       roles: (profile.target_role_categories ?? []) as string[],
+      targetJobTitle: profile.target_job_title,
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
       excludedKeywords,
@@ -205,15 +275,6 @@ serve(async (req) => {
       openToRelocation: profile.open_to_relocation,
       openToRemote: profile.open_to_remote,
       locationRadiusMiles: profile.location_radius_miles ?? null,
-    }
-
-    let body: TestJobMatchingBody = {}
-    if (req.method === 'POST' && req.headers.get('Content-Type')?.includes('application/json')) {
-      try {
-        body = (await req.json()) as TestJobMatchingBody
-      } catch {
-        // ignore invalid JSON; use empty overrides
-      }
     }
 
     const preferences = mergePreferences(basePreferences, body.preferencesOverride)

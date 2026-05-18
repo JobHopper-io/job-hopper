@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import type { MatchingAlgorithmAdminDbRow } from "../_shared/matching-algorithm-config-db.ts"
 

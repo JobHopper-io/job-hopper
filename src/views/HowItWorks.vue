@@ -8,10 +8,10 @@
         </h1>
         <div class="prose prose-lg max-w-none text-neutral-body">
           <p class="text-lg mb-4">
-            Job-Hopper sits on top of the job market - not inside it.
+            Job-Hopper is the AI layer that runs your U.S. job search for you—so you are not stuck refreshing five sites every night.
           </p>
           <p class="mb-4">
-            We continuously scan job boards and direct company postings, then actively vet each role for freshness, legitimacy, and real hiring activity. Our cutting edge system filters out stale listings, passive resume-collecting posts, and low-activity roles before they ever reach you.
+            We continuously scan job boards and direct company postings, then actively vet each role for freshness, legitimacy, and real hiring activity. Our system filters out stale listings, passive resume-collecting posts, and low-activity roles before they ever reach you.
           </p>
           <p class="mb-4">
             From there, our team and proprietary matching engine combine your profile, preferences, and career level with enriched company data and behind-the-scenes hiring insights to deliver only the most relevant opportunities, in real time.
@@ -20,10 +20,13 @@
             On higher tiers, Job-Hopper goes further - providing company intelligence, role context, hiring contact insights, and interview-prep guidance so you're not just applying blindly, but approaching opportunities with clarity and confidence.
           </p>
           <p class="mb-4">
+            For every role that passes through the Hopper, we also run deep metadata analysis. One outcome of that pipeline is a sponsorship-likelihood signal: when visa sponsorship is part of your situation, you can use it to spend less time on postings that are unlikely to line up—without Job-Hopper becoming a sponsorship-only product. The signal is a practical filter and estimate, not a promise that a given employer will sponsor.
+          </p>
+          <p class="mb-4">
             The result? Fewer distractions. Better timing. Smarter matches.
           </p>
           <p class="font-medium">
-            Job-Hopper turns a chaotic job search into a focused, technology-driven advantage - built entirely around you.
+            Job-Hopper turns a chaotic job search into a focused, AI-driven advantage—the kind of upgrade people will expect from job search from here on out.
           </p>
         </div>
       </section>
@@ -104,6 +107,12 @@
                   </svg>
                   <span>Map roles to experience levels so you don't see jobs that waste your time.</span>
                 </li>
+                <li class="flex items-start">
+                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span>Analyze posting metadata so you can optionally filter or sort by sponsorship likelihood when H-1B or other employer sponsorship is relevant to you.</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -144,6 +153,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                   <span>Experience level</span>
+                </li>
+                <li class="flex items-start">
+                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span>Your sponsorship needs and sponsorship-likelihood on each posting (when you use that filter)</span>
                 </li>
               </ul>
               <p class="text-neutral-body">
@@ -222,6 +237,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
             <span>Pause certain types of roles</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span>Turn sponsorship-likelihood filtering on or off depending on whether visa sponsorship is part of your search right now</span>
           </li>
         </ul>
       </section>

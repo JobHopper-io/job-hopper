@@ -1,5 +1,32 @@
 import { supabase } from '@/lib/supabase'
 
+export type AdminTestEmailKind =
+  | 'job_match_digest'
+  | 'subscription_started'
+  | 'subscription_updated'
+  | 'subscription_cancel_scheduled'
+  | 'subscription_canceled'
+  | 'system_announcement'
+
+export interface AdminSendTestEmailPayload {
+  profile_id?: string
+  email?: string
+  kind: AdminTestEmailKind
+  job_ids?: string[]
+  plan_name?: string
+  next_billing_date?: string
+  cancel_at_date?: string
+  announcement_id?: string
+}
+
+export interface AdminSendTestEmailResult {
+  success: boolean
+  message_id: string | null
+  error: string | null
+  kind: AdminTestEmailKind
+  profile_id: string
+}
+
 interface AdminUserRow {
   id: string
   email: string
@@ -57,6 +84,20 @@ export const adminAPI = {
     }
 
     return { data: data as ListUsersResult, error: null }
+  },
+
+  async sendTestEmail(
+    payload: AdminSendTestEmailPayload,
+  ): Promise<{ data: AdminSendTestEmailResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-send-test-email', {
+      body: payload,
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as AdminSendTestEmailResult, error: null }
   },
 }
 

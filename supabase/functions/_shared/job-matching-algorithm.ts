@@ -11,6 +11,8 @@ export interface SubscriberPreferences {
   /** `products.key` for base_plan rows on the subscriber's active subscriptions; must align with `job_hopper_live.subscription_tier`. */
   subscriptionTierProductKeys: string[]
   roles: string[]
+  /** When set (non-empty), title keywords are derived from this; otherwise {@link currentJobTitle} is used. */
+  targetJobTitle: string | null
   currentJobTitle: string | null
   currentIndustry: string | null
   /** Lowercase phrases; job excluded when job.title contains any (substring match). */
@@ -228,7 +230,8 @@ function toJobDataForInference(job: JobRecord): JobDataForInference {
   }
 }
 
-const AUXILIARY_KEYWORDS = new Set<string>([
+/** Dropped when they are the only word in an n-gram. */
+const AUXILIARY_KEYWORDS_ALONE = new Set<string>([
   'senior',
   'jr',
   'junior',
@@ -239,7 +242,6 @@ const AUXILIARY_KEYWORDS = new Set<string>([
   'temporary',
   'lead',
   'principal',
-  'staff',
   'associate',
   'assistant',
   'manager',
@@ -254,7 +256,33 @@ const AUXILIARY_KEYWORDS = new Set<string>([
   'coordinator',
   'analyst',
   'generalist',
+  'staff',
+  'executive',
+  'director',
+  'student',
+  'masters',
 ])
+
+/**
+ * Dropped when the first and/or last token in an n-gram (and thus alone, when length is 1).
+ * Example: n-gram "a &" or "and sales" is dropped, but "sales and marketing" is kept.
+ */
+const AUXILIARY_KEYWORDS_ENDS = new Set<string>(['&', 'and'])
+
+function isDroppedKeywordNgram(words: string[]): boolean {
+  if (words.length === 0) {
+    return true
+  }
+  const first = words[0]
+  const last = words[words.length - 1]
+  if (AUXILIARY_KEYWORDS_ENDS.has(first) || AUXILIARY_KEYWORDS_ENDS.has(last)) {
+    return true
+  }
+  if (words.length === 1 && AUXILIARY_KEYWORDS_ALONE.has(first)) {
+    return true
+  }
+  return false
+}
 
 /**
  * Generate keyword phrases from a comma-separated field.
@@ -262,7 +290,7 @@ const AUXILIARY_KEYWORDS = new Set<string>([
  * For each comma-separated segment, we:
  * - split into words
  * - generate all contiguous left-to-right n-grams (length 1..N)
- * - drop single-word n-grams that are purely auxiliary (e.g. "senior", "junior", "mid", "temp")
+ * - drop n-grams per {@link isDroppedKeywordNgram}
  *
  * Example: "Senior Electrical Engineer" →
  * - "senior electrical engineer"
@@ -292,7 +320,7 @@ function commaSeparatedKeywords(input: string | null | undefined): string[] {
     for (let len = n; len >= 1; len -= 1) {
       for (let start = 0; start + len <= n; start += 1) {
         const slice = words.slice(start, start + len)
-        if (slice.length === 1 && AUXILIARY_KEYWORDS.has(slice[0])) {
+        if (isDroppedKeywordNgram(slice)) {
           continue
         }
         set.add(slice.join(' '))
@@ -303,10 +331,24 @@ function commaSeparatedKeywords(input: string | null | undefined): string[] {
   return Array.from(set)
 }
 
-/** All keywords used for role matching: union of current job title and industry. */
+/**
+ * Text used for job-title keyword extraction: trimmed target title when present,
+ * otherwise the subscriber's current job title (unchanged string if non-empty after trim).
+ */
+export function effectiveJobTitleForKeywords(prefs: SubscriberPreferences): string | null {
+  const target = (prefs.targetJobTitle ?? '').trim()
+  if (target.length > 0) {
+    return target
+  }
+  const current = prefs.currentJobTitle
+  if (current == null) return null
+  return String(current).trim().length > 0 ? current : null
+}
+
+/** All keywords used for role matching: union of effective job title (target else current) and industry. */
 function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
   const set = new Set<string>()
-  for (const kw of commaSeparatedKeywords(prefs.currentJobTitle)) set.add(kw)
+  for (const kw of commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))) set.add(kw)
   for (const kw of commaSeparatedKeywords(prefs.currentIndustry)) set.add(kw)
   return Array.from(set)
 }
@@ -336,7 +378,7 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
  * Used to show score as percentage of max on the admin job-matching page.
  */
 export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
   const maxKeyword =
     titleKeywords.length * cfg.keywordWeights.currentJobTitleKeyword +
@@ -377,7 +419,7 @@ function computeRoleScore(
   const titleNorm = normalizeText(job.title)
   const bodyNorm = normalizeText(`${job.description ?? ''} ${job.aiBriefing ?? ''}`).trim()
 
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
@@ -429,7 +471,7 @@ function computeRoleScoreWithKeywords(
   const titleNorm = normalizeText(job.title)
   const bodyNorm = normalizeText(`${job.description ?? ''} ${job.aiBriefing ?? ''}`).trim()
 
-  const titleKeywords = commaSeparatedKeywords(prefs.currentJobTitle)
+  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
   const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
 
   let score = 0
@@ -491,7 +533,9 @@ function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: numb
         ? 52
         : type === 'month' || type === 'monthly'
           ? 12
-          : 1
+          : type === 'day' || type === 'daily'
+            ? 260
+            : 1
 
   const rawMin = payMin ?? payMax
   const rawMax = payMax ?? payMin
@@ -781,6 +825,10 @@ export function matchJobs(
       continue
     }
 
+    if (job.isRemote && prefs.openToRemote === false) {
+      continue
+    }
+
     const payScore = computePayScore(prefs, job, cfg)
     const { score: locationScore } = computeLocationScore(prefs, job, cfg)
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
@@ -852,6 +900,7 @@ export interface MatchJobsDebugPayload {
     maxScore: number | null
     averageScore: number | null
     averageRoleScore: number | null
+    averagePayScore: number | null
     averageLocationScore: number | null
     averageRecencyScore: number | null
     maxPossibleScore: number
@@ -889,6 +938,7 @@ export function matchJobsWithDebug(
   let maxScore: number | null = null
   let sumScore = 0
   let sumRoleScore = 0
+  let sumPayScore = 0
   let sumLocationScore = 0
   let sumRecencyScore = 0
 
@@ -992,6 +1042,7 @@ export function matchJobsWithDebug(
     if (maxScore === null || totalScore > maxScore) maxScore = totalScore
     sumScore += totalScore
     sumRoleScore += roleScore
+    sumPayScore += payScore
     sumLocationScore += locationScore
     sumRecencyScore += recencyScore
 
@@ -1035,6 +1086,7 @@ export function matchJobsWithDebug(
       maxScore,
       averageScore: count > 0 ? sumScore / count : null,
       averageRoleScore: count > 0 ? sumRoleScore / count : null,
+      averagePayScore: count > 0 ? sumPayScore / count : null,
       averageLocationScore: count > 0 ? sumLocationScore / count : null,
       averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
       maxPossibleScore,

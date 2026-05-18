@@ -24,19 +24,19 @@ const testimonialInterval = ref<ReturnType<typeof setTimeout> | null>(null)
 
 const testimonials = [
   {
-    text: "Job-Hopper didn't magically flood me with offers, but it did cut out all the junk. I went from scrolling for hours on job boards to checking a short list of roles a few times a week. Landed a maintenance tech job in 3 weeks after nothing for months.",
-    author: "Carlos R.",
-    location: "Toledo, OH"
+    text: "The ghost listings and noise disappeared. Job-Hopper narrowed everything to a short list I could act on. I had two Data Analyst interviews within a month and accepted an offer that was a real step up.",
+    author: "Jordan M.",
+    location: "Austin, TX"
   },
   {
-    text: "Honestly I was skeptical about paying for anything while unemployed, but the free trial sold me. The matches weren't perfect every day, but two of the jobs I applied to turned into real interviews, and one into my new production supervisor role.",
+    text: "I was skeptical about paying while between roles, but the trial won me over. The matches weren't perfect every day, but two applications turned into interviews—and one into my new Process Engineer job.",
     author: "Megan T.",
     location: "Kansas City, MO"
   },
   {
-    text: "I work in healthcare administration, not manufacturing, so I wasn't sure this would fit. It still pulled in a steady trickle of roles that matched what I do. It's not a firehose of jobs, but the ones I get are actually worth applying to.",
-    author: "Jasmine K.",
-    location: "Atlanta, GA"
+    text: "I'm in retail leadership, not software or a plant floor, so I wasn't sure an AI tool would get my profile. It did. Steady, relevant roles—not a firehose—and every week I actually had time to apply well.",
+    author: "Priya S.",
+    location: "Denver, CO"
   }
 ]
 
@@ -344,6 +344,16 @@ onMounted(() => {
     }
   }
   
+  // Logged-in UI preview panels
+  const appPreviewPanels = document.querySelectorAll('.app-preview-panel')
+  appPreviewPanels.forEach((panel, index) => {
+    revealOnScroll(panel, {
+      direction: 'up',
+      distance: 48,
+      delay: index * 0.08,
+    })
+  })
+
   // Create particles
   createParticles()
   
@@ -392,29 +402,35 @@ onUnmounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h1 ref="heroTitleRef" class="text-brand-charcoal mb-6 will-change-opacity">
-              Stop applying into the void.
+              The AI that does your job search for you.
             </h1>
             <p ref="heroSubtitleRef" class="text-xl text-neutral-body mb-6 will-change-opacity">
-              Job-Hopper sends you active, curated, high-quality jobs that actually fit your background—right to your inbox and dashboard.
+              Job-Hopper is a new kind of job search for people in the United States: we scan the market, cut the junk, and deliver curated matches that fit your background—straight to your inbox and dashboard. Stop applying into the void.
             </p>
             <ul ref="heroListRef" class="space-y-3 mb-8">
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Hand-picked openings vetted for recency and quality</span>
+                <span class="text-neutral-body">AI plus human judgment surfaces active, high-quality openings</span>
               </li>
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Matched to your role, pay range, and location</span>
+                <span class="text-neutral-body">Matched to your role, pay range, and location—not random feeds</span>
               </li>
               <li class="flex items-start will-change-transform">
                 <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                <span class="text-neutral-body">Optional access to hiring contact details and interview prep</span>
+                <span class="text-neutral-body">Optional hiring-contact insights and interview prep on premium plans</span>
+              </li>
+              <li class="flex items-start will-change-transform">
+                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-neutral-body">Sponsorship-likelihood signal—deep analysis of each posting’s metadata when you want to prioritize roles where employer visa sponsorship is more plausible (estimates only; not a guarantee)</span>
               </li>
             </ul>
             <div ref="heroButtonsRef" class="flex flex-col sm:flex-row gap-4 mb-4">
@@ -449,44 +465,50 @@ onUnmounted(() => {
               <div class="w-full max-w-md bg-white/95 rounded-2xl shadow-lg p-4 text-left text-[0.8rem] leading-snug">
                 <!-- Dashboard header -->
                 <div class="mb-3">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary">
-                    Dashboard
+                  <p class="text-2xl font-heading font-bold text-brand-charcoal">
+                    Good morning, Jordan
                   </p>
-                  <p class="text-lg font-heading font-bold text-brand-charcoal">
-                    Good morning, Carlos
-                  </p>
-                  <p class="text-xs text-neutral-body">
+                  <p class="text-xs text-neutral-body mt-0.5">
                     Here are your latest job matches.
+                  </p>
+                  <p class="text-[0.65rem] text-neutral-body mt-1">
+                    Your matches update as new opportunities hit the Hopper and as you refine your profile.
                   </p>
                 </div>
 
-                <!-- Summary cards row -->
-                <div class="grid grid-cols-3 gap-2 mb-3">
-                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
-                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
+                <!-- Summary cards — matches live Dashboard.vue -->
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
+                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
                       Subscription
                     </p>
                     <p class="text-xs font-heading font-semibold text-brand-charcoal">
                       Senior &amp; Management
                     </p>
-                    <p class="text-[0.6rem] text-neutral-body">
+                    <p class="text-[0.65rem] text-neutral-body">
                       Active · Trial
                     </p>
-                  </div>
-                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
-                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
-                      Add‑ons
-                    </p>
-                    <p class="text-xs text-brand-charcoal">
-                      Contact details
-                    </p>
-                    <p class="text-[0.6rem] text-neutral-body">
-                      Interview prep
+                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
+                      Manage plan →
                     </p>
                   </div>
-                  <div class="rounded-xl border border-neutral-border bg-neutral-bg px-2 py-2">
-                    <p class="text-[0.6rem] font-semibold text-neutral-body/80 uppercase tracking-wide">
-                      Profile
+                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
+                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
+                      Active add-ons
+                    </p>
+                    <p class="text-[0.65rem] text-neutral-body">
+                      ✓ Hiring contact details
+                    </p>
+                    <p class="text-[0.65rem] text-neutral-body">
+                      ✓ Interview prep
+                    </p>
+                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
+                      Add-ons →
+                    </p>
+                  </div>
+                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
+                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
+                      Profile completion
                     </p>
                     <div class="mt-1 flex items-center gap-1">
                       <div class="h-1.5 flex-1 rounded-full bg-neutral-bg overflow-hidden">
@@ -496,70 +518,118 @@ onUnmounted(() => {
                         80%
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                <!-- Filters strip -->
-                <div class="mb-3 rounded-xl border border-neutral-border bg-neutral-bg/80 px-3 py-2">
-                  <div class="mb-1 flex flex-wrap items-center gap-2">
-                    <p class="text-[0.65rem] font-semibold text-brand-charcoal">
-                      Filters
+                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
+                      Complete profile →
                     </p>
-                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Role type: Maintenance, Production
-                    </span>
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Location: Toledo, OH · 25 mi
-                    </span>
-                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Wage: $26–$40/hr
-                    </span>
-                    <span class="inline-flex items-center rounded-full bg-white px-2 py-[1px] text-[0.6rem] text-neutral-body">
-                      Saved only
-                    </span>
+                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
+                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
+                      Matching statistics
+                    </p>
+                    <p class="text-[0.65rem] text-neutral-body">
+                      <span class="font-medium text-brand-charcoal">This week:</span> 5
+                    </p>
+                    <p class="text-[0.65rem] text-neutral-body">
+                      <span class="font-medium text-brand-charcoal">Total delivered:</span> 28
+                    </p>
+                    <p class="text-[0.65rem] text-neutral-body">
+                      <span class="font-medium text-brand-charcoal">Avg. match score:</span> 87
+                    </p>
                   </div>
                 </div>
 
-                <!-- Mini job feed -->
-                <p class="mb-1 text-[0.7rem] font-semibold text-brand-charcoal">
+                <h2 class="mb-2 text-xl font-heading font-semibold text-brand-charcoal">
                   Recent job matches
-                </p>
+                </h2>
+
+                <!-- Filters card — matches live Dashboard filters panel -->
+                <div class="mb-3 rounded-xl border border-neutral-border bg-white px-3 py-2 shadow-sm">
+                  <p class="text-[0.7rem] font-heading font-semibold text-brand-charcoal mb-2">
+                    Filters
+                  </p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
+                        Role type
+                      </p>
+                      <div class="rounded border border-neutral-border bg-neutral-bg px-1.5 py-1 text-[0.6rem] text-neutral-body">
+                        Analytics, Software development…
+                      </div>
+                    </div>
+                    <div>
+                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
+                        Location
+                      </p>
+                      <div class="rounded border border-neutral-border bg-white px-1.5 py-1 text-[0.6rem] text-neutral-body">
+                        Austin, TX
+                      </div>
+                    </div>
+                    <div>
+                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
+                        Salary range
+                      </p>
+                      <div class="flex gap-1">
+                        <div class="flex-1 rounded border border-neutral-border px-1 py-0.5 text-[0.55rem] text-neutral-body">
+                          75000
+                        </div>
+                        <div class="flex-1 rounded border border-neutral-border px-1 py-0.5 text-[0.55rem] text-neutral-body">
+                          95000
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-end pb-0.5">
+                      <span class="inline-flex items-center gap-1 text-[0.6rem] text-neutral-body">
+                        <span class="inline-block h-2.5 w-2.5 rounded border border-neutral-body/70 bg-white" />
+                        Show saved jobs only
+                      </span>
+                    </div>
+                  </div>
+                  <p class="text-[0.55rem] text-neutral-body mt-2">
+                    Use filters to broaden or narrow what you see.
+                  </p>
+                </div>
+
+                <!-- Job cards — aligned with JobCard.vue (match score label; sponsorship badge when profile requests it) -->
                 <div class="space-y-1.5">
                   <div
                     class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
-                    style="border-left: 3px solid var(--color-brand-primary);"
+                    style="border-left: 4px solid var(--color-brand-primary);"
                   >
                     <div class="flex items-start justify-between gap-2">
-                      <div class="min-w-0 pr-6">
+                      <div class="min-w-0 pr-14">
                         <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Maintenance Technician · Night shift
+                          Data Analyst · Hybrid
                         </p>
                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
                           <span class="font-medium text-brand-primary">
-                            Lakeside Foods
+                            Summit Metrics Co.
                           </span>
                           <span>
-                            · Toledo, OH
+                            · Austin, TX
                           </span>
                           <span>
-                            · $26–$29/hr
+                            · $78k–$88k
                           </span>
                           <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
-                            92% match
+                            Match score: 92
                           </span>
                         </div>
+                        <p class="mt-1.5 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[0.55rem] font-medium text-emerald-800">
+                          Chance to provide sponsorship: High
+                        </p>
+                        <p class="mt-1.5 text-[0.6rem] text-neutral-body line-clamp-2">
+                          Brief AI summary of the role and why it fits your profile…
+                        </p>
                       </div>
                       <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full bg-brand-primary px-2 py-[2px] text-[0.6rem] font-semibold text-white shadow-sm">
                         Saved
                       </span>
                     </div>
-                    <div class="mt-2 flex gap-1.5 text-[0.6rem]">
-                      <span class="inline-flex flex-1 items-center justify-center rounded-full bg-brand-primary text-white">
+                    <div class="mt-2 flex flex-wrap gap-1.5 text-[0.6rem]">
+                      <span class="inline-flex min-w-[5rem] flex-1 items-center justify-center rounded-md bg-brand-primary px-2 py-1.5 font-medium text-white">
                         View details
                       </span>
-                      <span class="inline-flex flex-1 items-center justify-center rounded-full border border-neutral-border bg-white text-neutral-body">
+                      <span class="inline-flex items-center justify-center rounded-md border border-neutral-border bg-white px-3 py-1.5 font-medium text-neutral-body">
                         Apply
                       </span>
                     </div>
@@ -567,37 +637,40 @@ onUnmounted(() => {
 
                   <div
                     class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
-                    style="border-left: 3px solid var(--color-brand-primary);"
+                    style="border-left: 4px solid var(--color-brand-primary);"
                   >
                     <div class="flex items-start justify-between gap-2">
-                      <div class="min-w-0 pr-6">
+                      <div class="min-w-0 pr-14">
                         <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Production Supervisor · 2nd shift
+                          Full Stack Developer · Remote
                         </p>
                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
                           <span class="font-medium text-brand-primary">
-                            Heartland Manufacturing
+                            Northwind Labs
                           </span>
                           <span>
-                            · Kansas City, MO
+                            · Remote (US)
                           </span>
                           <span>
-                            · $72k–$82k
+                            · $115k–$135k
                           </span>
                           <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
-                            88% match
+                            Match score: 88
                           </span>
                         </div>
+                        <p class="mt-1.5 text-[0.6rem] text-neutral-body line-clamp-2">
+                          Stack matches your targets; team is hiring for product roadmap…
+                        </p>
                       </div>
-                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full bg-white px-2 py-[2px] text-[0.6rem] font-semibold text-brand-primary border border-brand-primary/40">
+                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full border border-neutral-border bg-neutral-bg px-2 py-[2px] text-[0.6rem] font-semibold text-neutral-body">
                         Save
                       </span>
                     </div>
-                    <div class="mt-2 flex gap-1.5 text-[0.6rem]">
-                      <span class="inline-flex flex-1 items-center justify-center rounded-full bg-brand-primary text-white">
+                    <div class="mt-2 flex flex-wrap gap-1.5 text-[0.6rem]">
+                      <span class="inline-flex min-w-[5rem] flex-1 items-center justify-center rounded-md bg-brand-primary px-2 py-1.5 font-medium text-white">
                         View details
                       </span>
-                      <span class="inline-flex flex-1 items-center justify-center rounded-full border border-neutral-border bg-white text-neutral-body">
+                      <span class="inline-flex items-center justify-center rounded-md border border-neutral-border bg-white px-3 py-1.5 font-medium text-neutral-body">
                         Apply
                       </span>
                     </div>
@@ -617,7 +690,7 @@ onUnmounted(() => {
           Job boards are crowded. Your time shouldn't be.
         </h2>
         <p class="text-lg text-neutral-body mb-8 text-center">
-          Most job platforms make it feel like a numbers game: hundreds of applications, endless screening questions, and almost no responses. Companies post roles they might need 'someday,' and you're left guessing which applications are actually worth your time.
+          Most job platforms make it feel like a numbers game: hundreds of applications, endless screening questions, and almost no responses. Companies post roles they might need someday, and you are left guessing which applications are actually worth your time.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div class="card p-6 problem-card card-3d will-change-transform">
@@ -659,6 +732,94 @@ onUnmounted(() => {
       </div>
     </section>
 
+    <!-- Logged-in UI previews (styling aligned with live Dashboard / JobDetail / Profile) -->
+    <section class="bg-white py-20 px-4 sm:px-6 lg:px-8 border-t border-neutral-border">
+      <div class="max-w-6xl mx-auto">
+        <h2 class="text-brand-charcoal mb-4 text-center">
+          What you see after you sign in
+        </h2>
+        <p class="text-lg text-neutral-body mb-12 text-center max-w-3xl mx-auto">
+          The product is a dashboard feed plus job detail pages—not a static job board grid. Below are simplified previews of the same layouts subscribers use: summary cards and filters above your matches, rich job cards, and profile-driven options like sponsorship estimates when they apply to your search.
+        </p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+          <article
+            class="app-preview-panel card p-6 overflow-hidden border-l-4 border-brand-primary"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-3">
+              Job detail view
+            </p>
+            <div class="flex flex-wrap items-start gap-2 mb-3">
+              <h3 class="text-xl font-heading font-bold text-brand-charcoal leading-tight flex-1 min-w-0">
+                Senior Business Analyst
+              </h3>
+              <span class="inline-flex shrink-0 rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body">
+                Senior &amp; Management
+              </span>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-body mb-4">
+              <span class="font-medium text-brand-primary">
+                Cascade Health Systems
+              </span>
+              <span>
+                · Nashville, TN · Hybrid
+              </span>
+              <span class="inline-flex rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal">
+                Match score: 91
+              </span>
+              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-900">
+                Chance to provide sponsorship: Medium
+              </span>
+            </div>
+            <div class="rounded-lg bg-neutral-bg p-4 text-sm text-neutral-body mb-4">
+              <p class="font-medium text-brand-charcoal mb-2">
+                Role briefing
+              </p>
+              <p class="leading-relaxed">
+                AI-generated summary of responsibilities, team context, and why this posting lines up with your targets—so you open the application knowing what matters.
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span class="btn-primary text-sm px-4 py-2 rounded-lg pointer-events-none">Apply</span>
+              <span class="btn-secondary text-sm px-4 py-2 rounded-lg pointer-events-none">Save</span>
+            </div>
+          </article>
+          <div class="space-y-6">
+            <div class="app-preview-panel card p-6">
+              <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-3">
+                Profile &amp; sponsorship
+              </p>
+              <p class="text-sm text-neutral-body mb-4">
+                Sponsorship estimates appear on job rows only when you indicate in your profile that you require U.S. employer sponsorship—otherwise your feed stays focused on fit and pay without visa labels.
+              </p>
+              <div class="rounded-lg border border-neutral-border bg-neutral-bg px-4 py-3 text-sm">
+                <p class="font-medium text-brand-charcoal mb-2">
+                  Requires U.S. employer sponsorship for work authorization
+                </p>
+                <div class="flex gap-4 text-neutral-body">
+                  <label class="flex items-center gap-2">
+                    <span class="h-3 w-3 rounded-full border border-neutral-border bg-brand-primary" />
+                    Yes
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <span class="h-3 w-3 rounded-full border border-neutral-border bg-white" />
+                    No
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="app-preview-panel card p-6">
+              <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-2">
+                Announcements
+              </p>
+              <p class="text-sm text-neutral-body">
+                When there is news—billing reminders, product updates—the live dashboard can show a banner at the top (styled like your subscription tier accent color), similar to in-product messaging you see in other SaaS apps.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- How It Works Preview -->
     <section class="bg-white py-20 px-4 sm:px-6 lg:px-8">
       <div class="max-w-4xl mx-auto">
@@ -678,7 +839,7 @@ onUnmounted(() => {
               <span class="text-white text-2xl font-bold">2</span>
             </div>
             <h3 class="text-xl font-heading font-semibold mb-3">We curate and match jobs in real time</h3>
-            <p class="text-neutral-body">Our team and cutting edge AI engine scan job boards and company postings, weed out the junk and pick only the most active jobs that fit YOU best, and verify them with company details and behind the scenes insights.</p>
+            <p class="text-neutral-body">Our team and AI scan job boards and company postings, strip out the junk, and enrich each match—including optional sponsorship-likelihood when your profile calls for it—so you see active roles that fit, not noise.</p>
           </div>
           <div class="text-center step-card will-change-transform">
             <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">
@@ -690,7 +851,7 @@ onUnmounted(() => {
         </div>
         <div class="text-center mt-12">
           <router-link to="/how-it-works" class="text-brand-primary hover:underline font-medium">
-            View sample job feed →
+            Learn how matching works →
           </router-link>
         </div>
       </div>
@@ -700,11 +861,14 @@ onUnmounted(() => {
     <section class="bg-neutral-bg py-20 px-4 sm:px-6 lg:px-8">
       <div class="max-w-6xl mx-auto">
         <h2 class="text-brand-charcoal mb-6 text-center">
-          Built for serious job seekers—starting with manufacturing
+          A smarter job search for everyone in the U.S.
         </h2>
-        <p class="text-lg text-neutral-body mb-12 text-center">
-          Whether you're on the plant floor or leading operations, Job-Hopper helps you move faster toward your next role.
+        <p class="text-lg text-neutral-body mb-6 text-center max-w-3xl mx-auto">
+          Job-Hopper is not built for one industry—it is built for anyone who works for a living. The same AI-driven pipeline that saves analysts and engineers time also works for nurses, managers, tradespeople, and roles across the economy.
         </p>
+            <p class="text-neutral-body mb-12 text-center max-w-3xl mx-auto">
+              Job-Hopper casts a wide net across the U.S. economy—the kind of coverage you expect from a major job board—with tech, analytics, and engineering roles featured alongside operations, healthcare, trades, professional services, and more. Our earliest traction included strong results in data, software, and engineering paths; we also have roots serving manufacturing and industrial talent, and we apply the same curation everywhere we operate.
+            </p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 who-its-for-grid">
           <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
             <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
@@ -714,7 +878,7 @@ onUnmounted(() => {
               </svg>
             </div>
             <h3 class="text-xl font-heading font-semibold mb-3">Entry & Mid Level Roles</h3>
-            <p class="text-neutral-body">Curated opportunities across hourly, administrative, and early-career salaried positions. Matched to your experience level, pay expectations, schedule preferences, and location.</p>
+            <p class="text-neutral-body">From support and hourly roles through early-career professional tracks—tech, analytics, engineering, operations, retail, healthcare, and more. We match to your experience, pay, schedule, and location without locking you to one industry.</p>
           </div>
           <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
             <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
@@ -829,10 +993,10 @@ onUnmounted(() => {
       
       <div class="max-w-4xl mx-auto text-center relative z-10">
         <h2 class="text-white mb-6">
-          Ready to stop hunting and hop to the next level?
+          Ready for the new standard in job search?
         </h2>
         <p class="text-xl text-white/90 mb-8">
-          Create your profile today and start receiving curated job matches. If it's not for you, cancel anytime in just a couple of clicks.
+          Create your profile and let Job-Hopper run the heavy lifting. Curated U.S. matches, your pace, your applications—cancel anytime in a couple of clicks if it is not for you.
         </p>
         <router-link to="/register" class="cta-button btn-secondary bg-white text-brand-primary hover:bg-neutral-bg inline-block mb-4">
           Start your free trial

@@ -47,6 +47,7 @@ const isSyncingFromProfile = ref(false)
 
 // Profile fields
 const currentJobTitle = ref('')
+const targetJobTitle = ref('')
 const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
@@ -88,6 +89,7 @@ function syncFormFromProfile() {
   const p = profile.value
   if (!p) return
   currentJobTitle.value = p.current_job_title || ''
+  targetJobTitle.value = p.target_job_title || ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry || ''
   targetRoleCategories.value = (p.target_role_categories ?? []).filter(
@@ -109,15 +111,21 @@ function syncFormFromProfile() {
     : ''
 }
 
-watch(profile, (p) => {
-  if (p) {
+// Sync from store only when the profile row first appears or the user id changes.
+// Do not re-sync on every `profile` update: autosave + Supabase Realtime both refresh
+// the store and would overwrite local input state while the user is typing.
+watch(
+  () => profile.value?.id,
+  (id) => {
+    if (!id) return
     isSyncingFromProfile.value = true
     syncFormFromProfile()
     nextTick(() => {
       isSyncingFromProfile.value = false
     })
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   // This boolean is used to determine if the auto-save feature should be enabled.
@@ -199,6 +207,7 @@ const saveProfile = async () => {
 
     await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
+      target_job_title: targetJobTitle.value,
       years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
@@ -236,6 +245,7 @@ const debouncedSave = () => {
 watch(
   () => ({
     currentJobTitle: currentJobTitle.value,
+    targetJobTitle: targetJobTitle.value,
     yearsOfExperience: yearsOfExperience.value,
     currentIndustry: currentIndustry.value,
     targetRoleCategories: [...(targetRoleCategories.value ?? [])],
@@ -366,6 +376,7 @@ watch(
             :resume-bucket-key="profile?.resume_bucket_key ?? null"
             :auto-upload="true"
             input-id="profile-resume-upload"
+            @uploaded="userStore.refreshProfile"
           />
           <div
             v-if="showResumeUpgradeAdviceButton"
@@ -397,6 +408,10 @@ watch(
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Target Preferences</h2>
           <div class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
+              <input v-model="targetJobTitle" type="text" class="input" />
+            </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -474,36 +489,47 @@ watch(
             </div>
             <template v-else>
               <div class="space-y-2">
-                <div class="flex items-center justify-between gap-4">
-                  <label class="flex items-center gap-3 flex-1 min-w-0">
+                <div
+                  class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                >
+                  <label class="flex w-full min-w-0 items-start gap-3 sm:flex-1">
                     <input
                       type="checkbox"
-                      class="w-4 h-4"
+                      class="mt-0.5 h-4 w-4 shrink-0"
                       :checked="notificationSettings.job_match_email_enabled"
                       :disabled="notificationSettingsSaving"
                       @change="saveNotificationSettings({ job_match_email_enabled: !notificationSettings.job_match_email_enabled })"
                     />
-                    <span class="text-sm text-brand-charcoal">Job match emails</span>
+                    <span class="min-w-0 text-sm text-brand-charcoal">Job match emails</span>
                   </label>
                   <div
                     v-if="notificationSettings.job_match_email_enabled"
-                    class="flex items-center gap-2"
+                    class="flex w-full min-w-0 flex-col gap-1.5 pl-7 sm:max-w-xs sm:flex-none sm:shrink-0 sm:pl-0"
                   >
-                    <label class="block text-xs font-medium text-neutral-body">Frequency</label>
-                    <select
-                      :value="notificationSettings.job_match_email_frequency"
-                      class="input text-sm max-w-xs"
-                      :disabled="notificationSettingsSaving"
-                      @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                    <div
+                      class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2"
                     >
-                      <option
-                        v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
-                        :key="opt.value"
-                        :value="opt.value"
+                      <label
+                        class="shrink-0 text-xs font-medium text-neutral-body sm:whitespace-nowrap"
+                        for="profile-job-match-email-frequency"
+                        >Frequency</label
                       >
-                        {{ opt.label }}
-                      </option>
-                    </select>
+                      <select
+                        id="profile-job-match-email-frequency"
+                        :value="notificationSettings.job_match_email_frequency"
+                        class="input w-full min-w-0 text-sm sm:min-w-[11rem] sm:max-w-xs"
+                        :disabled="notificationSettingsSaving"
+                        @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
+                      >
+                        <option
+                          v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
+                          :key="opt.value"
+                          :value="opt.value"
+                        >
+                          {{ opt.label }}
+                        </option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
