@@ -7,7 +7,7 @@ const props = withDefaults(
   defineProps<{
     open: boolean
     contacts: JobContact[] | null | undefined
-    companySummary?: unknown | null
+    companySummary?: Record<string, unknown> | null
     /** When set, modal shows error state instead of contacts */
     errorMessage?: string | null
   }>(),
@@ -27,9 +27,8 @@ const hasContacts = computed(() => {
 })
 
 const companySummaryText = computed(() => {
-  const s = props.companySummary
-  if (!s || typeof s !== 'object') return null
-  const o = s as Record<string, unknown>
+  const o = props.companySummary
+  if (!o) return null
   const name = typeof o.name === 'string' ? o.name : null
   const domain = typeof o.primary_domain === 'string' ? o.primary_domain : null
   if (name && domain) return `${name} · ${domain}`

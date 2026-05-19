@@ -4,7 +4,15 @@ import type { JobContact } from '@/types/database'
 export type PremiumInsightsSuccess = {
   status: 'complete'
   contacts: JobContact[]
-  company_summary: unknown | null
+  company_summary: Record<string, unknown> | null
+}
+
+function parseCompanySummary(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return null
 }
 
 type PremiumInsightsFnResponse = PremiumInsightsSuccess & { error?: string }
@@ -37,7 +45,9 @@ export const premiumInsightsAPI = {
           status: 'complete',
           contacts: data.contacts as JobContact[],
           company_summary:
-            'company_summary' in data ? (data as PremiumInsightsSuccess).company_summary : null,
+            'company_summary' in data
+              ? parseCompanySummary((data as PremiumInsightsSuccess).company_summary)
+              : null,
         },
         error: null,
       }

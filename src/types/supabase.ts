@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      apollo_limits: {
+        Row: {
+          credit_limit: number
+          id: string
+          name: string
+          updated_at: string
+          usage: number
+        }
+        Insert: {
+          credit_limit?: number
+          id?: string
+          name: string
+          updated_at?: string
+          usage?: number
+        }
+        Update: {
+          credit_limit?: number
+          id?: string
+          name?: string
+          updated_at?: string
+          usage?: number
+        }
+        Relationships: []
+      }
       bd_leads: {
         Row: {
           company_name: string | null
@@ -35,6 +59,36 @@ export type Database = {
           id?: number
           linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
+        }
+        Relationships: []
+      }
+      company_apollo_cache: {
+        Row: {
+          apollo_organization_id: string
+          cache_key: string
+          company_name: string
+          expires_at: string
+          location_region: string | null
+          primary_domain: string | null
+          resolved_at: string
+        }
+        Insert: {
+          apollo_organization_id: string
+          cache_key: string
+          company_name: string
+          expires_at: string
+          location_region?: string | null
+          primary_domain?: string | null
+          resolved_at?: string
+        }
+        Update: {
+          apollo_organization_id?: string
+          cache_key?: string
+          company_name?: string
+          expires_at?: string
+          location_region?: string | null
+          primary_domain?: string | null
+          resolved_at?: string
         }
         Relationships: []
       }
@@ -209,18 +263,21 @@ export type Database = {
         Row: {
           id: number
           max_job_searches: number
+          max_premium_insights: number
           max_resume_advice: number
           updated_at: string
         }
         Insert: {
           id?: number
           max_job_searches?: number
+          max_premium_insights?: number
           max_resume_advice?: number
           updated_at?: string
         }
         Update: {
           id?: number
           max_job_searches?: number
+          max_premium_insights?: number
           max_resume_advice?: number
           updated_at?: string
         }
@@ -230,6 +287,7 @@ export type Database = {
         Row: {
           created_at: string
           job_searches_used: number
+          premium_insights_used: number
           profile_id: string
           resume_advice_used: number
           selected_tier_key: string
@@ -238,6 +296,7 @@ export type Database = {
         Insert: {
           created_at?: string
           job_searches_used?: number
+          premium_insights_used?: number
           profile_id: string
           resume_advice_used?: number
           selected_tier_key: string
@@ -246,6 +305,7 @@ export type Database = {
         Update: {
           created_at?: string
           job_searches_used?: number
+          premium_insights_used?: number
           profile_id?: string
           resume_advice_used?: number
           selected_tier_key?: string
@@ -256,6 +316,60 @@ export type Database = {
             foreignKeyName: "freemium_usage_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_hiring_contacts: {
+        Row: {
+          company_summary: Json | null
+          completed_at: string | null
+          contacts: Json | null
+          created_at: string
+          error_code: string | null
+          id: string
+          job_match_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["job_hiring_contacts_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_summary?: Json | null
+          completed_at?: string | null
+          contacts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          job_match_id: string
+          profile_id: string
+          status?: Database["public"]["Enums"]["job_hiring_contacts_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_summary?: Json | null
+          completed_at?: string | null
+          contacts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          job_match_id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["job_hiring_contacts_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_hiring_contacts_job_match_id_fkey"
+            columns: ["job_match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_hiring_contacts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1119,6 +1233,14 @@ export type Database = {
     }
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
+      claim_premium_insights_for_addon: {
+        Args: { p_job_match_id: string; p_profile_id: string }
+        Returns: {
+          err: string
+          hiring_contact_id: string
+          ok: boolean
+        }[]
+      }
       claim_scraper_raw_jobs: {
         Args: { p_limit: number }
         Returns: {
@@ -1173,6 +1295,16 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      redeem_freemium_premium_insights: {
+        Args: { p_job_match_id: string; p_profile_id: string }
+        Returns: {
+          err: string
+          hiring_contact_id: string
+          max_premium_insights: number
+          ok: boolean
+          premium_insights_used: number
+        }[]
+      }
       redeem_freemium_resume_advice: {
         Args: {
           p_job_match_id: string
@@ -1185,6 +1317,23 @@ export type Database = {
           ok: boolean
           resume_advice_used: number
           resume_product_id: string
+        }[]
+      }
+      refund_apollo_credits: {
+        Args: { p_amount: number; p_name: string }
+        Returns: undefined
+      }
+      refund_freemium_premium_insights: {
+        Args: { p_hiring_contact_id: string; p_profile_id: string }
+        Returns: undefined
+      }
+      reset_apollo_limits_usage: { Args: never; Returns: undefined }
+      try_consume_apollo_credits: {
+        Args: { p_amount: number; p_name: string }
+        Returns: {
+          credit_limit: number
+          ok: boolean
+          usage_after: number
         }[]
       }
       try_consume_freemium_job_search: {
@@ -1209,6 +1358,11 @@ export type Database = {
         | "job_match_digest"
         | "subscription_update"
         | "system_announcement"
+      job_hiring_contacts_status:
+        | "pending"
+        | "complete"
+        | "failed"
+        | "cancelled"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
       job_processor_run_status: "queued" | "running" | "completed" | "failed"
       pay_type: "hour" | "year" | "month" | "week" | "day"
@@ -1370,6 +1524,12 @@ export const Constants = {
         "job_match_digest",
         "subscription_update",
         "system_announcement",
+      ],
+      job_hiring_contacts_status: [
+        "pending",
+        "complete",
+        "failed",
+        "cancelled",
       ],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
       job_processor_run_status: ["queued", "running", "completed", "failed"],

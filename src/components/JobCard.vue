@@ -47,7 +47,7 @@ const insightsLoading = ref(false)
 const insightsError = ref<string | null>(null)
 const insightsModalOpen = ref(false)
 const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
-const insightsModalOverrideCompany = ref<unknown | null>(null)
+const insightsModalOverrideCompany = ref<Record<string, unknown> | null>(null)
 const insightsModalError = ref<string | null>(null)
 
 const insightsModalContacts = computed(
