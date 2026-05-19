@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { jobsAPI } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
+import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice } = storeToRefs(userStore)
 
 const jobIdParam = route.params.id as string
 const job = ref<MatchedJob | null>(null)
@@ -22,6 +25,35 @@ const tailoringLoading = ref(false)
 const adviceCheckoutLoading = ref(false)
 const tailoringError = ref<string | null>(null)
 const adviceModalOpen = ref(false)
+
+const precheckOpen = ref(false)
+const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
+
+function closePrecheck() {
+  precheckOpen.value = false
+}
+
+function handleGetResumeAdviceClick() {
+  if (!job.value) return
+  tailoringError.value = null
+  const profile = userStore.profile
+  if (!profile?.resume_bucket_key?.trim()) {
+    precheckVariant.value = 'upload-required'
+    precheckOpen.value = true
+    return
+  }
+  if (freemiumResumeAdviceRemaining.value > 0) {
+    precheckVariant.value = 'confirm-free-credit'
+    precheckOpen.value = true
+    return
+  }
+  void executeTailoringCheckout()
+}
+
+function onConfirmFreeCredit() {
+  closePrecheck()
+  void executeTailoringCheckout()
+}
 
 async function loadTailoringPurchase(matchId: string) {
   tailoringLoading.value = true
@@ -208,7 +240,7 @@ const whyFitBullets = computed(() => {
   return bullets;
 })
 
-async function handleTailoringCheckout() {
+async function executeTailoringCheckout() {
   if (!job.value) return
   adviceCheckoutLoading.value = true
   tailoringError.value = null
@@ -219,11 +251,26 @@ async function handleTailoringCheckout() {
     tailoringError.value = error.message
     return
   }
-  if (data?.url) {
+  if (data && 'freemium' in data && data.freemium) {
+    adviceModalOpen.value = true
+    for (let i = 0; i < 24; i++) {
+      await loadTailoringPurchase(job.value.matchId)
+      if (advicePurchase.value?.improvements_text?.trim()) {
+        break
+      }
+      await new Promise((r) => setTimeout(r, 1500))
+    }
+    await loadTailoringPurchase(job.value.matchId)
+    void userStore.refreshFreemium()
+    adviceCheckoutLoading.value = false
+    return
+  }
+  if (data && 'url' in data && typeof data.url === 'string') {
     window.location.href = data.url
     return
   }
   adviceCheckoutLoading.value = false
+  tailoringError.value = 'Unable to start checkout. Please try again.'
 }
 </script>
 
@@ -337,7 +384,7 @@ async function handleTailoringCheckout() {
                   type="button"
                   class="btn-secondary inline-flex w-[11.5rem] items-center justify-center gap-2"
                   :disabled="adviceCheckoutLoading || tailoringLoading"
-                  @click="handleTailoringCheckout"
+                  @click="handleGetResumeAdviceClick"
                 >
                   <font-awesome-icon
                     v-if="adviceCheckoutLoading"
@@ -345,7 +392,7 @@ async function handleTailoringCheckout() {
                     spin
                     aria-hidden="true"
                   />
-                  {{ adviceCheckoutLoading ? 'Redirecting…' : 'Get resume advice' }}
+                  {{ adviceCheckoutLoading ? 'Please wait…' : 'Get resume advice' }}
                 </button>
                 <button
                   v-if="showResumeAdviceButton"
@@ -358,6 +405,14 @@ async function handleTailoringCheckout() {
                 </button>
               </div>
             </div>
+            <ResumeAdvicePrecheckModal
+              :open="precheckOpen"
+              :variant="precheckVariant"
+              :max-free-credits="freemiumMaxResumeAdvice"
+              :remaining-free-credits="freemiumResumeAdviceRemaining"
+              @close="closePrecheck"
+              @confirm="onConfirmFreeCredit"
+            />
             <ResumeAdviceModal
               :open="adviceModalOpen"
               :advice-text="advicePurchase?.improvements_text"

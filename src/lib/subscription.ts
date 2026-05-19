@@ -43,7 +43,7 @@ export function formatProductLineLabel(product: Product): string {
 }
 
 const productColumns =
-  'id, key, display_name, description, category, price_cents, available_for_purchase'
+  'id, key, display_name, description, category, price_cents, available_for_purchase, stripe_product_id'
 
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
@@ -115,7 +115,7 @@ export const subscriptionAPI = {
       .in('category', ['subscription_addon', 'one_time_addon'])
       .eq('available_for_purchase', true)
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: (data ?? []) as Product[], error: null }
+    return { data: data ?? [], error: null }
   },
 
   async getBasePlanProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
@@ -125,7 +125,7 @@ export const subscriptionAPI = {
       .eq('category', 'base_plan')
       .eq('available_for_purchase', true)
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: (data ?? []) as Product[], error: null }
+    return { data: data ?? [], error: null }
   },
 
   /**
@@ -199,11 +199,11 @@ export const subscriptionAPI = {
       return { data: null, error: new Error(subError.message) }
     }
 
-    const subscriptions: Subscription[] = (subRows ?? []) as Subscription[]
+    const subscriptions = subRows ?? []
 
     const { data: subscriptionProductRows, error: subProdError } = await supabase
       .from('subscription_product')
-      .select('id, subscription_id, product_id')
+      .select('id, subscription_id, product_id, stripe_subscription_item_id')
       .in(
         'subscription_id',
         subscriptions.map((s) => s.id),
@@ -213,8 +213,7 @@ export const subscriptionAPI = {
       return { data: null, error: new Error(subProdError.message) }
     }
 
-    const subscriptionProducts: SubscriptionProduct[] =
-      (subscriptionProductRows ?? []) as SubscriptionProduct[]
+    const subscriptionProducts = subscriptionProductRows ?? []
 
     const productIdsFromSubs = new Set<string>(
       subscriptionProducts.map((sp) => sp.product_id),
@@ -243,7 +242,7 @@ export const subscriptionAPI = {
         return { data: null, error: new Error(productError.message) }
       }
 
-      products = (productRows ?? []) as Product[]
+      products = productRows ?? []
     }
 
     return {

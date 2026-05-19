@@ -282,7 +282,12 @@ onMounted(async () => {
       changePlanError.value =
         'Unable to load available subscription plans. Please try again later.'
     } else {
-      basePlanProducts.value = baseRes.data ?? []
+      const plans = baseRes.data ?? []
+      basePlanProducts.value = [...plans].sort((a, b) => {
+        const byPrice = a.price_cents - b.price_cents
+        if (byPrice !== 0) return byPrice
+        return a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' })
+      })
       if (!selectedBasePlanId.value && basePlan.value) {
         selectedBasePlanId.value = basePlan.value.id
       }

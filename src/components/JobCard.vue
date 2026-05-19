@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
+import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -15,14 +17,44 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle-save', matchId: string, isSaved: boolean): void
+  (e: 'refresh-advice'): void
 }>()
 
 const router = useRouter()
 const userStore = useUserStore()
+const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice } = storeToRefs(userStore)
 
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
 const adviceModalOpen = ref(false)
+
+const precheckOpen = ref(false)
+const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
+
+function closePrecheck() {
+  precheckOpen.value = false
+}
+
+function handleGetResumeAdviceClick() {
+  adviceError.value = null
+  const profile = userStore.profile
+  if (!profile?.resume_bucket_key?.trim()) {
+    precheckVariant.value = 'upload-required'
+    precheckOpen.value = true
+    return
+  }
+  if (freemiumResumeAdviceRemaining.value > 0) {
+    precheckVariant.value = 'confirm-free-credit'
+    precheckOpen.value = true
+    return
+  }
+  void runAdviceCheckout()
+}
+
+function onConfirmFreeCredit() {
+  closePrecheck()
+  void runAdviceCheckout()
+}
 
 const showAdviceButton = computed(() => {
   const p = props.advicePurchase
@@ -65,7 +97,7 @@ function handleToggleSave() {
   emit('toggle-save', props.job.matchId, props.job.isSaved)
 }
 
-async function handleAdviceCheckout() {
+async function runAdviceCheckout() {
   adviceLoading.value = true
   adviceError.value = null
   try {
@@ -78,7 +110,22 @@ async function handleAdviceCheckout() {
       adviceError.value = error.message
       return
     }
-    if (data?.url) {
+    if (data && 'freemium' in data && data.freemium) {
+      adviceModalOpen.value = true
+      for (let i = 0; i < 24; i++) {
+        emit('refresh-advice')
+        const { data: row } = await resumeProductsAPI.getTailoringPurchaseForMatch(props.job.matchId)
+        if (row?.improvements_text?.trim()) {
+          break
+        }
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+      emit('refresh-advice')
+      void userStore.refreshFreemium()
+      adviceLoading.value = false
+      return
+    }
+    if (data && 'url' in data && typeof data.url === 'string') {
       window.location.href = data.url
       return
     }
@@ -174,7 +221,7 @@ async function handleAdviceCheckout() {
           type="button"
           class="btn-secondary w-[11.5rem] shrink-0 text-sm"
           :disabled="adviceLoading"
-          @click="handleAdviceCheckout"
+          @click="handleGetResumeAdviceClick"
         >
           <font-awesome-icon
             v-if="adviceLoading"
@@ -183,7 +230,7 @@ async function handleAdviceCheckout() {
             class="mr-1.5"
             aria-hidden="true"
           />
-          {{ adviceLoading ? 'Redirecting…' : 'Get resume advice' }}
+          {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
         </button>
         <button
           v-if="showResumeAdviceButton"
@@ -194,6 +241,14 @@ async function handleAdviceCheckout() {
           View resume advice
         </button>
       </div>
+      <ResumeAdvicePrecheckModal
+        :open="precheckOpen"
+        :variant="precheckVariant"
+        :max-free-credits="freemiumMaxResumeAdvice"
+        :remaining-free-credits="freemiumResumeAdviceRemaining"
+        @close="closePrecheck"
+        @confirm="onConfirmFreeCredit"
+      />
       <ResumeAdviceModal
         :open="adviceModalOpen"
         :advice-text="advicePurchase?.improvements_text"

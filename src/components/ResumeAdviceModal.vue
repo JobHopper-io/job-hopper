@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { markdownToSafeHtml } from '@/lib/markdown'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { markdownToSafeHtml } from '@/lib/markdown'
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/bodyScrollLock'
 
 const props = withDefaults(
   defineProps<{
@@ -38,9 +39,10 @@ watch(
   () => props.open,
   (isOpen) => {
     if (typeof document === 'undefined') return
-    if (isOpen) document.body.classList.add('overflow-hidden')
-    else document.body.classList.remove('overflow-hidden')
+    if (isOpen) lockBodyScroll()
+    else unlockBodyScroll()
   },
+  { immediate: true },
 )
 
 onMounted(() => {
@@ -49,7 +51,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
-  if (typeof document !== 'undefined') document.body.classList.remove('overflow-hidden')
+  if (props.open) unlockBodyScroll()
 })
 </script>
 

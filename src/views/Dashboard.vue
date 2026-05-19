@@ -3,9 +3,11 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
+import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { freemiumAPI } from '@/lib/freemium'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { dashboardBannerAPI, isDashboardBannerActive } from '@/lib/dashboardBanner'
 import { markdownToSafeHtml } from '@/lib/markdown'
@@ -21,6 +23,11 @@ const {
   basePlan,
   subscriptionStatusLabel,
   subscriptionAddonProducts,
+  showFreemiumJobSearchCta,
+  freemiumCanRunManualJobSearch,
+  freemiumJobSearchesRemaining,
+  freemiumMaxJobSearches,
+  hasActiveSubscription,
 } = storeToRefs(userStore)
 
 const profileCompletionDismissed = ref(
@@ -39,6 +46,8 @@ const matches = ref<MatchedJob[]>([])
 const adviceByMatchId = ref<Record<string, ResumeProduct>>({})
 const isLoadingMatches = ref(false)
 const matchesError = ref<string | null>(null)
+const freemiumSearchLoading = ref(false)
+const freemiumSearchMessage = ref<string | null>(null)
 
 const dashboardBanner = ref<DashboardBanner | null>(null)
 const showDashboardBanner = computed(() => isDashboardBannerActive(dashboardBanner.value))
@@ -116,6 +125,41 @@ const filteredMatches = computed(() => {
 
   return result
 })
+
+const showFreemiumExhaustedUpgrade = computed(
+  () =>
+    !hasActiveSubscription.value &&
+    freemiumMaxJobSearches.value > 0 &&
+    freemiumJobSearchesRemaining.value === 0,
+)
+
+const freemiumJobSearchesUsed = computed(() =>
+  Math.max(0, freemiumMaxJobSearches.value - freemiumJobSearchesRemaining.value),
+)
+
+async function runFreemiumJobSearch() {
+  if (!freemiumCanRunManualJobSearch.value) return
+  freemiumSearchMessage.value = null
+  matchesError.value = null
+  freemiumSearchLoading.value = true
+  try {
+    const { data, error } = await freemiumAPI.runJobSearch()
+    if (error) {
+      matchesError.value = error.message
+      return
+    }
+    if (data) {
+      freemiumSearchMessage.value =
+        data.matchesCreated > 0
+          ? `Added ${data.matchesCreated} new match${data.matchesCreated === 1 ? '' : 'es'}.`
+          : 'Search completed; no new matches met the bar this time. Try again later or adjust your profile.'
+    }
+    await userStore.refreshFreemium()
+    await loadMatchesAndStats()
+  } finally {
+    freemiumSearchLoading.value = false
+  }
+}
 
 async function loadMatchesAndStats() {
   isLoadingMatches.value = true
@@ -289,6 +333,19 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Manual job search (freemium): below status cards, above Recent matches -->
+      <div v-if="showFreemiumJobSearchCta" class="mb-8">
+        <FreemiumManualJobSearchPanel
+          :centered="false"
+          :can-run="freemiumCanRunManualJobSearch"
+          :used-searches="freemiumJobSearchesUsed"
+          :max-searches="freemiumMaxJobSearches"
+          :message="freemiumSearchMessage"
+          :loading="freemiumSearchLoading"
+          @run="runFreemiumJobSearch"
+        />
+      </div>
+
       <!-- Recent job matches -->
       <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
         Recent job matches
@@ -364,7 +421,18 @@ onMounted(() => {
         v-else-if="matches.length === 0"
         class="card p-12 text-center"
       >
-        <div class="max-w-md mx-auto">
+        <div v-if="showFreemiumJobSearchCta && freemiumCanRunManualJobSearch" class="max-w-md mx-auto">
+          <p class="text-neutral-body">
+            Your matches will show here after you run a job search using the section above.
+          </p>
+        </div>
+        <div v-else-if="showFreemiumJobSearchCta && !freemiumCanRunManualJobSearch" class="max-w-md mx-auto">
+          <p class="text-neutral-body">
+            You've used all included manual job searches. Use <span class="font-medium text-brand-charcoal">View plans</span>
+            in the section above to subscribe for automated matching, or check back if your limits are increased.
+          </p>
+        </div>
+        <div v-else class="max-w-md mx-auto">
           <div class="flex items-center justify-center mx-auto mb-4">
             <img
               :src="jobHopperRabbitLogo"
@@ -372,47 +440,62 @@ onMounted(() => {
               class="w-14 h-14"
             >
           </div>
-          <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
-            Your
-            <span class="font-heading font-bold text-brand-primary text-3xl tracking-tight leading-none">
-              Hopper
-            </span>
-            is warming up.
-          </h2>
-          <p class="text-neutral-body mb-6">
-            We're scanning new jobs now based on your profile. Check back soon, or loosen your filters to see a wider range of roles.
-          </p>
-          <router-link to="/profile" class="btn-primary inline-block">
-            Review my preferences
-          </router-link>
+          <template v-if="showFreemiumExhaustedUpgrade">
+            <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+              You have used all free manual searches
+            </h2>
+            <p class="text-neutral-body mb-6">
+              Subscribe to keep automated matching running in the background, or check back if your limits are increased.
+            </p>
+            <router-link :to="{ name: 'billing-purchase' }" class="btn-primary inline-block">
+              View plans and upgrade
+            </router-link>
+          </template>
+          <template v-else>
+            <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+              Your
+              <span class="font-heading font-bold text-brand-primary text-3xl tracking-tight leading-none">
+                Hopper
+              </span>
+              is warming up.
+            </h2>
+            <p class="text-neutral-body mb-6">
+              We're scanning new jobs now based on your profile. Check back soon, or loosen your filters to see a wider range of roles.
+            </p>
+            <router-link to="/profile" class="btn-primary inline-block">
+              Review my preferences
+            </router-link>
+          </template>
         </div>
       </div>
 
-      <!-- Empty State: matches exist but filters hide them -->
-      <div
-        v-else-if="filteredMatches.length === 0"
-        class="card p-12 text-center"
-      >
-        <div class="max-w-md mx-auto">
-          <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
-            No jobs match your filters.
-          </h2>
-          <p class="text-neutral-body mb-6">
-            Try clearing one or more filters to see more of your matches.
-          </p>
+      <!-- Matches exist but filters hide all of them -->
+      <template v-else-if="filteredMatches.length === 0">
+        <div class="card p-12 text-center">
+          <div class="max-w-md mx-auto">
+            <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+              No jobs match your filters.
+            </h2>
+            <p class="text-neutral-body mb-6">
+              Try clearing one or more filters to see more of your matches.
+            </p>
+          </div>
         </div>
-      </div>
+      </template>
 
-      <!-- Job Feed -->
-      <div v-else class="grid grid-cols-1 gap-6">
-        <JobCard
-          v-for="job in filteredMatches"
-          :key="job.matchId"
-          :job="job"
-          :advicePurchase="adviceByMatchId[job.matchId] ?? null"
-          @toggle-save="handleToggleSave"
-        />
-      </div>
+      <!-- Job feed -->
+      <template v-else>
+        <div class="grid grid-cols-1 gap-6">
+          <JobCard
+            v-for="job in filteredMatches"
+            :key="job.matchId"
+            :job="job"
+            :advicePurchase="adviceByMatchId[job.matchId] ?? null"
+            @toggle-save="handleToggleSave"
+            @refresh-advice="loadMatchesAndStats"
+          />
+        </div>
+      </template>
     </div>
   </div>
 </template>

@@ -33,6 +33,42 @@ function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' 
 
 type SupabaseAdmin = ReturnType<typeof createClient>
 
+const FREEMIUM_TIER_KEYS = new Set(['entry_mid', 'senior_management', 'director_vp_c_level'])
+
+async function upsertFreemiumUsageForCheckout(
+  supabaseAdmin: SupabaseAdmin,
+  profileId: string,
+  opts: { preferTierKey: string | null },
+) {
+  const { data: existing } = await supabaseAdmin
+    .from('freemium_usage')
+    .select('selected_tier_key, job_searches_used, resume_advice_used')
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  const prefer = opts.preferTierKey
+  const tierFromPrefer =
+    typeof prefer === 'string' && FREEMIUM_TIER_KEYS.has(prefer) ? prefer : null
+  const selectedTierKey =
+    tierFromPrefer ?? existing?.selected_tier_key ?? 'entry_mid'
+
+  const { error } = await supabaseAdmin.from('freemium_usage').upsert(
+    {
+      profile_id: profileId,
+      selected_tier_key: selectedTierKey,
+      job_searches_used: existing?.job_searches_used ?? 0,
+      resume_advice_used: existing?.resume_advice_used ?? 0,
+    },
+    { onConflict: 'profile_id' },
+  )
+
+  if (error) {
+    console.error(`${LOG_PREFIX} freemium_usage upsert failed`, { profileId, error })
+  } else {
+    console.log(`${LOG_PREFIX} freemium_usage upserted`, { profileId, selectedTierKey })
+  }
+}
+
 async function loadProfileAndCheckSubscriptionEmailAllowed(
   supabaseAdmin: SupabaseAdmin,
   profileId: string
@@ -126,6 +162,9 @@ serve(async (req) => {
           })
         }
 
+        let subscriptionCheckoutInsertSucceeded = false
+        let preferTierKeyFromSubscription: string | null = null
+
         if (session.subscription) {
           const stripeSubscription = await stripe.subscriptions.retrieve(
             session.subscription as string,
@@ -150,82 +189,105 @@ serve(async (req) => {
 
           if (subInsertError) {
             console.error('Failed to insert subscription:', subInsertError)
-            break
-          }
+          } else {
+            subscriptionCheckoutInsertSucceeded = true
+            const subscriptionId = subRow.id
+            console.log(`${LOG_PREFIX} subscription row inserted`, {
+              subscriptionId,
+              profileId,
+              stripeSubscriptionId: stripeSubscription.id,
+              status: subscriptionStatus,
+            })
 
-          const subscriptionId = subRow.id
-          console.log(`${LOG_PREFIX} subscription row inserted`, {
-            subscriptionId,
-            profileId,
-            stripeSubscriptionId: stripeSubscription.id,
-            status: subscriptionStatus,
-          })
-
-          const stripeProductIds = new Set<string>()
-          for (const item of stripeSubscription.items.data) {
-            const price = item.price
-            if (!price) continue
-            const product = price.product
-            if (typeof product === 'string') {
-              stripeProductIds.add(product)
-            } else if (product && typeof product.id === 'string') {
-              stripeProductIds.add(product.id)
+            const stripeProductIds = new Set<string>()
+            for (const item of stripeSubscription.items.data) {
+              const price = item.price
+              if (!price) continue
+              const product = price.product
+              if (typeof product === 'string') {
+                stripeProductIds.add(product)
+              } else if (product && typeof product.id === 'string') {
+                stripeProductIds.add(product.id)
+              }
             }
-          }
 
-          const stripeProductIdArray = Array.from(stripeProductIds)
-          const { data: productsForSub, error: productsForSubError } =
-            await supabaseAdmin
-              .from('products')
-              .select('id, stripe_product_id')
-              .in('stripe_product_id', stripeProductIdArray)
+            const stripeProductIdArray = Array.from(stripeProductIds)
+            const { data: productsForSub, error: productsForSubError } =
+              await supabaseAdmin
+                .from('products')
+                .select('id, stripe_product_id')
+                .in('stripe_product_id', stripeProductIdArray)
 
-          if (productsForSubError) {
-            console.error(
-              'checkout.session.completed: failed to load products for subscription items',
-              productsForSubError,
-            )
-          }
-
-          const productIdByStripeProductId = new Map<string, string>()
-          for (const row of productsForSub ?? []) {
-            if (row.stripe_product_id) {
-              productIdByStripeProductId.set(row.stripe_product_id, row.id)
-            }
-          }
-
-          for (const item of stripeSubscription.items.data) {
-            const price = item.price
-            if (!price) continue
-            const product = price.product
-            const stripeProductId =
-              typeof product === 'string' ? product : product?.id
-            if (!stripeProductId) {
+            if (productsForSubError) {
               console.error(
-                'checkout.session.completed: missing Stripe product id on subscription item, skipping',
+                'checkout.session.completed: failed to load products for subscription items',
+                productsForSubError,
               )
-              continue
             }
 
-            const productId = productIdByStripeProductId.get(stripeProductId)
-            if (!productId) {
-              console.error(
-                'checkout.session.completed: no matching Supabase product for Stripe product id, skipping item',
-                stripeProductId,
-              )
-              continue
+            const productIdByStripeProductId = new Map<string, string>()
+            for (const row of productsForSub ?? []) {
+              if (row.stripe_product_id) {
+                productIdByStripeProductId.set(row.stripe_product_id, row.id)
+              }
             }
 
-            await supabaseAdmin
+            for (const item of stripeSubscription.items.data) {
+              const price = item.price
+              if (!price) continue
+              const product = price.product
+              const stripeProductId =
+                typeof product === 'string' ? product : product?.id
+              if (!stripeProductId) {
+                console.error(
+                  'checkout.session.completed: missing Stripe product id on subscription item, skipping',
+                )
+                continue
+              }
+
+              const productId = productIdByStripeProductId.get(stripeProductId)
+              if (!productId) {
+                console.error(
+                  'checkout.session.completed: no matching Supabase product for Stripe product id, skipping item',
+                  stripeProductId,
+                )
+                continue
+              }
+
+              await supabaseAdmin
+                .from('subscription_product')
+                .upsert(
+                  {
+                    subscription_id: subscriptionId,
+                    product_id: productId,
+                    stripe_subscription_item_id: item.id,
+                  },
+                  { onConflict: 'subscription_id,product_id' },
+                )
+            }
+
+            const { data: spRows } = await supabaseAdmin
               .from('subscription_product')
-              .upsert(
-                {
-                  subscription_id: subscriptionId,
-                  product_id: productId,
-                  stripe_subscription_item_id: item.id,
-                },
-                { onConflict: 'subscription_id,product_id' },
-              )
+              .select('product_id')
+              .eq('subscription_id', subscriptionId)
+
+            const supabaseProductIds = (spRows ?? [])
+              .map((r) => r.product_id)
+              .filter((id): id is string => typeof id === 'string')
+
+            if (supabaseProductIds.length > 0) {
+              const { data: basePlanRows } = await supabaseAdmin
+                .from('products')
+                .select('key')
+                .in('id', supabaseProductIds)
+                .eq('category', 'base_plan')
+                .limit(1)
+
+              const k = basePlanRows?.[0]?.key
+              if (typeof k === 'string' && FREEMIUM_TIER_KEYS.has(k)) {
+                preferTierKeyFromSubscription = k
+              }
+            }
           }
         } else {
           console.log(`${LOG_PREFIX} checkout.session.completed: session has no subscription (one-time or non-subscription checkout)`, {
@@ -391,51 +453,58 @@ serve(async (req) => {
           }
         }
 
-        // Schedule initial job matching for this profile ~45 minutes after onboarding completes.
-        const runAt = new Date(Date.now() + 45 * 60 * 1000).toISOString()
-        const { error: scheduleError } = await supabaseAdmin
-          .from('scheduled_jobs')
-          .insert({
-            function_name: 'match-jobs',
-            payload: { profile_id: profileId, limit: 15 },
-            run_at: runAt,
-          })
-        if (scheduleError) {
-          console.error('checkout.session.completed: failed to schedule match-jobs:', scheduleError)
-        } else {
-          console.log(`${LOG_PREFIX} scheduled match-jobs`, { profileId, runAt })
+        await upsertFreemiumUsageForCheckout(supabaseAdmin, profileId, {
+          preferTierKey: subscriptionCheckoutInsertSucceeded ? preferTierKeyFromSubscription : null,
+        })
+
+        if (subscriptionCheckoutInsertSucceeded) {
+          // Schedule initial job matching for this profile ~45 minutes after subscription checkout.
+          const runAt = new Date(Date.now() + 45 * 60 * 1000).toISOString()
+          const { error: scheduleError } = await supabaseAdmin
+            .from('scheduled_jobs')
+            .insert({
+              function_name: 'match-jobs',
+              payload: { profile_id: profileId, limit: 15 },
+              run_at: runAt,
+            })
+          if (scheduleError) {
+            console.error('checkout.session.completed: failed to schedule match-jobs:', scheduleError)
+          } else {
+            console.log(`${LOG_PREFIX} scheduled match-jobs`, { profileId, runAt })
+          }
+
+          // Welcome / subscription started email (if allowed by notification settings).
+          const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileId)
+          if (recipient) {
+            try {
+              const footer = await getFooterLinksForProfile(profileId)
+              const { html, text } = renderSubscriptionStarted({
+                recipientName: recipient.firstName,
+                footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+              })
+              await sendEmail({
+                to: recipient.email,
+                subject: 'Welcome to Job-Hopper',
+                html,
+                text,
+                profileId,
+                eventType: 'subscription_update',
+                templateKey: 'subscription_started',
+                payload: null,
+                supabase: supabaseAdmin,
+              })
+              console.log(`${LOG_PREFIX} welcome email sent`, { profileId, sessionId: session.id })
+            } catch (err) {
+              console.error('checkout.session.completed: welcome email failed', { profileId, message: err instanceof Error ? err.message : String(err) })
+            }
+          } else {
+            console.log(`${LOG_PREFIX} welcome email skipped (no recipient or subscription email disabled / unsubscribed)`, {
+              profileId,
+              sessionId: session.id,
+            })
+          }
         }
 
-        // Welcome / subscription started email (if allowed by notification settings).
-        const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileId)
-        if (recipient) {
-          try {
-            const footer = await getFooterLinksForProfile(profileId)
-            const { html, text } = renderSubscriptionStarted({
-              recipientName: recipient.firstName,
-              footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
-            })
-            await sendEmail({
-              to: recipient.email,
-              subject: 'Welcome to Job-Hopper',
-              html,
-              text,
-              profileId,
-              eventType: 'subscription_update',
-              templateKey: 'subscription_started',
-              payload: null,
-              supabase: supabaseAdmin,
-            })
-            console.log(`${LOG_PREFIX} welcome email sent`, { profileId, sessionId: session.id })
-          } catch (err) {
-            console.error('checkout.session.completed: welcome email failed', { profileId, message: err instanceof Error ? err.message : String(err) })
-          }
-        } else {
-          console.log(`${LOG_PREFIX} welcome email skipped (no recipient or subscription email disabled / unsubscribed)`, {
-            profileId,
-            sessionId: session.id,
-          })
-        }
         break
       }
 

@@ -8,7 +8,7 @@ import { subscriptionAPI } from '@/lib/subscription'
 import type { Product, ResumeProduct } from '@/types/database'
 
 const productColumns =
-  'id, key, display_name, description, category, price_cents, available_for_purchase'
+  'id, key, display_name, description, category, price_cents, available_for_purchase, stripe_product_id'
 
 async function getCurrentProfileId(): Promise<string> {
   const { data, error } = await profileAPI.getCurrentUserProfile()
@@ -46,7 +46,7 @@ export const resumeProductsAPI = {
       .eq('available_for_purchase', true)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: data as Product | null, error: null }
+    return { data, error: null }
   },
 
   async getResumeAdviceProduct(): Promise<{
@@ -60,7 +60,7 @@ export const resumeProductsAPI = {
       .eq('available_for_purchase', true)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: data as Product | null, error: null }
+    return { data, error: null }
   },
 
   async getResumeProductsForProfile(): Promise<{
@@ -74,7 +74,7 @@ export const resumeProductsAPI = {
       .eq('profile_id', profileId)
       .order('created_at', { ascending: false })
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: (data ?? []) as ResumeProduct[], error: null }
+    return { data: data ?? [], error: null }
   },
 
   /** Latest resume overhaul purchase for this profile (`job_match_id` null). */
@@ -97,7 +97,7 @@ export const resumeProductsAPI = {
       .limit(1)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: data as ResumeProduct | null, error: null }
+    return { data, error: null }
   },
 
   async getTailoringPurchaseForMatch(matchId: string): Promise<{
@@ -119,7 +119,7 @@ export const resumeProductsAPI = {
       .limit(1)
       .maybeSingle()
     if (error) return { data: null, error: new Error(error.message) }
-    return { data: data as ResumeProduct | null, error: null }
+    return { data, error: null }
   },
 
   /** Returns a map of job_match_id → per-job resume advice purchase for all matches that have one (any status). */
@@ -145,7 +145,7 @@ export const resumeProductsAPI = {
     matchId: string,
     returnPath?: string,
   ): Promise<{
-    data: { url: string } | null
+    data: { url: string } | { freemium: true } | null
     error: Error | null
   }> {
     const { data: existing, error: existingError } =
@@ -168,6 +168,35 @@ export const resumeProductsAPI = {
         error: productError ?? new Error('Resume advice product not found'),
       }
     }
+
+    const profileId = await getCurrentProfileId()
+
+    const [{ data: limitsRow }, { data: settingsRow }] = await Promise.all([
+      supabase.from('freemium_usage').select('resume_advice_used').eq('profile_id', profileId).maybeSingle(),
+      supabase.from('freemium_settings').select('max_resume_advice').eq('id', 1).maybeSingle(),
+    ])
+
+    const maxAdvice =
+      typeof settingsRow?.max_resume_advice === 'number' ? settingsRow.max_resume_advice : 3
+    const usedAdvice =
+      typeof limitsRow?.resume_advice_used === 'number' ? limitsRow.resume_advice_used : 0
+    const freeRemaining = maxAdvice > 0 ? Math.max(0, maxAdvice - usedAdvice) : 0
+
+    if (freeRemaining > 0) {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke<{
+        resumeProductId?: string
+        error?: string
+      }>('freemium-resume-advice', { body: { job_match_id: matchId } })
+
+      if (fnError) {
+        return { data: null, error: new Error(fnError.message) }
+      }
+      if (fnData && typeof fnData === 'object' && 'error' in fnData && fnData.error) {
+        return { data: null, error: new Error(String(fnData.error)) }
+      }
+      return { data: { freemium: true }, error: null }
+    }
+
     const base = window.location.origin
     const path = returnPath ?? '/dashboard'
     const successUrl = `${base}${path}${path.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`

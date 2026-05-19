@@ -100,22 +100,6 @@ export const profileAPI = {
     return { data: data.signedUrl, error: null }
   },
 
-  async markOnboardingComplete() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true } satisfies Pick<ProfileUpdate, 'onboarding_completed'>)
-      .eq('auth_user_id', user.id)
-      .select()
-      .single<Profile>()
-
-    return { data, error }
-  },
-
   async updateEmail(newEmail: string) {
     const { data, error } = await supabase.auth.updateUser({
       email: newEmail,

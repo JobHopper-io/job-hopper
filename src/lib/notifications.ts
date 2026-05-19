@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type {
   NotificationSettings,
+  NotificationSettingsInsert,
   NotificationSettingsUpdate,
   JobMatchEmailFrequency,
 } from '@/types/database'
@@ -41,9 +42,9 @@ export const notificationsAPI = {
         .select()
         .single()
       if (insertError) return { data: null, error: insertError }
-      return { data: inserted as NotificationSettings, error: null }
+      return { data: inserted, error: null }
     }
-    return { data: data as NotificationSettings, error: null }
+    return { data, error: null }
   },
 
   async updateNotificationSettings(
@@ -53,19 +54,32 @@ export const notificationsAPI = {
     if (!profileId) {
       return { data: null, error: new Error('Not authenticated') }
     }
-    const allowed: Record<string, unknown> = { profile_id: profileId, updated_at: new Date().toISOString() }
-    if (updates.job_match_email_enabled !== undefined) allowed.job_match_email_enabled = updates.job_match_email_enabled
-    if (updates.job_match_email_frequency !== undefined) allowed.job_match_email_frequency = updates.job_match_email_frequency
-    if (updates.subscription_updates_email_enabled !== undefined) allowed.subscription_updates_email_enabled = updates.subscription_updates_email_enabled
-    if (updates.system_announcements_email_enabled !== undefined) allowed.system_announcements_email_enabled = updates.system_announcements_email_enabled
-    if (updates.email_unsubscribed_at !== undefined) allowed.email_unsubscribed_at = updates.email_unsubscribed_at
+    const allowed: NotificationSettingsInsert = {
+      profile_id: profileId,
+      updated_at: new Date().toISOString(),
+    }
+    if (updates.job_match_email_enabled !== undefined) {
+      allowed.job_match_email_enabled = updates.job_match_email_enabled
+    }
+    if (updates.job_match_email_frequency !== undefined) {
+      allowed.job_match_email_frequency = updates.job_match_email_frequency
+    }
+    if (updates.subscription_updates_email_enabled !== undefined) {
+      allowed.subscription_updates_email_enabled = updates.subscription_updates_email_enabled
+    }
+    if (updates.system_announcements_email_enabled !== undefined) {
+      allowed.system_announcements_email_enabled = updates.system_announcements_email_enabled
+    }
+    if (updates.email_unsubscribed_at !== undefined) {
+      allowed.email_unsubscribed_at = updates.email_unsubscribed_at
+    }
     const { data, error } = await supabase
       .from('notification_settings')
       .upsert(allowed, { onConflict: 'profile_id' })
       .select()
       .single()
     if (error) return { data: null, error }
-    return { data: data as NotificationSettings, error: null }
+    return { data, error: null }
   },
 
   async unsubscribeFromAll(): Promise<{ error: Error | null }> {

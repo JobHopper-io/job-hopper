@@ -1,8 +1,7 @@
-// Convenience type aliases for common database types
-// Import from the generated Supabase types file
+// Convenience type aliases for common database types (keys match generated `Database['public']['Tables']`).
+// Import from the generated Supabase types file (`supabase.ts`).
 import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
-// Convenience type aliases for common database types
 export type Profile = Tables<'profiles'>
 
 // Operation types for common entities
@@ -121,6 +120,13 @@ export type SystemAnnouncementInsert = TablesInsert<'system_announcements'>
 // Dashboard banner (singleton row id = 1); admins configure message and schedule
 export type DashboardBanner = Tables<'dashboard_banner'>
 export type DashboardBannerUpdate = TablesUpdate<'dashboard_banner'>
+
+// Freemium per-profile usage (counters + selected tier) and global caps (singleton id = 1)
+export type FreemiumUsage = Tables<'freemium_usage'>
+export type FreemiumUsageInsert = TablesInsert<'freemium_usage'>
+export type FreemiumUsageUpdate = TablesUpdate<'freemium_usage'>
+export type FreemiumSettings = Tables<'freemium_settings'>
+export type FreemiumSettingsUpdate = TablesUpdate<'freemium_settings'>
 
 // Job matching algorithm configuration
 export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>

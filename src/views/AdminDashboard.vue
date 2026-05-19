@@ -64,8 +64,7 @@
           System Settings
         </h2>
         <p class="text-sm text-neutral-body">
-          Global configuration and toggles.
-          <span class="font-medium text-amber-600">Coming soon</span>.
+          Global configuration: freemium usage counters and related toggles.
         </p>
       </router-link>
     </section>

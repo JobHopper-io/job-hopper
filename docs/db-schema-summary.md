@@ -15,7 +15,7 @@
 - **Non‑obvious rules**:
   - Profile fields (e.g. `resume_bucket_key`, preferences, target roles) should be treated as part of a single logical profile object when updating to avoid partial, inconsistent saves.
   - Phone number is stored on profiles and must be unique (normalized to digits for comparison).
-  - `onboarding_completed` is set by the Stripe webhook when `checkout.session.completed` is received for that profile.
+  - `onboarding_completed` is set when the user finishes onboarding: via the Stripe webhook on `checkout.session.completed` (paid path), or via the `complete-onboarding` Edge Function (free path). It is not set by direct client updates to `profiles`.
 
 ### subscriptions
 - **Meaning**: One row per Stripe subscription; Stripe is the source of truth. Subscription and product data are written only by the `stripe-webhook` Edge Function.
@@ -61,6 +61,17 @@
   - `status` enum: `pending` | `complete` | `cancelled`; default `pending`. `completed_at` set when fulfillment completes.
   - Only service_role (e.g. edge functions) writes; authenticated users can SELECT their own rows via RLS.
 
+### freemium_settings
+- **Meaning**: Single-row table (`id = 1`) with platform-wide caps: `max_job_searches` (manual match runs for users without an active subscription) and `max_resume_advice` (free per-job resume advice redemptions before Stripe checkout).
+- **Non‑obvious rules**: Any authenticated user may read the row (for UI counts). Only `admin` or `super_admin` may update it (RLS). A cap of `0` disables that freemium feature. Defaults are `3` / `3` at install; admins change values in **Admin → System Settings**.
+
+### freemium_usage
+- **Meaning**: One row per `profile_id` tracking freemium usage and the tier key used for manual job searches when the user does not have an active subscription.
+- **Key columns**: `selected_tier_key` (`products.key` for a base plan tier), `job_searches_used`, `resume_advice_used`, timestamps.
+- **Non‑obvious rules**:
+  - Row is created when a user completes onboarding (free `complete-onboarding` path or paid `checkout.session.completed` webhook) or by backfill for existing onboarded profiles. Counters are incremented only by backend (Edge Functions / SECURITY DEFINER RPCs); authenticated users may **SELECT** only their own row (RLS). There is no client `INSERT`/`UPDATE` on this table.
+  - Atomic consumption for job searches uses `try_consume_freemium_job_search(profile_id)` (service_role only). Free resume advice uses `redeem_freemium_resume_advice(profile_id, job_match_id, product_id)` which increments quota and inserts a `pending` `resume_products` row in one transaction.
+
 ## Job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
 - **Meaning**: Various tables representing job postings, lead enrichment, and exclusions for outreach/processing pipelines.
 - **Key relationships**:
@@ -69,7 +80,7 @@
   - `bd_leads` rows consist of `id`, `created_at`, `company_name`, and `status`, with a unique constraint on `company_name`. `status` uses the `bd_leads_status` enum (see enum values in `supabase.ts`); default is `'Ready to Process'`.
   - `exclusion_lists` rows should be treated as “do not contact”/“do not process” markers when matching jobs or companies for outbound flows. Each row consists of `id`, `created_at`, and `company_name`, with a unique constraint on `company_name`.
   - `enriched_lead` and `raw_jobs` often contain semi‑structured JSON metadata (`apollo_metadata`, `icypeas_meta_data`, `"apollo data"`, `"Meta Data"`); downstream logic should treat these as opaque blobs unless there is explicit parsing logic.
-  - `job_hopper_live.subscription_tier` references `products.key` (which base-plan bucket the posting belongs to). The job-matching algorithm only considers jobs whose tier equals at least one `products.key` for a `base_plan` row on the profile’s trial/active subscriptions.
+  - `job_hopper_live.subscription_tier` references `products.key` (which base-plan bucket the posting belongs to). The job-matching algorithm only considers jobs whose tier equals at least one `products.key` for a `base_plan` row on the profile’s trial/active subscriptions, **or** (for manual freemium runs) the tier key on `freemium_usage.selected_tier_key` when `match-jobs` is invoked with an explicit tier override.
 
 ### job_matches
 - **Meaning**: Records which jobs have been matched to which profile over time; this is the primary source for the user-facing “Recent job matches” and Job Browsing UI.

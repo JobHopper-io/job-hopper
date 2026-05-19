@@ -8,6 +8,7 @@ import {
   matchJobs,
 } from '../_shared/job-matching-algorithm.ts'
 import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
+import { isFreemiumBasePlanTierKey } from '../_shared/freemium-tier-keys.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderJobMatchDigest,
@@ -23,6 +24,8 @@ const corsHeaders = {
 interface MatchJobsPayload {
   profile_id: string
   limit?: number
+  /** When non-empty, used instead of subscription-derived tier keys (e.g. freemium manual search). */
+  subscription_tier_product_keys?: string[]
 }
 
 function configRowToOverride(row: any): Partial<MatchConfig> {
@@ -222,10 +225,28 @@ serve(async (req) => {
       )
     }
 
-    const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
-      supabaseAdminClient,
-      profile.id,
-    )
+    const rawTierOverride = payload.subscription_tier_product_keys
+    let subscriptionTierProductKeys: string[]
+    if (Array.isArray(rawTierOverride) && rawTierOverride.length > 0) {
+      const filtered = rawTierOverride.filter(
+        (k): k is string => typeof k === 'string' && isFreemiumBasePlanTierKey(k),
+      )
+      subscriptionTierProductKeys = [...new Set(filtered)]
+      if (subscriptionTierProductKeys.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or empty subscription_tier_product_keys' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          },
+        )
+      }
+    } else {
+      subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+        supabaseAdminClient,
+        profile.id,
+      )
+    }
 
     const preferences: SubscriberPreferences = {
       subscriptionTierProductKeys,

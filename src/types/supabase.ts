@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   public: {
     Tables: {
       bd_leads: {
@@ -202,6 +197,62 @@ export type Database = {
         }
         Relationships: []
       }
+      freemium_settings: {
+        Row: {
+          id: number
+          max_job_searches: number
+          max_resume_advice: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          max_job_searches?: number
+          max_resume_advice?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          max_job_searches?: number
+          max_resume_advice?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      freemium_usage: {
+        Row: {
+          created_at: string
+          job_searches_used: number
+          profile_id: string
+          resume_advice_used: number
+          selected_tier_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          job_searches_used?: number
+          profile_id: string
+          resume_advice_used?: number
+          selected_tier_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          job_searches_used?: number
+          profile_id?: string
+          resume_advice_used?: number
+          selected_tier_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freemium_usage_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_hopper_live: {
         Row: {
           ai_job_briefing: string
@@ -314,6 +365,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_processor_flags: {
+        Row: {
+          apollo_credits_exhausted: boolean
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          apollo_credits_exhausted?: boolean
+          id: number
+          updated_at?: string
+        }
+        Update: {
+          apollo_credits_exhausted?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_processor_runs: {
+        Row: {
+          counts: Json
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          options: Json
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at: string
+        }
+        Insert: {
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          options?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at?: string
+        }
+        Update: {
+          counts?: Json
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          options?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_processor_run_status"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       matching_algorithm_config: {
         Row: {
@@ -530,7 +635,6 @@ export type Database = {
           created_at: string | null
           current_industry: string | null
           current_job_title: string | null
-          target_job_title: string | null
           desired_salary_max: number | null
           desired_salary_min: number | null
           email: string
@@ -546,6 +650,7 @@ export type Database = {
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
+          target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
           years_of_experience: number | null
@@ -555,7 +660,6 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
-          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email: string
@@ -571,6 +675,7 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -580,7 +685,6 @@ export type Database = {
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
-          target_job_title?: string | null
           desired_salary_max?: number | null
           desired_salary_min?: number | null
           email?: string
@@ -596,6 +700,7 @@ export type Database = {
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
+          target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
           years_of_experience?: number | null
@@ -1006,6 +1111,33 @@ export type Database = {
     }
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
+      claim_scraper_raw_jobs: {
+        Args: { p_limit: number }
+        Returns: {
+          apply_link: string | null
+          company_name: string
+          date_scraped: string
+          description: string | null
+          employment_types: string[] | null
+          id: string
+          is_remote: boolean
+          job_title: string
+          location: string | null
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          posted_date: string | null
+          schedules: string[] | null
+          status: Database["public"]["Enums"]["scraper_raw_job_status"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "scraper_raw_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      clean_scraper_raw_jobs_n8n_parity: { Args: never; Returns: Json }
       create_user_profile: {
         Args: {
           first_name: string
@@ -1033,6 +1165,28 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      redeem_freemium_resume_advice: {
+        Args: {
+          p_job_match_id: string
+          p_product_id: string
+          p_profile_id: string
+        }
+        Returns: {
+          err: string
+          max_resume_advice: number
+          ok: boolean
+          resume_advice_used: number
+          resume_product_id: string
+        }[]
+      }
+      try_consume_freemium_job_search: {
+        Args: { p_profile_id: string }
+        Returns: {
+          job_searches_used: number
+          max_job_searches: number
+          success: boolean
+        }[]
+      }
     }
     Enums: {
       bd_leads_status:
@@ -1048,6 +1202,7 @@ export type Database = {
         | "subscription_update"
         | "system_announcement"
       job_match_email_frequency: "immediate" | "daily" | "weekly"
+      job_processor_run_status: "queued" | "running" | "completed" | "failed"
       pay_type: "hour" | "year" | "month" | "week" | "day"
       product_category:
         | "base_plan"
@@ -1064,7 +1219,7 @@ export type Database = {
         | "executive"
         | "other"
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
-      scraper_raw_job_status: "pending" | "processed"
+      scraper_raw_job_status: "pending" | "processed" | "processing"
       sponsorship_likelihood: "Low" | "Medium" | "High" | "N/A"
       subscription_status: "trial" | "active" | "canceled"
     }
@@ -1209,6 +1364,7 @@ export const Constants = {
         "system_announcement",
       ],
       job_match_email_frequency: ["immediate", "daily", "weekly"],
+      job_processor_run_status: ["queued", "running", "completed", "failed"],
       pay_type: ["hour", "year", "month", "week", "day"],
       product_category: [
         "base_plan",
@@ -1227,9 +1383,10 @@ export const Constants = {
         "other",
       ],
       scheduled_job_status: ["pending", "running", "completed", "failed"],
-      scraper_raw_job_status: ["pending", "processed"],
+      scraper_raw_job_status: ["pending", "processed", "processing"],
       sponsorship_likelihood: ["Low", "Medium", "High", "N/A"],
       subscription_status: ["trial", "active", "canceled"],
     },
   },
 } as const
+

@@ -4,7 +4,15 @@ import { profileAPI } from '@/lib/profile'
 import { subscriptionAPI } from '@/lib/subscription'
 import { getStatusLabel } from '@/lib/subscription'
 import { supabase } from '@/lib/supabase'
-import type { Profile, Subscription, Product, SubscriptionProduct, SubscriptionStatus } from '@/types/database'
+import type {
+  Profile,
+  Subscription,
+  Product,
+  SubscriptionProduct,
+  SubscriptionStatus,
+  FreemiumUsage,
+  FreemiumSettings,
+} from '@/types/database'
 
 export const useUserStore = defineStore('user', () => {
 
@@ -13,6 +21,8 @@ export const useUserStore = defineStore('user', () => {
   const subscriptions = ref<Subscription[]>([])
   const products = ref<Product[]>([])
   const subscriptionProducts = ref<SubscriptionProduct[]>([])
+  const freemiumUsage = ref<FreemiumUsage | null>(null)
+  const freemiumSettings = ref<FreemiumSettings | null>(null)
 
   // Realtime subscription for subscription_product (user's subscriptions only)
   let subscriptionProductChannel: ReturnType<typeof supabase.channel> | null = null
@@ -91,15 +101,75 @@ export const useUserStore = defineStore('user', () => {
     return '—'
   })
 
-  // Data Management Functions
+  /** Trial/active subscription rows only (from subscriptionAPI). */
+  const hasActiveSubscription = computed(() => subscriptions.value.length > 0)
+
+  const freemiumMaxJobSearches = computed(
+    () => freemiumSettings.value?.max_job_searches ?? 3,
+  )
+  const freemiumMaxResumeAdvice = computed(
+    () => freemiumSettings.value?.max_resume_advice ?? 3,
+  )
+
+  const freemiumJobSearchesRemaining = computed(() => {
+    const max = freemiumMaxJobSearches.value
+    const used = freemiumUsage.value?.job_searches_used ?? 0
+    return Math.max(0, max - used)
+  })
+
+  const freemiumResumeAdviceRemaining = computed(() => {
+    const max = freemiumMaxResumeAdvice.value
+    const used = freemiumUsage.value?.resume_advice_used ?? 0
+    return Math.max(0, max - used)
+  })
+
+  /** Show manual job search panel (free users when the feature is enabled). Stays visible when credits are used up. */
+  const showFreemiumJobSearchCta = computed(() => {
+    if (!profile.value?.onboarding_completed) return false
+    if (hasActiveSubscription.value) return false
+    if (freemiumMaxJobSearches.value <= 0) return false
+    return true
+  })
+
+  /** Whether the user can start another manual job search (credits remaining). */
+  const freemiumCanRunManualJobSearch = computed(() => freemiumJobSearchesRemaining.value > 0)
+
+  async function refreshFreemium() {
+    const pid = profile.value?.id
+    if (!pid) {
+      freemiumUsage.value = null
+      freemiumSettings.value = null
+      return
+    }
+    const [usageResult, settingsResult] = await Promise.all([
+      supabase.from('freemium_usage').select('*').eq('profile_id', pid).maybeSingle(),
+      supabase.from('freemium_settings').select('*').eq('id', 1).maybeSingle(),
+    ])
+    if (usageResult.error) {
+      console.error('Error loading freemium_usage:', usageResult.error)
+      freemiumUsage.value = null
+    } else {
+      freemiumUsage.value = usageResult.data
+    }
+    if (settingsResult.error) {
+      console.error('Error loading freemium_settings:', settingsResult.error)
+      freemiumSettings.value = null
+    } else {
+      freemiumSettings.value = settingsResult.data
+    }
+  }
+
   async function refreshProfile() {
     const { data, error } = await profileAPI.getCurrentUserProfile()
     if (!error && data) {
       profile.value = data
       startProfileRealtime(data.id)
+      await refreshFreemium()
     } else if (error) {
       console.error('Error loading profile data:', error)
       stopProfileRealtime()
+      freemiumUsage.value = null
+      freemiumSettings.value = null
     }
   }
 
@@ -120,6 +190,7 @@ export const useUserStore = defineStore('user', () => {
       console.error('Error loading subscription data:', error)
     } finally {
       isLoading.value = false
+      void refreshFreemium()
     }
   }
 
@@ -185,6 +256,8 @@ export const useUserStore = defineStore('user', () => {
     subscriptions.value = []
     products.value = []
     subscriptionProducts.value = []
+    freemiumUsage.value = null
+    freemiumSettings.value = null
   }
 
   return {
@@ -195,6 +268,16 @@ export const useUserStore = defineStore('user', () => {
     isLoading,
     refreshProfile,
     refreshSubscription,
+    refreshFreemium,
+    hasActiveSubscription,
+    freemiumUsage,
+    freemiumSettings,
+    freemiumMaxJobSearches,
+    freemiumMaxResumeAdvice,
+    freemiumJobSearchesRemaining,
+    freemiumCanRunManualJobSearch,
+    freemiumResumeAdviceRemaining,
+    showFreemiumJobSearchCta,
     clear,
     basePlan,
     addonProducts,

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
+import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -9,6 +11,7 @@ import ResumeUploader from '@/components/ResumeUploader.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 
+const router = useRouter()
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
 
@@ -37,11 +40,19 @@ const openToRemote = ref(false)
 // Step 3: Resume Upload
 const resumeFile = ref<File | null>(null)
 
-// Step 4: Plan Selection (product ids from DB)
+// Step 4: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
 const addonProducts = ref<Product[]>([])
 const selectedBasePlanId = ref<string | null>(null)
 const selectedAddonIds = ref<string[]>([])
+const startFreePlan = ref(false)
+const selectedFreemiumTier = ref<FreemiumBasePlanTierKey | ''>('')
+
+const freemiumTierOptions: { value: FreemiumBasePlanTierKey; label: string }[] = [
+  { value: 'entry_mid', label: 'Entry & Mid Level' },
+  { value: 'senior_management', label: 'Senior & Management' },
+  { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
+]
 
 const isLoading = ref(false)
 const error = ref('')
@@ -66,6 +77,9 @@ const canProceedStep2 = computed(() => {
 })
 
 const canProceedStep4 = computed(() => {
+  if (startFreePlan.value) {
+    return FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)
+  }
   return selectedBasePlanId.value !== null
 })
 
@@ -183,45 +197,89 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
   }
 }
 
+function selectPaidPlan(productId: string) {
+  startFreePlan.value = false
+  selectedFreemiumTier.value = ''
+  selectedBasePlanId.value = productId
+}
+
+function selectFreePlan() {
+  startFreePlan.value = true
+  selectedBasePlanId.value = null
+  selectedAddonIds.value = []
+}
+
+async function persistProfileAndResume(): Promise<boolean> {
+  const { error: updateError } = await profileAPI.updateProfile({
+    first_name: firstName.value.trim() || undefined,
+    last_name: lastName.value.trim() || undefined,
+    current_job_title: currentJobTitle.value,
+    target_job_title: targetJobTitle.value.trim(),
+    years_of_experience: yearsOfExperience.value ?? undefined,
+    current_industry: currentIndustry.value,
+    target_role_categories: targetRoleCategories.value,
+    desired_salary_min: desiredSalaryMin.value ?? undefined,
+    desired_salary_max: desiredSalaryMax.value ?? undefined,
+    preferred_locations: preferredLocations.value.length > 0 ? preferredLocations.value : undefined,
+    open_to_relocation: openToRelocation.value,
+    open_to_remote: openToRemote.value,
+    location_radius_miles: locationRadius.value ?? undefined,
+    requires_us_sponsorship:
+      requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
+  })
+
+  if (updateError) {
+    console.error('Error updating profile:', updateError)
+    error.value = 'We couldn’t save your profile details. Please try again before continuing.'
+    return false
+  }
+
+  if (resumeFile.value) {
+    const { error: resumeUploadError } = await profileAPI.uploadResume(resumeFile.value)
+    if (resumeUploadError) {
+      console.error('Error uploading resume:', resumeUploadError)
+      error.value = resumeUploadError.message || 'Could not upload your resume. Please try again.'
+      return false
+    }
+  }
+  return true
+}
+
 // Note: Authentication and onboarding redirects are handled in router guard
+
+const handleContinueForFree = async () => {
+  try {
+    isLoading.value = true
+    error.value = ''
+    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)) {
+      error.value = 'Please choose which plan level best describes the roles you want.'
+      return
+    }
+    const ok = await persistProfileAndResume()
+    if (!ok) return
+
+    const { error: freeError } = await freemiumAPI.completeOnboarding(selectedFreemiumTier.value)
+    if (freeError) {
+      error.value = freeError.message || 'Could not finish free signup. Please try again.'
+      return
+    }
+    await userStore.refreshProfile()
+    await router.push('/dashboard')
+  } catch (err) {
+    error.value = (err as Error).message || 'An unexpected error occurred'
+    console.error('Onboarding error:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const handleProceedToCheckout = async () => {
   try {
     isLoading.value = true
     error.value = ''
 
-    const { error: updateError } = await profileAPI.updateProfile({
-      first_name: firstName.value.trim() || undefined,
-      last_name: lastName.value.trim() || undefined,
-      current_job_title: currentJobTitle.value,
-      target_job_title: targetJobTitle.value.trim(),
-      years_of_experience: yearsOfExperience.value ?? undefined,
-      current_industry: currentIndustry.value,
-      target_role_categories: targetRoleCategories.value,
-      desired_salary_min: desiredSalaryMin.value ?? undefined,
-      desired_salary_max: desiredSalaryMax.value ?? undefined,
-      preferred_locations: preferredLocations.value.length > 0 ? preferredLocations.value : undefined,
-      open_to_relocation: openToRelocation.value,
-      open_to_remote: openToRemote.value,
-      location_radius_miles: locationRadius.value ?? undefined,
-      requires_us_sponsorship:
-        requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
-    })
-
-    if (updateError) {
-      console.error('Error updating profile:', updateError)
-      error.value = 'We couldn’t save your profile details. Please try again before continuing to checkout.'
-      return
-    }
-
-    if (resumeFile.value) {
-      const { error: resumeUploadError } = await profileAPI.uploadResume(resumeFile.value)
-      if (resumeUploadError) {
-        console.error('Error uploading resume:', resumeUploadError)
-        error.value = resumeUploadError.message || 'Could not upload your resume. Please try again.'
-        return
-      }
-    }
+    const ok = await persistProfileAndResume()
+    if (!ok) return
 
     if (!selectedBasePlanId.value) {
       error.value = 'Please select a plan to continue.'
@@ -259,8 +317,8 @@ const handleProceedToCheckout = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-2xl mx-auto">
+  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
       <div class="mb-8">
         <div class="flex justify-between mb-2">
           <span class="text-sm font-medium text-neutral-body">Step {{ currentStep }} of {{ totalSteps }}</span>
@@ -500,20 +558,55 @@ const handleProceedToCheckout = async () => {
         <!-- Step 4: Plan Selection -->
         <div v-if="currentStep === 4">
           <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            Choose your plan and start your 7-day free trial
+            Choose how you want to start
           </h2>
           <p class="text-neutral-body mb-6">
-            Pick the plan that matches the level of roles you're targeting. You won't be charged today. If you stay after your 7-day trial, billing begins automatically at the monthly rate for your chosen plan. You can change plans or cancel anytime.
+            Subscribe with a 7-day free trial for automated matching and email digests, or start on the free plan and run job searches yourself when you are ready. You can upgrade anytime from billing.
           </p>
 
           <div class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div
+                :class="[
+                  'card p-6 text-left transition-all flex flex-col',
+                  startFreePlan ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
+                ]"
+              >
+                <h3 class="font-semibold mb-2">Start for free</h3>
+                <p class="text-2xl font-bold text-brand-primary mb-1">$0</p>
+                <p class="text-sm text-neutral-body mb-4 grow">
+                  Explore the dashboard and preview our features.
+                </p>
+                <button type="button" class="btn-secondary w-full mb-3" @click="selectFreePlan">
+                  Choose free
+                </button>
+                <div v-if="startFreePlan">
+                  <label for="freemium-tier" class="block text-sm font-medium text-brand-charcoal mb-1">
+                    Which level of roles are you targeting? <span class="text-red-600">*</span>
+                  </label>
+                  <select
+                    id="freemium-tier"
+                    v-model="selectedFreemiumTier"
+                    class="input w-full"
+                  >
+                    <option disabled value="">Select a category</option>
+                    <option
+                      v-for="opt in freemiumTierOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                    >
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
               <div
                 v-for="product in basePlanProducts"
                 :key="product.id"
                 :class="[
                   'card p-6 text-left transition-all',
-                  selectedBasePlanId === product.id ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
+                  !startFreePlan && selectedBasePlanId === product.id ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
                 <h3 class="font-semibold mb-2">{{ product.display_name }}</h3>
@@ -521,7 +614,7 @@ const handleProceedToCheckout = async () => {
                 <p class="text-sm text-neutral-body mb-4">{{ product.description || '' }}</p>
                 <button
                   type="button"
-                  @click="selectedBasePlanId = product.id"
+                  @click="selectPaidPlan(product.id)"
                   class="btn-primary w-full"
                 >
                   Select plan
@@ -529,7 +622,7 @@ const handleProceedToCheckout = async () => {
               </div>
             </div>
 
-            <div class="border-t border-neutral-border pt-6">
+            <div v-if="!startFreePlan" class="border-t border-neutral-border pt-6">
               <h3 class="font-semibold text-brand-charcoal mb-2">Optional add-ons</h3>
               <p class="text-sm text-neutral-body mb-4">Separately priced; add any you'd like.</p>
               <div class="space-y-3">
@@ -584,6 +677,16 @@ const handleProceedToCheckout = async () => {
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ currentStep === 3 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
+          </button>
+          <button
+            v-else-if="startFreePlan"
+            @click="handleContinueForFree"
+            type="button"
+            :disabled="!canProceedStep4 || isLoading"
+            class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span v-if="isLoading">Saving…</span>
+            <span v-else>Continue for free</span>
           </button>
           <button
             v-else
