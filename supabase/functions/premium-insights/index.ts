@@ -179,6 +179,20 @@ serve(async (req) => {
     })
   }
 
+  console.log(
+    JSON.stringify({
+      fn: 'premium-insights',
+      phase: 'job_loaded',
+      job_match_id: jobMatchId,
+      profile_id: profileId,
+      job_id: matchRow.job_id,
+      company_name: job.company_name,
+      location: job.location,
+      job_title: job.job_title,
+      role_category: job.role_category,
+    }),
+  )
+
   const { data: existingRow } = await admin
     .from('job_hiring_contacts')
     .select('id, status, contacts, company_summary, error_code')
@@ -187,6 +201,14 @@ serve(async (req) => {
     .maybeSingle()
 
   if (existingRow?.status === 'complete') {
+    console.log(
+      JSON.stringify({
+        fn: 'premium-insights',
+        phase: 'short_circuit_complete_row',
+        job_match_id: jobMatchId,
+        profile_id: profileId,
+      }),
+    )
     return new Response(
       JSON.stringify({
         status: 'complete',
@@ -331,6 +353,19 @@ serve(async (req) => {
 
   const needOrgSearch = !organizationId
 
+  console.log(
+    JSON.stringify({
+      fn: 'premium-insights',
+      phase: 'company_cache_lookup',
+      job_match_id: jobMatchId,
+      profile_id: profileId,
+      cache_key: cacheKey,
+      cache_hit: Boolean(cacheHit),
+      need_org_search: needOrgSearch,
+      cached_apollo_organization_id: organizationId,
+    }),
+  )
+
   try {
     if (needOrgSearch) {
       const c1 = await tryConsumeApolloCredits(admin, PROCESS, 1)
@@ -345,6 +380,16 @@ serve(async (req) => {
       try {
         orgs = await searchOrganizationsByName(apolloKey, companyName, location)
       } catch (e) {
+        console.log(
+          JSON.stringify({
+            fn: 'premium-insights',
+            phase: 'failure',
+            job_match_id: jobMatchId,
+            profile_id: profileId,
+            code: 'org_search_error',
+            message: e instanceof Error ? e.message : String(e),
+          }),
+        )
         await refundApolloCredits(admin, PROCESS, 1)
         await finalizeFailure('org_search_error')
         const msg = e instanceof Error ? e.message : String(e)
@@ -356,6 +401,15 @@ serve(async (req) => {
 
       const scored = scoreOrganizationCandidates(companyName, location, orgs)
       if (scored.ambiguous) {
+        console.log(
+          JSON.stringify({
+            fn: 'premium-insights',
+            phase: 'failure',
+            job_match_id: jobMatchId,
+            profile_id: profileId,
+            code: 'ambiguous_org',
+          }),
+        )
         await refundApolloCredits(admin, PROCESS, 1)
         await finalizeFailure('ambiguous_org')
         return new Response(JSON.stringify({ error: 'ambiguous_org' }), {
@@ -364,6 +418,15 @@ serve(async (req) => {
         })
       }
       if (!scored.best) {
+        console.log(
+          JSON.stringify({
+            fn: 'premium-insights',
+            phase: 'failure',
+            job_match_id: jobMatchId,
+            profile_id: profileId,
+            code: 'org_not_found',
+          }),
+        )
         await refundApolloCredits(admin, PROCESS, 1)
         await finalizeFailure('org_not_found')
         return new Response(JSON.stringify({ error: 'org_not_found' }), {
@@ -374,6 +437,18 @@ serve(async (req) => {
       organizationId = scored.best.organizationId
       primaryDomain = scored.best.primaryDomain
       resolvedOrgName = scored.best.name
+
+      console.log(
+        JSON.stringify({
+          fn: 'premium-insights',
+          phase: 'org_resolved',
+          job_match_id: jobMatchId,
+          profile_id: profileId,
+          apollo_organization_id: organizationId,
+          resolved_name: resolvedOrgName,
+          primary_domain: primaryDomain,
+        }),
+      )
 
       const expiresAt = new Date(Date.now() + CACHE_TTL_DAYS * 86400000).toISOString()
       await admin.from('company_apollo_cache').upsert(
@@ -388,6 +463,18 @@ serve(async (req) => {
         },
         { onConflict: 'cache_key' },
       )
+    } else {
+      console.log(
+        JSON.stringify({
+          fn: 'premium-insights',
+          phase: 'org_from_company_cache',
+          job_match_id: jobMatchId,
+          profile_id: profileId,
+          cache_key: cacheKey,
+          apollo_organization_id: organizationId,
+          primary_domain: primaryDomain,
+        }),
+      )
     }
 
     const c2 = await tryConsumeApolloCredits(admin, PROCESS, 1)
@@ -400,10 +487,30 @@ serve(async (req) => {
     }
 
     const phrases = hiringTitlePhrases(job.role_category, job.job_title)
+    console.log(
+      JSON.stringify({
+        fn: 'premium-insights',
+        phase: 'people_step',
+        job_match_id: jobMatchId,
+        profile_id: profileId,
+        organization_id: organizationId,
+        title_phrases: phrases.slice(0, 12),
+      }),
+    )
     let people
     try {
       people = await searchPeopleAtOrganization(apolloKey, organizationId!, phrases)
     } catch (e) {
+      console.log(
+        JSON.stringify({
+          fn: 'premium-insights',
+          phase: 'failure',
+          job_match_id: jobMatchId,
+          profile_id: profileId,
+          code: 'people_search_error',
+          message: e instanceof Error ? e.message : String(e),
+        }),
+      )
       await refundApolloCredits(admin, PROCESS, 1)
       await finalizeFailure('people_search_error')
       const msg = e instanceof Error ? e.message : String(e)
@@ -419,6 +526,18 @@ serve(async (req) => {
     const pool = filtered.length ? filtered : people
     const best = pickBestPerson(pool, phrases)
     if (!best) {
+      console.log(
+        JSON.stringify({
+          fn: 'premium-insights',
+          phase: 'failure',
+          job_match_id: jobMatchId,
+          profile_id: profileId,
+          code: 'no_contacts',
+          organization_id: organizationId,
+          people_count: people.length,
+          after_employer_filter: filtered.length,
+        }),
+      )
       await refundApolloCredits(admin, PROCESS, 1)
       await finalizeFailure('no_contacts')
       return new Response(JSON.stringify({ error: 'no_contacts' }), {
@@ -429,6 +548,16 @@ serve(async (req) => {
 
     const { person, creditError } = await matchPersonById(apolloKey, best.id)
     if (creditError || !person) {
+      console.log(
+        JSON.stringify({
+          fn: 'premium-insights',
+          phase: 'failure',
+          job_match_id: jobMatchId,
+          profile_id: profileId,
+          code: creditError ? 'apollo_credit_error' : 'match_failed',
+          person_id: best.id,
+        }),
+      )
       await refundApolloCredits(admin, PROCESS, 1)
       await finalizeFailure(creditError ? 'apollo_credit_error' : 'match_failed')
       return new Response(JSON.stringify({ error: creditError ? 'apollo_credit_error' : 'match_failed' }), {
@@ -464,6 +593,17 @@ serve(async (req) => {
         completed_at: new Date().toISOString(),
       })
       .eq('id', hiringContactId)
+
+    console.log(
+      JSON.stringify({
+        fn: 'premium-insights',
+        phase: 'complete',
+        job_match_id: jobMatchId,
+        profile_id: profileId,
+        apollo_organization_id: organizationId,
+        contact_count: contacts.length,
+      }),
+    )
 
     return new Response(
       JSON.stringify({

@@ -68,6 +68,20 @@ Hide “Get hiring contacts” / similar CTAs when the `premium_insights` row wo
 3. Document the row in the registry table above.
 4. If the process runs outside Supabase, use the **service role** REST client or RPC with the service key.
 
+## Debug logging (Premium Insights)
+
+The `premium-insights` Edge Function and `_shared/apollo.ts` emit **structured JSON** lines via `console.log` (visible in Supabase **Edge Functions → Logs**).
+
+| `fn` | When |
+|------|------|
+| `premium-insights` | Phases: `job_loaded`, `short_circuit_complete_row`, `company_cache_lookup`, `org_from_company_cache`, `org_resolved`, `people_step`, `complete`, `failure` (includes `code`). |
+| `apollo:org-search` | After `mixed_companies/search`: query name, location filter, response JSON keys, raw vs filtered org counts, sample candidate ids/names. |
+| `apollo:org-score` | After scoring: `outcome` (`no_candidates`, `below_threshold`, `ambiguous`, `picked`) and top rankings with per-component scores. |
+| `apollo:people-search` | After `mixed_people/api_search`: org id, title sample, people count. |
+| `apollo:people-match` | After `people/match`: person id, outcome (`has_person`, `credit_http`, etc.). |
+
+Filter logs by `job_match_id` or grep for `fn":"premium-insights"` / `fn":"apollo:org-search"`.
+
 ## Related docs
 
 - [`docs/db-schema-summary.md`](db-schema-summary.md) — entity relationships and RLS overview.

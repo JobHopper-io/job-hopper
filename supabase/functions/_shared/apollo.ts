@@ -102,7 +102,18 @@ export function scoreOrganizationCandidates(
   jobLocation: string | null | undefined,
   orgs: ApolloOrgCandidate[],
 ): { best: ResolvedOrganization | null; ambiguous: boolean } {
-  if (!orgs.length) return { best: null, ambiguous: false }
+  if (!orgs.length) {
+    console.log(
+      JSON.stringify({
+        fn: 'apollo:org-score',
+        outcome: 'no_candidates',
+        companyName,
+        jobLocation: jobLocation ?? null,
+        orgCount: 0,
+      }),
+    )
+    return { best: null, ambiguous: false }
+  }
   const scored = orgs.map((o) => ({
     org: o,
     score: nameScore(companyName, o.name) + locationScore(jobLocation, o),
@@ -110,10 +121,52 @@ export function scoreOrganizationCandidates(
   scored.sort((a, b) => b.score - a.score)
   const top = scored[0]
   const second = scored[1]
-  if (!top || top.score < 25) return { best: null, ambiguous: false }
+  const rankings = scored.slice(0, 5).map((row) => ({
+    id: row.org.id,
+    name: row.org.name,
+    score: row.score,
+    nameScore: nameScore(companyName, row.org.name),
+    locationScore: locationScore(jobLocation, row.org),
+  }))
+  if (!top || top.score < 25) {
+    console.log(
+      JSON.stringify({
+        fn: 'apollo:org-score',
+        outcome: 'below_threshold',
+        companyName,
+        jobLocation: jobLocation ?? null,
+        minScore: 25,
+        topScore: top?.score ?? null,
+        rankings,
+      }),
+    )
+    return { best: null, ambiguous: false }
+  }
   if (second && second.score > top.score * AMBIGUITY_RATIO) {
+    console.log(
+      JSON.stringify({
+        fn: 'apollo:org-score',
+        outcome: 'ambiguous',
+        companyName,
+        jobLocation: jobLocation ?? null,
+        ambiguityRatio: AMBIGUITY_RATIO,
+        topScore: top.score,
+        secondScore: second.score,
+        rankings,
+      }),
+    )
     return { best: null, ambiguous: true }
   }
+  console.log(
+    JSON.stringify({
+      fn: 'apollo:org-score',
+      outcome: 'picked',
+      companyName,
+      jobLocation: jobLocation ?? null,
+      winner: { id: top.org.id, name: top.org.name, score: top.score },
+      rankings,
+    }),
+  )
   return {
     best: {
       organizationId: top.org.id,
@@ -219,9 +272,27 @@ export async function searchOrganizationsByName(
     const text = await res.text()
     throw new Error(`Apollo org search ${res.status}: ${text.slice(0, 500)}`)
   }
-  const json = (await res.json()) as { organizations?: ApolloOrgCandidate[] }
-  const orgs = json.organizations ?? []
-  return orgs.filter((o) => o.id && o.name)
+  const json = (await res.json()) as Record<string, unknown>
+  const orgsField = json['organizations']
+  const rawList = Array.isArray(orgsField) ? orgsField : []
+  const orgs = (rawList as ApolloOrgCandidate[]).filter((o) => o?.id && o?.name)
+  console.log(
+    JSON.stringify({
+      fn: 'apollo:org-search',
+      q_organization_name: params.q_organization_name,
+      has_location_filter: Boolean(loc),
+      organization_locations: loc ? [loc] : null,
+      responseTopLevelKeys: Object.keys(json),
+      organizationsArrayLength: Array.isArray(orgsField) ? orgsField.length : null,
+      candidatesAfterIdNameFilter: orgs.length,
+      candidateSummaries: orgs.slice(0, 5).map((o) => ({
+        id: o.id,
+        name: o.name,
+        domain: o.primary_domain ?? null,
+      })),
+    }),
+  )
+  return orgs
 }
 
 export async function searchPeopleAtOrganization(
@@ -241,8 +312,20 @@ export async function searchPeopleAtOrganization(
     const text = await res.text()
     throw new Error(`Apollo people search ${res.status}: ${text.slice(0, 500)}`)
   }
-  const json = (await res.json()) as { people?: ApolloPersonSearchHit[] }
-  return json.people ?? []
+  const json = (await res.json()) as Record<string, unknown>
+  const peopleField = json['people']
+  const people = Array.isArray(peopleField) ? (peopleField as ApolloPersonSearchHit[]) : []
+  console.log(
+    JSON.stringify({
+      fn: 'apollo:people-search',
+      organizationId,
+      titleSample: personTitles.slice(0, 8),
+      responseTopLevelKeys: Object.keys(json),
+      peopleArrayLength: Array.isArray(peopleField) ? peopleField.length : null,
+      peopleCount: people.length,
+    }),
+  )
+  return people
 }
 
 export function employerNamePlausible(
@@ -265,19 +348,53 @@ export async function matchPersonById(
   const res = await fetch(url, { method: 'POST', headers: apolloHeaders(apiKey), body: '{}' })
   const text = await res.text()
   if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 429) {
+    console.log(
+      JSON.stringify({
+        fn: 'apollo:people-match',
+        personId,
+        outcome: 'credit_http',
+        httpStatus: res.status,
+      }),
+    )
     return { person: null, creditError: true }
   }
   if (!res.ok) {
-    if (text.toLowerCase().includes('credit')) return { person: null, creditError: true }
+    if (text.toLowerCase().includes('credit')) {
+      console.log(
+        JSON.stringify({
+          fn: 'apollo:people-match',
+          personId,
+          outcome: 'credit_body',
+          httpStatus: res.status,
+        }),
+      )
+      return { person: null, creditError: true }
+    }
     throw new Error(`Apollo people match ${res.status}: ${text.slice(0, 500)}`)
   }
   let json: { person?: Record<string, unknown> }
   try {
     json = JSON.parse(text) as { person?: Record<string, unknown> }
   } catch {
+    console.log(
+      JSON.stringify({
+        fn: 'apollo:people-match',
+        personId,
+        outcome: 'json_parse_error',
+      }),
+    )
     return { person: null, creditError: false }
   }
-  return { person: json.person ?? null, creditError: false }
+  const person = json.person ?? null
+  console.log(
+    JSON.stringify({
+      fn: 'apollo:people-match',
+      personId,
+      outcome: person ? 'has_person' : 'empty_person',
+      hasEmail: !!(person && typeof person.email === 'string' && person.email),
+    }),
+  )
+  return { person, creditError: false }
 }
 
 export function personToMatchedContact(
