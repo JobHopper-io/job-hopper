@@ -10,8 +10,11 @@ export function mapPremiumInsightsClientError(raw: string): string {
   if (t === 'Another job is already processing' || t.includes('Another job')) {
     return 'Another hiring contact lookup is already running. Wait for it to finish or try again in a few minutes.'
   }
-  if (t === 'ambiguous_org' || t === 'org_not_found' || t === 'no_contacts') {
+  if (t === 'ambiguous_org' || t === 'org_not_found' || t === 'no_contacts' || t === 'match_failed') {
     return 'We could not confidently identify a hiring contact for this posting.'
+  }
+  if (t === 'cached_resolution_miss') {
+    return 'We could not find a hiring contact for this job recently. Try again in about a week, or contact support if this keeps happening.'
   }
   return t || 'Something went wrong. Please try again.'
 }

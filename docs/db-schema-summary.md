@@ -84,6 +84,10 @@
 - **Meaning**: Deduplicates Apollo organization resolution by `cache_key` (normalized company name + location region) with `apollo_organization_id`, `primary_domain`, and TTL (`expires_at`).
 - **Non‑obvious rules**: Written only by service role (e.g. `premium-insights`). Not exposed to the client.
 
+### company_apollo_search_miss
+- **Meaning**: Short-lived negative cache keyed by the **same** `cache_key` as `company_apollo_cache`. When org/contact resolution recently failed for that company/region, the row prevents repeat Premium Insights runs from redeeming freemium quota or spending Apollo credits until `expires_at` (typically about a week).
+- **Non‑obvious rules**: Written only by service role (`premium-insights` on definitive resolution failures). Not exposed to the client. Rows are not a substitute for `company_apollo_cache` positive hits.
+
 ## Job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)
 - **Meaning**: Various tables representing job postings, lead enrichment, and exclusions for outreach/processing pipelines.
 - **Key relationships**:

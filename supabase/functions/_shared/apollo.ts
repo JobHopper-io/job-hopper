@@ -264,8 +264,9 @@ export async function searchOrganizationsByName(
     per_page: 5,
     page: 1,
   }
+  // Do not send job location as organization_locations[] — Apollo treats that as HQ location,
+  // which breaks many legitimate searches (e.g. subsidiary name + job city).
   const loc = jobLocation?.trim()
-  if (loc) params.organization_locations = [loc]
   const url = `${APOLLO_BASE}/mixed_companies/search?${buildQuery(params)}`
   const res = await fetch(url, { method: 'POST', headers: apolloHeaders(apiKey), body: '{}' })
   if (!res.ok) {
@@ -280,8 +281,8 @@ export async function searchOrganizationsByName(
     JSON.stringify({
       fn: 'apollo:org-search',
       q_organization_name: params.q_organization_name,
-      has_location_filter: Boolean(loc),
-      organization_locations: loc ? [loc] : null,
+      has_location_filter: false,
+      job_location_for_scoring_only: loc || null,
       responseTopLevelKeys: Object.keys(json),
       organizationsArrayLength: Array.isArray(orgsField) ? orgsField.length : null,
       candidatesAfterIdNameFilter: orgs.length,

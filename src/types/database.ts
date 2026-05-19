@@ -140,3 +140,13 @@ export type FreemiumSettingsUpdate = TablesUpdate<'freemium_settings'>
 export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigInsert = TablesInsert<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigUpdate = TablesUpdate<'matching_algorithm_config'>
+
+// Apollo org resolution (service_role; premium-insights). Not exposed to the client via RLS.
+export type CompanyApolloCache = Tables<'company_apollo_cache'>
+export type CompanyApolloCacheInsert = TablesInsert<'company_apollo_cache'>
+export type CompanyApolloCacheUpdate = TablesUpdate<'company_apollo_cache'>
+
+/** Negative cache for recent org/contact resolution failures (same cache_key as company_apollo_cache). */
+export type CompanyApolloSearchMiss = Tables<'company_apollo_search_miss'>
+export type CompanyApolloSearchMissInsert = TablesInsert<'company_apollo_search_miss'>
+export type CompanyApolloSearchMissUpdate = TablesUpdate<'company_apollo_search_miss'>

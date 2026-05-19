@@ -37,6 +37,10 @@ To avoid charging for a `people/match` when org resolution never succeeded:
 1. `try_consume_apollo_credits('premium_insights', 1)` → org search → on failure, `refund_apollo_credits('premium_insights', 1)`.
 2. `try_consume_apollo_credits('premium_insights', 1)` → `people/match` → on failure, `refund_apollo_credits('premium_insights', 1)`.
 
+`mixed_companies/search` is called **by organization name only** (job posting location is not passed as Apollo’s HQ `organization_locations` filter, which would otherwise exclude valid subsidiaries and brands).
+
+Before redeeming freemium or consuming credits, the function may short-circuit on **`company_apollo_search_miss`** (same `cache_key` as `company_apollo_cache`, TTL on the order of a week) when that company/region recently hit a definitive org/contact resolution failure, avoiding repeat spend.
+
 `mixed_people/api_search` is **not** counted as a credit (Apollo documents it as non–credit-consuming for API search).
 
 ### Job processor
@@ -75,7 +79,7 @@ The `premium-insights` Edge Function and `_shared/apollo.ts` emit **structured J
 | `fn` | When |
 |------|------|
 | `premium-insights` | Phases: `job_loaded`, `short_circuit_complete_row`, `company_cache_lookup`, `org_from_company_cache`, `org_resolved`, `people_step`, `complete`, `failure` (includes `code`). |
-| `apollo:org-search` | After `mixed_companies/search`: query name, location filter, response JSON keys, raw vs filtered org counts, sample candidate ids/names. |
+| `apollo:org-search` | After `mixed_companies/search` (by **company name only**; job location is not sent as Apollo HQ `organization_locations`, since that filter is headquarters-based and breaks many valid matches): query name, response JSON keys, raw vs filtered org counts, sample candidate ids/names. |
 | `apollo:org-score` | After scoring: `outcome` (`no_candidates`, `below_threshold`, `ambiguous`, `picked`) and top rankings with per-component scores. |
 | `apollo:people-search` | After `mixed_people/api_search`: org id, title sample, people count. |
 | `apollo:people-match` | After `people/match`: person id, outcome (`has_person`, `credit_http`, etc.). |

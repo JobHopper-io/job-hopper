@@ -6,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
-import { premiumInsightsAPI } from '@/lib/premiumInsights'
+import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
@@ -46,9 +46,11 @@ const insightsPrecheckOpen = ref(false)
 const insightsLoading = ref(false)
 const insightsError = ref<string | null>(null)
 const insightsModalOpen = ref(false)
+const insightsModalLoading = ref(false)
 const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
 const insightsModalOverrideCompany = ref<Record<string, unknown> | null>(null)
 const insightsModalError = ref<string | null>(null)
+const insightsModalFreemiumNote = ref<string | null>(null)
 
 const insightsModalContacts = computed(
   () => insightsModalOverrideContacts.value ?? props.job.contacts,
@@ -104,13 +106,17 @@ function closeInsightsPrecheck() {
 
 function onCloseInsightsModal() {
   insightsModalOpen.value = false
+  insightsModalLoading.value = false
   insightsModalOverrideContacts.value = null
   insightsModalOverrideCompany.value = null
   insightsModalError.value = null
+  insightsModalFreemiumNote.value = null
 }
 
 function openInsightsViewModal() {
   insightsModalError.value = null
+  insightsModalFreemiumNote.value = null
+  insightsModalLoading.value = false
   insightsModalOverrideContacts.value = null
   insightsModalOverrideCompany.value = null
   insightsModalOpen.value = true
@@ -163,24 +169,44 @@ const showPremiumInsightsPending = computed(
 async function runPremiumInsights() {
   insightsLoading.value = true
   insightsError.value = null
+  insightsModalError.value = null
+  insightsModalFreemiumNote.value = null
+  insightsModalOverrideContacts.value = null
+  insightsModalOverrideCompany.value = null
+  insightsModalOpen.value = true
+  insightsModalLoading.value = true
   try {
-    const { data, error } = await premiumInsightsAPI.runForJobMatch(props.job.matchId)
+    const { data, error, meta } = await premiumInsightsAPI.runForJobMatch(props.job.matchId)
+    insightsModalLoading.value = false
     if (error) {
-      insightsError.value = mapPremiumInsightsClientError(error.message)
+      const friendly = mapPremiumInsightsClientError(error.message)
+      insightsModalError.value = friendly
+      insightsError.value = friendly
+      insightsModalFreemiumNote.value = premiumInsightsFreemiumReassurance(
+        meta,
+        hasPremiumInsightsAddon.value,
+      )
+      emit('refresh-job-matches')
+      void userStore.refreshFreemium()
       return
     }
+    insightsModalError.value = null
+    insightsModalFreemiumNote.value = null
     if (data?.contacts?.length) {
       insightsModalOverrideContacts.value = data.contacts
       insightsModalOverrideCompany.value = data.company_summary ?? null
-      insightsModalOpen.value = true
     }
     emit('refresh-job-matches')
     void userStore.refreshFreemium()
   } catch (err) {
-    insightsError.value =
-      err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    insightsModalLoading.value = false
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const friendly = mapPremiumInsightsClientError(raw)
+    insightsError.value = friendly
+    insightsModalError.value = friendly
   } finally {
     insightsLoading.value = false
+    insightsModalLoading.value = false
   }
 }
 
@@ -413,9 +439,11 @@ async function runAdviceCheckout() {
       />
       <PremiumInsightsModal
         :open="insightsModalOpen"
+        :loading="insightsModalLoading"
         :contacts="insightsModalContacts"
         :company-summary="insightsModalOverrideCompany"
         :error-message="insightsModalError"
+        :freemium-note="insightsModalFreemiumNote"
         @close="onCloseInsightsModal"
       />
       <p v-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">

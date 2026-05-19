@@ -10,10 +10,16 @@ const props = withDefaults(
     companySummary?: Record<string, unknown> | null
     /** When set, modal shows error state instead of contacts */
     errorMessage?: string | null
+    /** Request in flight (contacts may still be stale from a prior view) */
+    loading?: boolean
+    /** Optional second line under an error (e.g. freemium credit reassurance) */
+    freemiumNote?: string | null
   }>(),
   {
     companySummary: null,
     errorMessage: null,
+    loading: false,
+    freemiumNote: null,
   },
 )
 
@@ -96,20 +102,35 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          <p v-if="companySummaryText" class="text-sm text-neutral-body">
+          <p v-if="!loading && !errorMessage && companySummaryText" class="text-sm text-neutral-body">
             <span class="font-medium text-brand-charcoal">Organization:</span>
             {{ companySummaryText }}
           </p>
 
           <div
-            v-if="errorMessage"
-            class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            role="alert"
+            v-if="loading"
+            class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm"
           >
-            {{ errorMessage }}
+            <font-awesome-icon
+              :icon="['fas', 'spinner']"
+              spin
+              class="text-2xl text-brand-primary"
+              aria-hidden="true"
+            />
+            <p>Looking up hiring contacts…</p>
           </div>
 
-          <ul v-else-if="hasContacts" class="space-y-4">
+          <template v-else>
+            <div
+              v-if="errorMessage"
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 space-y-2"
+              role="alert"
+            >
+              <p>{{ errorMessage }}</p>
+              <p v-if="freemiumNote" class="text-red-900/90 text-xs leading-snug">{{ freemiumNote }}</p>
+            </div>
+
+            <ul v-else-if="hasContacts" class="space-y-4">
             <li
               v-for="(c, idx) in contacts"
               :key="idx"
@@ -130,15 +151,13 @@ onUnmounted(() => {
             </li>
           </ul>
 
-          <div v-else class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm">
-            <font-awesome-icon
-              :icon="['fas', 'spinner']"
-              spin
-              class="text-2xl text-brand-primary"
-              aria-hidden="true"
-            />
-            <p>Looking up hiring contacts…</p>
-          </div>
+            <div
+              v-else
+              class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm"
+            >
+              <p>No hiring contacts are available for this job yet.</p>
+            </div>
+          </template>
         </div>
         <div class="border-t border-neutral-border px-6 py-4">
           <button type="button" class="btn-primary w-full sm:w-auto" @click="emit('close')">

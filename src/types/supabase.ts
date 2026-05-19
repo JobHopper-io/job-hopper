@@ -92,6 +92,27 @@ export type Database = {
         }
         Relationships: []
       }
+      company_apollo_search_miss: {
+        Row: {
+          cache_key: string
+          expires_at: string
+          reason: string
+          recorded_at: string
+        }
+        Insert: {
+          cache_key: string
+          expires_at: string
+          reason?: string
+          recorded_at?: string
+        }
+        Update: {
+          cache_key?: string
+          expires_at?: string
+          reason?: string
+          recorded_at?: string
+        }
+        Relationships: []
+      }
       dashboard_banner: {
         Row: {
           ends_at: string | null

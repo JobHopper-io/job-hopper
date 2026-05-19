@@ -22,6 +22,32 @@ const corsHeaders = {
 
 const PROCESS = 'premium_insights'
 const CACHE_TTL_DAYS = 90
+const NEGATIVE_CACHE_TTL_DAYS = 7
+
+function userMessageForPremiumInsightsFailure(code: string): string {
+  switch (code) {
+    case 'apollo_exhausted':
+      return 'Contact lookups are temporarily unavailable. Please try again later.'
+    case 'ambiguous_org':
+    case 'org_not_found':
+    case 'no_contacts':
+    case 'match_failed':
+      return 'We could not confidently identify a hiring contact for this posting.'
+    case 'cached_resolution_miss':
+      return 'We could not find a hiring contact for this job recently. Try again in about a week, or contact support if this keeps happening.'
+    case 'org_search_error':
+    case 'people_search_error':
+      return 'The hiring-contact service had a problem. Please try again in a few minutes.'
+    case 'apollo_credit_error':
+      return 'Contact lookups are temporarily unavailable. Please try again later.'
+    case 'apollo_not_configured':
+      return 'Contact lookups are not available right now. Please try again later.'
+    case 'unexpected':
+      return 'Something went wrong. Please try again.'
+    default:
+      return 'Something went wrong. Please try again.'
+  }
+}
 
 type RpcRow = { ok?: boolean; hiring_contact_id?: string; err?: string }
 
@@ -193,6 +219,35 @@ serve(async (req) => {
     }),
   )
 
+  const companyName = job.company_name
+  const location = job.location
+  const cacheKey = buildCompanyCacheKey(companyName, location)
+
+  const searchMissExpiresAt = () =>
+    new Date(Date.now() + NEGATIVE_CACHE_TTL_DAYS * 86400000).toISOString()
+
+  async function hasActiveSearchMiss(): Promise<boolean> {
+    const { data: miss } = await admin
+      .from('company_apollo_search_miss')
+      .select('cache_key')
+      .eq('cache_key', cacheKey)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
+    return Boolean(miss)
+  }
+
+  async function recordSearchMiss(reason: string) {
+    await admin.from('company_apollo_search_miss').upsert(
+      {
+        cache_key: cacheKey,
+        reason,
+        expires_at: searchMissExpiresAt(),
+        recorded_at: new Date().toISOString(),
+      },
+      { onConflict: 'cache_key' },
+    )
+  }
+
   const { data: existingRow } = await admin
     .from('job_hiring_contacts')
     .select('id, status, contacts, company_summary, error_code')
@@ -240,6 +295,34 @@ serve(async (req) => {
 
   /** When true, `redeem_freemium_premium_insights` ran successfully in this request; roll back quota on failure. */
   let freemiumChargedThisRequest = false
+
+  if (await hasActiveSearchMiss()) {
+    if (hiringContactId) {
+      await admin
+        .from('job_hiring_contacts')
+        .update({
+          status: 'failed',
+          error_code: 'cached_resolution_miss',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', hiringContactId)
+    }
+    const user_message = userMessageForPremiumInsightsFailure('cached_resolution_miss')
+    const missBody: Record<string, unknown> = {
+      status: 'failed',
+      error_code: 'cached_resolution_miss',
+      user_message,
+      cached_miss: true,
+    }
+    if (!hasAddon) {
+      missBody.freemium_credit_never_consumed = true
+      missBody.freemium_credit_refunded = false
+    }
+    return new Response(JSON.stringify(missBody), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
+  }
 
   if (!hiringContactId) {
     if (hasAddon) {
@@ -306,14 +389,14 @@ serve(async (req) => {
     })
   }
 
-  const finalizeFailure = async (code: string) => {
+  const finalizeFailure = async (code: string): Promise<{ refunded: boolean }> => {
     if (freemiumChargedThisRequest && hiringContactId) {
       const { error: rfErr } = await admin.rpc('refund_freemium_premium_insights', {
         p_profile_id: profileId,
         p_hiring_contact_id: hiringContactId,
       })
       if (rfErr) console.error('refund_freemium_premium_insights', rfErr)
-      return
+      return { refunded: !rfErr }
     }
     if (hiringContactId) {
       await admin
@@ -325,19 +408,36 @@ serve(async (req) => {
         })
         .eq('id', hiringContactId)
     }
+    return { refunded: false }
   }
 
-  if (!apolloKey) {
-    await finalizeFailure('apollo_not_configured')
-    return new Response(JSON.stringify({ error: 'Apollo is not configured' }), {
+  const respondFailure = async (
+    code: string,
+    httpStatus: number,
+    options?: { recordMiss?: boolean },
+  ): Promise<Response> => {
+    const fin = await finalizeFailure(code)
+    if (options?.recordMiss) await recordSearchMiss(code)
+    const user_message = userMessageForPremiumInsightsFailure(code)
+    const body: Record<string, unknown> = {
+      status: 'failed',
+      error_code: code,
+      user_message,
+    }
+    if (!hasAddon) {
+      body.freemium_credit_never_consumed = !freemiumChargedThisRequest
+      if (freemiumChargedThisRequest) body.freemium_credit_refunded = fin.refunded
+    }
+    return new Response(JSON.stringify(body), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 503,
+      status: httpStatus,
     })
   }
 
-  const companyName = job.company_name
-  const location = job.location
-  const cacheKey = buildCompanyCacheKey(companyName, location)
+  if (!apolloKey) {
+    return await respondFailure('apollo_not_configured', 503)
+  }
+
   const nowIso = new Date().toISOString()
 
   const { data: cacheHit } = await admin
@@ -370,11 +470,7 @@ serve(async (req) => {
     if (needOrgSearch) {
       const c1 = await tryConsumeApolloCredits(admin, PROCESS, 1)
       if (!c1.ok) {
-        await finalizeFailure('apollo_exhausted')
-        return new Response(JSON.stringify({ error: 'apollo_exhausted' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        })
+        return await respondFailure('apollo_exhausted', 403)
       }
       let orgs
       try {
@@ -391,12 +487,7 @@ serve(async (req) => {
           }),
         )
         await refundApolloCredits(admin, PROCESS, 1)
-        await finalizeFailure('org_search_error')
-        const msg = e instanceof Error ? e.message : String(e)
-        return new Response(JSON.stringify({ error: msg }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 502,
-        })
+        return await respondFailure('org_search_error', 502)
       }
 
       const scored = scoreOrganizationCandidates(companyName, location, orgs)
@@ -411,11 +502,7 @@ serve(async (req) => {
           }),
         )
         await refundApolloCredits(admin, PROCESS, 1)
-        await finalizeFailure('ambiguous_org')
-        return new Response(JSON.stringify({ error: 'ambiguous_org' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 422,
-        })
+        return await respondFailure('ambiguous_org', 422, { recordMiss: true })
       }
       if (!scored.best) {
         console.log(
@@ -428,11 +515,7 @@ serve(async (req) => {
           }),
         )
         await refundApolloCredits(admin, PROCESS, 1)
-        await finalizeFailure('org_not_found')
-        return new Response(JSON.stringify({ error: 'org_not_found' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 422,
-        })
+        return await respondFailure('org_not_found', 422, { recordMiss: true })
       }
       organizationId = scored.best.organizationId
       primaryDomain = scored.best.primaryDomain
@@ -479,11 +562,7 @@ serve(async (req) => {
 
     const c2 = await tryConsumeApolloCredits(admin, PROCESS, 1)
     if (!c2.ok) {
-      await finalizeFailure('apollo_exhausted')
-      return new Response(JSON.stringify({ error: 'apollo_exhausted' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403,
-      })
+      return await respondFailure('apollo_exhausted', 403)
     }
 
     const phrases = hiringTitlePhrases(job.role_category, job.job_title)
@@ -512,12 +591,7 @@ serve(async (req) => {
         }),
       )
       await refundApolloCredits(admin, PROCESS, 1)
-      await finalizeFailure('people_search_error')
-      const msg = e instanceof Error ? e.message : String(e)
-      return new Response(JSON.stringify({ error: msg }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 502,
-      })
+      return await respondFailure('people_search_error', 502)
     }
 
     const filtered = people.filter((p) =>
@@ -539,11 +613,7 @@ serve(async (req) => {
         }),
       )
       await refundApolloCredits(admin, PROCESS, 1)
-      await finalizeFailure('no_contacts')
-      return new Response(JSON.stringify({ error: 'no_contacts' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 422,
-      })
+      return await respondFailure('no_contacts', 422, { recordMiss: true })
     }
 
     const { person, creditError } = await matchPersonById(apolloKey, best.id)
@@ -559,10 +629,9 @@ serve(async (req) => {
         }),
       )
       await refundApolloCredits(admin, PROCESS, 1)
-      await finalizeFailure(creditError ? 'apollo_credit_error' : 'match_failed')
-      return new Response(JSON.stringify({ error: creditError ? 'apollo_credit_error' : 'match_failed' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: creditError ? 403 : 422,
+      const failCode = creditError ? 'apollo_credit_error' : 'match_failed'
+      return await respondFailure(failCode, creditError ? 403 : 422, {
+        recordMiss: !creditError,
       })
     }
 
@@ -615,10 +684,6 @@ serve(async (req) => {
     )
   } catch (e) {
     console.error('premium-insights', e)
-    await finalizeFailure('unexpected')
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'error' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    })
+    return await respondFailure('unexpected', 500)
   }
 })
