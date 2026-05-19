@@ -5,7 +5,7 @@ import { lockBodyScroll, unlockBodyScroll } from '@/lib/bodyScrollLock'
 const props = withDefaults(
   defineProps<{
     open: boolean
-    variant: 'upload-required' | 'confirm-free-credit'
+    variant: 'upload-required' | 'confirm-free-credit' | 'confirm-premium-insights-credit'
     /** Platform free allowance (from freemium_settings); shown for confirm variant only. */
     maxFreeCredits?: number
     /** Credits still available; shown for confirm variant only. */
@@ -70,7 +70,8 @@ onUnmounted(() => {
             class="text-xl font-heading font-semibold text-brand-charcoal"
           >
             <template v-if="variant === 'upload-required'">Upload your resume first</template>
-            <template v-else>Use a free resume advice credit?</template>
+            <template v-else-if="variant === 'confirm-free-credit'">Use a free resume advice credit?</template>
+            <template v-else>Use a free Premium Insights credit?</template>
           </h2>
         </div>
         <div class="px-6 py-4 text-sm text-neutral-body space-y-3">
@@ -80,7 +81,7 @@ onUnmounted(() => {
               before you can use this feature.
             </p>
           </template>
-          <template v-else>
+          <template v-else-if="variant === 'confirm-free-credit'">
             <p>
               You can get up to
               <span class="font-semibold text-brand-charcoal">{{ maxFreeCredits }}</span>
@@ -91,6 +92,19 @@ onUnmounted(() => {
             <p>
               Using one credit generates tailored feedback for this job and counts against your free limit. If you
               continue without credits later, you can purchase advice through checkout.
+            </p>
+            <p class="font-medium text-brand-charcoal">Use one free credit for this job?</p>
+          </template>
+          <template v-else>
+            <p>
+              You can request hiring-contact insights for up to
+              <span class="font-semibold text-brand-charcoal">{{ maxFreeCredits }}</span>
+              jobs at no charge. You have
+              <span class="font-semibold text-brand-charcoal">{{ remainingFreeCredits }}</span>
+              left.
+            </p>
+            <p>
+              Each request uses one credit and runs our research pipeline for this job. Continue?
             </p>
             <p class="font-medium text-brand-charcoal">Use one free credit for this job?</p>
           </template>
@@ -109,7 +123,7 @@ onUnmounted(() => {
           <template v-else>
             <button type="button" class="btn-secondary w-full sm:w-auto" @click="emit('close')">Cancel</button>
             <button type="button" class="btn-primary w-full sm:w-auto" @click="emit('confirm')">
-              Use one free credit
+              {{ variant === 'confirm-free-credit' ? 'Use one free credit' : 'Use one Premium Insights credit' }}
             </button>
           </template>
         </div>

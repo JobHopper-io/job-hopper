@@ -14,6 +14,12 @@ import type {
   FreemiumSettings,
 } from '@/types/database'
 
+type ApolloPremiumInsightsLimitsRow = {
+  name: string
+  usage: number
+  credit_limit: number
+}
+
 export const useUserStore = defineStore('user', () => {
 
   // Raw DB Data
@@ -23,6 +29,7 @@ export const useUserStore = defineStore('user', () => {
   const subscriptionProducts = ref<SubscriptionProduct[]>([])
   const freemiumUsage = ref<FreemiumUsage | null>(null)
   const freemiumSettings = ref<FreemiumSettings | null>(null)
+  const apolloPremiumInsightsLimits = ref<ApolloPremiumInsightsLimitsRow | null>(null)
 
   // Realtime subscription for subscription_product (user's subscriptions only)
   let subscriptionProductChannel: ReturnType<typeof supabase.channel> | null = null
@@ -123,6 +130,45 @@ export const useUserStore = defineStore('user', () => {
     return Math.max(0, max - used)
   })
 
+  const hasPremiumInsightsAddon = computed(() => {
+    const activeSubIds = new Set(
+      subscriptions.value
+        .filter((s) => s.status === 'trial' || s.status === 'active')
+        .map((s) => s.id),
+    )
+    const insightProduct = products.value.find((p) => p.key === 'premium_insights')
+    if (!insightProduct) return false
+    return subscriptionProducts.value.some(
+      (sp) => activeSubIds.has(sp.subscription_id) && sp.product_id === insightProduct.id,
+    )
+  })
+
+  const freemiumMaxPremiumInsights = computed(
+    () => freemiumSettings.value?.max_premium_insights ?? 3,
+  )
+
+  const freemiumPremiumInsightsRemaining = computed(() => {
+    const max = freemiumMaxPremiumInsights.value
+    const used = freemiumUsage.value?.premium_insights_used ?? 0
+    return Math.max(0, max - used)
+  })
+
+  /** Conservative gate: cold path needs 2 Apollo credits (org search + people match). */
+  const apolloPremiumInsightsCanAffordColdPath = computed(() => {
+    const row = apolloPremiumInsightsLimits.value
+    if (!row) return false
+    if (row.credit_limit <= 0) return false
+    return row.usage + 2 <= row.credit_limit
+  })
+
+  const canRequestPremiumInsights = computed(() => {
+    if (profile.value?.onboarding_completed !== true) return false
+    if (!apolloPremiumInsightsCanAffordColdPath.value) return false
+    if (hasPremiumInsightsAddon.value) return true
+    if (freemiumMaxPremiumInsights.value <= 0) return false
+    return freemiumPremiumInsightsRemaining.value > 0
+  })
+
   /** Show manual job search panel (free users when the feature is enabled). Stays visible when credits are used up. */
   const showFreemiumJobSearchCta = computed(() => {
     if (!profile.value?.onboarding_completed) return false
@@ -139,11 +185,17 @@ export const useUserStore = defineStore('user', () => {
     if (!pid) {
       freemiumUsage.value = null
       freemiumSettings.value = null
+      apolloPremiumInsightsLimits.value = null
       return
     }
-    const [usageResult, settingsResult] = await Promise.all([
+    const [usageResult, settingsResult, apolloInsightsResult] = await Promise.all([
       supabase.from('freemium_usage').select('*').eq('profile_id', pid).maybeSingle(),
       supabase.from('freemium_settings').select('*').eq('id', 1).maybeSingle(),
+      supabase
+        .from('apollo_limits')
+        .select('name, usage, credit_limit')
+        .eq('name', 'premium_insights')
+        .maybeSingle(),
     ])
     if (usageResult.error) {
       console.error('Error loading freemium_usage:', usageResult.error)
@@ -156,6 +208,12 @@ export const useUserStore = defineStore('user', () => {
       freemiumSettings.value = null
     } else {
       freemiumSettings.value = settingsResult.data
+    }
+    if (apolloInsightsResult.error) {
+      console.error('Error loading apollo_limits (premium_insights):', apolloInsightsResult.error)
+      apolloPremiumInsightsLimits.value = null
+    } else {
+      apolloPremiumInsightsLimits.value = apolloInsightsResult.data as ApolloPremiumInsightsLimitsRow | null
     }
   }
 
@@ -170,6 +228,7 @@ export const useUserStore = defineStore('user', () => {
       stopProfileRealtime()
       freemiumUsage.value = null
       freemiumSettings.value = null
+      apolloPremiumInsightsLimits.value = null
     }
   }
 
@@ -258,6 +317,7 @@ export const useUserStore = defineStore('user', () => {
     subscriptionProducts.value = []
     freemiumUsage.value = null
     freemiumSettings.value = null
+    apolloPremiumInsightsLimits.value = null
   }
 
   return {
@@ -278,6 +338,12 @@ export const useUserStore = defineStore('user', () => {
     freemiumCanRunManualJobSearch,
     freemiumResumeAdviceRemaining,
     showFreemiumJobSearchCta,
+    hasPremiumInsightsAddon,
+    freemiumMaxPremiumInsights,
+    freemiumPremiumInsightsRemaining,
+    apolloPremiumInsightsLimits,
+    apolloPremiumInsightsCanAffordColdPath,
+    canRequestPremiumInsights,
     clear,
     basePlan,
     addonProducts,

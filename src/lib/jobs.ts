@@ -9,6 +9,8 @@ import type {
   MatchingStats,
   PayType,
   RoleCategory,
+  JobContact,
+  JobHiringContactsStatus,
 } from '@/types/database'
 
 export type { PayType, RoleCategory, MatchedJob, MatchingStats }
@@ -35,6 +37,24 @@ const JOB_HOPPER_LIVE_SELECT = `
   is_remote,
   sponsorship_likelihood
 ` as const
+
+function parseJobContactsFromJson(raw: unknown): JobContact[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: JobContact[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    if (typeof o.name !== 'string' || !o.name.trim()) continue
+    out.push({
+      name: o.name.trim(),
+      title: typeof o.title === 'string' ? o.title : null,
+      location: typeof o.location === 'string' ? o.location : null,
+      note: typeof o.note === 'string' ? o.note : null,
+      email: typeof o.email === 'string' && o.email.trim() ? o.email.trim() : null,
+    })
+  }
+  return out.length ? out : undefined
+}
 
 function toMatchedJob(
   match: JobMatch,
@@ -123,7 +143,7 @@ export const jobsAPI = {
 
     const matchIds = matches.map((m) => m.id)
 
-    const [{ data: jobsRaw, error: jobsError }, { data: savedRowsRaw, error: savedError }] =
+    const [{ data: jobsRaw, error: jobsError }, { data: savedRowsRaw, error: savedError }, { data: hiringRaw, error: hiringError }] =
       await Promise.all([
         jobIds.length
           ? supabase.from('job_hopper_live').select(JOB_HOPPER_LIVE_SELECT).in('id', jobIds)
@@ -132,6 +152,10 @@ export const jobsAPI = {
           .from('saved_jobs')
           .select('match_id')
           .in('match_id', matchIds),
+        supabase
+          .from('job_hiring_contacts')
+          .select('job_match_id, status, contacts, error_code')
+          .in('job_match_id', matchIds),
       ])
 
     if (jobsError) {
@@ -142,8 +166,27 @@ export const jobsAPI = {
       return { data: [], error: savedError }
     }
 
+    if (hiringError) {
+      return { data: [], error: hiringError }
+    }
+
     const jobs = (jobsRaw ?? []) as JobHopperLive[]
     const savedRows = (savedRowsRaw ?? []) as SavedJob[]
+
+    const hiringByMatchId = new Map<
+      string,
+      { status: JobHiringContactsStatus; contacts: unknown; error_code: string | null }
+    >()
+    for (const row of hiringRaw ?? []) {
+      const mid = row.job_match_id as string | undefined
+      const st = row.status as JobHiringContactsStatus | undefined
+      if (!mid || !st) continue
+      hiringByMatchId.set(mid, {
+        status: st,
+        contacts: row.contacts,
+        error_code: (row.error_code as string | null) ?? null,
+      })
+    }
 
     const tierKeys = Array.from(
       new Set(
@@ -190,9 +233,15 @@ export const jobsAPI = {
         base.subscriptionTier != null
           ? tierNameByKey.get(base.subscriptionTier) ?? null
           : null
+      const hiring = hiringByMatchId.get(match.id)
+      const contacts =
+        hiring?.status === 'complete' ? parseJobContactsFromJson(hiring.contacts) : undefined
       return {
         ...base,
         subscriptionTierDisplayName: tierName,
+        premiumInsightsStatus: hiring?.status ?? null,
+        premiumInsightsErrorCode: hiring?.error_code ?? null,
+        contacts,
       }
     })
 
@@ -226,7 +275,7 @@ export const jobsAPI = {
 
     const match = matchRaw as JobMatch
 
-    const [{ data: job, error: jobError }, { data: savedRow, error: savedError }] =
+    const [{ data: job, error: jobError }, { data: savedRow, error: savedError }, { data: hiringRow, error: hiringError }] =
       await Promise.all([
         supabase
           .from('job_hopper_live')
@@ -237,6 +286,11 @@ export const jobsAPI = {
           .from('saved_jobs')
           .select('id, match_id')
           .eq('match_id', match.id)
+          .maybeSingle(),
+        supabase
+          .from('job_hiring_contacts')
+          .select('status, contacts, error_code')
+          .eq('job_match_id', match.id)
           .maybeSingle(),
       ])
 
@@ -258,6 +312,10 @@ export const jobsAPI = {
       if (!isNoRowsError) {
         return { data: null, error: savedError }
       }
+    }
+
+    if (hiringError) {
+      return { data: null, error: hiringError }
     }
 
     let subscriptionTierDisplayName: string | null = null
@@ -286,10 +344,17 @@ export const jobsAPI = {
 
     const base = toMatchedJob(match, job as JobHopperLive, !!savedRow)
 
+    const hiringStatus = hiringRow?.status as JobHiringContactsStatus | undefined
+    const contacts =
+      hiringStatus === 'complete' ? parseJobContactsFromJson(hiringRow?.contacts) : undefined
+
     return {
       data: {
         ...base,
         subscriptionTierDisplayName,
+        premiumInsightsStatus: hiringStatus ?? null,
+        premiumInsightsErrorCode: (hiringRow?.error_code as string | null) ?? null,
+        contacts,
       },
       error: null,
     }

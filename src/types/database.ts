@@ -2,6 +2,9 @@
 // Import from the generated Supabase types file (`supabase.ts`).
 import type { Tables, Enums, TablesInsert, TablesUpdate } from './supabase'
 
+export type JobHiringContactsStatus = Enums<'job_hiring_contacts_status'>
+export type ApolloLimitsRow = Tables<'apollo_limits'>
+
 export type Profile = Tables<'profiles'>
 
 // Operation types for common entities
@@ -60,6 +63,8 @@ export interface JobContact {
   title: string | null
   location: string | null
   note: string | null
+  /** Work email when Apollo match returns it (Premium Insights). */
+  email: string | null
 }
 
 /** Job match with joined job details for feed and job detail views */
@@ -89,6 +94,9 @@ export interface MatchedJob {
   isRemote: boolean | null
   sponsorshipLikelihood: SponsorshipLikelihood | null
   contacts?: JobContact[]
+  /** Premium Insights pipeline row status for this match, if any */
+  premiumInsightsStatus?: JobHiringContactsStatus | null
+  premiumInsightsErrorCode?: string | null
 }
 
 /** Aggregate stats for the current user's job matches */

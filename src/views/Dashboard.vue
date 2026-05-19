@@ -187,6 +187,7 @@ async function loadMatchesAndStats() {
     } else {
       adviceByMatchId.value = {}
     }
+    void userStore.refreshFreemium()
   } finally {
     isLoadingMatches.value = false
   }
@@ -493,6 +494,7 @@ onMounted(() => {
             :advicePurchase="adviceByMatchId[job.matchId] ?? null"
             @toggle-save="handleToggleSave"
             @refresh-advice="loadMatchesAndStats"
+            @refresh-job-matches="loadMatchesAndStats"
           />
         </div>
       </template>

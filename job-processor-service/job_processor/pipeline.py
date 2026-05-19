@@ -122,13 +122,27 @@ async def process_one_job(
             if shared_apollo_exhausted[0]:
                 apollo_body = None
             else:
-                apollo_body, credit_err = await apollo_organization_enrich(
-                    http_client, settings, company_domain
+                consumed_row = await db.try_consume_apollo_credits(
+                    "job_processor", 1, dry_run=options.dry_run
                 )
-                if credit_err:
+                if not consumed_row.get("ok"):
                     shared_apollo_exhausted[0] = True
-                    await db.set_apollo_credits_exhausted(True, options.dry_run)
                     apollo_body = None
+                else:
+                    apollo_body, credit_err = await apollo_organization_enrich(
+                        http_client, settings, company_domain
+                    )
+                    if credit_err:
+                        await db.refund_apollo_credits(
+                            "job_processor", 1, dry_run=options.dry_run
+                        )
+                        shared_apollo_exhausted[0] = True
+                        await db.set_apollo_credits_exhausted(True, options.dry_run)
+                        apollo_body = None
+                    elif apollo_body is None:
+                        await db.refund_apollo_credits(
+                            "job_processor", 1, dry_run=options.dry_run
+                        )
 
     apollo_org = (apollo_body or {}).get("organization") or {}
     if not isinstance(apollo_org, dict):

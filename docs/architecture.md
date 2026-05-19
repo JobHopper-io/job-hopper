@@ -18,6 +18,7 @@ A table-driven scheduler runs edge functions at approximately a given time. Use 
 
 - For database schema, types, see docs: `docs/db-schema-summary.md`.
 - For how AI should use them, see Cursor rule: `.cursor/rules/db-schema.mdc`.
+- **Apollo budgeting** (per-process credits, Premium Insights, job processor): see `docs/apollo-limits.md`.
 - **User-editable subsets**: When an API or form should only allow updating a subset of columns (e.g. to avoid letting callers change `role`, `organization_id`, or other sensitive fields), define a narrowed type in `src/types/database.ts`—e.g. `ProfileUserEditable` as `Pick<ProfileUpdate, ...>`—and use that for the public API. This keeps the allowed-field set in one place and documents the boundary next to the other profile types.
 
 ### Admin roles and permissions

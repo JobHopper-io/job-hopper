@@ -192,6 +192,10 @@ verify_jwt = false
 [functions.unsubscribe-email]
 verify_jwt = false
 
+# Invoked by pg_cron monthly; secured with x-cron-secret (CRON_SECRET) or service role bearer.
+[functions.reset-apollo-limits]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
@@ -209,6 +213,7 @@ SUPABASE_URL = "env(SUPABASE_URL)"
 SUPABASE_SERVICE_ROLE_KEY = "env(SUPABASE_SERVICE_ROLE_KEY)"
 SUPABASE_ANON_KEY = "env(SUPABASE_ANON_KEY)"
 PROJECT_URL = "env(SUPABASE_URL)"
+APOLLO_API_KEY = "env(APOLLO_API_KEY)"
 
 [analytics]
 enabled = true

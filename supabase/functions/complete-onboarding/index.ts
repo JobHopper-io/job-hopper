@@ -122,6 +122,7 @@ serve(async (req) => {
         selected_tier_key: tier,
         job_searches_used: 0,
         resume_advice_used: 0,
+        premium_insights_used: 0,
       },
       { onConflict: 'profile_id' },
     )

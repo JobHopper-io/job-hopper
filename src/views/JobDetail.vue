@@ -4,16 +4,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { jobsAPI } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { premiumInsightsAPI } from '@/lib/premiumInsights'
+import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
+import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice } = storeToRefs(userStore)
+const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice, hasPremiumInsightsAddon, freemiumPremiumInsightsRemaining, freemiumMaxPremiumInsights, canRequestPremiumInsights } = storeToRefs(userStore)
 
 const jobIdParam = route.params.id as string
 const job = ref<MatchedJob | null>(null)
@@ -28,6 +31,18 @@ const adviceModalOpen = ref(false)
 
 const precheckOpen = ref(false)
 const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
+
+const insightsPrecheckOpen = ref(false)
+const insightsLoading = ref(false)
+const insightsError = ref<string | null>(null)
+const insightsModalOpen = ref(false)
+const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
+const insightsModalOverrideCompany = ref<unknown | null>(null)
+const insightsModalError = ref<string | null>(null)
+
+const insightsModalContacts = computed(
+  () => insightsModalOverrideContacts.value ?? job.value?.contacts,
+)
 
 function closePrecheck() {
   precheckOpen.value = false
@@ -240,6 +255,102 @@ const whyFitBullets = computed(() => {
   return bullets;
 })
 
+async function reloadJobFromRoute() {
+  if (!jobIdParam) return
+  const { data, error } = await jobsAPI.getJobMatchByJobId(jobIdParam)
+  if (!error && data) {
+    job.value = data
+  }
+}
+
+function closeInsightsPrecheck() {
+  insightsPrecheckOpen.value = false
+}
+
+function onCloseInsightsModal() {
+  insightsModalOpen.value = false
+  insightsModalOverrideContacts.value = null
+  insightsModalOverrideCompany.value = null
+  insightsModalError.value = null
+}
+
+function openInsightsViewModal() {
+  insightsModalError.value = null
+  insightsModalOverrideContacts.value = null
+  insightsModalOverrideCompany.value = null
+  insightsModalOpen.value = true
+}
+
+function handlePremiumInsightsClick() {
+  insightsError.value = null
+  if (hasPremiumInsightsAddon.value) {
+    void runPremiumInsights()
+    return
+  }
+  if (freemiumPremiumInsightsRemaining.value > 0) {
+    insightsPrecheckOpen.value = true
+  }
+}
+
+function onConfirmInsightsCredit() {
+  closeInsightsPrecheck()
+  void runPremiumInsights()
+}
+
+const showPremiumInsightsRow = computed(() => {
+  const j = job.value
+  if (!j) return false
+  const st = j.premiumInsightsStatus
+  if (st === 'complete' || st === 'pending' || st === 'failed' || st === 'cancelled') return true
+  return canRequestPremiumInsights.value
+})
+
+const showPremiumInsightsViewButton = computed(() => {
+  const j = job.value
+  return (
+    !!j &&
+    j.premiumInsightsStatus === 'complete' &&
+    (j.contacts?.length ?? 0) > 0
+  )
+})
+
+const showPremiumInsightsGetButton = computed(() => {
+  const j = job.value
+  if (!j || !showPremiumInsightsRow.value) return false
+  if (j.premiumInsightsStatus === 'pending') return false
+  if (j.premiumInsightsStatus === 'complete' && (j.contacts?.length ?? 0) > 0) return false
+  return canRequestPremiumInsights.value
+})
+
+const showPremiumInsightsPending = computed(
+  () => job.value?.premiumInsightsStatus === 'pending',
+)
+
+async function runPremiumInsights() {
+  if (!job.value) return
+  insightsLoading.value = true
+  insightsError.value = null
+  try {
+    const { data, error } = await premiumInsightsAPI.runForJobMatch(job.value.matchId)
+    if (error) {
+      insightsError.value = mapPremiumInsightsClientError(error.message)
+      return
+    }
+    if (data?.contacts?.length) {
+      insightsModalOverrideContacts.value = data.contacts
+      insightsModalOverrideCompany.value = data.company_summary ?? null
+      insightsModalOpen.value = true
+    }
+    await reloadJobFromRoute()
+    void userStore.refreshFreemium()
+  } catch (err) {
+    insightsError.value =
+      err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+  } finally {
+    insightsLoading.value = false
+  }
+}
+
 async function executeTailoringCheckout() {
   if (!job.value) return
   adviceCheckoutLoading.value = true
@@ -403,6 +514,46 @@ async function executeTailoringCheckout() {
                 >
                   View resume advice
                 </button>
+                <template v-if="showPremiumInsightsRow">
+                  <button
+                    v-if="showPremiumInsightsGetButton"
+                    type="button"
+                    class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2"
+                    :disabled="insightsLoading"
+                    @click="handlePremiumInsightsClick"
+                  >
+                    <font-awesome-icon
+                      v-if="insightsLoading"
+                      :icon="['fas', 'spinner']"
+                      spin
+                      aria-hidden="true"
+                    />
+                    <font-awesome-icon
+                      v-else
+                      :icon="['fas', 'user-tie']"
+                      class="opacity-80"
+                      aria-hidden="true"
+                    />
+                    {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+                  </button>
+                  <button
+                    v-if="showPremiumInsightsPending"
+                    type="button"
+                    class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2 opacity-80"
+                    disabled
+                  >
+                    <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
+                    Finding contacts…
+                  </button>
+                  <button
+                    v-if="showPremiumInsightsViewButton"
+                    type="button"
+                    class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2"
+                    @click="openInsightsViewModal"
+                  >
+                    View hiring contacts
+                  </button>
+                </template>
               </div>
             </div>
             <ResumeAdvicePrecheckModal
@@ -413,10 +564,25 @@ async function executeTailoringCheckout() {
               @close="closePrecheck"
               @confirm="onConfirmFreeCredit"
             />
+            <ResumeAdvicePrecheckModal
+              :open="insightsPrecheckOpen"
+              variant="confirm-premium-insights-credit"
+              :max-free-credits="freemiumMaxPremiumInsights"
+              :remaining-free-credits="freemiumPremiumInsightsRemaining"
+              @close="closeInsightsPrecheck"
+              @confirm="onConfirmInsightsCredit"
+            />
             <ResumeAdviceModal
               :open="adviceModalOpen"
               :advice-text="advicePurchase?.improvements_text"
               @close="adviceModalOpen = false"
+            />
+            <PremiumInsightsModal
+              :open="insightsModalOpen"
+              :contacts="insightsModalContacts"
+              :company-summary="insightsModalOverrideCompany"
+              :error-message="insightsModalError"
+              @close="onCloseInsightsModal"
             />
             <!-- Purchase status and error (below actions; does not affect button layout) -->
             <div
@@ -443,6 +609,9 @@ async function executeTailoringCheckout() {
                 {{ tailoringError }}
               </p>
             </div>
+            <p v-if="showPremiumInsightsRow && insightsError" class="mt-2 text-xs text-red-600">
+              {{ insightsError }}
+            </p>
           </div>
         </article>
 

@@ -91,6 +91,37 @@ class SupabaseRest:
             prefer="return=minimal",
         )
 
+    async def try_consume_apollo_credits(self, name: str, amount: int, *, dry_run: bool) -> dict[str, Any]:
+        """Calls public.try_consume_apollo_credits RPC. Returns {ok, usage_after, credit_limit}."""
+        if dry_run:
+            return {"ok": True, "usage_after": 0, "credit_limit": 999999}
+        data = await self._request(
+            "POST",
+            "/rpc/try_consume_apollo_credits",
+            json_body={"p_name": name, "p_amount": amount},
+            prefer="return=representation",
+        )
+        if not data:
+            return {"ok": False, "usage_after": 0, "credit_limit": 0}
+        row = data[0] if isinstance(data, list) else data
+        if not isinstance(row, dict):
+            return {"ok": False, "usage_after": 0, "credit_limit": 0}
+        return {
+            "ok": bool(row.get("ok")),
+            "usage_after": int(row.get("usage_after") or 0),
+            "credit_limit": int(row.get("credit_limit") or 0),
+        }
+
+    async def refund_apollo_credits(self, name: str, amount: int, *, dry_run: bool) -> None:
+        if dry_run:
+            return
+        await self._request(
+            "POST",
+            "/rpc/refund_apollo_credits",
+            json_body={"p_name": name, "p_amount": amount},
+            prefer="return=minimal",
+        )
+
     async def insert_run(
         self,
         *,

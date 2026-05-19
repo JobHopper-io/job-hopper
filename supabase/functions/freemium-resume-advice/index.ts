@@ -101,6 +101,7 @@ serve(async (req) => {
         selected_tier_key: 'entry_mid',
         job_searches_used: 0,
         resume_advice_used: 0,
+        premium_insights_used: 0,
       })
       if (insertLimErr) {
         console.error('freemium-resume-advice: failed to create freemium_usage', insertLimErr)

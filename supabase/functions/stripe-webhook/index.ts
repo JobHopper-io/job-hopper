@@ -42,7 +42,7 @@ async function upsertFreemiumUsageForCheckout(
 ) {
   const { data: existing } = await supabaseAdmin
     .from('freemium_usage')
-    .select('selected_tier_key, job_searches_used, resume_advice_used')
+    .select('selected_tier_key, job_searches_used, resume_advice_used, premium_insights_used')
     .eq('profile_id', profileId)
     .maybeSingle()
 
@@ -58,6 +58,7 @@ async function upsertFreemiumUsageForCheckout(
       selected_tier_key: selectedTierKey,
       job_searches_used: existing?.job_searches_used ?? 0,
       resume_advice_used: existing?.resume_advice_used ?? 0,
+      premium_insights_used: existing?.premium_insights_used ?? 0,
     },
     { onConflict: 'profile_id' },
   )

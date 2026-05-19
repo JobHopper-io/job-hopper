@@ -18,7 +18,10 @@ export const freemiumSettingsAPI = {
   },
 
   async update(
-    updates: Pick<FreemiumSettingsUpdate, 'max_job_searches' | 'max_resume_advice'>,
+    updates: Pick<
+      FreemiumSettingsUpdate,
+      'max_job_searches' | 'max_resume_advice' | 'max_premium_insights'
+    >,
   ): Promise<{ data: FreemiumSettings | null; error: string | null }> {
     const { data, error } = await supabase
       .from('freemium_settings')

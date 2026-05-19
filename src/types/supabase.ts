@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   public: {
     Tables: {
       bd_leads: {
@@ -14,18 +19,21 @@ export type Database = {
           company_name: string | null
           created_at: string
           id: number
+          linkedin_url: string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Relationships: []
@@ -1389,4 +1397,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -13,6 +13,8 @@ import {
   faBuilding,
   faXmark,
   faCircleInfo,
+  faEnvelope,
+  faUserTie,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -27,6 +29,8 @@ library.add(
   faBuilding,
   faXmark,
   faCircleInfo,
+  faEnvelope,
+  faUserTie,
 )
 
 export function registerFontAwesome(app: App) {

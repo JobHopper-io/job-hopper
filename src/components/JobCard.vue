@@ -6,9 +6,12 @@ import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
 import type { ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { premiumInsightsAPI } from '@/lib/premiumInsights'
+import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
+import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -18,11 +21,19 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-save', matchId: string, isSaved: boolean): void
   (e: 'refresh-advice'): void
+  (e: 'refresh-job-matches'): void
 }>()
 
 const router = useRouter()
 const userStore = useUserStore()
-const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice } = storeToRefs(userStore)
+const {
+  freemiumResumeAdviceRemaining,
+  freemiumMaxResumeAdvice,
+  hasPremiumInsightsAddon,
+  freemiumPremiumInsightsRemaining,
+  freemiumMaxPremiumInsights,
+  canRequestPremiumInsights,
+} = storeToRefs(userStore)
 
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
@@ -30,6 +41,18 @@ const adviceModalOpen = ref(false)
 
 const precheckOpen = ref(false)
 const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
+
+const insightsPrecheckOpen = ref(false)
+const insightsLoading = ref(false)
+const insightsError = ref<string | null>(null)
+const insightsModalOpen = ref(false)
+const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
+const insightsModalOverrideCompany = ref<unknown | null>(null)
+const insightsModalError = ref<string | null>(null)
+
+const insightsModalContacts = computed(
+  () => insightsModalOverrideContacts.value ?? props.job.contacts,
+)
 
 function closePrecheck() {
   precheckOpen.value = false
@@ -74,6 +97,92 @@ const adviceStatusText = computed<string | null>(() => {
   if (p.status === 'pending') return 'Generating resume advice'
   return null
 })
+
+function closeInsightsPrecheck() {
+  insightsPrecheckOpen.value = false
+}
+
+function onCloseInsightsModal() {
+  insightsModalOpen.value = false
+  insightsModalOverrideContacts.value = null
+  insightsModalOverrideCompany.value = null
+  insightsModalError.value = null
+}
+
+function openInsightsViewModal() {
+  insightsModalError.value = null
+  insightsModalOverrideContacts.value = null
+  insightsModalOverrideCompany.value = null
+  insightsModalOpen.value = true
+}
+
+function handlePremiumInsightsClick() {
+  insightsError.value = null
+  if (hasPremiumInsightsAddon.value) {
+    void runPremiumInsights()
+    return
+  }
+  if (freemiumPremiumInsightsRemaining.value > 0) {
+    insightsPrecheckOpen.value = true
+  }
+}
+
+function onConfirmInsightsCredit() {
+  closeInsightsPrecheck()
+  void runPremiumInsights()
+}
+
+const showPremiumInsightsRow = computed(() => {
+  const st = props.job.premiumInsightsStatus
+  if (st === 'complete' || st === 'pending' || st === 'failed' || st === 'cancelled') return true
+  return canRequestPremiumInsights.value
+})
+
+const showPremiumInsightsViewButton = computed(
+  () =>
+    props.job.premiumInsightsStatus === 'complete' &&
+    (props.job.contacts?.length ?? 0) > 0,
+)
+
+const showPremiumInsightsGetButton = computed(() => {
+  if (!showPremiumInsightsRow.value) return false
+  if (props.job.premiumInsightsStatus === 'pending') return false
+  if (
+    props.job.premiumInsightsStatus === 'complete' &&
+    (props.job.contacts?.length ?? 0) > 0
+  ) {
+    return false
+  }
+  return canRequestPremiumInsights.value
+})
+
+const showPremiumInsightsPending = computed(
+  () => props.job.premiumInsightsStatus === 'pending',
+)
+
+async function runPremiumInsights() {
+  insightsLoading.value = true
+  insightsError.value = null
+  try {
+    const { data, error } = await premiumInsightsAPI.runForJobMatch(props.job.matchId)
+    if (error) {
+      insightsError.value = mapPremiumInsightsClientError(error.message)
+      return
+    }
+    if (data?.contacts?.length) {
+      insightsModalOverrideContacts.value = data.contacts
+      insightsModalOverrideCompany.value = data.company_summary ?? null
+      insightsModalOpen.value = true
+    }
+    emit('refresh-job-matches')
+    void userStore.refreshFreemium()
+  } catch (err) {
+    insightsError.value =
+      err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+  } finally {
+    insightsLoading.value = false
+  }
+}
 
 const showSponsorshipBadge = computed(() => {
   const profile = userStore.profile
@@ -240,6 +349,46 @@ async function runAdviceCheckout() {
         >
           View resume advice
         </button>
+        <template v-if="showPremiumInsightsRow">
+          <button
+            v-if="showPremiumInsightsGetButton"
+            type="button"
+            class="btn-secondary w-[12.5rem] shrink-0 text-sm inline-flex items-center justify-center gap-2"
+            :disabled="insightsLoading"
+            @click="handlePremiumInsightsClick"
+          >
+            <font-awesome-icon
+              v-if="insightsLoading"
+              :icon="['fas', 'spinner']"
+              spin
+              aria-hidden="true"
+            />
+            <font-awesome-icon
+              v-else
+              :icon="['fas', 'user-tie']"
+              class="opacity-80"
+              aria-hidden="true"
+            />
+            {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+          </button>
+          <button
+            v-if="showPremiumInsightsPending"
+            type="button"
+            class="btn-secondary w-[12.5rem] shrink-0 text-sm opacity-80"
+            disabled
+          >
+            <font-awesome-icon :icon="['fas', 'spinner']" spin class="mr-1.5" aria-hidden="true" />
+            Finding contacts…
+          </button>
+          <button
+            v-if="showPremiumInsightsViewButton"
+            type="button"
+            class="btn-secondary w-[12.5rem] shrink-0 text-sm"
+            @click="openInsightsViewModal"
+          >
+            View hiring contacts
+          </button>
+        </template>
       </div>
       <ResumeAdvicePrecheckModal
         :open="precheckOpen"
@@ -249,16 +398,34 @@ async function runAdviceCheckout() {
         @close="closePrecheck"
         @confirm="onConfirmFreeCredit"
       />
+      <ResumeAdvicePrecheckModal
+        :open="insightsPrecheckOpen"
+        variant="confirm-premium-insights-credit"
+        :max-free-credits="freemiumMaxPremiumInsights"
+        :remaining-free-credits="freemiumPremiumInsightsRemaining"
+        @close="closeInsightsPrecheck"
+        @confirm="onConfirmInsightsCredit"
+      />
       <ResumeAdviceModal
         :open="adviceModalOpen"
         :advice-text="advicePurchase?.improvements_text"
         @close="adviceModalOpen = false"
+      />
+      <PremiumInsightsModal
+        :open="insightsModalOpen"
+        :contacts="insightsModalContacts"
+        :company-summary="insightsModalOverrideCompany"
+        :error-message="insightsModalError"
+        @close="onCloseInsightsModal"
       />
       <p v-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">
         {{ adviceStatusText }}
       </p>
       <p v-else-if="adviceError" class="mt-2 text-xs text-red-600">
         {{ adviceError }}
+      </p>
+      <p v-if="showPremiumInsightsRow && insightsError" class="mt-1 text-xs text-red-600">
+        {{ insightsError }}
       </p>
     </div>
   </article>
