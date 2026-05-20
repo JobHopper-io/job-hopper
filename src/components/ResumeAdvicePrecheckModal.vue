@@ -109,21 +109,25 @@ onUnmounted(() => {
             <p class="font-medium text-brand-charcoal">Use one free credit for this job?</p>
           </template>
         </div>
-        <div class="flex flex-col gap-2 border-t border-neutral-border px-6 py-4 sm:flex-row sm:flex-wrap sm:justify-end">
+        <div class="flex flex-wrap gap-3 justify-end border-t border-neutral-border px-6 py-4">
           <template v-if="variant === 'upload-required'">
-            <button type="button" class="btn-secondary w-full sm:w-auto" @click="emit('close')">Close</button>
+            <button type="button" class="btn-secondary" @click="emit('close')">Close</button>
             <router-link
               :to="{ name: 'profile' }"
-              class="btn-primary w-full text-center sm:w-auto"
+              class="btn-primary text-center"
               @click="emit('close')"
             >
               Go to profile
             </router-link>
           </template>
           <template v-else>
-            <button type="button" class="btn-secondary w-full sm:w-auto" @click="emit('close')">Cancel</button>
-            <button type="button" class="btn-primary w-full sm:w-auto" @click="emit('confirm')">
-              {{ variant === 'confirm-free-credit' ? 'Use one free credit' : 'Use one Premium Insights credit' }}
+            <button type="button" class="btn-secondary" @click="emit('close')">Cancel</button>
+            <button type="button" class="btn-primary" @click="emit('confirm')">
+              {{
+                variant === 'confirm-premium-insights-credit'
+                  ? 'Continue'
+                  : 'Use one free credit'
+              }}
             </button>
           </template>
         </div>

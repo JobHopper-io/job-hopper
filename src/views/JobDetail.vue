@@ -286,7 +286,7 @@ function closeInsightsPrecheck() {
   insightsPrecheckOpen.value = false
 }
 
-function onCloseInsightsModal() {
+async function onCloseInsightsModal() {
   insightsModalOpen.value = false
   insightsModalLoading.value = false
   insightsModalOverrideContacts.value = null
@@ -295,6 +295,7 @@ function onCloseInsightsModal() {
   insightsModalFreemiumNote.value = null
   insightsModalOrgChoicesOverride.value = null
   insightsModalOrgChoiceSubmitting.value = false
+  await reloadJobFromRoute()
 }
 
 function openInsightsViewModal() {
@@ -377,7 +378,6 @@ async function runPremiumInsights() {
     insightsModalLoading.value = false
     if (result.needsOrgChoice) {
       insightsModalOrgChoicesOverride.value = result.needsOrgChoice.organizations
-      await reloadJobFromRoute()
       void userStore.refreshFreemium()
       return
     }
@@ -389,7 +389,6 @@ async function runPremiumInsights() {
         result.meta,
         hasPremiumInsightsAddon.value,
       )
-      await reloadJobFromRoute()
       void userStore.refreshFreemium()
       return
     }
@@ -399,7 +398,6 @@ async function runPremiumInsights() {
       insightsModalOverrideContacts.value = result.data.contacts
       insightsModalOverrideCompany.value = result.data.company_summary ?? null
     }
-    await reloadJobFromRoute()
     void userStore.refreshFreemium()
   } catch (err) {
     insightsModalLoading.value = false
@@ -426,7 +424,6 @@ async function onConfirmOrgDisambiguation(
     insightsModalLoading.value = false
     if (result.needsOrgChoice) {
       insightsModalOrgChoicesOverride.value = result.needsOrgChoice.organizations
-      await reloadJobFromRoute()
       void userStore.refreshFreemium()
       return
     }
@@ -438,7 +435,6 @@ async function onConfirmOrgDisambiguation(
         result.meta,
         hasPremiumInsightsAddon.value,
       )
-      await reloadJobFromRoute()
       void userStore.refreshFreemium()
       return
     }
@@ -449,7 +445,6 @@ async function onConfirmOrgDisambiguation(
       insightsModalOverrideContacts.value = result.data.contacts
       insightsModalOverrideCompany.value = result.data.company_summary ?? null
     }
-    await reloadJobFromRoute()
     void userStore.refreshFreemium()
   } catch (err) {
     insightsModalLoading.value = false

@@ -161,8 +161,10 @@ async function runFreemiumJobSearch() {
   }
 }
 
-async function loadMatchesAndStats() {
-  isLoadingMatches.value = true
+async function loadMatchesAndStats(options?: { silent?: boolean }) {
+  if (!options?.silent) {
+    isLoadingMatches.value = true
+  }
   matchesError.value = null
   try {
     const [matchesResult, statsResult, tailoringResult] = await Promise.all([
@@ -494,7 +496,7 @@ onMounted(() => {
             :advicePurchase="adviceByMatchId[job.matchId] ?? null"
             @toggle-save="handleToggleSave"
             @refresh-advice="loadMatchesAndStats"
-            @refresh-job-matches="loadMatchesAndStats"
+            @refresh-job-matches="() => loadMatchesAndStats({ silent: true })"
           />
         </div>
       </template>
