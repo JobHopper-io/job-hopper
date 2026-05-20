@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
@@ -50,11 +50,21 @@ const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
 const insightsModalOverrideCompany = ref<Record<string, unknown> | null>(null)
 const insightsModalError = ref<string | null>(null)
 const insightsModalFreemiumNote = ref<string | null>(null)
+/** `null` = follow `job.premiumInsightsOrgChoices`; `[]` = session-cleared after resolution (avoid stale props). */
 const insightsModalOrgChoicesOverride = ref<PremiumInsightsOrgChoice[] | null>(null)
 const insightsModalOrgChoiceSubmitting = ref(false)
 
-const insightsOrgChoicesForModal = computed(
-  () => insightsModalOrgChoicesOverride.value ?? props.job.premiumInsightsOrgChoices ?? null,
+const insightsOrgChoicesForModal = computed(() => {
+  const o = insightsModalOrgChoicesOverride.value
+  if (o !== null) return o
+  return props.job.premiumInsightsOrgChoices ?? null
+})
+
+watch(
+  () => props.job.premiumInsightsOrgChoices?.length ?? 0,
+  (len) => {
+    if (len === 0) insightsModalOrgChoicesOverride.value = null
+  },
 )
 
 const showPremiumInsightsOrgChoiceHint = computed(
@@ -262,7 +272,7 @@ async function onConfirmOrgDisambiguation(
       void userStore.refreshFreemium()
       return
     }
-    insightsModalOrgChoicesOverride.value = null
+    insightsModalOrgChoicesOverride.value = []
     insightsModalError.value = null
     insightsModalFreemiumNote.value = null
     if (result.data?.contacts?.length) {
@@ -270,6 +280,7 @@ async function onConfirmOrgDisambiguation(
       insightsModalOverrideCompany.value = result.data.company_summary ?? null
     }
     void userStore.refreshFreemium()
+    emit('refresh-job-matches')
   } catch (err) {
     insightsModalLoading.value = false
     const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
