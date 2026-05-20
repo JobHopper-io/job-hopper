@@ -614,7 +614,7 @@ async function executeTailoringCheckout() {
                     spin
                     aria-hidden="true"
                   />
-                  {{ adviceCheckoutLoading ? 'Please wait…' : 'View advice' }}
+                  {{ adviceCheckoutLoading ? 'Please wait…' : 'Get resume advice' }}
                 </button>
                 <button
                   v-if="showResumeAdviceButton"
@@ -670,7 +670,7 @@ async function executeTailoringCheckout() {
                     class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2"
                     @click="openInsightsViewModal"
                   >
-                    View hiring contact
+                    View hiring contacts
                   </button>
                 </template>
               </div>
