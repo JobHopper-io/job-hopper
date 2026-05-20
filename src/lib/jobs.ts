@@ -11,7 +11,29 @@ import type {
   RoleCategory,
   JobContact,
   JobHiringContactsStatus,
+  PremiumInsightsOrgChoice,
 } from '@/types/database'
+
+function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const out: PremiumInsightsOrgChoice[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return null
+    const o = item as Record<string, unknown>
+    const apollo_organization_id =
+      typeof o.apollo_organization_id === 'string' ? o.apollo_organization_id.trim() : ''
+    const name = typeof o.name === 'string' ? o.name.trim() : ''
+    const score = typeof o.score === 'number' ? o.score : NaN
+    if (!apollo_organization_id || !name || Number.isNaN(score)) return null
+    out.push({
+      apollo_organization_id,
+      name,
+      primary_domain: typeof o.primary_domain === 'string' ? o.primary_domain : null,
+      score,
+    })
+  }
+  return out
+}
 
 export type { PayType, RoleCategory, MatchedJob, MatchingStats }
 
@@ -154,7 +176,7 @@ export const jobsAPI = {
           .in('match_id', matchIds),
         supabase
           .from('job_hiring_contacts')
-          .select('job_match_id, status, contacts, error_code')
+          .select('job_match_id, status, contacts, error_code, org_disambiguation_options')
           .in('job_match_id', matchIds),
       ])
 
@@ -175,7 +197,12 @@ export const jobsAPI = {
 
     const hiringByMatchId = new Map<
       string,
-      { status: JobHiringContactsStatus; contacts: unknown; error_code: string | null }
+      {
+        status: JobHiringContactsStatus
+        contacts: unknown
+        error_code: string | null
+        org_disambiguation_options: unknown
+      }
     >()
     for (const row of hiringRaw ?? []) {
       const mid = row.job_match_id as string | undefined
@@ -185,6 +212,8 @@ export const jobsAPI = {
         status: st,
         contacts: row.contacts,
         error_code: (row.error_code as string | null) ?? null,
+        org_disambiguation_options: (row as { org_disambiguation_options?: unknown })
+          .org_disambiguation_options,
       })
     }
 
@@ -241,6 +270,7 @@ export const jobsAPI = {
         subscriptionTierDisplayName: tierName,
         premiumInsightsStatus: hiring?.status ?? null,
         premiumInsightsErrorCode: hiring?.error_code ?? null,
+        premiumInsightsOrgChoices: parsePremiumInsightsOrgChoices(hiring?.org_disambiguation_options),
         contacts,
       }
     })
@@ -289,7 +319,7 @@ export const jobsAPI = {
           .maybeSingle(),
         supabase
           .from('job_hiring_contacts')
-          .select('status, contacts, error_code')
+          .select('status, contacts, error_code, org_disambiguation_options')
           .eq('job_match_id', match.id)
           .maybeSingle(),
       ])
@@ -347,6 +377,8 @@ export const jobsAPI = {
     const hiringStatus = hiringRow?.status as JobHiringContactsStatus | undefined
     const contacts =
       hiringStatus === 'complete' ? parseJobContactsFromJson(hiringRow?.contacts) : undefined
+    const orgRaw = (hiringRow as { org_disambiguation_options?: unknown } | null)
+      ?.org_disambiguation_options
 
     return {
       data: {
@@ -354,6 +386,7 @@ export const jobsAPI = {
         subscriptionTierDisplayName,
         premiumInsightsStatus: hiringStatus ?? null,
         premiumInsightsErrorCode: (hiringRow?.error_code as string | null) ?? null,
+        premiumInsightsOrgChoices: parsePremiumInsightsOrgChoices(orgRaw),
         contacts,
       },
       error: null,

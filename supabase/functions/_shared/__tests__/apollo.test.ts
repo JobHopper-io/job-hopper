@@ -21,10 +21,9 @@ Deno.test('locationRegionToken takes last segment', () => {
   assertEquals(locationRegionToken('Remote, USA'), 'usa')
 })
 
-Deno.test('scoreOrganizationCandidates returns null when empty', () => {
+Deno.test('scoreOrganizationCandidates returns no_candidates when empty', () => {
   const r = scoreOrganizationCandidates('Acme', null, [])
-  assertEquals(r.best, null)
-  assertEquals(r.ambiguous, false)
+  assertEquals(r.kind, 'no_candidates')
 })
 
 Deno.test('scoreOrganizationCandidates picks clear winner', () => {
@@ -33,8 +32,48 @@ Deno.test('scoreOrganizationCandidates picks clear winner', () => {
     { id: '2', name: 'Acme Corp', primary_domain: 'acme.com' },
   ]
   const r = scoreOrganizationCandidates('Acme Corp', 'Texas', orgs)
-  assertEquals(r.ambiguous, false)
-  assertEquals(r.best?.organizationId, '2')
+  assertEquals(r.kind, 'picked')
+  if (r.kind === 'picked') {
+    assertEquals(r.best.organizationId, '2')
+  }
+})
+
+Deno.test('scoreOrganizationCandidates picks when top is one point above second', () => {
+  const orgs = [
+    { id: 'w', name: 'WidgetCo', primary_domain: 'widget.com' },
+    { id: 'o', name: 'Other Retail Inc', primary_domain: 'other.com' },
+  ]
+  const r = scoreOrganizationCandidates('WidgetCo', 'Austin, TX', orgs)
+  assertEquals(r.kind, 'picked')
+  if (r.kind === 'picked') {
+    assertEquals(r.best.organizationId, 'w')
+  }
+})
+
+Deno.test('scoreOrganizationCandidates needs_user_choice when second is within ambiguity ratio of top', () => {
+  const orgs = [
+    { id: '1', name: 'WidgetCo A', primary_domain: 'a.com' },
+    { id: '2', name: 'WidgetCo B', primary_domain: 'b.com' },
+  ]
+  const r = scoreOrganizationCandidates('WidgetCo', 'Austin, TX', orgs)
+  assertEquals(r.kind, 'needs_user_choice')
+  if (r.kind === 'needs_user_choice') {
+    assertEquals(r.candidates.length, 2)
+    assertEquals(r.candidates[0].score, r.candidates[1].score)
+  }
+})
+
+Deno.test('scoreOrganizationCandidates needs_user_choice includes every org above ambiguity floor', () => {
+  const orgs = [
+    { id: '1', name: 'WidgetCo A', primary_domain: 'a.com' },
+    { id: '2', name: 'WidgetCo B', primary_domain: 'b.com' },
+    { id: '3', name: 'WidgetCo C', primary_domain: 'c.com' },
+  ]
+  const r = scoreOrganizationCandidates('WidgetCo', 'Austin, TX', orgs)
+  assertEquals(r.kind, 'needs_user_choice')
+  if (r.kind === 'needs_user_choice') {
+    assertEquals(r.candidates.length, 3)
+  }
 })
 
 Deno.test('pickBestPerson prefers has_email and title match', () => {

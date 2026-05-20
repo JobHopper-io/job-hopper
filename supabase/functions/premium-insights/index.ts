@@ -24,11 +24,39 @@ const PROCESS = 'premium_insights'
 const CACHE_TTL_DAYS = 90
 const NEGATIVE_CACHE_TTL_DAYS = 7
 
+type StoredOrgDisambiguation = {
+  apollo_organization_id: string
+  name: string
+  primary_domain: string | null
+  score: number
+}
+
+function parseStoredOrgDisambiguation(raw: unknown): StoredOrgDisambiguation[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const out: StoredOrgDisambiguation[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return null
+    const o = item as Record<string, unknown>
+    const id = typeof o.apollo_organization_id === 'string' ? o.apollo_organization_id.trim() : ''
+    const name = typeof o.name === 'string' ? o.name.trim() : ''
+    const score = typeof o.score === 'number' ? o.score : NaN
+    if (!id || !name || Number.isNaN(score)) return null
+    out.push({
+      apollo_organization_id: id,
+      name,
+      primary_domain: typeof o.primary_domain === 'string' ? o.primary_domain : null,
+      score,
+    })
+  }
+  return out
+}
+
 function userMessageForPremiumInsightsFailure(code: string): string {
   switch (code) {
     case 'apollo_exhausted':
       return 'Contact lookups are temporarily unavailable. Please try again later.'
-    case 'ambiguous_org':
+    case 'user_declined_org_choice':
+      return "We couldn't find a hiring contact for this job."
     case 'org_not_found':
     case 'no_contacts':
     case 'match_failed':
@@ -102,9 +130,9 @@ serve(async (req) => {
     })
   }
 
-  let body: { job_match_id?: string }
+  let body: Record<string, unknown>
   try {
-    body = (await req.json()) as { job_match_id?: string }
+    body = (await req.json()) as Record<string, unknown>
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -113,6 +141,11 @@ serve(async (req) => {
   }
 
   const jobMatchId = typeof body.job_match_id === 'string' ? body.job_match_id.trim() : ''
+  const declineOrgDisambiguation = body.decline_org_disambiguation === true
+  const selectedApolloOrganizationId =
+    typeof body.selected_apollo_organization_id === 'string'
+      ? body.selected_apollo_organization_id.trim()
+      : ''
   if (!jobMatchId) {
     return new Response(JSON.stringify({ error: 'Missing job_match_id' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -250,10 +283,15 @@ serve(async (req) => {
 
   const { data: existingRow } = await admin
     .from('job_hiring_contacts')
-    .select('id, status, contacts, company_summary, error_code')
+    .select('id, status, contacts, company_summary, error_code, org_disambiguation_options')
     .eq('profile_id', profileId)
     .eq('job_match_id', jobMatchId)
     .maybeSingle()
+
+  const orgDisambiguationStored = parseStoredOrgDisambiguation(existingRow?.org_disambiguation_options)
+  const pendingOrgDisambiguation =
+    existingRow?.status === 'pending' &&
+    Boolean(orgDisambiguationStored && orgDisambiguationStored.length > 0)
 
   if (existingRow?.status === 'complete') {
     console.log(
@@ -296,7 +334,7 @@ serve(async (req) => {
   /** When true, `redeem_freemium_premium_insights` ran successfully in this request; roll back quota on failure. */
   let freemiumChargedThisRequest = false
 
-  if (await hasActiveSearchMiss()) {
+  if (!pendingOrgDisambiguation && (await hasActiveSearchMiss())) {
     if (hiringContactId) {
       await admin
         .from('job_hiring_contacts')
@@ -304,6 +342,7 @@ serve(async (req) => {
           status: 'failed',
           error_code: 'cached_resolution_miss',
           completed_at: new Date().toISOString(),
+          org_disambiguation_options: null,
         })
         .eq('id', hiringContactId)
     }
@@ -405,6 +444,7 @@ serve(async (req) => {
           status: 'failed',
           error_code: code,
           completed_at: new Date().toISOString(),
+          org_disambiguation_options: null,
         })
         .eq('id', hiringContactId)
     }
@@ -434,6 +474,62 @@ serve(async (req) => {
     })
   }
 
+  let prefilledOrg: {
+    organizationId: string
+    primaryDomain: string | null
+    resolvedOrgName: string
+  } | null = null
+
+  if (pendingOrgDisambiguation && (declineOrgDisambiguation || selectedApolloOrganizationId)) {
+    if (declineOrgDisambiguation && selectedApolloOrganizationId) {
+      return new Response(
+        JSON.stringify({
+          error: 'Use either decline_org_disambiguation or selected_apollo_organization_id, not both',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        },
+      )
+    }
+    if (declineOrgDisambiguation) {
+      await refundApolloCredits(admin, PROCESS, 1)
+      return await respondFailure('user_declined_org_choice', 422)
+    }
+    const found = orgDisambiguationStored!.find(
+      (o) => o.apollo_organization_id === selectedApolloOrganizationId,
+    )
+    if (!found) {
+      return new Response(JSON.stringify({ error: 'Invalid organization selection' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+    prefilledOrg = {
+      organizationId: found.apollo_organization_id,
+      primaryDomain: found.primary_domain,
+      resolvedOrgName: found.name,
+    }
+    await admin
+      .from('job_hiring_contacts')
+      .update({
+        org_disambiguation_options: null,
+        error_code: null,
+      })
+      .eq('id', hiringContactId)
+  }
+
+  if (pendingOrgDisambiguation && !declineOrgDisambiguation && !selectedApolloOrganizationId) {
+    return new Response(
+      JSON.stringify({
+        status: 'needs_org_choice',
+        organizations: orgDisambiguationStored,
+        job_match_id: jobMatchId,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    )
+  }
+
   if (!apolloKey) {
     return await respondFailure('apollo_not_configured', 503)
   }
@@ -450,6 +546,12 @@ serve(async (req) => {
   let organizationId: string | null = cacheHit?.apollo_organization_id ?? null
   let primaryDomain: string | null = cacheHit?.primary_domain ?? null
   let resolvedOrgName = companyName
+
+  if (prefilledOrg) {
+    organizationId = prefilledOrg.organizationId
+    primaryDomain = prefilledOrg.primaryDomain
+    resolvedOrgName = prefilledOrg.resolvedOrgName
+  }
 
   const needOrgSearch = !organizationId
 
@@ -491,20 +593,32 @@ serve(async (req) => {
       }
 
       const scored = scoreOrganizationCandidates(companyName, location, orgs)
-      if (scored.ambiguous) {
+      if (scored.kind === 'needs_user_choice') {
         console.log(
           JSON.stringify({
             fn: 'premium-insights',
-            phase: 'failure',
+            phase: 'org_disambiguation_required',
             job_match_id: jobMatchId,
             profile_id: profileId,
-            code: 'ambiguous_org',
+            candidate_count: scored.candidates.length,
           }),
         )
-        await refundApolloCredits(admin, PROCESS, 1)
-        return await respondFailure('ambiguous_org', 422, { recordMiss: true })
+        await admin
+          .from('job_hiring_contacts')
+          .update({
+            org_disambiguation_options: scored.candidates,
+          })
+          .eq('id', hiringContactId)
+        return new Response(
+          JSON.stringify({
+            status: 'needs_org_choice',
+            organizations: scored.candidates,
+            job_match_id: jobMatchId,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+        )
       }
-      if (!scored.best) {
+      if (scored.kind !== 'picked') {
         console.log(
           JSON.stringify({
             fn: 'premium-insights',
@@ -512,10 +626,13 @@ serve(async (req) => {
             job_match_id: jobMatchId,
             profile_id: profileId,
             code: 'org_not_found',
+            score_kind: scored.kind,
           }),
         )
         await refundApolloCredits(admin, PROCESS, 1)
-        return await respondFailure('org_not_found', 422, { recordMiss: true })
+        return await respondFailure('org_not_found', 422, {
+          recordMiss: scored.kind === 'no_candidates',
+        })
       }
       organizationId = scored.best.organizationId
       primaryDomain = scored.best.primaryDomain
@@ -547,17 +664,44 @@ serve(async (req) => {
         { onConflict: 'cache_key' },
       )
     } else {
-      console.log(
-        JSON.stringify({
-          fn: 'premium-insights',
-          phase: 'org_from_company_cache',
-          job_match_id: jobMatchId,
-          profile_id: profileId,
-          cache_key: cacheKey,
-          apollo_organization_id: organizationId,
-          primary_domain: primaryDomain,
-        }),
-      )
+      if (prefilledOrg) {
+        console.log(
+          JSON.stringify({
+            fn: 'premium-insights',
+            phase: 'org_from_user_disambiguation',
+            job_match_id: jobMatchId,
+            profile_id: profileId,
+            cache_key: cacheKey,
+            apollo_organization_id: organizationId,
+            primary_domain: primaryDomain,
+          }),
+        )
+        const expiresAtUserPick = new Date(Date.now() + CACHE_TTL_DAYS * 86400000).toISOString()
+        await admin.from('company_apollo_cache').upsert(
+          {
+            cache_key: cacheKey,
+            company_name: normalizeCompanyName(companyName),
+            location_region: location ?? null,
+            apollo_organization_id: organizationId,
+            primary_domain: primaryDomain,
+            resolved_at: nowIso,
+            expires_at: expiresAtUserPick,
+          },
+          { onConflict: 'cache_key' },
+        )
+      } else {
+        console.log(
+          JSON.stringify({
+            fn: 'premium-insights',
+            phase: 'org_from_company_cache',
+            job_match_id: jobMatchId,
+            profile_id: profileId,
+            cache_key: cacheKey,
+            apollo_organization_id: organizationId,
+            primary_domain: primaryDomain,
+          }),
+        )
+      }
     }
 
     const c2 = await tryConsumeApolloCredits(admin, PROCESS, 1)

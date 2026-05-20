@@ -41,6 +41,8 @@ To avoid charging for a `people/match` when org resolution never succeeded:
 
 Before redeeming freemium or consuming credits, the function may short-circuit on **`company_apollo_search_miss`** (same `cache_key` as `company_apollo_cache`, TTL on the order of a week) when that company/region recently hit a definitive org/contact resolution failure, avoiding repeat spend.
 
+When the **second-best** Apollo org score is still above **92%** of the best score (same ambiguity rule as org scoring), every org whose score is **above that 92% floor** is stored in **`job_hiring_contacts.org_disambiguation_options`** and the response is **`needs_org_choice`** so the user can pick an `apollo_organization_id` or decline; a follow-up request continues the pipeline without a second org-search credit.
+
 `mixed_people/api_search` is **not** counted as a credit (Apollo documents it as non–credit-consuming for API search).
 
 ### Job processor

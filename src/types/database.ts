@@ -67,6 +67,14 @@ export interface JobContact {
   email: string | null
 }
 
+/** Apollo org options when Premium Insights needs the user to pick the employer (ambiguity band, see apollo-limits). */
+export interface PremiumInsightsOrgChoice {
+  apollo_organization_id: string
+  name: string
+  primary_domain: string | null
+  score: number
+}
+
 /** Job match with joined job details for feed and job detail views */
 export interface MatchedJob {
   matchId: string
@@ -97,6 +105,8 @@ export interface MatchedJob {
   /** Premium Insights pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null
   premiumInsightsErrorCode?: string | null
+  /** When Premium Insights needs the user to pick among tied Apollo organizations */
+  premiumInsightsOrgChoices?: PremiumInsightsOrgChoice[] | null
 }
 
 /** Aggregate stats for the current user's job matches */

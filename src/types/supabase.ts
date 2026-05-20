@@ -351,6 +351,7 @@ export type Database = {
           error_code: string | null
           id: string
           job_match_id: string
+          org_disambiguation_options: Json | null
           profile_id: string
           status: Database["public"]["Enums"]["job_hiring_contacts_status"]
           updated_at: string
@@ -363,6 +364,7 @@ export type Database = {
           error_code?: string | null
           id?: string
           job_match_id: string
+          org_disambiguation_options?: Json | null
           profile_id: string
           status?: Database["public"]["Enums"]["job_hiring_contacts_status"]
           updated_at?: string
@@ -375,6 +377,7 @@ export type Database = {
           error_code?: string | null
           id?: string
           job_match_id?: string
+          org_disambiguation_options?: Json | null
           profile_id?: string
           status?: Database["public"]["Enums"]["job_hiring_contacts_status"]
           updated_at?: string

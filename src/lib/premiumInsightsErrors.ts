@@ -1,6 +1,22 @@
+/** Shown when Apollo could not resolve a contact for this job. */
+export const PREMIUM_INSIGHTS_NO_CONTACT_MESSAGE =
+  "We couldn't find a hiring contact for this job."
+
+function isGenericEdgeFunctionInvokeError(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('edge function returned a non-2xx') ||
+    lower.includes('failed to send a request to the edge function') ||
+    lower.includes('functionshttperror')
+  )
+}
+
 /** User-facing copy for Premium Insights edge / RPC error codes. */
 export function mapPremiumInsightsClientError(raw: string): string {
   const t = raw.trim()
+  if (!t || isGenericEdgeFunctionInvokeError(t)) {
+    return PREMIUM_INSIGHTS_NO_CONTACT_MESSAGE
+  }
   if (t === 'apollo_exhausted') {
     return 'Contact lookups are temporarily unavailable. Please try again later.'
   }
@@ -10,11 +26,17 @@ export function mapPremiumInsightsClientError(raw: string): string {
   if (t === 'Another job is already processing' || t.includes('Another job')) {
     return 'Another hiring contact lookup is already running. Wait for it to finish or try again in a few minutes.'
   }
-  if (t === 'ambiguous_org' || t === 'org_not_found' || t === 'no_contacts' || t === 'match_failed') {
-    return 'We could not confidently identify a hiring contact for this posting.'
+  if (
+    t === 'org_not_found' ||
+    t === 'no_contacts' ||
+    t === 'match_failed' ||
+    t === 'cached_resolution_miss' ||
+    t === 'user_declined_org_choice'
+  ) {
+    return PREMIUM_INSIGHTS_NO_CONTACT_MESSAGE
   }
-  if (t === 'cached_resolution_miss') {
-    return 'We could not find a hiring contact for this job recently. Try again in about a week, or contact support if this keeps happening.'
+  if (t === 'org_search_error' || t === 'people_search_error') {
+    return 'The hiring-contact service had a problem. Please try again in a few minutes.'
   }
-  return t || 'Something went wrong. Please try again.'
+  return t
 }

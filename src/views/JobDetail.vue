@@ -7,7 +7,7 @@ import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import { useUserStore } from '@/stores/user'
-import type { MatchedJob, PayType, ResumeProduct } from '@/types/database'
+import type { MatchedJob, PayType, PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
@@ -41,6 +41,23 @@ const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
 const insightsModalOverrideCompany = ref<Record<string, unknown> | null>(null)
 const insightsModalError = ref<string | null>(null)
 const insightsModalFreemiumNote = ref<string | null>(null)
+const insightsModalOrgChoicesOverride = ref<PremiumInsightsOrgChoice[] | null>(null)
+const insightsModalOrgChoiceSubmitting = ref(false)
+
+const insightsOrgChoicesForModal = computed(
+  () =>
+    insightsModalOrgChoicesOverride.value ?? job.value?.premiumInsightsOrgChoices ?? null,
+)
+
+const showPremiumInsightsOrgChoiceHint = computed(
+  () =>
+    Boolean(
+      job.value &&
+        insightsOrgChoicesForModal.value?.length &&
+        !insightsModalOpen.value &&
+        job.value.premiumInsightsStatus === 'pending',
+    ),
+)
 
 const insightsModalContacts = computed(
   () => insightsModalOverrideContacts.value ?? job.value?.contacts,
@@ -276,6 +293,8 @@ function onCloseInsightsModal() {
   insightsModalOverrideCompany.value = null
   insightsModalError.value = null
   insightsModalFreemiumNote.value = null
+  insightsModalOrgChoicesOverride.value = null
+  insightsModalOrgChoiceSubmitting.value = false
 }
 
 function openInsightsViewModal() {
@@ -284,6 +303,14 @@ function openInsightsViewModal() {
   insightsModalLoading.value = false
   insightsModalOverrideContacts.value = null
   insightsModalOverrideCompany.value = null
+  insightsModalOrgChoicesOverride.value = null
+  insightsModalOpen.value = true
+}
+
+function openOrgChoiceModal() {
+  insightsModalError.value = null
+  insightsModalFreemiumNote.value = null
+  insightsModalLoading.value = false
   insightsModalOpen.value = true
 }
 
@@ -329,7 +356,9 @@ const showPremiumInsightsGetButton = computed(() => {
 })
 
 const showPremiumInsightsPending = computed(
-  () => job.value?.premiumInsightsStatus === 'pending',
+  () =>
+    job.value?.premiumInsightsStatus === 'pending' &&
+    !(insightsOrgChoicesForModal.value && insightsOrgChoicesForModal.value.length > 0),
 )
 
 async function runPremiumInsights() {
@@ -340,17 +369,24 @@ async function runPremiumInsights() {
   insightsModalFreemiumNote.value = null
   insightsModalOverrideContacts.value = null
   insightsModalOverrideCompany.value = null
+  insightsModalOrgChoicesOverride.value = null
   insightsModalOpen.value = true
   insightsModalLoading.value = true
   try {
-    const { data, error, meta } = await premiumInsightsAPI.runForJobMatch(job.value.matchId)
+    const result = await premiumInsightsAPI.runForJobMatch(job.value.matchId)
     insightsModalLoading.value = false
-    if (error) {
-      const friendly = mapPremiumInsightsClientError(error.message)
+    if (result.needsOrgChoice) {
+      insightsModalOrgChoicesOverride.value = result.needsOrgChoice.organizations
+      await reloadJobFromRoute()
+      void userStore.refreshFreemium()
+      return
+    }
+    if (result.error) {
+      const friendly = mapPremiumInsightsClientError(result.error.message)
       insightsModalError.value = friendly
       insightsError.value = friendly
       insightsModalFreemiumNote.value = premiumInsightsFreemiumReassurance(
-        meta,
+        result.meta,
         hasPremiumInsightsAddon.value,
       )
       await reloadJobFromRoute()
@@ -359,9 +395,9 @@ async function runPremiumInsights() {
     }
     insightsModalError.value = null
     insightsModalFreemiumNote.value = null
-    if (data?.contacts?.length) {
-      insightsModalOverrideContacts.value = data.contacts
-      insightsModalOverrideCompany.value = data.company_summary ?? null
+    if (result.data?.contacts?.length) {
+      insightsModalOverrideContacts.value = result.data.contacts
+      insightsModalOverrideCompany.value = result.data.company_summary ?? null
     }
     await reloadJobFromRoute()
     void userStore.refreshFreemium()
@@ -373,6 +409,56 @@ async function runPremiumInsights() {
     insightsModalError.value = friendly
   } finally {
     insightsLoading.value = false
+    insightsModalLoading.value = false
+  }
+}
+
+async function onConfirmOrgDisambiguation(
+  payload: { decline: true } | { selectedApolloOrganizationId: string },
+) {
+  if (!job.value) return
+  insightsModalOrgChoiceSubmitting.value = true
+  insightsModalLoading.value = true
+  insightsModalError.value = null
+  insightsModalFreemiumNote.value = null
+  try {
+    const result = await premiumInsightsAPI.resolveOrgDisambiguation(job.value.matchId, payload)
+    insightsModalLoading.value = false
+    if (result.needsOrgChoice) {
+      insightsModalOrgChoicesOverride.value = result.needsOrgChoice.organizations
+      await reloadJobFromRoute()
+      void userStore.refreshFreemium()
+      return
+    }
+    if (result.error) {
+      const friendly = mapPremiumInsightsClientError(result.error.message)
+      insightsModalError.value = friendly
+      insightsError.value = friendly
+      insightsModalFreemiumNote.value = premiumInsightsFreemiumReassurance(
+        result.meta,
+        hasPremiumInsightsAddon.value,
+      )
+      await reloadJobFromRoute()
+      void userStore.refreshFreemium()
+      return
+    }
+    insightsModalOrgChoicesOverride.value = null
+    insightsModalError.value = null
+    insightsModalFreemiumNote.value = null
+    if (result.data?.contacts?.length) {
+      insightsModalOverrideContacts.value = result.data.contacts
+      insightsModalOverrideCompany.value = result.data.company_summary ?? null
+    }
+    await reloadJobFromRoute()
+    void userStore.refreshFreemium()
+  } catch (err) {
+    insightsModalLoading.value = false
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const friendly = mapPremiumInsightsClientError(raw)
+    insightsError.value = friendly
+    insightsModalError.value = friendly
+  } finally {
+    insightsModalOrgChoiceSubmitting.value = false
     insightsModalLoading.value = false
   }
 }
@@ -563,6 +649,14 @@ async function executeTailoringCheckout() {
                     {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
                   </button>
                   <button
+                    v-if="showPremiumInsightsOrgChoiceHint"
+                    type="button"
+                    class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2 text-sm"
+                    @click="openOrgChoiceModal"
+                  >
+                    Choose employer…
+                  </button>
+                  <button
                     v-if="showPremiumInsightsPending"
                     type="button"
                     class="btn-secondary inline-flex w-[12.5rem] items-center justify-center gap-2 opacity-80"
@@ -610,7 +704,10 @@ async function executeTailoringCheckout() {
               :company-summary="insightsModalOverrideCompany"
               :error-message="insightsModalError"
               :freemium-note="insightsModalFreemiumNote"
+              :org-choice-options="insightsOrgChoicesForModal"
+              :org-choice-submitting="insightsModalOrgChoiceSubmitting"
               @close="onCloseInsightsModal"
+              @confirm-org-choice="onConfirmOrgDisambiguation"
             />
             <!-- Purchase status and error (below actions; does not affect button layout) -->
             <div

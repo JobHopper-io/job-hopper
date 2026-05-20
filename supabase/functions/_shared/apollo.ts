@@ -36,6 +36,20 @@ export type ResolvedOrganization = {
   primaryDomain: string | null
 }
 
+/** Stored on job_hiring_contacts and returned to the client when top org scores tie. */
+export type OrgDisambiguationCandidate = {
+  apollo_organization_id: string
+  name: string
+  primary_domain: string | null
+  score: number
+}
+
+export type OrgScoreResult =
+  | { kind: 'picked'; best: ResolvedOrganization }
+  | { kind: 'below_threshold' }
+  | { kind: 'no_candidates' }
+  | { kind: 'needs_user_choice'; candidates: OrgDisambiguationCandidate[] }
+
 function stripLegalSuffixes(name: string): string {
   return name
     .replace(/\b(inc|llc|l\.l\.c\.|corp|corporation|ltd|limited|plc|co|company)\b\.?/gi, '')
@@ -95,13 +109,15 @@ function locationScore(jobLocation: string | null | undefined, org: ApolloOrgCan
   return 5
 }
 
+const MIN_ORG_SCORE = 25
+/** Second place must be strictly above this fraction of the top score to trigger user disambiguation (same rule as historical Apollo org scoring). */
 const AMBIGUITY_RATIO = 0.92
 
 export function scoreOrganizationCandidates(
   companyName: string,
   jobLocation: string | null | undefined,
   orgs: ApolloOrgCandidate[],
-): { best: ResolvedOrganization | null; ambiguous: boolean } {
+): OrgScoreResult {
   if (!orgs.length) {
     console.log(
       JSON.stringify({
@@ -112,7 +128,7 @@ export function scoreOrganizationCandidates(
         orgCount: 0,
       }),
     )
-    return { best: null, ambiguous: false }
+    return { kind: 'no_candidates' }
   }
   const scored = orgs.map((o) => ({
     org: o,
@@ -128,53 +144,69 @@ export function scoreOrganizationCandidates(
     nameScore: nameScore(companyName, row.org.name),
     locationScore: locationScore(jobLocation, row.org),
   }))
-  if (!top || top.score < 25) {
+  if (!top || top.score < MIN_ORG_SCORE) {
     console.log(
       JSON.stringify({
         fn: 'apollo:org-score',
         outcome: 'below_threshold',
         companyName,
         jobLocation: jobLocation ?? null,
-        minScore: 25,
+        minScore: MIN_ORG_SCORE,
         topScore: top?.score ?? null,
         rankings,
       }),
     )
-    return { best: null, ambiguous: false }
+    return { kind: 'below_threshold' }
   }
-  if (second && second.score > top.score * AMBIGUITY_RATIO) {
+
+  const ambiguityFloor = top.score * AMBIGUITY_RATIO
+
+  if (!second || second.score <= ambiguityFloor) {
     console.log(
       JSON.stringify({
         fn: 'apollo:org-score',
-        outcome: 'ambiguous',
+        outcome: 'picked',
         companyName,
         jobLocation: jobLocation ?? null,
+        winner: { id: top.org.id, name: top.org.name, score: top.score },
+        secondScore: second?.score ?? null,
         ambiguityRatio: AMBIGUITY_RATIO,
-        topScore: top.score,
-        secondScore: second.score,
+        ambiguityFloor,
         rankings,
       }),
     )
-    return { best: null, ambiguous: true }
+    return {
+      kind: 'picked',
+      best: {
+        organizationId: top.org.id,
+        name: top.org.name,
+        primaryDomain: top.org.primary_domain ?? null,
+      },
+    }
   }
+
+  const inAmbiguityBand = scored.filter((row) => row.score > ambiguityFloor)
+  const candidates: OrgDisambiguationCandidate[] = inAmbiguityBand.map((row) => ({
+    apollo_organization_id: row.org.id,
+    name: row.org.name,
+    primary_domain: row.org.primary_domain ?? null,
+    score: row.score,
+  }))
   console.log(
     JSON.stringify({
       fn: 'apollo:org-score',
-      outcome: 'picked',
+      outcome: 'needs_user_choice',
       companyName,
       jobLocation: jobLocation ?? null,
-      winner: { id: top.org.id, name: top.org.name, score: top.score },
+      ambiguityRatio: AMBIGUITY_RATIO,
+      ambiguityFloor,
+      topScore: top.score,
+      secondScore: second.score,
+      candidateCount: candidates.length,
       rankings,
     }),
   )
-  return {
-    best: {
-      organizationId: top.org.id,
-      name: top.org.name,
-      primaryDomain: top.org.primary_domain ?? null,
-    },
-    ambiguous: false,
-  }
+  return { kind: 'needs_user_choice', candidates }
 }
 
 export function hiringTitlePhrases(
