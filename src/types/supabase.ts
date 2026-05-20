@@ -569,10 +569,9 @@ export type Database = {
       matching_algorithm_config: {
         Row: {
           active: boolean
+          archived: boolean
           created_at: string
           id: string
-          keyword_current_industry_weight: number
-          keyword_current_job_title_weight: number
           loc_distance_0_10_weight: number
           loc_distance_10_25_weight: number
           loc_distance_25_50_weight: number
@@ -589,6 +588,16 @@ export type Database = {
           pay_inside_range_weight: number
           pay_missing_salary_weight: number
           pay_near_range_weight: number
+          phrase_industry_briefing_weight: number
+          phrase_industry_description_weight: number
+          phrase_industry_title_weight: number
+          phrase_min_primary_words: number
+          phrase_primary_briefing_weight: number
+          phrase_primary_description_weight: number
+          phrase_primary_title_weight: number
+          phrase_secondary_briefing_weight: number
+          phrase_secondary_description_weight: number
+          phrase_secondary_title_weight: number
           recency_base_weight: number
           recency_max_age_days: number
           recency_per_day_decay: number
@@ -600,10 +609,9 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          archived?: boolean
           created_at?: string
           id?: string
-          keyword_current_industry_weight: number
-          keyword_current_job_title_weight: number
           loc_distance_0_10_weight: number
           loc_distance_10_25_weight: number
           loc_distance_25_50_weight: number
@@ -620,6 +628,16 @@ export type Database = {
           pay_inside_range_weight: number
           pay_missing_salary_weight: number
           pay_near_range_weight: number
+          phrase_industry_briefing_weight: number
+          phrase_industry_description_weight: number
+          phrase_industry_title_weight: number
+          phrase_min_primary_words: number
+          phrase_primary_briefing_weight: number
+          phrase_primary_description_weight: number
+          phrase_primary_title_weight: number
+          phrase_secondary_briefing_weight: number
+          phrase_secondary_description_weight: number
+          phrase_secondary_title_weight: number
           recency_base_weight: number
           recency_max_age_days: number
           recency_per_day_decay: number
@@ -631,10 +649,9 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          archived?: boolean
           created_at?: string
           id?: string
-          keyword_current_industry_weight?: number
-          keyword_current_job_title_weight?: number
           loc_distance_0_10_weight?: number
           loc_distance_10_25_weight?: number
           loc_distance_25_50_weight?: number
@@ -651,6 +668,16 @@ export type Database = {
           pay_inside_range_weight?: number
           pay_missing_salary_weight?: number
           pay_near_range_weight?: number
+          phrase_industry_briefing_weight?: number
+          phrase_industry_description_weight?: number
+          phrase_industry_title_weight?: number
+          phrase_min_primary_words?: number
+          phrase_primary_briefing_weight?: number
+          phrase_primary_description_weight?: number
+          phrase_primary_title_weight?: number
+          phrase_secondary_briefing_weight?: number
+          phrase_secondary_description_weight?: number
+          phrase_secondary_title_weight?: number
           recency_base_weight?: number
           recency_max_age_days?: number
           recency_per_day_decay?: number

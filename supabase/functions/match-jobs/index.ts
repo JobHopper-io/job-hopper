@@ -15,6 +15,7 @@ import {
   type JobSummary,
 } from '../_shared/email-templates.ts'
 import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import { configRowToOverride } from '../_shared/matching-algorithm-config-row.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,55 +27,6 @@ interface MatchJobsPayload {
   limit?: number
   /** When non-empty, used instead of subscription-derived tier keys (e.g. freemium manual search). */
   subscription_tier_product_keys?: string[]
-}
-
-function configRowToOverride(row: any): Partial<MatchConfig> {
-  const keywordWeights = {
-    currentJobTitleKeyword: row.keyword_current_job_title_weight,
-    currentIndustryKeyword: row.keyword_current_industry_weight,
-  }
-
-  const payWeights = {
-    insideRange: row.pay_inside_range_weight,
-    nearRange: row.pay_near_range_weight,
-    missingSalary: row.pay_missing_salary_weight,
-    belowRangePenalty: row.pay_below_range_penalty,
-  }
-
-  const locationWeights = {
-    sameMetro: row.loc_same_metro_weight,
-    sameState: row.loc_same_state_weight,
-    remotePreferred: row.loc_remote_preferred_weight,
-    relocationAllowed: row.loc_relocation_allowed_weight,
-    otherLocationPenalty: row.loc_other_location_penalty,
-    distance0to10: row.loc_distance_0_10_weight,
-    distance10to25: row.loc_distance_10_25_weight,
-    distance25to50: row.loc_distance_25_50_weight,
-    distance50to100: row.loc_distance_50_100_weight,
-    distanceBeyond100: row.loc_distance_beyond_100_weight,
-    withinRadiusBonus: row.loc_within_radius_bonus_weight,
-  }
-
-  const recencyWeights = {
-    baseRecency: row.recency_base_weight,
-    perDayDecay: row.recency_per_day_decay,
-    maxAgeDays: row.recency_max_age_days,
-  }
-
-  const thresholds = {
-    minTotalScore: row.threshold_min_total_score,
-    noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
-    overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
-    underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
-  }
-
-  return {
-    keywordWeights,
-    payWeights,
-    locationWeights,
-    recencyWeights,
-    thresholds,
-  }
 }
 
 function mergeConfigOverrides(
@@ -91,9 +43,14 @@ function mergeConfigOverrides(
   return {
     ...b,
     ...o,
-    keywordWeights: {
-      ...(b.keywordWeights ?? {}),
-      ...(o.keywordWeights ?? {}),
+    phraseWeights: {
+      primary: { ...(b.phraseWeights?.primary ?? {}), ...(o.phraseWeights?.primary ?? {}) },
+      secondary: { ...(b.phraseWeights?.secondary ?? {}), ...(o.phraseWeights?.secondary ?? {}) },
+      industry: { ...(b.phraseWeights?.industry ?? {}), ...(o.phraseWeights?.industry ?? {}) },
+    },
+    phraseMatching: {
+      ...(b.phraseMatching ?? {}),
+      ...(o.phraseMatching ?? {}),
     },
     payWeights: {
       ...(b.payWeights ?? {}),
@@ -266,6 +223,7 @@ serve(async (req) => {
       .from('matching_algorithm_config')
       .select('*')
       .eq('active', true)
+      .eq('archived', false)
       .maybeSingle()
 
     if (configError) {

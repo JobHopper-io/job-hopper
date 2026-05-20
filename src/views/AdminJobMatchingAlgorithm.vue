@@ -28,6 +28,10 @@ const isConfigModalOpen = ref(false)
 const isSaveConfigModalOpen = ref(false)
 const isOverrideWarningOpen = ref(false)
 const configToOverride = ref<AdminMatchingConfig | null>(null)
+const isArchiveConfirmOpen = ref(false)
+const configToArchive = ref<AdminMatchingConfig | null>(null)
+const isArchivingConfig = ref(false)
+const configArchiveError = ref<string | null>(null)
 const saveConfigName = ref('')
 const saveConfigMakeActive = ref(false)
 const overrideConfirmationText = ref('')
@@ -73,7 +77,12 @@ const prefsForm = reactive<{
 
 // Match config form (defaults from DEFAULT_ADMIN_MATCH_CONFIG)
 const configForm = reactive<MatchConfigOverride>({
-  keywordWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights },
+  phraseWeights: {
+    primary: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.primary },
+    secondary: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.secondary },
+    industry: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.industry },
+  },
+  phraseMatching: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseMatching },
   payWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights },
   locationWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights },
   recencyWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights },
@@ -256,9 +265,20 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
   }
 }
 
+function snapshotPhraseWeights(src: MatchConfigOverride['phraseWeights']): NonNullable<
+  MatchConfigOverride['phraseWeights']
+> {
+  return {
+    primary: { ...src?.primary },
+    secondary: { ...src?.secondary },
+    industry: { ...src?.industry },
+  }
+}
+
 function buildMatchConfigOverride(): MatchConfigOverride {
   return {
-    keywordWeights: { ...configForm.keywordWeights },
+    phraseWeights: snapshotPhraseWeights(configForm.phraseWeights),
+    phraseMatching: { ...configForm.phraseMatching },
     payWeights: { ...configForm.payWeights },
     locationWeights: { ...configForm.locationWeights },
     recencyWeights: { ...configForm.recencyWeights },
@@ -272,13 +292,15 @@ async function resetToDefaults() {
   await loadAdminPreferencesOnly()
   suppressMatchSubjectWatch.value = false
   if (activeConfig.value) {
-    configForm.keywordWeights = { ...(activeConfig.value.config.keywordWeights ?? {}) }
+    configForm.phraseWeights = snapshotPhraseWeights(activeConfig.value.config.phraseWeights)
+    configForm.phraseMatching = { ...(activeConfig.value.config.phraseMatching ?? {}) }
     configForm.payWeights = { ...(activeConfig.value.config.payWeights ?? {}) }
     configForm.locationWeights = { ...(activeConfig.value.config.locationWeights ?? {}) }
     configForm.recencyWeights = { ...(activeConfig.value.config.recencyWeights ?? {}) }
     configForm.thresholds = { ...(activeConfig.value.config.thresholds ?? {}) }
   } else {
-    configForm.keywordWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.keywordWeights }
+    configForm.phraseWeights = snapshotPhraseWeights(DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights)
+    configForm.phraseMatching = { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseMatching }
     configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
     configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
     configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
@@ -288,7 +310,8 @@ async function resetToDefaults() {
 
 function applyConfigToForm(cfg: MatchConfigOverride | undefined) {
   if (!cfg) return
-  configForm.keywordWeights = { ...(cfg.keywordWeights ?? {}) }
+  configForm.phraseWeights = snapshotPhraseWeights(cfg.phraseWeights)
+  configForm.phraseMatching = { ...(cfg.phraseMatching ?? {}) }
   configForm.payWeights = { ...(cfg.payWeights ?? {}) }
   configForm.locationWeights = { ...(cfg.locationWeights ?? {}) }
   configForm.recencyWeights = { ...(cfg.recencyWeights ?? {}) }
@@ -381,6 +404,34 @@ function handleOverrideClick(cfg: AdminMatchingConfig) {
   }
 }
 
+function openArchiveConfirm(cfg: AdminMatchingConfig) {
+  if (cfg.active) return
+  configToArchive.value = cfg
+  configArchiveError.value = null
+  isArchiveConfirmOpen.value = true
+}
+
+async function confirmArchiveConfig() {
+  const target = configToArchive.value
+  if (!target || target.active) return
+
+  isArchivingConfig.value = true
+  configArchiveError.value = null
+
+  const { error } = await jobMatchingAlgorithmAdminAPI.archiveConfig(target.id)
+
+  isArchivingConfig.value = false
+
+  if (error) {
+    configArchiveError.value = error.message
+    return
+  }
+
+  configs.value = configs.value.filter((c) => c.id !== target.id)
+  isArchiveConfirmOpen.value = false
+  configToArchive.value = null
+}
+
 async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
@@ -400,6 +451,21 @@ async function loadMatches() {
   }
 
   isLoading.value = false
+}
+
+function formatPhraseMatchCell(job: RankedJob): string {
+  const pm = job.phraseMatch
+  if (!pm) return '—'
+  const parts: string[] = []
+  for (const tier of ['primary', 'secondary', 'industry'] as const) {
+    const by = pm.matchedBySurface[tier]
+    if (!by) continue
+    for (const surf of ['title', 'description', 'briefing'] as const) {
+      const v = by[surf]
+      if (v) parts.push(`${tier}:${surf}=${v}`)
+    }
+  }
+  return parts.length > 0 ? parts.join(' ') : '—'
 }
 
 onMounted(async () => {
@@ -428,7 +494,7 @@ onMounted(async () => {
           Admin · Job Matching Algorithm
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
-          Run the same scoring pipeline as production: the job catalog is pre-filtered in SQL by subscription tier, target role categories, maxAgeDays recency, and remote opt-out when applicable; then role keywords from <span class="font-medium text-brand-charcoal">target job title</span> when set (else current job title) plus industry; pay, location (distance bands with categorical fallback), and recency decay contribute to the total; jobs below the minimum score or with no keyword overlap are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
+          Run the same scoring pipeline as production: the job catalog is pre-filtered in SQL by subscription tier, target role categories, maxAgeDays recency, and remote opt-out when applicable; then <span class="font-medium text-brand-charcoal">phrase matching</span> scores primary, secondary, and industry n-grams on job title, description, and AI briefing (word-boundary matches, weighted per surface); pay, location (distance bands with categorical fallback), and recency decay contribute to the total; jobs below the minimum score or failing the phrase gate are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
         </p>
       </header>
 
@@ -636,29 +702,74 @@ onMounted(async () => {
           </div>
           <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-3 py-3 sm:px-4 sm:py-4">
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Keyword weights</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.keywordWeights!.currentJobTitleKeyword"
-                      type="number"
-                      class="input w-20 text-sm"
-                      title="Weight per matched title keyword (from target job title, else current job title; comma-separated phrases)"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="DB column keyword_current_job_title_weight — applies to target-then-current title keywords"
-                    >currentJobTitleKeyword</span>
+              <div class="space-y-3 bg-white rounded-lg shadow-sm px-3 py-2.5 sm:col-span-2 xl:col-span-4">
+                <p class="text-xs font-semibold text-neutral-body">
+                  Phrase matching
+                </p>
+                <p class="text-[11px] text-neutral-body">
+                  Weights apply per matched phrase; score includes phrase word count. Use 0 on a surface to ignore it. With a target/current title, at least one primary phrase must match on a surface with non-zero primary weights.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input
+                    v-model.number="configForm.phraseMatching!.minPrimaryWords"
+                    type="number"
+                    min="1"
+                    class="input w-20 text-sm"
+                    title="Minimum words for a title/industry n-gram to count as primary (single-word primaries allowed only when not a stop word)"
+                  >
+                  <span class="text-[11px] text-neutral-body">minPrimaryWords</span>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
+                    <p class="text-[11px] font-semibold text-brand-charcoal">
+                      Primary (title intent)
+                    </p>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.primary!.title" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">title</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.primary!.description" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">description</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.primary!.briefing" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.keywordWeights!.currentIndustryKeyword"
-                      type="number"
-                      class="input w-20 text-sm"
-                      title="Score when a current industry keyword (comma-separated) appears in the job"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Score when a current industry keyword (comma-separated) appears in the job">currentIndustryKeyword</span>
+                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
+                    <p class="text-[11px] font-semibold text-brand-charcoal">
+                      Secondary (title)
+                    </p>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.title" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">title</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.description" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">description</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.briefing" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
+                    </div>
+                  </div>
+                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
+                    <p class="text-[11px] font-semibold text-brand-charcoal">
+                      Industry
+                    </p>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.industry!.title" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">title</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.industry!.description" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">description</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="configForm.phraseWeights!.industry!.briefing" type="number" class="input w-16 text-sm">
+                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1019,7 +1130,7 @@ onMounted(async () => {
               <span>{{ debug.filters.excludedByRecency }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by no keyword match:</span>
+              <span class="font-semibold">Excluded by phrase gate / no match:</span>
               <span>{{ debug.filters.excludedByNoKeywordMatch }}</span>
             </p>
             <p class="text-xs text-neutral-body">
@@ -1033,7 +1144,7 @@ onMounted(async () => {
 
           <div class="space-y-2">
             <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-              Score statistics & top keywords
+              Score statistics & phrase histogram
             </h3>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Score range:</span>
@@ -1098,21 +1209,31 @@ onMounted(async () => {
 
             <div class="mt-2">
               <p class="text-xs font-semibold text-neutral-body mb-1">
-                Keywords (title: target job title if set, else current — plus industry; comma-separated)
+                Phrase histogram (profile phrases × included jobs)
+              </p>
+              <p
+                v-if="debug.matchSurfaces"
+                class="text-[11px] text-neutral-body mb-1"
+              >
+                Included jobs with a match on surface — title: {{ debug.matchSurfaces.title }}, description:
+                {{ debug.matchSurfaces.description }}, briefing: {{ debug.matchSurfaces.briefing }}
               </p>
               <ul class="text-[11px] text-neutral-body max-h-32 overflow-auto border border-neutral-border rounded-md p-2 bg-neutral-surface">
-                <li v-if="!debug.keywords.length">None</li>
-                <li
-                  v-for="kw in debug.keywords"
-                  v-else
-                  :key="kw.keyword"
-                  class="flex justify-between gap-2"
-                >
-                  <span class="truncate">{{ kw.keyword }}</span>
-                  <span class="font-mono text-[10px]">
-                    {{ kw.matchedJobCount }}
-                  </span>
+                <li v-if="!(debug.phrases && debug.phrases.length)">
+                  None
                 </li>
+                <template v-else>
+                  <li
+                    v-for="row in debug.phrases"
+                    :key="`${row.kind}-${row.phrase}`"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="truncate"><span class="text-neutral-subtle">{{ row.kind }}</span> {{ row.phrase }}</span>
+                    <span class="font-mono text-[10px]">
+                      {{ row.matchedJobCount }}
+                    </span>
+                  </li>
+                </template>
               </ul>
             </div>
           </div>
@@ -1159,7 +1280,7 @@ onMounted(async () => {
                   Role / Pay / Location / Recency
                 </th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
-                  Matched role keywords
+                  Phrase match
                 </th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Details</th>
               </tr>
@@ -1224,11 +1345,8 @@ onMounted(async () => {
                   <div>Location: {{ job.components?.location ?? '—' }}</div>
                   <div>Recency: {{ job.components?.recency != null ? job.components.recency.toFixed(2) : '—' }}</div>
                 </td>
-                <td class="px-3 py-2 text-neutral-body">
-                  <span v-if="job.matchedRoleKeywords?.length">
-                    {{ job.matchedRoleKeywords.join(', ') }}
-                  </span>
-                  <span v-else>—</span>
+                <td class="px-3 py-2 text-neutral-body text-[11px] max-w-xs">
+                  {{ formatPhraseMatchCell(job) }}
                 </td>
                 <td class="px-3 py-2 text-neutral-body">
                   <details class="space-y-1 max-w-xs sm:max-w-md">
@@ -1332,6 +1450,25 @@ onMounted(async () => {
                 >
                   Override with current values…
                 </button>
+                <button
+                  v-if="cfg.active"
+                  type="button"
+                  class="btn-secondary text-[11px] py-1 px-2 opacity-50 cursor-not-allowed"
+                  disabled
+                  title="Cannot delete the active configuration"
+                >
+                  <font-awesome-icon :icon="['fas', 'trash']" class="mr-1" aria-hidden="true" />
+                  Delete
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="btn-secondary text-[11px] py-1 px-2 text-red-700 border-red-200 hover:bg-red-50"
+                  @click="openArchiveConfirm(cfg)"
+                >
+                  <font-awesome-icon :icon="['fas', 'trash']" class="mr-1" aria-hidden="true" />
+                  Delete
+                </button>
               </div>
             </div>
           </li>
@@ -1394,6 +1531,66 @@ onMounted(async () => {
             @click="saveCurrentAsConfig"
           >
             Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Archive config confirmation modal -->
+  <div
+    v-if="isArchiveConfirmOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  >
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+      <div class="px-4 py-3 border-b border-neutral-border flex items-center justify-between">
+        <h2 class="text-sm font-heading font-semibold text-brand-charcoal">
+          Delete configuration?
+        </h2>
+        <button
+          type="button"
+          class="text-xs text-neutral-body hover:text-brand-charcoal"
+          @click="isArchiveConfirmOpen = false"
+        >
+          Close
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <p class="text-xs text-neutral-body">
+          <span class="font-semibold text-brand-charcoal">{{ configToArchive?.name }}</span>
+          will be removed from this list. The row is kept in the database with
+          <code class="font-mono text-[11px] bg-neutral-bg px-1 py-0.5 rounded">archived = true</code>
+          and will not be used for matching.
+        </p>
+        <p
+          v-if="configArchiveError"
+          class="text-xs text-red-700"
+        >
+          {{ configArchiveError }}
+        </p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :disabled="isArchivingConfig"
+            @click="isArchiveConfirmOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn-primary text-xs bg-red-600 hover:bg-red-700 border-red-700"
+            :disabled="isArchivingConfig"
+            @click="confirmArchiveConfig"
+          >
+            <font-awesome-icon
+              v-if="isArchivingConfig"
+              :icon="['fas', 'spinner']"
+              spin
+              class="mr-1"
+              aria-hidden="true"
+            />
+            Delete configuration
           </button>
         </div>
       </div>

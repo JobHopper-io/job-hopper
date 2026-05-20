@@ -4,6 +4,17 @@ import {
   inferSponsorshipLikelihood,
   type JobDataForInference,
 } from './infer-sponsorship-likelihood.ts'
+import {
+  evaluatePhraseMatch,
+  getAllProfilePhrasesForDebug,
+  getMaxPhraseScore,
+  effectiveJobTitleForKeywords as effectiveJobTitleForKeywordsFromPhrase,
+  type MatchConfigPhraseMatching,
+  type MatchConfigPhraseWeights,
+  type PhraseMatchDetails,
+  type PhraseMatchJobSurfaces,
+  type PhraseMatchSubscriberInput,
+} from './phrase-matching.ts'
 
 export { getEffectiveSponsorshipLikelihood, inferSponsorshipLikelihood }
 
@@ -46,10 +57,7 @@ export interface JobRecord {
   sponsorshipLikelihood?: 'Low' | 'Medium' | 'High' | 'N/A' | null
 }
 
-export interface MatchConfigKeywordWeights {
-  currentJobTitleKeyword: number
-  currentIndustryKeyword: number
-}
+export type { MatchConfigPhraseMatching, MatchConfigPhraseWeights, PhraseMatchDetails }
 
 export interface MatchConfigPayWeights {
   insideRange: number
@@ -91,7 +99,8 @@ export interface MatchConfigDebug {
 }
 
 export interface MatchConfig {
-  keywordWeights: MatchConfigKeywordWeights
+  phraseWeights: MatchConfigPhraseWeights
+  phraseMatching: MatchConfigPhraseMatching
   payWeights: MatchConfigPayWeights
   locationWeights: MatchConfigLocationWeights
   recencyWeights: MatchConfigRecencyWeights
@@ -107,7 +116,7 @@ export interface RankedJob extends JobRecord {
     location: number
     recency: number
   }
-  matchedRoleKeywords?: string[]
+  phraseMatch?: PhraseMatchDetails
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
@@ -116,9 +125,13 @@ export interface RankedJob extends JobRecord {
 }
 
 export const defaultConfig: MatchConfig = {
-  keywordWeights: {
-    currentJobTitleKeyword: 2,
-    currentIndustryKeyword: 1,
+  phraseWeights: {
+    primary: { title: 4, description: 1, briefing: 0 },
+    secondary: { title: 1, description: 0.5, briefing: 0 },
+    industry: { title: 2, description: 1, briefing: 0 },
+  },
+  phraseMatching: {
+    minPrimaryWords: 2,
   },
   payWeights: {
     insideRange: 4,
@@ -158,12 +171,21 @@ export const defaultConfig: MatchConfig = {
 export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined): MatchConfig {
   if (!overrides) return defaultConfig
 
+  const ow = overrides.phraseWeights
+  const defPw = defaultConfig.phraseWeights
+  const phraseWeights: MatchConfigPhraseWeights = {
+    primary: { ...defPw.primary, ...(ow?.primary ?? {}) },
+    secondary: { ...defPw.secondary, ...(ow?.secondary ?? {}) },
+    industry: { ...defPw.industry, ...(ow?.industry ?? {}) },
+  }
+
   return {
     ...defaultConfig,
     ...overrides,
-    keywordWeights: {
-      ...defaultConfig.keywordWeights,
-      ...(overrides.keywordWeights ?? {}),
+    phraseWeights,
+    phraseMatching: {
+      ...defaultConfig.phraseMatching,
+      ...(overrides.phraseMatching ?? {}),
     },
     payWeights: {
       ...defaultConfig.payWeights,
@@ -188,10 +210,6 @@ export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined):
   }
 }
 
-function normalizeText(value: string | null | undefined): string {
-  return (value ?? '').toLowerCase()
-}
-
 function toJobDataForInference(job: JobRecord): JobDataForInference {
   return {
     title: job.title,
@@ -204,112 +222,50 @@ function toJobDataForInference(job: JobRecord): JobDataForInference {
   }
 }
 
-/** Dropped when they are the only word in an n-gram. */
-const AUXILIARY_KEYWORDS_ALONE = new Set<string>([
-  'senior',
-  'jr',
-  'junior',
-  'sr',
-  'mid',
-  'middle',
-  'temp',
-  'temporary',
-  'vp',
-  'staff',
-  'executive',
-  'director',
-  'student',
-  'masters',
-])
-
 /**
- * Dropped when the first and/or last token in an n-gram (and thus alone, when length is 1).
- * Example: n-gram "a &" or "and sales" is dropped, but "sales and marketing" is kept.
- */
-const AUXILIARY_KEYWORDS_ENDS = new Set<string>(['&', 'and'])
-
-function isDroppedKeywordNgram(words: string[]): boolean {
-  if (words.length === 0) {
-    return true
-  }
-  const first = words[0]
-  const last = words[words.length - 1]
-  if (AUXILIARY_KEYWORDS_ENDS.has(first) || AUXILIARY_KEYWORDS_ENDS.has(last)) {
-    return true
-  }
-  if (words.length === 1 && AUXILIARY_KEYWORDS_ALONE.has(first)) {
-    return true
-  }
-  return false
-}
-
-/**
- * Generate keyword phrases from a comma-separated field.
- *
- * For each comma-separated segment, we:
- * - split into words
- * - generate all contiguous left-to-right n-grams (length 1..N)
- * - drop n-grams per {@link isDroppedKeywordNgram}
- *
- * Example: "Senior Electrical Engineer" →
- * - "senior electrical engineer"
- * - "senior electrical"
- * - "senior engineer"
- * - "electrical engineer"
- * - "electrical"
- * - "engineer"
- */
-function commaSeparatedKeywords(input: string | null | undefined): string[] {
-  if (!input) return []
-
-  const set = new Set<string>()
-
-  for (const rawSegment of input.split(',')) {
-    const segment = rawSegment.trim().toLowerCase()
-    if (!segment) continue
-
-    const words = segment
-      .split(/\s+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0)
-
-    if (!words.length) continue
-
-    const n = words.length
-    for (let len = n; len >= 1; len -= 1) {
-      for (let start = 0; start + len <= n; start += 1) {
-        const slice = words.slice(start, start + len)
-        if (isDroppedKeywordNgram(slice)) {
-          continue
-        }
-        set.add(slice.join(' '))
-      }
-    }
-  }
-
-  return Array.from(set)
-}
-
-/**
- * Text used for job-title keyword extraction: trimmed target title when present,
- * otherwise the subscriber's current job title (unchanged string if non-empty after trim).
+ * Text used for job-title phrase extraction: trimmed target title when present,
+ * otherwise the subscriber's current job title (non-empty after trim).
  */
 export function effectiveJobTitleForKeywords(prefs: SubscriberPreferences): string | null {
-  const target = (prefs.targetJobTitle ?? '').trim()
-  if (target.length > 0) {
-    return target
-  }
-  const current = prefs.currentJobTitle
-  if (current == null) return null
-  return String(current).trim().length > 0 ? current : null
+  return effectiveJobTitleForKeywordsFromPhrase({
+    targetJobTitle: prefs.targetJobTitle,
+    currentJobTitle: prefs.currentJobTitle,
+    currentIndustry: prefs.currentIndustry,
+  })
 }
 
-/** All keywords used for role matching: union of effective job title (target else current) and industry. */
-function getRoleMatchKeywords(prefs: SubscriberPreferences): string[] {
-  const set = new Set<string>()
-  for (const kw of commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))) set.add(kw)
-  for (const kw of commaSeparatedKeywords(prefs.currentIndustry)) set.add(kw)
-  return Array.from(set)
+function prefsToPhraseInput(prefs: SubscriberPreferences): PhraseMatchSubscriberInput {
+  return {
+    targetJobTitle: prefs.targetJobTitle,
+    currentJobTitle: prefs.currentJobTitle,
+    currentIndustry: prefs.currentIndustry,
+  }
+}
+
+function jobToPhraseSurfaces(job: JobRecord): PhraseMatchJobSurfaces {
+  return {
+    title: job.title,
+    description: job.description,
+    aiBriefing: job.aiBriefing,
+  }
+}
+
+function computePhraseRoleScore(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): { roleScore: number; phraseMatch: PhraseMatchDetails } {
+  const { phraseScore, phraseMatch, passesGate, hasSearchIntent } = evaluatePhraseMatch(
+    prefsToPhraseInput(prefs),
+    jobToPhraseSurfaces(job),
+    cfg.phraseWeights,
+    cfg.phraseMatching,
+  )
+  let roleScore = phraseScore
+  if (hasSearchIntent && !passesGate) {
+    roleScore += cfg.thresholds.noKeywordMatchPenalty
+  }
+  return { roleScore, phraseMatch }
 }
 
 /** True if the job's catalog tier matches one of the subscriber's base plan product keys. */
@@ -337,11 +293,7 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
  * Used to show score as percentage of max on the admin job-matching page.
  */
 export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
-  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
-  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
-  const maxKeyword =
-    titleKeywords.length * cfg.keywordWeights.currentJobTitleKeyword +
-    industryKeywords.length * cfg.keywordWeights.currentIndustryKeyword
+  const maxPhrase = getMaxPhraseScore(prefsToPhraseInput(prefs), cfg.phraseWeights, cfg.phraseMatching)
   const maxPay = cfg.payWeights.insideRange
   const maxLocation = Math.max(
     cfg.locationWeights.sameMetro,
@@ -351,92 +303,7 @@ export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConf
     cfg.locationWeights.distance0to10 + cfg.locationWeights.withinRadiusBonus,
   )
   const maxRecency = cfg.recencyWeights.baseRecency
-  return maxKeyword + maxPay + maxLocation + maxRecency
-}
-
-function computeRoleScore(
-  prefs: SubscriberPreferences,
-  job: JobRecord,
-  cfg: MatchConfig,
-): number {
-  const title = normalizeText(job.title)
-  const description = normalizeText(job.description)
-  const briefing = normalizeText(job.aiBriefing)
-  const combined = `${title} ${description} ${briefing}`.trim()
-
-  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
-  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
-
-  let score = 0
-
-  if (combined.length > 0 && titleKeywords.length > 0) {
-    for (const kw of titleKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentJobTitleKeyword
-      }
-    }
-  }
-
-  if (combined.length > 0 && industryKeywords.length > 0) {
-    for (const kw of industryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentIndustryKeyword
-      }
-    }
-  }
-
-  if (titleKeywords.length > 0 || industryKeywords.length > 0) {
-    const anyOverlap = score > 0
-    if (!anyOverlap) {
-      score += cfg.thresholds.noKeywordMatchPenalty
-    }
-  }
-
-  return score
-}
-
-function computeRoleScoreWithKeywords(
-  prefs: SubscriberPreferences,
-  job: JobRecord,
-  cfg: MatchConfig,
-): { score: number; matchedRoleKeywords: string[] } {
-  const title = normalizeText(job.title)
-  const description = normalizeText(job.description)
-  const briefing = normalizeText(job.aiBriefing)
-  const combined = `${title} ${description} ${briefing}`.trim()
-
-  const titleKeywords = commaSeparatedKeywords(effectiveJobTitleForKeywords(prefs))
-  const industryKeywords = commaSeparatedKeywords(prefs.currentIndustry)
-
-  let score = 0
-  const matchedRoleKeywords: string[] = []
-
-  if (combined.length > 0 && titleKeywords.length > 0) {
-    for (const kw of titleKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentJobTitleKeyword
-        matchedRoleKeywords.push(kw)
-      }
-    }
-  }
-
-  if (combined.length > 0 && industryKeywords.length > 0) {
-    for (const kw of industryKeywords) {
-      if (combined.includes(kw)) {
-        score += cfg.keywordWeights.currentIndustryKeyword
-        matchedRoleKeywords.push(kw)
-      }
-    }
-  }
-
-  if (titleKeywords.length > 0 || industryKeywords.length > 0) {
-    const anyOverlap = score > 0
-    if (!anyOverlap) {
-      score += cfg.thresholds.noKeywordMatchPenalty
-    }
-  }
-
-  return { score, matchedRoleKeywords }
+  return maxPhrase + maxPay + maxLocation + maxRecency
 }
 
 function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: number | null } {
@@ -752,7 +619,7 @@ export function matchJobs(
       continue
     }
 
-    const roleScore = computeRoleScore(prefs, job, cfg)
+    const { roleScore } = computePhraseRoleScore(prefs, job, cfg)
     if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       continue
     }
@@ -827,10 +694,16 @@ export interface MatchJobsDebugPayload {
     averageRecencyScore: number | null
     maxPossibleScore: number
   }
-  keywords: {
-    keyword: string
+  phrases: {
+    phrase: string
+    kind: 'primary' | 'secondary' | 'industry'
     matchedJobCount: number
   }[]
+  matchSurfaces: {
+    title: number
+    description: number
+    briefing: number
+  }
 }
 
 export function matchJobsWithDebug(
@@ -862,11 +735,17 @@ export function matchJobsWithDebug(
   let sumLocationScore = 0
   let sumRecencyScore = 0
 
-  const allKeywords = getRoleMatchKeywords(prefs)
-  const keywordCounts = new Map<string, number>()
-  for (const kw of allKeywords) {
-    keywordCounts.set(kw, 0)
+  const phraseDebugList = getAllProfilePhrasesForDebug(
+    prefsToPhraseInput(prefs),
+    cfg.phraseMatching,
+  )
+  const phraseCounts = new Map<string, number>()
+  const phraseKey = (kind: string, phrase: string) => `${kind}\x1f${phrase}`
+  for (const { phrase, kind } of phraseDebugList) {
+    phraseCounts.set(phraseKey(kind, phrase), 0)
   }
+
+  const matchSurfaces = { title: 0, description: 0, briefing: 0 }
 
   for (const job of jobs) {
     if (!jobMatchesSubscriptionTier(job, prefs)) {
@@ -889,7 +768,7 @@ export function matchJobsWithDebug(
       continue
     }
 
-    const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
+    const { roleScore, phraseMatch } = computePhraseRoleScore(prefs, job, cfg)
 
     if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       excludedByNoKeywordMatch += 1
@@ -929,7 +808,7 @@ export function matchJobsWithDebug(
         location: locationScore,
         recency: recencyScore,
       },
-      matchedRoleKeywords,
+      phraseMatch,
       locationDistanceMiles: distanceMiles,
       withinRadius,
       locationParsed,
@@ -946,8 +825,25 @@ export function matchJobsWithDebug(
     sumLocationScore += locationScore
     sumRecencyScore += recencyScore
 
-    for (const kw of matchedRoleKeywords) {
-      keywordCounts.set(kw, (keywordCounts.get(kw) ?? 0) + 1)
+    for (const [tier, bySurf] of Object.entries(phraseMatch.matchedBySurface)) {
+      const kind = tier as 'primary' | 'secondary' | 'industry'
+      if (!bySurf) continue
+      for (const phrase of Object.values(bySurf)) {
+        if (!phrase) continue
+        const key = phraseKey(kind, phrase)
+        phraseCounts.set(key, (phraseCounts.get(key) ?? 0) + 1)
+      }
+    }
+
+    for (const surface of ['title', 'description', 'briefing'] as const) {
+      let hit = false
+      for (const tier of ['primary', 'secondary', 'industry'] as const) {
+        if (phraseMatch.surfaceScores[tier][surface] > 0) {
+          hit = true
+          break
+        }
+      }
+      if (hit) matchSurfaces[surface] += 1
     }
   }
 
@@ -989,9 +885,15 @@ export function matchJobsWithDebug(
       averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
       maxPossibleScore,
     },
-    keywords: Array.from(keywordCounts.entries())
-      .sort(([, aCount], [, bCount]) => bCount - aCount)
-      .map(([keyword, matchedJobCount]) => ({ keyword, matchedJobCount })),
+    phrases: Array.from(phraseCounts.entries())
+      .map(([key, matchedJobCount]) => {
+        const i = key.indexOf('\x1f')
+        const kind = key.slice(0, i) as 'primary' | 'secondary' | 'industry'
+        const phrase = key.slice(i + 1)
+        return { phrase, kind, matchedJobCount }
+      })
+      .sort((a, b) => b.matchedJobCount - a.matchedJobCount),
+    matchSurfaces,
   }
 
   return { ranked, debug }

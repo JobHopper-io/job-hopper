@@ -1,12 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
+import type { MatchingAlgorithmConfigRow } from "../_shared/matching-algorithm-config-row.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-type Action = "list" | "create" | "update" | "activate"
+type Action = "list" | "create" | "update" | "activate" | "archive"
 
 interface AdminMatchingConfigsRequest {
   action?: Action
@@ -14,9 +15,13 @@ interface AdminMatchingConfigsRequest {
   name?: string
   makeActive?: boolean
   config?: {
-    keywordWeights?: {
-      currentJobTitleKeyword?: number
-      currentIndustryKeyword?: number
+    phraseWeights?: {
+      primary?: { title?: number; description?: number; briefing?: number }
+      secondary?: { title?: number; description?: number; briefing?: number }
+      industry?: { title?: number; description?: number; briefing?: number }
+    }
+    phraseMatching?: {
+      minPrimaryWords?: number
     }
     payWeights?: {
       insideRange?: number
@@ -54,9 +59,22 @@ interface AdminMatchingConfigsRequest {
 function overrideToDbColumns(input: NonNullable<AdminMatchingConfigsRequest["config"]>) {
   const cols: Record<string, number | null | boolean | string> = {}
 
-  const kw = input.keywordWeights ?? {}
-  if (kw.currentJobTitleKeyword != null) cols.keyword_current_job_title_weight = kw.currentJobTitleKeyword
-  if (kw.currentIndustryKeyword != null) cols.keyword_current_industry_weight = kw.currentIndustryKeyword
+  const pw = input.phraseWeights ?? {}
+  const pPrimary = pw.primary ?? {}
+  const pSecondary = pw.secondary ?? {}
+  const pIndustry = pw.industry ?? {}
+  if (pPrimary.title != null) cols.phrase_primary_title_weight = pPrimary.title
+  if (pPrimary.description != null) cols.phrase_primary_description_weight = pPrimary.description
+  if (pPrimary.briefing != null) cols.phrase_primary_briefing_weight = pPrimary.briefing
+  if (pSecondary.title != null) cols.phrase_secondary_title_weight = pSecondary.title
+  if (pSecondary.description != null) cols.phrase_secondary_description_weight = pSecondary.description
+  if (pSecondary.briefing != null) cols.phrase_secondary_briefing_weight = pSecondary.briefing
+  if (pIndustry.title != null) cols.phrase_industry_title_weight = pIndustry.title
+  if (pIndustry.description != null) cols.phrase_industry_description_weight = pIndustry.description
+  if (pIndustry.briefing != null) cols.phrase_industry_briefing_weight = pIndustry.briefing
+
+  const pm = input.phraseMatching ?? {}
+  if (pm.minPrimaryWords != null) cols.phrase_min_primary_words = pm.minPrimaryWords
 
   const pay = input.payWeights ?? {}
   if (pay.insideRange != null) cols.pay_inside_range_weight = pay.insideRange
@@ -91,17 +109,33 @@ function overrideToDbColumns(input: NonNullable<AdminMatchingConfigsRequest["con
   return cols
 }
 
-function rowToConfig(row: any) {
+function rowToConfig(row: MatchingAlgorithmConfigRow) {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    active: row.active as boolean,
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
+    id: row.id,
+    name: row.name,
+    active: row.active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
     config: {
-      keywordWeights: {
-        currentJobTitleKeyword: row.keyword_current_job_title_weight,
-        currentIndustryKeyword: row.keyword_current_industry_weight,
+      phraseWeights: {
+        primary: {
+          title: row.phrase_primary_title_weight,
+          description: row.phrase_primary_description_weight,
+          briefing: row.phrase_primary_briefing_weight,
+        },
+        secondary: {
+          title: row.phrase_secondary_title_weight,
+          description: row.phrase_secondary_description_weight,
+          briefing: row.phrase_secondary_briefing_weight,
+        },
+        industry: {
+          title: row.phrase_industry_title_weight,
+          description: row.phrase_industry_description_weight,
+          briefing: row.phrase_industry_briefing_weight,
+        },
+      },
+      phraseMatching: {
+        minPrimaryWords: row.phrase_min_primary_words,
       },
       payWeights: {
         insideRange: row.pay_inside_range_weight,
@@ -228,6 +262,7 @@ serve(async (req) => {
       const { data, error } = await serviceClient
         .from("matching_algorithm_config")
         .select("*")
+        .eq("archived", false)
         .order("created_at", { ascending: false })
 
       if (error) {
@@ -257,6 +292,7 @@ serve(async (req) => {
       const cols = overrideToDbColumns(body.config)
       cols.name = body.name
       cols.active = !!body.makeActive
+      cols.archived = false
 
       const { data, error } = await serviceClient
         .from("matching_algorithm_config")
@@ -300,6 +336,7 @@ serve(async (req) => {
         .from("matching_algorithm_config")
         .update(cols)
         .eq("id", body.id)
+        .eq("archived", false)
         .select("*")
         .single()
 
@@ -319,6 +356,68 @@ serve(async (req) => {
       })
     }
 
+    if (action === "archive") {
+      if (!body.id) {
+        return new Response(JSON.stringify({ error: "Missing id" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        })
+      }
+
+      const { data: existing, error: fetchError } = await serviceClient
+        .from("matching_algorithm_config")
+        .select("id, active, archived")
+        .eq("id", body.id)
+        .maybeSingle()
+
+      if (fetchError) {
+        console.error("admin-matching-configs: archive lookup failed", fetchError)
+        return new Response(JSON.stringify({ error: "Failed to archive config" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        })
+      }
+
+      if (!existing) {
+        return new Response(JSON.stringify({ error: "Config not found" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        })
+      }
+
+      if (existing.archived) {
+        return new Response(JSON.stringify({ error: "Config is already archived" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        })
+      }
+
+      if (existing.active) {
+        return new Response(JSON.stringify({ error: "Cannot archive the active configuration" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        })
+      }
+
+      const { error } = await serviceClient
+        .from("matching_algorithm_config")
+        .update({ archived: true })
+        .eq("id", body.id)
+
+      if (error) {
+        console.error("admin-matching-configs: archive failed", error)
+        return new Response(JSON.stringify({ error: "Failed to archive config" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        })
+      }
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      })
+    }
+
     if (action === "activate") {
       if (!body.id) {
         return new Response(JSON.stringify({ error: "Missing id" }), {
@@ -331,6 +430,7 @@ serve(async (req) => {
         .from("matching_algorithm_config")
         .update({ active: true })
         .eq("id", body.id)
+        .eq("archived", false)
         .select("*")
         .single()
 

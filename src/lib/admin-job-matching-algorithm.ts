@@ -1,4 +1,36 @@
 import { supabase } from '@/lib/supabase'
+import type { FunctionsHttpError } from '@supabase/supabase-js'
+
+function messageFromFunctionsHttpError(error: FunctionsHttpError): string {
+  const ctx = error.context as { body?: string } | undefined
+  const raw = ctx?.body
+  if (typeof raw === 'string' && raw.length > 0) {
+    try {
+      const parsed = JSON.parse(raw) as { error?: string; detail?: string }
+      if (parsed.error) return parsed.error
+      if (parsed.detail) return parsed.detail
+    } catch {
+      return raw.slice(0, 500)
+    }
+  }
+  return error.message
+}
+
+export interface PhraseMatchSurfaceDetail {
+  primaryPhrases: string[]
+  secondaryPhrases: string[]
+  industryPhrases: string[]
+  matchedBySurface: {
+    primary?: Partial<Record<'title' | 'description' | 'briefing', string>>
+    secondary?: Partial<Record<'title' | 'description' | 'briefing', string>>
+    industry?: Partial<Record<'title' | 'description' | 'briefing', string>>
+  }
+  surfaceScores: {
+    primary: Record<'title' | 'description' | 'briefing', number>
+    secondary: Record<'title' | 'description' | 'briefing', number>
+    industry: Record<'title' | 'description' | 'briefing', number>
+  }
+}
 
 export interface RankedJob {
   id: string
@@ -16,7 +48,7 @@ export interface RankedJob {
     location: number
     recency: number
   }
-  matchedRoleKeywords?: string[]
+  phraseMatch?: PhraseMatchSurfaceDetail
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
@@ -47,10 +79,16 @@ export interface MatchJobsDebugPayload {
     averageRecencyScore: number | null
     maxPossibleScore: number
   }
-  keywords: {
-    keyword: string
+  phrases: {
+    phrase: string
+    kind: 'primary' | 'secondary' | 'industry'
     matchedJobCount: number
   }[]
+  matchSurfaces?: {
+    title: number
+    description: number
+    briefing: number
+  }
 }
 
 export interface MatchJobsResponse {
@@ -75,9 +113,20 @@ export interface SubscriberPreferencesOverride {
   locationRadiusMiles?: number | null
 }
 
-export interface MatchConfigKeywordWeights {
-  currentJobTitleKeyword?: number
-  currentIndustryKeyword?: number
+export interface MatchConfigPhraseSurfaceWeights {
+  title?: number
+  description?: number
+  briefing?: number
+}
+
+export interface MatchConfigPhraseWeights {
+  primary?: MatchConfigPhraseSurfaceWeights
+  secondary?: MatchConfigPhraseSurfaceWeights
+  industry?: MatchConfigPhraseSurfaceWeights
+}
+
+export interface MatchConfigPhraseMatching {
+  minPrimaryWords?: number
 }
 
 export interface MatchConfigPayWeights {
@@ -115,7 +164,8 @@ export interface MatchConfigThresholds {
 }
 
 export interface MatchConfigOverride {
-  keywordWeights?: MatchConfigKeywordWeights
+  phraseWeights?: MatchConfigPhraseWeights
+  phraseMatching?: MatchConfigPhraseMatching
   payWeights?: MatchConfigPayWeights
   locationWeights?: MatchConfigLocationWeights
   recencyWeights?: MatchConfigRecencyWeights
@@ -179,9 +229,13 @@ export interface GetAdminMatchesOptions {
 
 /** Default admin match config values (mirror of backend defaultConfig). Used for form defaults and reset. */
 export const DEFAULT_ADMIN_MATCH_CONFIG: MatchConfigOverride = {
-  keywordWeights: {
-    currentJobTitleKeyword: 2,
-    currentIndustryKeyword: 1,
+  phraseWeights: {
+    primary: { title: 4, description: 1, briefing: 0 },
+    secondary: { title: 1, description: 0.5, briefing: 0 },
+    industry: { title: 2, description: 1, briefing: 0 },
+  },
+  phraseMatching: {
+    minPrimaryWords: 2,
   },
   payWeights: {
     insideRange: 4,
@@ -398,6 +452,29 @@ export const jobMatchingAlgorithmAdminAPI = {
       },
       error: null,
     }
+  },
+
+  async archiveConfig(id: string): Promise<{ error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>(
+      'admin-matching-configs',
+      {
+        method: 'POST',
+        body: {
+          action: 'archive',
+          id,
+        },
+      },
+    )
+
+    if (error) {
+      return { error: new Error(messageFromFunctionsHttpError(error as FunctionsHttpError)) }
+    }
+
+    if (data?.error) {
+      return { error: new Error(data.error) }
+    }
+
+    return { error: null }
   },
 
   async activateConfig(id: string): Promise<{ data: AdminMatchingConfig | null; error: Error | null }> {
