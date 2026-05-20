@@ -494,7 +494,7 @@ onMounted(async () => {
           Admin · Job Matching Algorithm
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
-          Run the same scoring pipeline as production: the job catalog is pre-filtered in SQL by subscription tier, target role categories, maxAgeDays recency, and remote opt-out when applicable; then <span class="font-medium text-brand-charcoal">phrase matching</span> scores primary, secondary, and industry n-grams on job title, description, and AI briefing (word-boundary matches, weighted per surface); pay, location (distance bands with categorical fallback), and recency decay contribute to the total; jobs below the minimum score or failing the phrase gate are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
+          Run the same scoring pipeline as production.
         </p>
       </header>
 
@@ -714,7 +714,7 @@ onMounted(async () => {
                     v-model.number="configForm.phraseMatching!.minPrimaryWords"
                     type="number"
                     min="1"
-                    class="input w-20 text-sm"
+                    class="input w-28 shrink-0 text-sm"
                     title="Minimum words for a title/industry n-gram to count as primary (single-word primaries allowed only when not a stop word)"
                   >
                   <span class="text-[11px] text-neutral-body">minPrimaryWords</span>
@@ -725,15 +725,15 @@ onMounted(async () => {
                       Primary (title intent)
                     </p>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.title" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.primary!.title" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">title</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.description" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.primary!.description" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">description</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.briefing" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.primary!.briefing" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">briefing</span>
                     </div>
                   </div>
@@ -742,15 +742,15 @@ onMounted(async () => {
                       Secondary (title)
                     </p>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.title" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.title" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">title</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.description" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.description" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">description</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.briefing" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.secondary!.briefing" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">briefing</span>
                     </div>
                   </div>
@@ -759,15 +759,15 @@ onMounted(async () => {
                       Industry
                     </p>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.title" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.industry!.title" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">title</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.description" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.industry!.description" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">description</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.briefing" type="number" class="input w-16 text-sm">
+                      <input v-model.number="configForm.phraseWeights!.industry!.briefing" type="number" class="input w-28 shrink-0 text-sm">
                       <span class="text-[11px] text-neutral-body truncate">briefing</span>
                     </div>
                   </div>
@@ -781,7 +781,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.payWeights!.insideRange"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Score when job salary range overlaps your desired range"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Score when job salary range overlaps your desired range">insideRange</span>
@@ -790,7 +790,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.payWeights!.nearRange"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Score when job salary is slightly above or below your range (within tolerance)"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Score when job salary is slightly above or below your range (within tolerance)">nearRange</span>
@@ -799,7 +799,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.payWeights!.missingSalary"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Score when job has no salary listed"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Score when job has no salary listed">missingSalary</span>
@@ -808,7 +808,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.payWeights!.belowRangePenalty"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Penalty when job salary is below your range (beyond tolerance)"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Penalty when job salary is below your range (beyond tolerance)">belowRangePenalty</span>
@@ -824,7 +824,7 @@ onMounted(async () => {
                       v-model.number="configForm.recencyWeights!.baseRecency"
                       type="number"
                       step="0.1"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Base score for job recency; decay is applied per day"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Base score for job recency; decay is applied per day">baseRecency</span>
@@ -834,7 +834,7 @@ onMounted(async () => {
                       v-model.number="configForm.recencyWeights!.perDayDecay"
                       type="number"
                       step="0.01"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Amount subtracted from recency score per day since posted"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Amount subtracted from recency score per day since posted">perDayDecay</span>
@@ -843,7 +843,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.recencyWeights!.maxAgeDays"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)">maxAgeDays</span>
@@ -858,7 +858,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.thresholds!.minTotalScore"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Minimum total score for a job to be included in results"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Minimum total score for a job to be included in results">minTotalScore</span>
@@ -867,7 +867,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Penalty when user has title (target else current) or industry keywords but the job matches none (job is excluded if role score drops below half this magnitude)"
                     >
                     <span
@@ -880,7 +880,7 @@ onMounted(async () => {
                       v-model.number="configForm.thresholds!.overPayTolerancePct"
                       type="number"
                       step="0.01"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange">overPayTolerancePct</span>
@@ -890,7 +890,7 @@ onMounted(async () => {
                       v-model.number="configForm.thresholds!.underPayTolerancePct"
                       type="number"
                       step="0.01"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange"
                     >
                     <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
@@ -905,7 +905,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.distance0to10"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
                     >
                     <span
@@ -917,7 +917,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.distance10to25"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
                     >
                     <span
@@ -929,7 +929,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.distance25to50"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
                     >
                     <span
@@ -941,7 +941,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.distance50to100"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
                     >
                     <span
@@ -953,7 +953,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.distanceBeyond100"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
                     >
                     <span
@@ -965,7 +965,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.withinRadiusBonus"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
                     >
                     <span
@@ -983,7 +983,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.sameMetro"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
                     >
                     <span
@@ -995,7 +995,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.sameState"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
                     >
                     <span
@@ -1013,7 +1013,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.remotePreferred"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
                     >
                     <span
@@ -1025,7 +1025,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.relocationAllowed"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Applied when job is outside preferred locations and far away but you are open to relocation"
                     >
                     <span
@@ -1037,7 +1037,7 @@ onMounted(async () => {
                     <input
                       v-model.number="configForm.locationWeights!.otherLocationPenalty"
                       type="number"
-                      class="input w-20 text-sm"
+                      class="input w-28 shrink-0 text-sm"
                       title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
                     >
                     <span
