@@ -2,11 +2,13 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import {
   buildPhraseProfile,
   evaluatePhraseMatch,
+  getMaxPhraseScore,
   phraseMatchesAtWordBoundaries,
   STOP_WORDS,
 } from '../phrase-matching.ts'
 import {
   defaultConfig,
+  getMaxPossibleScore,
   mergeConfig,
   matchJobs,
   type JobRecord,
@@ -139,6 +141,62 @@ Deno.test('evaluatePhraseMatch: title-derived secondary tier alone does not pass
   const r = evaluatePhraseMatch(prefs, job, cfg.phraseWeights, cfg.phraseMatching)
   assertEquals(r.phraseScore > 0, true)
   assertEquals(r.passesGate, false)
+})
+
+Deno.test('getMaxPhraseScore: industry tier counts primary or secondary per surface not both', () => {
+  const prefs = {
+    targetJobTitle: null,
+    currentJobTitle: null,
+    currentIndustry: 'Defense Systems, Aerospace',
+  }
+  const cfg = mergeConfig({ phraseMatching: { minPrimaryWords: 3 } })
+  const maxPhrase = getMaxPhraseScore(prefs, cfg.phraseWeights, cfg.phraseMatching)
+  const perfectJob = {
+    title: 'Defense Systems Aerospace',
+    description: 'Defense Systems Aerospace',
+    aiBriefing: 'Defense Systems Aerospace',
+  }
+  const actual = evaluatePhraseMatch(prefs, perfectJob, cfg.phraseWeights, cfg.phraseMatching)
+  assertEquals(maxPhrase >= actual.phraseScore, true)
+  assertEquals(maxPhrase, actual.phraseScore)
+})
+
+Deno.test('getMaxPossibleScore is at least any included job total', () => {
+  const prefs: SubscriberPreferences = {
+    subscriptionTierProductKeys: ['tier_a'],
+    roles: [],
+    targetJobTitle: 'Mechanical Engineer',
+    currentJobTitle: null,
+    currentIndustry: 'Aerospace Manufacturing',
+    payRangeMin: 80000,
+    payRangeMax: 120000,
+    preferredLocations: ['Chicago, IL'],
+    openToRelocation: false,
+    openToRemote: true,
+    locationRadiusMiles: 25,
+  }
+  const cfg = mergeConfig(null)
+  const maxPossible = getMaxPossibleScore(prefs, cfg)
+  const job: JobRecord = {
+    id: '1',
+    title: 'Mechanical Design Engineer',
+    companyName: 'Co',
+    roleCategory: 'engineering',
+    location: 'Chicago, IL',
+    isRemote: false,
+    description: 'Aerospace manufacturing mechanical engineer role.',
+    aiBriefing: 'Aerospace manufacturing',
+    applyLink: null,
+    payMin: 90000,
+    payMax: 110000,
+    payType: 'year',
+    createdAt: new Date().toISOString(),
+    postedDate: new Date().toISOString(),
+    subscriptionTier: 'tier_a',
+  }
+  const ranked = matchJobs(prefs, [job], cfg)
+  assertEquals(ranked.length, 1)
+  assertEquals(maxPossible >= ranked[0].score, true)
 })
 
 Deno.test('matchJobs excludes when phrase gate fails', () => {

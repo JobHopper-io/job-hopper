@@ -365,12 +365,12 @@ export function getMaxPhraseScore(
     for (const surface of ['title', 'description', 'briefing'] as const) {
       const weight = w[surface]
       if (weight === 0) continue
-      if (maxLenP > 0) {
-        sum += PER_WORD_MULTIPLIER ? weight * maxLenP : weight
-      }
-      if (maxLenS > 0) {
-        sum += PER_WORD_MULTIPLIER ? weight * maxLenS : weight
-      }
+      const primaryPts =
+        maxLenP > 0 ? (PER_WORD_MULTIPLIER ? weight * maxLenP : weight) : 0
+      const secondaryPts =
+        maxLenS > 0 ? (PER_WORD_MULTIPLIER ? weight * maxLenS : weight) : 0
+      // Mirrors evaluatePhraseMatch: at most one phrase (primary else secondary) per surface.
+      sum += Math.max(primaryPts, secondaryPts)
     }
   }
 

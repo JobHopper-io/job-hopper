@@ -292,16 +292,28 @@ function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): bo
  * Highest possible total score for the given prefs and config (theoretical maximum).
  * Used to show score as percentage of max on the admin job-matching page.
  */
+function getMaxLocationScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
+  const lw = cfg.locationWeights
+  const remotePart = prefs.openToRemote ? lw.remotePreferred : 0
+  if ((prefs.preferredLocations ?? []).length === 0) {
+    return remotePart
+  }
+
+  const radiusBonus =
+    prefs.locationRadiusMiles != null && prefs.locationRadiusMiles > 0
+      ? lw.withinRadiusBonus
+      : 0
+
+  // Scoring uses distance bands OR categorical fallback, not both; remote stacks with either.
+  const distanceBest = remotePart + lw.distance0to10 + radiusBonus
+  const categoricalBest = remotePart + lw.sameMetro
+  return Math.max(distanceBest, categoricalBest)
+}
+
 export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
   const maxPhrase = getMaxPhraseScore(prefsToPhraseInput(prefs), cfg.phraseWeights, cfg.phraseMatching)
   const maxPay = cfg.payWeights.insideRange
-  const maxLocation = Math.max(
-    cfg.locationWeights.sameMetro,
-    cfg.locationWeights.sameState,
-    cfg.locationWeights.remotePreferred + cfg.locationWeights.distance0to10,
-    cfg.locationWeights.relocationAllowed + cfg.locationWeights.distance0to10,
-    cfg.locationWeights.distance0to10 + cfg.locationWeights.withinRadiusBonus,
-  )
+  const maxLocation = getMaxLocationScore(prefs, cfg)
   const maxRecency = cfg.recencyWeights.baseRecency
   return maxPhrase + maxPay + maxLocation + maxRecency
 }
