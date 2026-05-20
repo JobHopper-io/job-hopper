@@ -447,7 +447,7 @@ async function runAdviceCheckout() {
             class="mr-1.5"
             aria-hidden="true"
           />
-          {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
+          {{ adviceLoading ? 'Please wait…' : 'View advice' }}
         </button>
         <button
           v-if="showResumeAdviceButton"
@@ -502,7 +502,7 @@ async function runAdviceCheckout() {
             class="btn-secondary w-[12.5rem] shrink-0 text-sm"
             @click="openInsightsViewModal"
           >
-            View hiring contacts
+            View hiring contact
           </button>
         </template>
       </div>
