@@ -34,7 +34,6 @@ const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-r
 
 const insightsPrecheckOpen = ref(false)
 const insightsLoading = ref(false)
-const insightsError = ref<string | null>(null)
 const insightsModalOpen = ref(false)
 const insightsModalLoading = ref(false)
 const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
@@ -316,7 +315,6 @@ function openOrgChoiceModal() {
 }
 
 function handlePremiumInsightsClick() {
-  insightsError.value = null
   if (hasPremiumInsightsAddon.value) {
     void runPremiumInsights()
     return
@@ -365,7 +363,6 @@ const showPremiumInsightsPending = computed(
 async function runPremiumInsights() {
   if (!job.value) return
   insightsLoading.value = true
-  insightsError.value = null
   insightsModalError.value = null
   insightsModalFreemiumNote.value = null
   insightsModalOverrideContacts.value = null
@@ -384,7 +381,6 @@ async function runPremiumInsights() {
     if (result.error) {
       const friendly = mapPremiumInsightsClientError(result.error.message)
       insightsModalError.value = friendly
-      insightsError.value = friendly
       insightsModalFreemiumNote.value = premiumInsightsFreemiumReassurance(
         result.meta,
         hasPremiumInsightsAddon.value,
@@ -403,7 +399,6 @@ async function runPremiumInsights() {
     insightsModalLoading.value = false
     const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
     const friendly = mapPremiumInsightsClientError(raw)
-    insightsError.value = friendly
     insightsModalError.value = friendly
   } finally {
     insightsLoading.value = false
@@ -430,7 +425,6 @@ async function onConfirmOrgDisambiguation(
     if (result.error) {
       const friendly = mapPremiumInsightsClientError(result.error.message)
       insightsModalError.value = friendly
-      insightsError.value = friendly
       insightsModalFreemiumNote.value = premiumInsightsFreemiumReassurance(
         result.meta,
         hasPremiumInsightsAddon.value,
@@ -450,7 +444,6 @@ async function onConfirmOrgDisambiguation(
     insightsModalLoading.value = false
     const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
     const friendly = mapPremiumInsightsClientError(raw)
-    insightsError.value = friendly
     insightsModalError.value = friendly
   } finally {
     insightsModalOrgChoiceSubmitting.value = false
@@ -729,9 +722,6 @@ async function executeTailoringCheckout() {
                 {{ tailoringError }}
               </p>
             </div>
-            <p v-if="showPremiumInsightsRow && insightsError" class="mt-2 text-xs text-red-600">
-              {{ insightsError }}
-            </p>
           </div>
         </article>
 

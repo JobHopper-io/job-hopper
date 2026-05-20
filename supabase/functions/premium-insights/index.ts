@@ -62,7 +62,7 @@ function userMessageForPremiumInsightsFailure(code: string): string {
     case 'match_failed':
       return 'We could not confidently identify a hiring contact for this posting.'
     case 'cached_resolution_miss':
-      return 'We could not find a hiring contact for this job recently. Try again in about a week, or contact support if this keeps happening.'
+      return 'We could not find a hiring contact for this job. Feel free to try again in a few days.'
     case 'org_search_error':
     case 'people_search_error':
       return 'The hiring-contact service had a problem. Please try again in a few minutes.'
