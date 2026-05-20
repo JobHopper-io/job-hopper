@@ -453,6 +453,14 @@ async function loadMatches() {
   isLoading.value = false
 }
 
+function formatJobPostedDate(job: RankedJob): string {
+  const iso = job.postedDate ?? job.createdAt
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 function formatPhraseMatchCell(job: RankedJob): string {
   const pm = job.phraseMatch
   if (!pm) return '—'
@@ -1275,7 +1283,7 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Sponsorship</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
-                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Created</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Posted</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
                   Role / Pay / Location / Recency
                 </th>
@@ -1337,7 +1345,15 @@ onMounted(async () => {
                   <span v-else>—</span>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
-                  {{ new Date(job.createdAt).toLocaleString() }}
+                  <span :title="job.postedDate ? 'posted_date' : 'posted_date missing; showing created_at'">
+                    {{ formatJobPostedDate(job) }}
+                  </span>
+                  <div
+                    v-if="!job.postedDate"
+                    class="text-[10px] text-neutral-subtle"
+                  >
+                    (created)
+                  </div>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   <div>Role: {{ job.components?.role ?? '—' }}</div>

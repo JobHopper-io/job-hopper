@@ -41,6 +41,8 @@ export interface RankedJob {
   aiBriefing: string | null
   applyLink: string | null
   createdAt: string
+  /** When set, used for recency scoring and display; otherwise {@link createdAt} is shown. */
+  postedDate?: string | null
   score: number
   components?: {
     role: number
