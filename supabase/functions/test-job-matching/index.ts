@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { fetchJobRecordsForMatching } from '../_shared/fetch-jobs-for-matching.ts'
 import {
-  type JobRecord,
   type MatchConfig,
   type SubscriberPreferences,
   matchJobsWithDebug,
@@ -349,85 +349,15 @@ serve(async (req) => {
       })
     }
 
-    const allJobs: any[] = []
-    const pageSize = 1000
-    let offset = 0
-
-    // Fetch ALL jobs from job_hopper_live in pages (optionally capped by ?limit=).
-    while (true) {
-      const remaining = maxJobs != null ? maxJobs - allJobs.length : null
-      if (remaining !== null && remaining <= 0) {
-        break
-      }
-
-      const effectivePageSize =
-        remaining !== null && remaining < pageSize ? remaining : pageSize
-
-      const { data: page, error: jobsError } = await supabaseAdminClient
-        .from('job_hopper_live')
-        .select(
-          `
-          id,
-          job_title,
-          company_name,
-          role_category,
-          location,
-          is_remote,
-          description,
-          ai_job_briefing,
-          apply_link,
-          pay_min,
-          pay_max,
-          pay_type,
-          created_at,
-          posted_date,
-          subscription_tier,
-          employee_count,
-          sponsorship_likelihood
-        `,
-        )
-        .order('created_at', { ascending: false })
-        .range(offset, offset + effectivePageSize - 1)
-
-      if (jobsError) {
-        throw new Error(jobsError.message)
-      }
-
-      if (!page || page.length === 0) {
-        break
-      }
-
-      allJobs.push(...page)
-
-      if (page.length < effectivePageSize) {
-        break
-      }
-
-      offset += effectivePageSize
-    }
-
-    const jobRecords: JobRecord[] = allJobs.map((row: any) => ({
-      id: row.id,
-      title: row.job_title ?? null,
-      companyName: row.company_name ?? null,
-      roleCategory: row.role_category ?? null,
-      location: row.location ?? null,
-      isRemote: !!row.is_remote,
-      description: row.description ?? null,
-      aiBriefing: row.ai_job_briefing ?? null,
-      applyLink: row.apply_link ?? null,
-      payMin: row.pay_min,
-      payMax: row.pay_max,
-      payType: row.pay_type,
-      createdAt: row.created_at,
-      postedDate: row.posted_date,
-      subscriptionTier: row.subscription_tier ?? null,
-      employeeCount: row.employee_count ?? null,
-      sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
-    }))
-
     const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
     const combinedOverride = mergeConfigOverrides(dbOverride, body.matchConfigOverride ?? null)
+
+    const jobRecords = await fetchJobRecordsForMatching(
+      supabaseAdminClient,
+      preferences,
+      combinedOverride,
+      { maxJobs },
+    )
 
     const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride)
 

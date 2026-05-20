@@ -428,8 +428,7 @@ onMounted(async () => {
           Admin · Job Matching Algorithm
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
-          Run the same scoring pipeline as production: subscription tier, target role categories,
-          then role keywords from <span class="font-medium text-brand-charcoal">target job title</span> when set (else current job title) plus industry; remote roles are dropped when the subscriber is not open to remote; pay, location (distance bands with categorical fallback), and recency contribute to the total; jobs below the minimum score or with no keyword overlap are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
+          Run the same scoring pipeline as production: the job catalog is pre-filtered in SQL by subscription tier, target role categories, maxAgeDays recency, and remote opt-out when applicable; then role keywords from <span class="font-medium text-brand-charcoal">target job title</span> when set (else current job title) plus industry; pay, location (distance bands with categorical fallback), and recency decay contribute to the total; jobs below the minimum score or with no keyword overlap are excluded. Sponsorship shown on each row is informational (effective stored vs inferred), not a filter.
         </p>
       </header>
 
@@ -734,9 +733,9 @@ onMounted(async () => {
                       v-model.number="configForm.recencyWeights!.maxAgeDays"
                       type="number"
                       class="input w-20 text-sm"
-                      title="Jobs older than this many days are excluded (recency score becomes -Infinity)"
+                      title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)"
                     >
-                    <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded (recency score becomes -Infinity)">maxAgeDays</span>
+                    <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)">maxAgeDays</span>
                   </div>
                 </div>
               </div>

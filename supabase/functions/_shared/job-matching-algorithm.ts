@@ -688,7 +688,32 @@ function computeLocationScore(
   return { score, distanceMiles: minDistance, withinRadius, parsed: jobNorm.parsed }
 }
 
+/** ISO timestamp for jobs at or after the recency window (matches {@link jobExceedsMaxAge} / SQL prefilter). */
+export function getRecencyCutoffIso(maxAgeDays: number, nowMs: number = Date.now()): string {
+  const cutoffMs = nowMs - maxAgeDays * 24 * 60 * 60 * 1000
+  return new Date(cutoffMs).toISOString()
+}
+
+/**
+ * Hard recency filter: uses {@link JobRecord.postedDate} when set, otherwise {@link JobRecord.createdAt}.
+ * Missing or unparseable dates are not treated as too old (same as legacy scoring behavior).
+ */
+export function jobExceedsMaxAge(job: JobRecord, cfg: MatchConfig, nowMs: number = Date.now()): boolean {
+  const ts = job.postedDate ?? job.createdAt
+  if (!ts) return false
+
+  const dateMs = Date.parse(ts)
+  if (Number.isNaN(dateMs)) return false
+
+  const days = (nowMs - dateMs) / (1000 * 60 * 60 * 24)
+  return days > cfg.recencyWeights.maxAgeDays
+}
+
 function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
+  if (jobExceedsMaxAge(job, cfg, nowMs)) {
+    return -Infinity
+  }
+
   const ts = job.postedDate ?? job.createdAt
   if (!ts) return 0
 
@@ -696,10 +721,6 @@ function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): n
   if (Number.isNaN(dateMs)) return 0
 
   const days = (nowMs - dateMs) / (1000 * 60 * 60 * 24)
-  if (days > cfg.recencyWeights.maxAgeDays) {
-    return -Infinity
-  }
-
   const score = cfg.recencyWeights.baseRecency - days * cfg.recencyWeights.perDayDecay
   return score > 0 ? score : 0
 }
@@ -723,8 +744,7 @@ export function matchJobs(
       continue
     }
 
-    const roleScore = computeRoleScore(prefs, job, cfg)
-    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
+    if (jobExceedsMaxAge(job, cfg, nowMs)) {
       continue
     }
 
@@ -732,13 +752,14 @@ export function matchJobs(
       continue
     }
 
+    const roleScore = computeRoleScore(prefs, job, cfg)
+    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
+      continue
+    }
+
     const payScore = computePayScore(prefs, job, cfg)
     const { score: locationScore } = computeLocationScore(prefs, job, cfg)
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
-
-    if (recencyScore === -Infinity) {
-      continue
-    }
 
     const totalScore = roleScore + payScore + locationScore + recencyScore
     if (totalScore < cfg.thresholds.minTotalScore) {
@@ -858,16 +879,20 @@ export function matchJobsWithDebug(
       continue
     }
 
+    if (jobExceedsMaxAge(job, cfg, nowMs)) {
+      excludedByRecency += 1
+      continue
+    }
+
+    if (job.isRemote && prefs.openToRemote === false) {
+      excludedByRemoteOptOut += 1
+      continue
+    }
+
     const { score: roleScore, matchedRoleKeywords } = computeRoleScoreWithKeywords(prefs, job, cfg)
 
     if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
       excludedByNoKeywordMatch += 1
-      continue
-    }
-
-    const isRemote = job.isRemote
-    if (isRemote && prefs.openToRemote === false) {
-      excludedByRemoteOptOut += 1
       continue
     }
 
@@ -883,11 +908,6 @@ export function matchJobsWithDebug(
       cfg,
     )
     const recencyScore = computeRecencyScore(job, cfg, nowMs)
-
-    if (recencyScore === -Infinity) {
-      excludedByRecency += 1
-      continue
-    }
 
     const totalScore = roleScore + payScore + locationScore + recencyScore
     if (totalScore < cfg.thresholds.minTotalScore) {

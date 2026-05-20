@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { fetchJobRecordsForMatching } from '../_shared/fetch-jobs-for-matching.ts'
 import {
-  type JobRecord,
   type MatchConfig,
   type RankedJob,
   type SubscriberPreferences,
@@ -262,26 +262,6 @@ serve(async (req) => {
       locationRadiusMiles: profile.location_radius_miles ?? null,
     }
 
-    type JobRow = {
-      id: string
-      job_title: string | null
-      company_name: string | null
-      role_category: string | null
-      location: string | null
-      is_remote: boolean | null
-      description: string | null
-      ai_job_briefing: string | null
-      apply_link: string | null
-      pay_min: number | null
-      pay_max: number | null
-      pay_type: string | null
-      created_at: string
-      posted_date: string | null
-      subscription_tier: string
-      employee_count: number | null
-      sponsorship_likelihood: 'Low' | 'Medium' | 'High' | 'N/A' | null
-    }
-
     const { data: activeConfig, error: configError } = await supabaseAdminClient
       .from('matching_algorithm_config')
       .select('*')
@@ -294,38 +274,17 @@ serve(async (req) => {
       })
     }
 
-    // Fetch all jobs from job_hopper_live in a single query.
-    const { data, error: jobsError } = await supabase
-      .from('job_hopper_live')
-      .select(
-        `
-        id,
-        job_title,
-        company_name,
-        role_category,
-        location,
-        is_remote,
-        description,
-        ai_job_briefing,
-        apply_link,
-        pay_min,
-        pay_max,
-        pay_type,
-        created_at,
-        posted_date,
-        subscription_tier,
-        employee_count,
-        sponsorship_likelihood
-      `,
-      )
-      .order('created_at', { ascending: false })
+    const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
+    const matchConfigOverride = dbOverride ? mergeConfigOverrides(dbOverride, null) : undefined
 
-    if (jobsError) {
-      console.error('match-jobs: failed to load jobs from job_hopper_live', {
-        error: jobsError,
-      })
+    let jobRecords
+    try {
+      jobRecords = await fetchJobRecordsForMatching(supabase, preferences, matchConfigOverride)
+    } catch (jobsError) {
+      const message = jobsError instanceof Error ? jobsError.message : String(jobsError)
+      console.error('match-jobs: failed to load jobs from job_hopper_live', { error: message })
       return new Response(
-        JSON.stringify({ error: 'Failed to load jobs', details: jobsError.message }),
+        JSON.stringify({ error: 'Failed to load jobs', details: message }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -333,30 +292,7 @@ serve(async (req) => {
       )
     }
 
-    const allJobs = (data ?? []) as JobRow[]
-
-    const jobRecords: JobRecord[] = allJobs.map((row) => ({
-      id: row.id,
-      title: row.job_title ?? null,
-      companyName: row.company_name ?? null,
-      roleCategory: row.role_category ?? null,
-      location: row.location ?? null,
-      isRemote: !!row.is_remote,
-      description: row.description ?? null,
-      aiBriefing: row.ai_job_briefing ?? null,
-      applyLink: row.apply_link ?? null,
-      payMin: row.pay_min,
-      payMax: row.pay_max,
-      payType: row.pay_type,
-      createdAt: row.created_at,
-      postedDate: row.posted_date,
-      subscriptionTier: row.subscription_tier ?? null,
-      employeeCount: row.employee_count ?? null,
-      sponsorshipLikelihood: row.sponsorship_likelihood ?? 'N/A',
-    }))
-
-    const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
-    const ranked = matchJobs(preferences, jobRecords, dbOverride ? mergeConfigOverrides(dbOverride, null) : undefined)
+    const ranked = matchJobs(preferences, jobRecords, matchConfigOverride)
 
     // Load existing matches for this profile so we never duplicate a job match.
     const { data: existingMatches, error: existingError } = await supabase
