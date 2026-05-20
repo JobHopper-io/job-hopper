@@ -162,8 +162,7 @@ onUnmounted(() => {
           <template v-else>
             <template v-if="showOrgChoice">
               <p class="text-sm text-neutral-body">
-                Several Apollo organizations scored close enough to the best match that we need your help.
-                Choose the one that best represents this posting’s employer, or choose none to stop without a contact.
+                Choose the one that best represents this posting’s employer, or choose none if there are no good matches.
               </p>
               <fieldset class="space-y-3">
                 <legend class="sr-only">Employer match</legend>
