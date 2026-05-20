@@ -39,7 +39,13 @@ function parseStoredOrgDisambiguation(raw: unknown): StoredOrgDisambiguation[] |
     const o = item as Record<string, unknown>
     const id = typeof o.apollo_organization_id === 'string' ? o.apollo_organization_id.trim() : ''
     const name = typeof o.name === 'string' ? o.name.trim() : ''
-    const score = typeof o.score === 'number' ? o.score : NaN
+    const scoreRaw = o.score
+    const score =
+      typeof scoreRaw === 'number'
+        ? scoreRaw
+        : typeof scoreRaw === 'string'
+          ? Number(scoreRaw)
+          : NaN
     if (!id || !name || Number.isNaN(score)) return null
     out.push({
       apollo_organization_id: id,
@@ -49,6 +55,36 @@ function parseStoredOrgDisambiguation(raw: unknown): StoredOrgDisambiguation[] |
     })
   }
   return out
+}
+
+/** Match a user-selected org id against stored JSON even when strict parse fails (e.g. numeric score as string). */
+function findOrgChoiceInRaw(
+  raw: unknown,
+  selectedId: string,
+): StoredOrgDisambiguation | null {
+  if (!Array.isArray(raw)) return null
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const id = typeof o.apollo_organization_id === 'string' ? o.apollo_organization_id.trim() : ''
+    if (id !== selectedId) continue
+    const name = typeof o.name === 'string' ? o.name.trim() : ''
+    const scoreRaw = o.score
+    const score =
+      typeof scoreRaw === 'number'
+        ? scoreRaw
+        : typeof scoreRaw === 'string'
+          ? Number(scoreRaw)
+          : NaN
+    if (!name || Number.isNaN(score)) return null
+    return {
+      apollo_organization_id: id,
+      name,
+      primary_domain: typeof o.primary_domain === 'string' ? o.primary_domain : null,
+      score,
+    }
+  }
+  return null
 }
 
 function userMessageForPremiumInsightsFailure(code: string): string {
@@ -480,7 +516,11 @@ serve(async (req) => {
     resolvedOrgName: string
   } | null = null
 
-  if (pendingOrgDisambiguation && (declineOrgDisambiguation || selectedApolloOrganizationId)) {
+  const pendingInsightsRow = existingRow?.status === 'pending'
+  const userSubmittedOrgResolution =
+    pendingInsightsRow && (declineOrgDisambiguation || Boolean(selectedApolloOrganizationId))
+
+  if (userSubmittedOrgResolution) {
     if (declineOrgDisambiguation && selectedApolloOrganizationId) {
       return new Response(
         JSON.stringify({
@@ -496,9 +536,11 @@ serve(async (req) => {
       await refundApolloCredits(admin, PROCESS, 1)
       return await respondFailure('user_declined_org_choice', 422)
     }
-    const found = orgDisambiguationStored!.find(
-      (o) => o.apollo_organization_id === selectedApolloOrganizationId,
-    )
+    const found =
+      orgDisambiguationStored?.find(
+        (o) => o.apollo_organization_id === selectedApolloOrganizationId,
+      ) ??
+      findOrgChoiceInRaw(existingRow?.org_disambiguation_options, selectedApolloOrganizationId)
     if (!found) {
       return new Response(JSON.stringify({ error: 'Invalid organization selection' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -553,7 +595,7 @@ serve(async (req) => {
     resolvedOrgName = prefilledOrg.resolvedOrgName
   }
 
-  const needOrgSearch = !organizationId
+  const needOrgSearch = !organizationId && !prefilledOrg
 
   console.log(
     JSON.stringify({

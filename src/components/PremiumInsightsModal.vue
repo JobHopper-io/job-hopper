@@ -51,7 +51,11 @@ const hasContacts = computed(() => {
 })
 
 const showOrgChoice = computed(
-  () => Array.isArray(props.orgChoiceOptions) && props.orgChoiceOptions.length > 0,
+  () =>
+    !props.loading &&
+    !props.errorMessage &&
+    Array.isArray(props.orgChoiceOptions) &&
+    props.orgChoiceOptions.length > 0,
 )
 
 const companySummaryText = computed(() => {

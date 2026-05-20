@@ -23,7 +23,13 @@ function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[
     const apollo_organization_id =
       typeof o.apollo_organization_id === 'string' ? o.apollo_organization_id.trim() : ''
     const name = typeof o.name === 'string' ? o.name.trim() : ''
-    const score = typeof o.score === 'number' ? o.score : NaN
+    const scoreRaw = o.score
+    const score =
+      typeof scoreRaw === 'number'
+        ? scoreRaw
+        : typeof scoreRaw === 'string'
+          ? Number(scoreRaw)
+          : NaN
     if (!apollo_organization_id || !name || Number.isNaN(score)) return null
     out.push({
       apollo_organization_id,

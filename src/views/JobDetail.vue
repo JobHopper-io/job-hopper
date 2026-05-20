@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { jobsAPI } from '@/lib/jobs'
@@ -40,22 +40,18 @@ const insightsModalOverrideContacts = ref<MatchedJob['contacts'] | null>(null)
 const insightsModalOverrideCompany = ref<Record<string, unknown> | null>(null)
 const insightsModalError = ref<string | null>(null)
 const insightsModalFreemiumNote = ref<string | null>(null)
-/** `null` = follow `job.premiumInsightsOrgChoices`; `[]` = session-cleared after resolution (avoid stale props). */
 const insightsModalOrgChoicesOverride = ref<PremiumInsightsOrgChoice[] | null>(null)
 const insightsModalOrgChoiceSubmitting = ref(false)
+/** After Continue, ignore stale org options on the job until a new insights run. */
+const insightsOrgChoiceDismissed = ref(false)
 
 const insightsOrgChoicesForModal = computed(() => {
+  if (insightsOrgChoiceDismissed.value) return null
   const o = insightsModalOrgChoicesOverride.value
-  if (o !== null) return o
-  return job.value?.premiumInsightsOrgChoices ?? null
+  if (o !== null) return o.length > 0 ? o : null
+  const fromJob = job.value?.premiumInsightsOrgChoices
+  return fromJob?.length ? fromJob : null
 })
-
-watch(
-  () => job.value?.premiumInsightsOrgChoices?.length ?? 0,
-  (len) => {
-    if (len === 0) insightsModalOrgChoicesOverride.value = null
-  },
-)
 
 const showPremiumInsightsOrgChoiceHint = computed(
   () =>
@@ -303,6 +299,7 @@ async function onCloseInsightsModal() {
   insightsModalFreemiumNote.value = null
   insightsModalOrgChoicesOverride.value = null
   insightsModalOrgChoiceSubmitting.value = false
+  insightsOrgChoiceDismissed.value = false
   await reloadJobFromRoute()
 }
 
@@ -320,6 +317,7 @@ function openOrgChoiceModal() {
   insightsModalError.value = null
   insightsModalFreemiumNote.value = null
   insightsModalLoading.value = false
+  insightsOrgChoiceDismissed.value = false
   insightsModalOpen.value = true
 }
 
@@ -377,6 +375,7 @@ async function runPremiumInsights() {
   insightsModalOverrideContacts.value = null
   insightsModalOverrideCompany.value = null
   insightsModalOrgChoicesOverride.value = null
+  insightsOrgChoiceDismissed.value = false
   insightsModalOpen.value = true
   insightsModalLoading.value = true
   try {
@@ -419,6 +418,7 @@ async function onConfirmOrgDisambiguation(
   payload: { decline: true } | { selectedApolloOrganizationId: string },
 ) {
   if (!job.value) return
+  insightsOrgChoiceDismissed.value = true
   insightsModalOrgChoiceSubmitting.value = true
   insightsModalLoading.value = true
   insightsModalError.value = null
@@ -427,6 +427,7 @@ async function onConfirmOrgDisambiguation(
     const result = await premiumInsightsAPI.resolveOrgDisambiguation(job.value.matchId, payload)
     insightsModalLoading.value = false
     if (result.needsOrgChoice) {
+      insightsOrgChoiceDismissed.value = false
       insightsModalOrgChoicesOverride.value = result.needsOrgChoice.organizations
       void userStore.refreshFreemium()
       return
@@ -441,7 +442,7 @@ async function onConfirmOrgDisambiguation(
       void userStore.refreshFreemium()
       return
     }
-    insightsModalOrgChoicesOverride.value = []
+    insightsModalOrgChoicesOverride.value = null
     insightsModalError.value = null
     insightsModalFreemiumNote.value = null
     if (result.data?.contacts?.length) {
