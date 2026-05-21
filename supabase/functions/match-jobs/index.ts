@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import type { Database } from '../_shared/database.ts'
 import { fetchJobRecordsForMatching } from '../_shared/fetch-jobs-for-matching.ts'
+import { fetchMatchSynonymsForMatching } from '../_shared/fetch-match-synonyms.ts'
+import { subscriberPreferencesFromProfile } from '../_shared/subscriber-preferences-from-profile.ts'
+import type { MatchSynonymEntry } from '../_shared/match-synonym-row.ts'
 import {
-  type MatchConfig,
   type RankedJob,
   type SubscriberPreferences,
   matchJobs,
@@ -16,6 +19,7 @@ import {
 } from '../_shared/email-templates.ts'
 import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
 import { configRowToOverride } from '../_shared/matching-algorithm-config-row.ts'
+import { mergeConfigOverrides } from '../_shared/merge-match-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,52 +31,6 @@ interface MatchJobsPayload {
   limit?: number
   /** When non-empty, used instead of subscription-derived tier keys (e.g. freemium manual search). */
   subscription_tier_product_keys?: string[]
-}
-
-function mergeConfigOverrides(
-  base: Partial<MatchConfig> | null | undefined,
-  override: Partial<MatchConfig> | null | undefined,
-): Partial<MatchConfig> | undefined {
-  if (!base && !override) return undefined
-  if (!base && override) return override
-  if (base && !override) return base
-
-  const b = base as Partial<MatchConfig>
-  const o = override as Partial<MatchConfig>
-
-  return {
-    ...b,
-    ...o,
-    phraseWeights: {
-      primary: { ...(b.phraseWeights?.primary ?? {}), ...(o.phraseWeights?.primary ?? {}) },
-      secondary: { ...(b.phraseWeights?.secondary ?? {}), ...(o.phraseWeights?.secondary ?? {}) },
-      industry: { ...(b.phraseWeights?.industry ?? {}), ...(o.phraseWeights?.industry ?? {}) },
-    },
-    phraseMatching: {
-      ...(b.phraseMatching ?? {}),
-      ...(o.phraseMatching ?? {}),
-    },
-    payWeights: {
-      ...(b.payWeights ?? {}),
-      ...(o.payWeights ?? {}),
-    },
-    locationWeights: {
-      ...(b.locationWeights ?? {}),
-      ...(o.locationWeights ?? {}),
-    },
-    recencyWeights: {
-      ...(b.recencyWeights ?? {}),
-      ...(o.recencyWeights ?? {}),
-    },
-    thresholds: {
-      ...(b.thresholds ?? {}),
-      ...(o.thresholds ?? {}),
-    },
-    debug: {
-      ...(b.debug ?? {}),
-      ...(o.debug ?? {}),
-    },
-  }
 }
 
 serve(async (req) => {
@@ -141,7 +99,7 @@ serve(async (req) => {
       auth: { persistSession: false },
     })
 
-    const supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey, {
+    const supabaseAdminClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     })
 
@@ -205,19 +163,10 @@ serve(async (req) => {
       )
     }
 
-    const preferences: SubscriberPreferences = {
+    const preferences: SubscriberPreferences = subscriberPreferencesFromProfile(
+      profile,
       subscriptionTierProductKeys,
-      roles: (profile.target_role_categories ?? []) as string[],
-      targetJobTitle: profile.target_job_title,
-      currentJobTitle: profile.current_job_title,
-      currentIndustry: profile.current_industry,
-      payRangeMin: profile.desired_salary_min,
-      payRangeMax: profile.desired_salary_max,
-      preferredLocations: (profile.preferred_locations ?? []) as string[],
-      openToRelocation: profile.open_to_relocation,
-      openToRemote: profile.open_to_remote,
-      locationRadiusMiles: profile.location_radius_miles ?? null,
-    }
+    )
 
     const { data: activeConfig, error: configError } = await supabaseAdminClient
       .from('matching_algorithm_config')
@@ -235,6 +184,15 @@ serve(async (req) => {
     const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
     const matchConfigOverride = dbOverride ? mergeConfigOverrides(dbOverride, null) : undefined
 
+    let matchSynonyms: MatchSynonymEntry[] = []
+    try {
+      matchSynonyms = await fetchMatchSynonymsForMatching(supabaseAdminClient)
+    } catch (synonymError) {
+      console.error('match-jobs: failed to load match_synonyms', {
+        error: synonymError instanceof Error ? synonymError.message : String(synonymError),
+      })
+    }
+
     let jobRecords
     try {
       jobRecords = await fetchJobRecordsForMatching(supabase, preferences, matchConfigOverride)
@@ -250,7 +208,9 @@ serve(async (req) => {
       )
     }
 
-    const ranked = matchJobs(preferences, jobRecords, matchConfigOverride)
+    const ranked = matchJobs(preferences, jobRecords, matchConfigOverride, {
+      synonyms: matchSynonyms,
+    })
 
     // Load existing matches for this profile so we never duplicate a job match.
     const { data: existingMatches, error: existingError } = await supabase

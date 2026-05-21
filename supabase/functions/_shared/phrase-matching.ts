@@ -1,7 +1,11 @@
 /**
- * Phrase-based matching for job title / industry: primary and secondary n-grams,
- * word-boundary search, per-surface weights (title, description, briefing).
+ * Phrase-based matching for job title / industry: comma-segment phrases,
+ * word-boundary search, subscriber-relative relevance, optional synonym expansion.
  */
+
+import type { MatchSynonymEntry } from './match-synonym-row.ts'
+
+export type { MatchSynonymEntry }
 
 export interface PhraseMatchSubscriberInput {
   targetJobTitle: string | null
@@ -15,19 +19,9 @@ export interface PhraseMatchJobSurfaces {
   aiBriefing: string | null
 }
 
-export interface MatchConfigPhraseSurfaceWeights {
-  title: number
-  description: number
-  briefing: number
-}
-
-export interface MatchConfigPhraseWeights {
-  primary: MatchConfigPhraseSurfaceWeights
-  secondary: MatchConfigPhraseSurfaceWeights
-  industry: MatchConfigPhraseSurfaceWeights
-}
-
-export interface MatchConfigPhraseMatching {
+export interface MatchConfigPhrase {
+  tierFactors: { primary: number; industry: number; secondary: number }
+  surfaceWeights: { title: number; description: number; briefing: number }
   minPrimaryWords: number
 }
 
@@ -64,9 +58,6 @@ export const STOP_WORDS = new Set<string>([
 
 const END_ANCHOR_WORDS = new Set<string>(['&', 'and'])
 
-/** When true, multiply surface score by matched phrase word count. */
-export const PER_WORD_MULTIPLIER = true
-
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase()
 }
@@ -75,7 +66,7 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** True if `phrase` appears in `haystack` as whole words (case-sensitive on normalized strings). */
+/** True if `phrase` appears in `haystack` as whole words (case-insensitive on normalized strings). */
 export function phraseMatchesAtWordBoundaries(haystack: string, phrase: string): boolean {
   const p = phrase.trim().toLowerCase()
   if (!p || !haystack) return false
@@ -83,7 +74,7 @@ export function phraseMatchesAtWordBoundaries(haystack: string, phrase: string):
   return re.test(haystack)
 }
 
-function isDroppedNgram(words: string[]): boolean {
+function isDroppedSegment(words: string[]): boolean {
   if (words.length === 0) return true
   const first = words[0]
   const last = words[words.length - 1]
@@ -92,31 +83,33 @@ function isDroppedNgram(words: string[]): boolean {
   return false
 }
 
-/** All contiguous n-grams for one comma segment (deduped). */
-function ngramsForSegment(segment: string): string[] {
+/**
+ * Phrases from one comma segment: the full segment only (no sub-span n-grams).
+ * Single-word stop-word segments are dropped unless this is the user's only segment in the field.
+ */
+function phrasesForSegment(segment: string, soleUserSegmentInField: boolean): string[] {
   const seg = segment.trim().toLowerCase()
   if (!seg) return []
   const words = seg.split(/\s+/).map((w) => w.trim()).filter((w) => w.length > 0)
   if (!words.length) return []
-
-  const set = new Set<string>()
-  const n = words.length
-  for (let len = n; len >= 1; len -= 1) {
-    for (let start = 0; start + len <= n; start += 1) {
-      const slice = words.slice(start, start + len)
-      if (isDroppedNgram(slice)) continue
-      set.add(slice.join(' '))
+  if (isDroppedSegment(words)) {
+    if (soleUserSegmentInField) {
+      return [words.join(' ')]
     }
+    return []
   }
-  return Array.from(set)
+  return [words.join(' ')]
 }
 
-function collectNgramsFromCommaField(input: string | null | undefined): string[] {
+/** Distinct phrases from a comma-separated field (full segments + true unigrams only). */
+export function phrasesFromCommaField(input: string | null | undefined): string[] {
   if (!input) return []
+  const rawParts = input.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+  const soleUserSegmentInField = rawParts.length === 1
   const all = new Set<string>()
-  for (const raw of input.split(',')) {
-    for (const g of ngramsForSegment(raw)) {
-      all.add(g)
+  for (const raw of rawParts) {
+    for (const p of phrasesForSegment(raw, soleUserSegmentInField)) {
+      all.add(p)
     }
   }
   return Array.from(all)
@@ -131,21 +124,33 @@ export function effectiveJobTitleForKeywords(prefs: PhraseMatchSubscriberInput):
 }
 
 export interface PhraseProfile {
-  /** Phrases that can satisfy the primary gate (length rules + non-stop singles). */
   primaryPhrases: string[]
-  /** Shorter n-grams only: 2 <= len < minPrimaryWords (empty when minPrimaryWords <= 2). */
   secondaryPhrases: string[]
 }
 
-export function buildPhraseProfile(titleText: string | null, minPrimaryWords: number): PhraseProfile {
-  const titleNgrams = collectNgramsFromCommaField(titleText)
+function longestPhraseWordCount(phrases: string[]): number {
+  let max = 0
+  for (const phrase of phrases) {
+    const wc = phrase.split(/\s+/).filter(Boolean).length
+    if (wc > max) max = wc
+  }
+  return max
+}
 
+function bucketPhrasesByMinPrimaryWords(
+  phrases: string[],
+  minPrimaryWords: number,
+): PhraseProfile {
   const primarySet = new Set<string>()
   const secondarySet = new Set<string>()
-
   const minP = Math.max(1, Math.floor(minPrimaryWords))
+  const soleUserIntentInField = phrases.length === 1
 
-  for (const phrase of titleNgrams) {
+  for (const phrase of phrases) {
+    if (soleUserIntentInField) {
+      primarySet.add(phrase)
+      continue
+    }
     const wc = phrase.split(/\s+/).length
     if (wc >= minP) {
       primarySet.add(phrase)
@@ -162,22 +167,54 @@ export function buildPhraseProfile(titleText: string | null, minPrimaryWords: nu
   }
 }
 
-/** Industry tier uses the same phrase lists split by length vs minPrimaryWords (rebuilt in evaluate). */
+export function buildPhraseProfile(titleText: string | null, minPrimaryWords: number): PhraseProfile {
+  return bucketPhrasesByMinPrimaryWords(phrasesFromCommaField(titleText), minPrimaryWords)
+}
+
 function industryTierPhrases(industryText: string | null, minPrimaryWords: number): {
   primary: string[]
   secondary: string[]
 } {
-  const ngrams = collectNgramsFromCommaField(industryText)
-  const primary = new Set<string>()
-  const secondary = new Set<string>()
-  const minP = Math.max(1, Math.floor(minPrimaryWords))
-  for (const phrase of ngrams) {
-    const wc = phrase.split(/\s+/).length
-    if (wc >= minP) primary.add(phrase)
-    else if (wc >= 2 && wc < minP) secondary.add(phrase)
-    else if (wc === 1 && !STOP_WORDS.has(phrase)) primary.add(phrase)
+  const bucket = bucketPhrasesByMinPrimaryWords(phrasesFromCommaField(industryText), minPrimaryWords)
+  return { primary: bucket.primaryPhrases, secondary: bucket.secondaryPhrases }
+}
+
+/** Expand phrase lists with canonical forms and aliases for matching (not for gate length rules). */
+export function expandPhrasesForMatching(
+  phrases: string[],
+  synonyms: MatchSynonymEntry[],
+): string[] {
+  if (phrases.length === 0) return []
+  const out = new Set(phrases.map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0))
+  if (synonyms.length === 0) return Array.from(out)
+
+  const aliasToCanonical = new Map<string, string>()
+  const canonicalToAliases = new Map<string, string[]>()
+
+  for (const row of synonyms) {
+    const c = row.canonical.trim().toLowerCase()
+    if (!c) continue
+    aliasToCanonical.set(c, c)
+    const als = row.aliases
+      .map((a) => a.trim().toLowerCase())
+      .filter((a) => a.length > 0)
+    canonicalToAliases.set(c, als)
+    for (const a of als) {
+      aliasToCanonical.set(a, c)
+    }
   }
-  return { primary: Array.from(primary), secondary: Array.from(secondary) }
+
+  for (const phrase of [...out]) {
+    const canonical = aliasToCanonical.get(phrase) ??
+      (canonicalToAliases.has(phrase) ? phrase : null)
+    if (!canonical) continue
+    out.add(canonical)
+    for (const a of canonicalToAliases.get(canonical) ?? []) {
+      out.add(a)
+    }
+  }
+
+  return Array.from(out)
 }
 
 export type PhraseTier = 'primary' | 'secondary' | 'industry'
@@ -223,32 +260,91 @@ function bestMatchOnSurface(phrases: string[], haystack: string): string | null 
   return best
 }
 
-function scoreForMatch(
+/** Relevance factor from matched length vs subscriber's longest primary phrase (not a fixed constant). */
+function specificityScore(matchedWordCount: number, longestSubscriberPrimaryWords: number): number {
+  const target = Math.max(1, longestSubscriberPrimaryWords)
+  return Math.min(1, matchedWordCount / target)
+}
+
+function tierMatchRelevance(
   phrase: string | null,
-  weight: number,
+  tierFactor: number,
+  longestSubscriberPrimaryWords: number,
 ): number {
-  if (phrase == null || weight === 0) return 0
+  if (phrase == null || tierFactor <= 0) return 0
   const words = phrase.split(/\s+/).length
-  return PER_WORD_MULTIPLIER ? weight * words : weight
+  return Math.min(1, tierFactor * specificityScore(words, longestSubscriberPrimaryWords))
+}
+
+function surfaceAggregateRelevance(
+  haystack: string,
+  listPrimary: string[],
+  listSecondary: string[],
+  tierFactorPrimary: number,
+  tierFactorSecondary: number,
+  longestPrimaryWords: number,
+  longestSecondaryWords: number,
+): { relevance: number; matchedPhrase: string | null; tier: PhraseTier | null } {
+  let bestPrimary: string | null = null
+  if (listPrimary.length) {
+    bestPrimary = bestMatchOnSurface(listPrimary, haystack)
+  }
+  let bestSecondary: string | null = null
+  if (!bestPrimary && listSecondary.length) {
+    bestSecondary = bestMatchOnSurface(listSecondary, haystack)
+  }
+
+  const primaryRel = tierMatchRelevance(bestPrimary, tierFactorPrimary, longestPrimaryWords)
+  const secondaryRel = tierMatchRelevance(
+    bestSecondary,
+    tierFactorSecondary,
+    Math.max(1, longestSecondaryWords),
+  )
+  const relevance = Math.max(primaryRel, secondaryRel)
+
+  if (relevance <= 0) return { relevance: 0, matchedPhrase: null, tier: null }
+  if (primaryRel >= secondaryRel && bestPrimary) {
+    return { relevance, matchedPhrase: bestPrimary, tier: 'primary' }
+  }
+  if (bestSecondary) {
+    return { relevance, matchedPhrase: bestSecondary, tier: 'secondary' }
+  }
+  return { relevance, matchedPhrase: bestPrimary, tier: 'primary' }
+}
+
+/** True when every title primary phrase is a single non-stop word. */
+function hasOnlySingleWordTitlePrimaries(primaryPhrases: string[]): boolean {
+  if (primaryPhrases.length === 0) return false
+  return primaryPhrases.every((p) => p.split(/\s+/).filter(Boolean).length === 1)
 }
 
 export function evaluatePhraseMatch(
   prefs: PhraseMatchSubscriberInput,
   job: PhraseMatchJobSurfaces,
-  phraseWeights: MatchConfigPhraseWeights,
-  phraseMatching: MatchConfigPhraseMatching,
+  phraseConfig: MatchConfigPhrase,
+  synonyms: MatchSynonymEntry[] = [],
 ): {
-  phraseScore: number
+  phraseRelevance: number
   phraseMatch: PhraseMatchDetails
   passesGate: boolean
   hasSearchIntent: boolean
 } {
   const titleText = effectiveJobTitleForKeywords(prefs)
   const industryText = prefs.currentIndustry
-  const minP = phraseMatching.minPrimaryWords
+  const minP = phraseConfig.minPrimaryWords
 
   const titleProfile = buildPhraseProfile(titleText, minP)
   const indTier = industryTierPhrases(industryText, minP)
+
+  const titlePrimaryMatch = expandPhrasesForMatching(titleProfile.primaryPhrases, synonyms)
+  const titleSecondaryMatch = expandPhrasesForMatching(titleProfile.secondaryPhrases, synonyms)
+  const industryPrimaryMatch = expandPhrasesForMatching(indTier.primary, synonyms)
+  const industrySecondaryMatch = expandPhrasesForMatching(indTier.secondary, synonyms)
+
+  const longestTitlePrimary = longestPhraseWordCount(titleProfile.primaryPhrases)
+  const longestTitleSecondary = longestPhraseWordCount(titleProfile.secondaryPhrases)
+  const longestIndustryPrimary = longestPhraseWordCount(indTier.primary)
+  const longestIndustrySecondary = longestPhraseWordCount(indTier.secondary)
 
   const surfaces: Record<PhraseSurface, string> = {
     title: normalizeText(job.title),
@@ -261,66 +357,98 @@ export function evaluatePhraseMatch(
 
   const hasTitleIntent =
     titleProfile.primaryPhrases.length > 0 || titleProfile.secondaryPhrases.length > 0
-  const industryAll = collectNgramsFromCommaField(industryText)
+  const industryAll = phrasesFromCommaField(industryText)
   const hasIndustryIntent = industryAll.length > 0
 
-  const tiers: { key: PhraseTier; phrases: { primary: string[]; secondary: string[] } }[] = [
-    { key: 'primary', phrases: { primary: titleProfile.primaryPhrases, secondary: [] } },
-    { key: 'secondary', phrases: { primary: [], secondary: titleProfile.secondaryPhrases } },
-    {
-      key: 'industry',
-      phrases: { primary: indTier.primary, secondary: indTier.secondary },
-    },
-  ]
+  const singleWordTitlePrimaryOnly = hasOnlySingleWordTitlePrimaries(titleProfile.primaryPhrases)
 
-  for (const tier of tiers) {
-    const listPrimary = tier.phrases.primary
-    const listSecondary = tier.phrases.secondary
-    const weights = phraseWeights[tier.key]
+  const sw = phraseConfig.surfaceWeights
+  const tf = phraseConfig.tierFactors
 
-    for (const surface of ['title', 'description', 'briefing'] as const) {
-      const hay = surfaces[surface]
-      let best: string | null = null
-      if (listPrimary.length) {
-        best = bestMatchOnSurface(listPrimary, hay)
-      }
-      if (!best && listSecondary.length) {
-        best = bestMatchOnSurface(listSecondary, hay)
-      }
-      const w = weights[surface]
-      const pts = scoreForMatch(best, w)
-      surfaceScores[tier.key][surface] = pts
-      if (best && pts !== 0) {
-        const prev = matchedBySurface[tier.key] ?? {}
-        prev[surface] = best
-        matchedBySurface[tier.key] = prev
+  let phraseRelevance = 0
+  let hasPrimaryOrIndustryMatch = false
+  let titlePrimaryMatchedOnTitleSurface = false
+
+  for (const surface of ['title', 'description', 'briefing'] as const) {
+    const hay = surfaces[surface]
+    const surfaceWeight = sw[surface]
+    if (surfaceWeight <= 0) continue
+
+    const primaryResult = surfaceAggregateRelevance(
+      hay,
+      titlePrimaryMatch,
+      [],
+      tf.primary,
+      0,
+      longestTitlePrimary,
+      longestTitleSecondary,
+    )
+    surfaceScores.primary[surface] = primaryResult.relevance
+    if (primaryResult.matchedPhrase) {
+      const prev = matchedBySurface.primary ?? {}
+      prev[surface] = primaryResult.matchedPhrase
+      matchedBySurface.primary = prev
+      if (primaryResult.relevance > 0) {
+        hasPrimaryOrIndustryMatch = true
+        if (surface === 'title') titlePrimaryMatchedOnTitleSurface = true
       }
     }
-  }
 
-  let phraseScore = 0
-  for (const tier of ['primary', 'secondary', 'industry'] as const) {
-    for (const surface of ['title', 'description', 'briefing'] as const) {
-      phraseScore += surfaceScores[tier][surface]
+    const secondaryResult = surfaceAggregateRelevance(
+      hay,
+      [],
+      titleSecondaryMatch,
+      0,
+      tf.secondary,
+      longestTitlePrimary,
+      longestTitleSecondary,
+    )
+    surfaceScores.secondary[surface] = secondaryResult.relevance
+    if (secondaryResult.matchedPhrase) {
+      const prev = matchedBySurface.secondary ?? {}
+      prev[surface] = secondaryResult.matchedPhrase
+      matchedBySurface.secondary = prev
     }
+
+    const industryResult = surfaceAggregateRelevance(
+      hay,
+      industryPrimaryMatch,
+      industrySecondaryMatch,
+      tf.industry,
+      tf.secondary,
+      longestIndustryPrimary,
+      longestIndustrySecondary,
+    )
+    surfaceScores.industry[surface] = industryResult.relevance
+    if (industryResult.matchedPhrase) {
+      const prev = matchedBySurface.industry ?? {}
+      prev[surface] = industryResult.matchedPhrase
+      matchedBySurface.industry = prev
+      if (industryResult.relevance > 0) hasPrimaryOrIndustryMatch = true
+    }
+
+    const surfaceRel = Math.max(
+      primaryResult.relevance,
+      secondaryResult.relevance,
+      industryResult.relevance,
+    )
+    phraseRelevance += surfaceWeight * surfaceRel
   }
 
-  const primaryTierScore =
-    surfaceScores.primary.title +
-    surfaceScores.primary.description +
-    surfaceScores.primary.briefing
-  const industryTierScore =
-    surfaceScores.industry.title +
-    surfaceScores.industry.description +
-    surfaceScores.industry.briefing
-
-  // Gate uses primary + industry tiers only: title-derived secondary tier never satisfies the gate alone
-  // (see plan: secondary is ranking-only). Industry matches still count when the user has title intent.
-  const gateScore = primaryTierScore + industryTierScore
+  phraseRelevance = Math.min(1, Math.max(0, phraseRelevance))
 
   let passesGate = true
   if (hasTitleIntent || hasIndustryIntent) {
-    passesGate = gateScore > 0
+    if (singleWordTitlePrimaryOnly && titleProfile.primaryPhrases.length > 0) {
+      const industryMatched = Boolean(
+        matchedBySurface.industry?.title ??
+          matchedBySurface.industry?.description ??
+          matchedBySurface.industry?.briefing,
+      )
+      passesGate = titlePrimaryMatchedOnTitleSurface || industryMatched
+    } else {
+      passesGate = hasPrimaryOrIndustryMatch
+    }
   }
 
   const phraseMatch: PhraseMatchDetails = {
@@ -333,58 +461,17 @@ export function evaluatePhraseMatch(
 
   const hasSearchIntent = hasTitleIntent || hasIndustryIntent
 
-  return { phraseScore, phraseMatch, passesGate, hasSearchIntent }
-}
-
-function maxPhraseLen(phrases: string[]): number {
-  if (!phrases.length) return 0
-  return Math.max(...phrases.map((p) => p.split(/\s+/).length))
-}
-
-/** Upper bound on phrase contribution for admin % display. */
-export function getMaxPhraseScore(
-  prefs: PhraseMatchSubscriberInput,
-  phraseWeights: MatchConfigPhraseWeights,
-  phraseMatching: MatchConfigPhraseMatching,
-): number {
-  const titleText = effectiveJobTitleForKeywords(prefs)
-  const profile = buildPhraseProfile(titleText, phraseMatching.minPrimaryWords)
-  const ind = industryTierPhrases(prefs.currentIndustry, phraseMatching.minPrimaryWords)
-
-  let sum = 0
-  const tiers: { key: PhraseTier; primary: string[]; secondary: string[] }[] = [
-    { key: 'primary', primary: profile.primaryPhrases, secondary: [] },
-    { key: 'secondary', primary: [], secondary: profile.secondaryPhrases },
-    { key: 'industry', primary: ind.primary, secondary: ind.secondary },
-  ]
-
-  for (const t of tiers) {
-    const maxLenP = maxPhraseLen(t.primary)
-    const maxLenS = maxPhraseLen(t.secondary)
-    const w = phraseWeights[t.key]
-    for (const surface of ['title', 'description', 'briefing'] as const) {
-      const weight = w[surface]
-      if (weight === 0) continue
-      const primaryPts =
-        maxLenP > 0 ? (PER_WORD_MULTIPLIER ? weight * maxLenP : weight) : 0
-      const secondaryPts =
-        maxLenS > 0 ? (PER_WORD_MULTIPLIER ? weight * maxLenS : weight) : 0
-      // Mirrors evaluatePhraseMatch: at most one phrase (primary else secondary) per surface.
-      sum += Math.max(primaryPts, secondaryPts)
-    }
-  }
-
-  return sum
+  return { phraseRelevance, phraseMatch, passesGate, hasSearchIntent }
 }
 
 /** All distinct phrases for debug histograms (primary + secondary title + industry tiers). */
 export function getAllProfilePhrasesForDebug(
   prefs: PhraseMatchSubscriberInput,
-  phraseMatching: MatchConfigPhraseMatching,
+  minPrimaryWords: number,
 ): { phrase: string; kind: 'primary' | 'secondary' | 'industry' }[] {
   const titleText = effectiveJobTitleForKeywords(prefs)
-  const profile = buildPhraseProfile(titleText, phraseMatching.minPrimaryWords)
-  const ind = industryTierPhrases(prefs.currentIndustry, phraseMatching.minPrimaryWords)
+  const profile = buildPhraseProfile(titleText, minPrimaryWords)
+  const ind = industryTierPhrases(prefs.currentIndustry, minPrimaryWords)
   const out: { phrase: string; kind: 'primary' | 'secondary' | 'industry' }[] = []
   for (const p of profile.primaryPhrases) out.push({ phrase: p, kind: 'primary' })
   for (const p of profile.secondaryPhrases) out.push({ phrase: p, kind: 'secondary' })

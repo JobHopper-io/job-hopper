@@ -106,7 +106,7 @@ export function applyJobMatchingHardFiltersToQuery<T extends JobHopperLiveFilter
     q = q.eq('is_remote', false) as T
   }
 
-  q = q.or(buildRecencyOrFilter(cfg.recencyWeights.maxAgeDays, nowMs)) as T
+  q = q.or(buildRecencyOrFilter(cfg.recency.maxAgeDays, nowMs)) as T
 
   return q
 }

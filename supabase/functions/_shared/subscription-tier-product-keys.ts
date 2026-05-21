@@ -41,3 +41,19 @@ export async function getSubscriptionTierProductKeysForProfile(
 
   return [...new Set(baseProducts.map((p) => p.key).filter((k): k is string => typeof k === 'string' && k.length > 0))]
 }
+
+/** User-facing error when matching cannot load jobs without tier keys. */
+export function subscriptionTierKeysRequiredMessage(): string {
+  return (
+    'No subscription tier product keys are available. The profile has no trial/active base plan ' +
+    'subscription (or none were resolved), and the tier keys override field is empty. ' +
+    'Enter comma-separated products.key values that match job_hopper_live.subscription_tier, ' +
+    'or test as a profile with an active base plan subscription.'
+  )
+}
+
+export function assertSubscriptionTierKeysForMatching(keys: readonly string[]): void {
+  if (keys.length === 0) {
+    throw new Error(subscriptionTierKeysRequiredMessage())
+  }
+}

@@ -1,20 +1,8 @@
 import { supabase } from '@/lib/supabase'
-import type { FunctionsHttpError } from '@supabase/supabase-js'
-
-function messageFromFunctionsHttpError(error: FunctionsHttpError): string {
-  const ctx = error.context as { body?: string } | undefined
-  const raw = ctx?.body
-  if (typeof raw === 'string' && raw.length > 0) {
-    try {
-      const parsed = JSON.parse(raw) as { error?: string; detail?: string }
-      if (parsed.error) return parsed.error
-      if (parsed.detail) return parsed.detail
-    } catch {
-      return raw.slice(0, 500)
-    }
-  }
-  return error.message
-}
+import {
+  errorMessageFromInvokeData,
+  parseFunctionsInvokeError,
+} from '@/lib/parse-functions-invoke-error'
 
 export interface PhraseMatchSurfaceDetail {
   primaryPhrases: string[]
@@ -41,11 +29,19 @@ export interface RankedJob {
   aiBriefing: string | null
   applyLink: string | null
   createdAt: string
-  /** When set, used for recency scoring and display; otherwise {@link createdAt} is shown. */
   postedDate?: string | null
+  /** Total match score on 0–100 scale. */
   score: number
+  /** Category quality scores in [0, 1]. */
   components?: {
-    role: number
+    phrase: number
+    pay: number
+    location: number
+    recency: number
+  }
+  /** Points contributed per category on 0–100 scale. */
+  scoreContributions?: {
+    phrase: number
     pay: number
     location: number
     recency: number
@@ -54,7 +50,6 @@ export interface RankedJob {
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
-  /** Effective sponsorship likelihood: stored value if not N/A, else inferred from job data */
   effectiveSponsorshipLikelihood?: 'Low' | 'Medium' | 'High'
 }
 
@@ -64,9 +59,10 @@ export interface MatchJobsDebugPayload {
     excludedBySubscriptionTier: number
     excludedByRole: number
     excludedByRemoteOptOut: number
-    excludedByLocation: number
     excludedByRecency: number
-    excludedByNoKeywordMatch: number
+    excludedByPhraseGate: number
+    excludedByPayHardFloor: number
+    excludedByRelocationGate: number
     excludedByMinTotalScore: number
     includedAfterFilters: number
   }
@@ -74,11 +70,10 @@ export interface MatchJobsDebugPayload {
     minScore: number | null
     maxScore: number | null
     averageScore: number | null
-    averageRoleScore: number | null
-    /** Present on current API; may be absent on older deployed functions. */
-    averagePayScore?: number | null
-    averageLocationScore: number | null
-    averageRecencyScore: number | null
+    averagePhraseQuality: number | null
+    averagePayQuality: number | null
+    averageLocationQuality: number | null
+    averageRecencyQuality: number | null
     maxPossibleScore: number
   }
   phrases: {
@@ -103,7 +98,6 @@ export interface MatchJobsResponse {
 export interface SubscriberPreferencesOverride {
   subscriptionTierProductKeys?: string[]
   roles?: string[]
-  /** When set (including empty string), overrides profile target title for matching. */
   targetJobTitle?: string | null
   currentJobTitle?: string | null
   currentIndustry?: string | null
@@ -115,63 +109,111 @@ export interface SubscriberPreferencesOverride {
   locationRadiusMiles?: number | null
 }
 
-export interface MatchConfigPhraseSurfaceWeights {
-  title?: number
-  description?: number
-  briefing?: number
+export interface MatchConfigCategoryWeights {
+  phrase?: number
+  pay?: number
+  location?: number
+  recency?: number
 }
 
-export interface MatchConfigPhraseWeights {
-  primary?: MatchConfigPhraseSurfaceWeights
-  secondary?: MatchConfigPhraseSurfaceWeights
-  industry?: MatchConfigPhraseSurfaceWeights
-}
-
-export interface MatchConfigPhraseMatching {
+export interface MatchConfigPhrase {
+  tierFactors?: { primary?: number; industry?: number; secondary?: number }
+  surfaceWeights?: { title?: number; description?: number; briefing?: number }
   minPrimaryWords?: number
 }
 
-export interface MatchConfigPayWeights {
-  insideRange?: number
-  nearRange?: number
-  missingSalary?: number
-  belowRangePenalty?: number
+export interface MatchConfigPay {
+  missingSalaryQuality?: number
+  nearRangeQuality?: number
+  aboveRangeQuality?: number
+  overToleranceFraction?: number
+  underToleranceFraction?: number
+  hardFloorEnabled?: boolean
+  hardFloorFraction?: number
 }
 
-export interface MatchConfigLocationWeights {
-  sameMetro?: number
-  sameState?: number
-  remotePreferred?: number
-  relocationAllowed?: number
-  otherLocationPenalty?: number
-  distance0to10?: number
-  distance10to25?: number
-  distance25to50?: number
-  distance50to100?: number
-  distanceBeyond100?: number
-  withinRadiusBonus?: number
+export interface MatchConfigLocationBandQualities {
+  d0to10?: number
+  d10to25?: number
+  d25to50?: number
+  d50to100?: number
+  dBeyond100?: number
 }
 
-export interface MatchConfigRecencyWeights {
-  baseRecency?: number
-  perDayDecay?: number
+export interface MatchConfigLocation {
+  bandQualities?: MatchConfigLocationBandQualities
+  sameMetroQuality?: number
+  sameStateQuality?: number
+  remoteAsPerfect?: boolean
+  relocationGateEnabled?: boolean
+}
+
+export interface MatchConfigRecency {
   maxAgeDays?: number
 }
 
 export interface MatchConfigThresholds {
   minTotalScore?: number
-  noKeywordMatchPenalty?: number
-  overPayTolerancePct?: number
-  underPayTolerancePct?: number
+}
+
+export interface MatchConfigPhraseGate {
+  requirePrimaryOrIndustry?: boolean
 }
 
 export interface MatchConfigOverride {
-  phraseWeights?: MatchConfigPhraseWeights
-  phraseMatching?: MatchConfigPhraseMatching
-  payWeights?: MatchConfigPayWeights
-  locationWeights?: MatchConfigLocationWeights
-  recencyWeights?: MatchConfigRecencyWeights
+  categoryWeights?: MatchConfigCategoryWeights
+  phrase?: MatchConfigPhrase
+  pay?: MatchConfigPay
+  location?: MatchConfigLocation
+  recency?: MatchConfigRecency
   thresholds?: MatchConfigThresholds
+  phraseGate?: MatchConfigPhraseGate
+}
+
+/** Fully populated nested config used by the admin tuning form (no optional sections). */
+export interface AdminMatchConfigForm {
+  categoryWeights: {
+    phrase: number
+    pay: number
+    location: number
+    recency: number
+  }
+  phrase: {
+    tierFactors: { primary: number; industry: number; secondary: number }
+    surfaceWeights: { title: number; description: number; briefing: number }
+    minPrimaryWords: number
+  }
+  pay: {
+    missingSalaryQuality: number
+    nearRangeQuality: number
+    aboveRangeQuality: number
+    overToleranceFraction: number
+    underToleranceFraction: number
+    hardFloorEnabled: boolean
+    hardFloorFraction: number
+  }
+  location: {
+    bandQualities: {
+      d0to10: number
+      d10to25: number
+      d25to50: number
+      d50to100: number
+      dBeyond100: number
+    }
+    sameMetroQuality: number
+    sameStateQuality: number
+    remoteAsPerfect: boolean
+    relocationGateEnabled: boolean
+  }
+  recency: {
+    maxAgeDays: number
+  }
+  thresholds: {
+    minTotalScore: number
+  }
+  phraseGate: {
+    requirePrimaryOrIndustry: boolean
+  }
 }
 
 export interface AdminMatchingConfig {
@@ -220,55 +262,155 @@ export interface OnboardedMatchingSubscribersListResult {
 }
 
 export interface GetAdminMatchesOptions {
-  /**
-   * When set, the test-job-matching function uses this profile as the subscriber under test
-   * (must have completed onboarding). Omit or empty to use the logged-in admin’s profile as the base.
-   */
   targetProfileId?: string | null
   preferencesOverride?: SubscriberPreferencesOverride
   matchConfigOverride?: MatchConfigOverride
 }
 
-/** Default admin match config values (mirror of backend defaultConfig). Used for form defaults and reset. */
-export const DEFAULT_ADMIN_MATCH_CONFIG: MatchConfigOverride = {
-  phraseWeights: {
-    primary: { title: 4, description: 1, briefing: 0 },
-    secondary: { title: 1, description: 0.5, briefing: 0 },
-    industry: { title: 2, description: 1, briefing: 0 },
+/** Default admin match config (mirrors backend defaultConfig). */
+export const DEFAULT_ADMIN_MATCH_CONFIG = {
+  categoryWeights: {
+    phrase: 0.5,
+    pay: 0.15,
+    location: 0.25,
+    recency: 0.1,
   },
-  phraseMatching: {
+  phrase: {
+    tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
+    surfaceWeights: { title: 0.6, description: 0.3, briefing: 0.1 },
     minPrimaryWords: 2,
   },
-  payWeights: {
-    insideRange: 4,
-    nearRange: 2,
-    missingSalary: 1,
-    belowRangePenalty: -2,
+  pay: {
+    missingSalaryQuality: 0.3,
+    nearRangeQuality: 0.5,
+    aboveRangeQuality: 0.7,
+    overToleranceFraction: 0.25,
+    underToleranceFraction: 0.15,
+    hardFloorEnabled: false,
+    hardFloorFraction: 0.3,
   },
-  locationWeights: {
-    sameMetro: 4,
-    sameState: 2,
-    remotePreferred: 3,
-    relocationAllowed: 1,
-    otherLocationPenalty: -3,
-    distance0to10: 4,
-    distance10to25: 3,
-    distance25to50: 2,
-    distance50to100: 1,
-    distanceBeyond100: 0,
-    withinRadiusBonus: 3,
+  location: {
+    bandQualities: {
+      d0to10: 1,
+      d10to25: 0.85,
+      d25to50: 0.65,
+      d50to100: 0.35,
+      dBeyond100: 0,
+    },
+    sameMetroQuality: 0.7,
+    sameStateQuality: 0.4,
+    remoteAsPerfect: true,
+    relocationGateEnabled: false,
   },
-  recencyWeights: {
-    baseRecency: 3,
-    perDayDecay: 0.1,
+  recency: {
     maxAgeDays: 45,
   },
   thresholds: {
-    minTotalScore: 5,
-    noKeywordMatchPenalty: -100,
-    overPayTolerancePct: 0.25,
-    underPayTolerancePct: 0.15,
+    minTotalScore: 40,
   },
+  phraseGate: {
+    requirePrimaryOrIndustry: true,
+  },
+} satisfies AdminMatchConfigForm
+
+function num(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function bool(value: boolean | undefined, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+/** Merge a partial override (e.g. from DB) into a complete admin form shape. */
+export function normalizeMatchConfigForm(
+  src: MatchConfigOverride | undefined | null,
+): AdminMatchConfigForm {
+  const base = DEFAULT_ADMIN_MATCH_CONFIG
+  const phrase = src?.phrase
+  const pay = src?.pay
+  const location = src?.location
+  const bands = location?.bandQualities
+  const tier = phrase?.tierFactors
+  const surfaces = phrase?.surfaceWeights
+
+  return {
+    categoryWeights: {
+      phrase: num(src?.categoryWeights?.phrase, base.categoryWeights.phrase),
+      pay: num(src?.categoryWeights?.pay, base.categoryWeights.pay),
+      location: num(src?.categoryWeights?.location, base.categoryWeights.location),
+      recency: num(src?.categoryWeights?.recency, base.categoryWeights.recency),
+    },
+    phrase: {
+      minPrimaryWords: num(phrase?.minPrimaryWords, base.phrase.minPrimaryWords),
+      tierFactors: {
+        primary: num(tier?.primary, base.phrase.tierFactors.primary),
+        industry: num(tier?.industry, base.phrase.tierFactors.industry),
+        secondary: num(tier?.secondary, base.phrase.tierFactors.secondary),
+      },
+      surfaceWeights: {
+        title: num(surfaces?.title, base.phrase.surfaceWeights.title),
+        description: num(surfaces?.description, base.phrase.surfaceWeights.description),
+        briefing: num(surfaces?.briefing, base.phrase.surfaceWeights.briefing),
+      },
+    },
+    pay: {
+      missingSalaryQuality: num(pay?.missingSalaryQuality, base.pay.missingSalaryQuality),
+      nearRangeQuality: num(pay?.nearRangeQuality, base.pay.nearRangeQuality),
+      aboveRangeQuality: num(pay?.aboveRangeQuality, base.pay.aboveRangeQuality),
+      overToleranceFraction: num(pay?.overToleranceFraction, base.pay.overToleranceFraction),
+      underToleranceFraction: num(pay?.underToleranceFraction, base.pay.underToleranceFraction),
+      hardFloorEnabled: bool(pay?.hardFloorEnabled, base.pay.hardFloorEnabled),
+      hardFloorFraction: num(pay?.hardFloorFraction, base.pay.hardFloorFraction),
+    },
+    location: {
+      bandQualities: {
+        d0to10: num(bands?.d0to10, base.location.bandQualities.d0to10),
+        d10to25: num(bands?.d10to25, base.location.bandQualities.d10to25),
+        d25to50: num(bands?.d25to50, base.location.bandQualities.d25to50),
+        d50to100: num(bands?.d50to100, base.location.bandQualities.d50to100),
+        dBeyond100: num(bands?.dBeyond100, base.location.bandQualities.dBeyond100),
+      },
+      sameMetroQuality: num(location?.sameMetroQuality, base.location.sameMetroQuality),
+      sameStateQuality: num(location?.sameStateQuality, base.location.sameStateQuality),
+      remoteAsPerfect: bool(location?.remoteAsPerfect, base.location.remoteAsPerfect),
+      relocationGateEnabled: bool(
+        location?.relocationGateEnabled,
+        base.location.relocationGateEnabled,
+      ),
+    },
+    recency: {
+      maxAgeDays: num(src?.recency?.maxAgeDays, base.recency.maxAgeDays),
+    },
+    thresholds: {
+      minTotalScore: num(src?.thresholds?.minTotalScore, base.thresholds.minTotalScore),
+    },
+    phraseGate: {
+      requirePrimaryOrIndustry: bool(
+        src?.phraseGate?.requirePrimaryOrIndustry,
+        base.phraseGate.requirePrimaryOrIndustry,
+      ),
+    },
+  }
+}
+
+export function matchConfigFormToOverride(form: AdminMatchConfigForm): MatchConfigOverride {
+  return JSON.parse(JSON.stringify(form)) as MatchConfigOverride
+}
+
+function deepCloneConfig(src: AdminMatchConfigForm): AdminMatchConfigForm {
+  return JSON.parse(JSON.stringify(src)) as AdminMatchConfigForm
+}
+
+export function categoryWeightSum(cfg: AdminMatchConfigForm | MatchConfigOverride): number {
+  const w = cfg.categoryWeights
+  if (!w) return 0
+  return (w.phrase ?? 0) + (w.pay ?? 0) + (w.location ?? 0) + (w.recency ?? 0)
+}
+
+export function phraseSurfaceWeightSum(cfg: AdminMatchConfigForm | MatchConfigOverride): number {
+  const sw = cfg.phrase?.surfaceWeights
+  if (!sw) return 0
+  return (sw.title ?? 0) + (sw.description ?? 0) + (sw.briefing ?? 0)
 }
 
 export const jobMatchingAlgorithmAdminAPI = {
@@ -298,7 +440,13 @@ export const jobMatchingAlgorithmAdminAPI = {
     )
 
     if (error) {
-      return { data: null, error: new Error(error.message) }
+      const message = await parseFunctionsInvokeError(error)
+      return { data: null, error: new Error(message) }
+    }
+
+    const dataError = errorMessageFromInvokeData(data)
+    if (dataError) {
+      return { data: null, error: new Error(dataError) }
     }
 
     return { data: data ?? null, error: null }
@@ -469,7 +617,8 @@ export const jobMatchingAlgorithmAdminAPI = {
     )
 
     if (error) {
-      return { error: new Error(messageFromFunctionsHttpError(error as FunctionsHttpError)) }
+      const message = await parseFunctionsInvokeError(error)
+      return { error: new Error(message) }
     }
 
     if (data?.error) {
@@ -516,3 +665,4 @@ export const jobMatchingAlgorithmAdminAPI = {
   },
 }
 
+export { deepCloneConfig }

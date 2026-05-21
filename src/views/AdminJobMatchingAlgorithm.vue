@@ -5,17 +5,158 @@ import { subscriptionAPI } from '@/lib/subscription'
 import {
   jobMatchingAlgorithmAdminAPI,
   DEFAULT_ADMIN_MATCH_CONFIG,
+  deepCloneConfig,
+  normalizeMatchConfigForm,
+  matchConfigFormToOverride,
+  categoryWeightSum,
+  phraseSurfaceWeightSum,
   type MatchJobsResponse,
   type RankedJob,
   type MatchJobsDebugPayload,
   type SubscriberPreferencesOverride,
   type MatchConfigOverride,
+  type AdminMatchConfigForm,
   type AdminMatchingConfig,
   type OnboardedMatchingSubscriberRow,
   type SubscriberMatchingPreferencesPayload,
 } from '@/lib/admin-job-matching-algorithm'
 import type { Profile } from '@/types/database'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
+import AdminTuningHintIcon from '@/components/AdminTuningHintIcon.vue'
+
+/** Short visible blurbs under section headers (always shown). */
+const MATCH_SECTION_INTROS = {
+  page:
+    'Each job gets a 0–100 score from four parts (title fit, pay, location, freshness). Hard gates drop bad fits before scoring.',
+  preferences:
+    'Simulates a subscriber: what they want, where they work, and which job tiers they can see.',
+  matchConfig:
+    'Weights and rules for scoring. Saved configs apply in production when marked active.',
+  categoryMix:
+    'Split 100% across the four score parts. Higher % = that part can move the total more.',
+  hardGates:
+    'On/off filters applied before scoring. Failed gates remove the job entirely.',
+  phrase:
+    'How strongly title and industry keywords match job text. Score scales by matched words vs your longest target phrase.',
+  pay: 'How pay compares to the subscriber range (missing salary uses its own score).',
+  location:
+    'Inside the subscriber’s radius → full score. Outside → band weights by miles past that radius (or by absolute miles if no radius set).',
+  recency: 'How new the posting is; very old jobs can be dropped entirely.',
+} as const
+
+/** Hover hints — keep short; section intros carry the big picture. */
+const MATCH_TUNING_TOOLTIPS = {
+  pageOverview: MATCH_SECTION_INTROS.page,
+  sectionPreferences: MATCH_SECTION_INTROS.preferences,
+  sectionMatchConfig: MATCH_SECTION_INTROS.matchConfig,
+  sectionCategoryMix: MATCH_SECTION_INTROS.categoryMix,
+  sectionHardGates: MATCH_SECTION_INTROS.hardGates,
+  sectionPhrase: MATCH_SECTION_INTROS.phrase,
+  sectionPay: MATCH_SECTION_INTROS.pay,
+  sectionLocation: MATCH_SECTION_INTROS.location,
+  sectionRecency: MATCH_SECTION_INTROS.recency,
+  matchSubject: 'Test as this user’s preferences and subscription tier. Empty = your admin profile.',
+  subscriptionTier:
+    'Product keys the subscriber’s plan allows. Jobs must match one key. Empty = live keys from their subscription.',
+  roles: 'Only jobs in these categories are considered. Leave empty to allow all categories.',
+  targetJobTitle: 'Comma-separated job-title phrases to match (main signal for “right role”).',
+  currentJobTitle: 'Used only when target job title is empty.',
+  currentIndustry: 'Industry keywords; matched separately from title phrases.',
+  payRangeMin: 'Low end of desired annual pay (jobs convert hourly/monthly/etc. to yearly first).',
+  payRangeMax: 'High end of desired annual pay.',
+  locationRadiusMiles:
+    'Jobs within this many miles of a preferred place get full location score (1.0). Band weights below apply only beyond this distance.',
+  preferredLocations: 'Cities, states, or ZIPs used for distance and relocation rules.',
+  openToRelocation: 'If off, very distant on-site jobs may be removed when the relocation gate is on.',
+  openToRemote: 'If off, remote jobs are dropped. If on, remote can score full location points.',
+  categoryPhrase: 'Title/industry keyword fit.',
+  categoryPay: 'Salary vs desired range.',
+  categoryLocation: 'Distance, remote, metro/state.',
+  categoryRecency: 'How recently the job was posted.',
+  minTotalScore: 'Cutoff after scoring; jobs below this are hidden (default 40).',
+  phraseGate:
+    'Requires a real title or industry keyword hit—not description-only matches.',
+  payHardFloorEnabled: 'Drop jobs paid far below the subscriber’s minimum.',
+  payHardFloorFraction: 'How far below min salary still counts as “far” (e.g. 0.3 = 30% under).',
+  relocationGate: 'Drop distant on-site jobs when the subscriber won’t relocate.',
+  phraseMinPrimaryWords:
+    'When there are multiple comma-separated phrases, sets the minimum word count for primary vs secondary. Ignored when the user entered only one phrase (that always becomes primary).',
+  tierPrimary: 'Strength when target title phrases match.',
+  tierIndustry: 'Strength when industry keywords match.',
+  tierSecondary: 'Strength for weaker title phrase matches.',
+  surfaceTitle: 'How much the job title counts in phrase score.',
+  surfaceDescription: 'How much the job description counts.',
+  surfaceBriefing: 'How much the AI briefing counts.',
+  payMissingSalary: 'Score when the listing has no salary (0–1).',
+  payNearRange: 'Score when pay is a little below range.',
+  payAboveRange: 'Score when pay is a little above range.',
+  payOverTolerance: 'How far above max still counts as “a little above”.',
+  payUnderTolerance: 'How far below min still counts as “a little below”.',
+  loc0to10: 'Score when 0–10 miles past the subscriber’s radius.',
+  loc10to25: 'Score when 10–25 miles past the radius.',
+  loc25to50: 'Score when 25–50 miles past the radius.',
+  loc50to100: 'Score when 50–100 miles past the radius.',
+  locBeyond100: 'Score when more than 100 miles past the radius (relocation gate may drop earlier).',
+  locSameMetro: 'Score when only city/metro text matches (no coordinates).',
+  locSameState: 'Score when only state matches.',
+  locRemoteAsPerfect: 'Remote jobs get full location points when subscriber allows remote.',
+  recencyMaxAgeDays: 'Max job age in days; older jobs are excluded and newer ones score higher.',
+} as const
+
+const categoryWeightFields: {
+  key: 'phrase' | 'pay' | 'location' | 'recency'
+  label: string
+  tooltip: string
+}[] = [
+  { key: 'phrase', label: 'Phrase', tooltip: MATCH_TUNING_TOOLTIPS.categoryPhrase },
+  { key: 'pay', label: 'Pay', tooltip: MATCH_TUNING_TOOLTIPS.categoryPay },
+  { key: 'location', label: 'Location', tooltip: MATCH_TUNING_TOOLTIPS.categoryLocation },
+  { key: 'recency', label: 'Recency', tooltip: MATCH_TUNING_TOOLTIPS.categoryRecency },
+]
+
+type PhraseTierKey = 'primary' | 'industry' | 'secondary'
+type PhraseSurfaceKey = 'title' | 'description' | 'briefing'
+
+const phraseTierFields: { key: PhraseTierKey; label: string; tooltip: string }[] = [
+  { key: 'primary', label: 'Primary', tooltip: MATCH_TUNING_TOOLTIPS.tierPrimary },
+  { key: 'industry', label: 'Industry', tooltip: MATCH_TUNING_TOOLTIPS.tierIndustry },
+  { key: 'secondary', label: 'Secondary', tooltip: MATCH_TUNING_TOOLTIPS.tierSecondary },
+]
+
+const phraseSurfaceFields: { key: PhraseSurfaceKey; label: string; tooltip: string }[] = [
+  { key: 'title', label: 'Title wt', tooltip: MATCH_TUNING_TOOLTIPS.surfaceTitle },
+  { key: 'description', label: 'Desc wt', tooltip: MATCH_TUNING_TOOLTIPS.surfaceDescription },
+  { key: 'briefing', label: 'Brief wt', tooltip: MATCH_TUNING_TOOLTIPS.surfaceBriefing },
+]
+
+const payQualityFields: {
+  label: string
+  tooltip: string
+  modelKey:
+    | 'missingSalaryQuality'
+    | 'nearRangeQuality'
+    | 'aboveRangeQuality'
+    | 'overToleranceFraction'
+    | 'underToleranceFraction'
+}[] = [
+  { label: 'missingSalary', modelKey: 'missingSalaryQuality', tooltip: MATCH_TUNING_TOOLTIPS.payMissingSalary },
+  { label: 'nearRange', modelKey: 'nearRangeQuality', tooltip: MATCH_TUNING_TOOLTIPS.payNearRange },
+  { label: 'aboveRange', modelKey: 'aboveRangeQuality', tooltip: MATCH_TUNING_TOOLTIPS.payAboveRange },
+  { label: 'overTol', modelKey: 'overToleranceFraction', tooltip: MATCH_TUNING_TOOLTIPS.payOverTolerance },
+  { label: 'underTol', modelKey: 'underToleranceFraction', tooltip: MATCH_TUNING_TOOLTIPS.payUnderTolerance },
+]
+
+const locationBandFields: {
+  label: string
+  modelKey: 'd0to10' | 'd10to25' | 'd25to50' | 'd50to100' | 'dBeyond100'
+  tooltip: string
+}[] = [
+  { label: '0–10 mi past range', modelKey: 'd0to10', tooltip: MATCH_TUNING_TOOLTIPS.loc0to10 },
+  { label: '10–25 past', modelKey: 'd10to25', tooltip: MATCH_TUNING_TOOLTIPS.loc10to25 },
+  { label: '25–50 past', modelKey: 'd25to50', tooltip: MATCH_TUNING_TOOLTIPS.loc25to50 },
+  { label: '50–100 past', modelKey: 'd50to100', tooltip: MATCH_TUNING_TOOLTIPS.loc50to100 },
+  { label: '100+ past', modelKey: 'dBeyond100', tooltip: MATCH_TUNING_TOOLTIPS.locBeyond100 },
+]
 
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -75,19 +216,16 @@ const prefsForm = reactive<{
   locationRadiusMiles: '',
 })
 
-// Match config form (defaults from DEFAULT_ADMIN_MATCH_CONFIG)
-const configForm = reactive<MatchConfigOverride>({
-  phraseWeights: {
-    primary: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.primary },
-    secondary: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.secondary },
-    industry: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights!.industry },
-  },
-  phraseMatching: { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseMatching },
-  payWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights },
-  locationWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights },
-  recencyWeights: { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights },
-  thresholds: { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds },
-})
+const configForm = reactive<AdminMatchConfigForm>(deepCloneConfig(DEFAULT_ADMIN_MATCH_CONFIG))
+
+const categoryWeightSumPct = computed(() => Math.round(categoryWeightSum(configForm) * 100))
+const phraseSurfaceWeightSumPct = computed(() =>
+  Math.round(phraseSurfaceWeightSum(configForm) * 100),
+)
+const categoryWeightsValid = computed(() => Math.abs(categoryWeightSum(configForm) - 1) <= 0.02)
+const phraseSurfaceWeightsValid = computed(
+  () => Math.abs(phraseSurfaceWeightSum(configForm) - 1) <= 0.02,
+)
 
 const JOBS_PER_PAGE = 25
 const currentPage = ref(1)
@@ -265,25 +403,8 @@ function buildPreferencesOverride(): SubscriberPreferencesOverride {
   }
 }
 
-function snapshotPhraseWeights(src: MatchConfigOverride['phraseWeights']): NonNullable<
-  MatchConfigOverride['phraseWeights']
-> {
-  return {
-    primary: { ...src?.primary },
-    secondary: { ...src?.secondary },
-    industry: { ...src?.industry },
-  }
-}
-
 function buildMatchConfigOverride(): MatchConfigOverride {
-  return {
-    phraseWeights: snapshotPhraseWeights(configForm.phraseWeights),
-    phraseMatching: { ...configForm.phraseMatching },
-    payWeights: { ...configForm.payWeights },
-    locationWeights: { ...configForm.locationWeights },
-    recencyWeights: { ...configForm.recencyWeights },
-    thresholds: { ...configForm.thresholds },
-  }
+  return matchConfigFormToOverride(configForm)
 }
 
 async function resetToDefaults() {
@@ -291,31 +412,19 @@ async function resetToDefaults() {
   matchSubjectProfileId.value = ''
   await loadAdminPreferencesOnly()
   suppressMatchSubjectWatch.value = false
-  if (activeConfig.value) {
-    configForm.phraseWeights = snapshotPhraseWeights(activeConfig.value.config.phraseWeights)
-    configForm.phraseMatching = { ...(activeConfig.value.config.phraseMatching ?? {}) }
-    configForm.payWeights = { ...(activeConfig.value.config.payWeights ?? {}) }
-    configForm.locationWeights = { ...(activeConfig.value.config.locationWeights ?? {}) }
-    configForm.recencyWeights = { ...(activeConfig.value.config.recencyWeights ?? {}) }
-    configForm.thresholds = { ...(activeConfig.value.config.thresholds ?? {}) }
-  } else {
-    configForm.phraseWeights = snapshotPhraseWeights(DEFAULT_ADMIN_MATCH_CONFIG.phraseWeights)
-    configForm.phraseMatching = { ...DEFAULT_ADMIN_MATCH_CONFIG.phraseMatching }
-    configForm.payWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.payWeights }
-    configForm.locationWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.locationWeights }
-    configForm.recencyWeights = { ...DEFAULT_ADMIN_MATCH_CONFIG.recencyWeights }
-    configForm.thresholds = { ...DEFAULT_ADMIN_MATCH_CONFIG.thresholds }
-  }
+  const src = activeConfig.value?.config
+  Object.assign(configForm, deepCloneConfig(normalizeMatchConfigForm(src)))
 }
 
 function applyConfigToForm(cfg: MatchConfigOverride | undefined) {
-  if (!cfg) return
-  configForm.phraseWeights = snapshotPhraseWeights(cfg.phraseWeights)
-  configForm.phraseMatching = { ...(cfg.phraseMatching ?? {}) }
-  configForm.payWeights = { ...(cfg.payWeights ?? {}) }
-  configForm.locationWeights = { ...(cfg.locationWeights ?? {}) }
-  configForm.recencyWeights = { ...(cfg.recencyWeights ?? {}) }
-  configForm.thresholds = { ...(cfg.thresholds ?? {}) }
+  Object.assign(configForm, deepCloneConfig(normalizeMatchConfigForm(cfg)))
+}
+
+function setCategoryWeightPct(
+  key: 'phrase' | 'pay' | 'location' | 'recency',
+  pct: number,
+) {
+  configForm.categoryWeights[key] = Math.max(0, Math.min(100, pct)) / 100
 }
 
 async function openConfigModal() {
@@ -436,21 +545,26 @@ async function loadMatches() {
   isLoading.value = true
   errorMessage.value = null
 
-  const { data, error } = await jobMatchingAlgorithmAdminAPI.getAdminMatches({
-    targetProfileId: matchSubjectProfileId.value || undefined,
-    preferencesOverride: buildPreferencesOverride(),
-    matchConfigOverride: buildMatchConfigOverride(),
-  })
+  try {
+    const { data, error } = await jobMatchingAlgorithmAdminAPI.getAdminMatches({
+      targetProfileId: matchSubjectProfileId.value || undefined,
+      preferencesOverride: buildPreferencesOverride(),
+      matchConfigOverride: buildMatchConfigOverride(),
+    })
 
-  if (error) {
-    errorMessage.value = error.message
+    if (error) {
+      errorMessage.value = error.message
+      result.value = null
+    } else {
+      result.value = data
+      currentPage.value = 1
+    }
+  } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : 'Failed to run matching'
     result.value = null
-  } else {
-    result.value = data
-    currentPage.value = 1
+  } finally {
+    isLoading.value = false
   }
-
-  isLoading.value = false
 }
 
 function formatJobPostedDate(job: RankedJob): string {
@@ -503,6 +617,13 @@ onMounted(async () => {
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
           Run the same scoring pipeline as production.
+          <AdminTuningHintIcon
+            class="inline-block align-middle ml-1"
+            :tooltip="MATCH_TUNING_TOOLTIPS.pageOverview"
+          />
+        </p>
+        <p class="text-xs text-neutral-body max-w-3xl mt-2">
+          {{ MATCH_SECTION_INTROS.page }}
         </p>
       </header>
 
@@ -511,15 +632,29 @@ onMounted(async () => {
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
           Algorithm input
         </h2>
+        <p class="text-xs text-neutral-body max-w-3xl -mt-4">
+          Set who you are matching as, their preferences, then adjust scoring weights and gates.
+        </p>
 
-        <div class="rounded-xl border border-neutral-border/80 bg-neutral-bg/80 px-3 py-3 sm:px-4 sm:py-4 space-y-2">
-          <label class="block text-xs font-medium text-neutral-body" for="admin-match-subject">
-            Match as subscriber
+        <div
+          class="rounded-xl border border-neutral-border/80 bg-neutral-bg/80 px-3 py-3 sm:px-4 sm:py-4 space-y-2"
+          :title="MATCH_TUNING_TOOLTIPS.matchSubject"
+        >
+          <label
+            class="block text-xs font-medium text-neutral-body"
+            for="admin-match-subject"
+            :title="MATCH_TUNING_TOOLTIPS.matchSubject"
+          >
+            <span class="inline-flex items-center gap-1">
+              <span>Match as subscriber</span>
+              <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.matchSubject" />
+            </span>
           </label>
           <select
             id="admin-match-subject"
             v-model="matchSubjectProfileId"
             class="input w-full text-sm"
+            :title="MATCH_TUNING_TOOLTIPS.matchSubject"
             :disabled="isOnboardedListLoading || isApplyingMatchSubject"
           >
             <option value="">
@@ -552,96 +687,171 @@ onMounted(async () => {
         </div>
 
         <section class="space-y-3">
-          <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-            Preferences
-          </h3>
+          <div>
+            <h3 class="text-sm font-heading font-semibold text-brand-charcoal inline-flex items-center gap-1">
+              <span>Preferences</span>
+              <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionPreferences" />
+            </h3>
+            <p class="text-xs text-neutral-body mt-1">
+              {{ MATCH_SECTION_INTROS.preferences }}
+            </p>
+          </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
-              <label class="block text-xs font-medium text-neutral-body mb-1">
-                Subscription tier product keys (comma-separated, optional override)
-                <span v-if="basePlanProductKeyOptions.length" class="font-normal">
-                  ({{ basePlanProductKeyOptions.join(', ') }})
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.subscriptionTier"
+              >
+                <span class="inline-flex items-center gap-1 flex-wrap">
+                  <span>
+                    Subscription tier product keys (comma-separated, optional override)
+                    <span v-if="basePlanProductKeyOptions.length" class="font-normal">
+                      ({{ basePlanProductKeyOptions.join(', ') }})
+                    </span>
+                  </span>
+                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.subscriptionTier" />
                 </span>
               </label>
               <input
                 v-model="prefsForm.subscriptionTierProductKeys"
                 type="text"
                 class="input w-full"
+                :title="MATCH_TUNING_TOOLTIPS.subscriptionTier"
                 :placeholder="subscriptionTierFieldPlaceholder"
               >
               <p class="text-xs text-neutral-body mt-1">
-                Must match <code class="text-xs">job_hopper_live.subscription_tier</code> for a job to be scored.
+                Leave empty to use the subscriber’s live plan keys.
               </p>
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">
-                Target role categories (comma-separated; must match <code class="text-[10px]">job_hopper_live.role_category</code> values)
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.roles"
+              >
+                <span class="inline-flex items-center gap-1 flex-wrap">
+                  <span>
+                    Target role categories (comma-separated; must match
+                    <code class="text-[10px]">job_hopper_live.role_category</code> values)
+                  </span>
+                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.roles" />
+                </span>
               </label>
               <input
                 v-model="prefsForm.roles"
                 type="text"
                 class="input w-full"
+                :title="MATCH_TUNING_TOOLTIPS.roles"
                 placeholder="e.g. maintenance, engineering"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Target job title (comma-separated keyword phrases)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.targetJobTitle"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Target job title (comma-separated keyword phrases)</span>
+                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.targetJobTitle" />
+                </span>
+              </label>
               <input
                 v-model="prefsForm.targetJobTitle"
                 type="text"
                 class="input w-full"
-                placeholder="Primary source for title keywords when filled"
+                :title="MATCH_TUNING_TOOLTIPS.targetJobTitle"
+                placeholder="e.g. welder, plant manager"
               >
               <p class="text-[11px] text-neutral-body mt-1">
                 If empty, title keywords fall back to current job title.
               </p>
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Current job title (fallback for title keywords)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.currentJobTitle"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Current job title (fallback for title keywords)</span>
+                </span>
+              </label>
               <input
                 v-model="prefsForm.currentJobTitle"
                 type="text"
                 class="input w-full"
+                :title="MATCH_TUNING_TOOLTIPS.currentJobTitle"
                 placeholder="Used when target job title is empty"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Current industry (comma-separated keywords)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.currentIndustry"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Current industry (comma-separated keywords)</span>
+                </span>
+              </label>
               <input
                 v-model="prefsForm.currentIndustry"
                 type="text"
                 class="input w-full"
+                :title="MATCH_TUNING_TOOLTIPS.currentIndustry"
                 placeholder="e.g. Tech, Finance"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary min (annual)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.payRangeMin"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Desired salary min (annual)</span>
+                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.payRangeMin" />
+                </span>
+              </label>
               <input
                 v-model="prefsForm.payRangeMin"
                 type="number"
                 class="input w-full"
-                placeholder="Compared after normalizing job pay to annual"
+                :title="MATCH_TUNING_TOOLTIPS.payRangeMin"
+                placeholder="e.g. 80000"
               >
               <p class="text-[11px] text-neutral-body mt-1">
-                Job pay uses <code class="text-[10px]">pay_type</code> (year, month, week, day, hour) to convert to an annual band before overlap scoring.
+                Hourly and monthly listings are converted to yearly before comparing.
               </p>
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Desired salary max (annual)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.payRangeMax"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Desired salary max (annual)</span>
+                </span>
+              </label>
               <input
                 v-model="prefsForm.payRangeMax"
                 type="number"
                 class="input w-full"
-                placeholder="Compared after normalizing job pay to annual"
+                :title="MATCH_TUNING_TOOLTIPS.payRangeMax"
+                placeholder="e.g. 80000"
               >
             </div>
             <div>
-              <label class="block text-xs font-medium text-neutral-body mb-1">Location radius (miles)</label>
+              <label
+                class="block text-xs font-medium text-neutral-body mb-1"
+                :title="MATCH_TUNING_TOOLTIPS.locationRadiusMiles"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>Location radius (miles)</span>
+                </span>
+              </label>
               <input
                 v-model="prefsForm.locationRadiusMiles"
                 type="number"
                 min="0"
                 class="input w-full"
+                :title="MATCH_TUNING_TOOLTIPS.locationRadiusMiles"
                 placeholder="e.g. 25"
               >
             </div>
@@ -650,24 +860,37 @@ onMounted(async () => {
                 v-model="prefsForm.preferredLocations"
                 label="Preferred locations"
                 input-id="admin-preferred-locations"
+                :tooltip="MATCH_TUNING_TOOLTIPS.preferredLocations"
               />
             </div>
             <div class="flex items-center gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
+              <label
+                class="flex items-center gap-2 cursor-pointer"
+                :title="MATCH_TUNING_TOOLTIPS.openToRelocation"
+              >
                 <input
                   v-model="prefsForm.openToRelocation"
                   type="checkbox"
                   class="rounded border-neutral-border"
+                  :title="MATCH_TUNING_TOOLTIPS.openToRelocation"
                 >
-                <span class="text-sm text-neutral-body">Open to relocation</span>
+                <span class="text-sm text-neutral-body" :title="MATCH_TUNING_TOOLTIPS.openToRelocation">
+                  Open to relocation
+                </span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
+              <label
+                class="flex items-center gap-2 cursor-pointer"
+                :title="MATCH_TUNING_TOOLTIPS.openToRemote"
+              >
                 <input
                   v-model="prefsForm.openToRemote"
                   type="checkbox"
                   class="rounded border-neutral-border"
+                  :title="MATCH_TUNING_TOOLTIPS.openToRemote"
                 >
-                <span class="text-sm text-neutral-body">Open to remote</span>
+                <span class="text-sm text-neutral-body" :title="MATCH_TUNING_TOOLTIPS.openToRemote">
+                  Open to remote
+                </span>
               </label>
             </div>
           </div>
@@ -676,9 +899,13 @@ onMounted(async () => {
         <section class="space-y-3 border-t border-neutral-border pt-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 class="text-sm font-heading font-semibold text-brand-charcoal">
-                Match config
+              <h3 class="text-sm font-heading font-semibold text-brand-charcoal inline-flex items-center gap-1">
+                <span>Match config</span>
+                <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionMatchConfig" />
               </h3>
+              <p class="text-xs text-neutral-body mt-1">
+                {{ MATCH_SECTION_INTROS.matchConfig }}
+              </p>
               <p class="text-xs text-neutral-body" v-if="activeConfig">
                 <span class="font-semibold">Active config:</span>
                 <span>{{ activeConfig.name }}</span>
@@ -708,352 +935,370 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-          <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-3 py-3 sm:px-4 sm:py-4">
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <div class="space-y-3 bg-white rounded-lg shadow-sm px-3 py-2.5 sm:col-span-2 xl:col-span-4">
-                <p class="text-xs font-semibold text-neutral-body">
-                  Phrase matching
+          <div class="rounded-2xl border border-neutral-border/70 bg-neutral-bg px-3 py-3 sm:px-4 sm:py-4 space-y-4">
+            <div class="bg-white rounded-lg shadow-sm px-3 py-3 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
+                    <span>Category mix (0–100 total)</span>
+                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionCategoryMix" />
+                  </p>
+                  <p class="text-[11px] text-neutral-body mt-0.5">
+                    {{ MATCH_SECTION_INTROS.categoryMix }}
+                  </p>
+                </div>
+                <span
+                  class="text-[11px] font-mono"
+                  :class="categoryWeightsValid ? 'text-green-700' : 'text-red-700'"
+                >
+                  Sum: {{ categoryWeightSumPct }}% (must be 100%)
+                </span>
+              </div>
+              <label
+                v-for="field in categoryWeightFields"
+                :key="field.key"
+                class="block text-[11px] text-neutral-body"
+                :title="field.tooltip"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <span>
+                    {{ field.label }}
+                    {{ Math.round((configForm.categoryWeights?.[field.key] ?? 0) * 100) }}%
+                  </span>
+                  <AdminTuningHintIcon :tooltip="field.tooltip" />
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  class="w-full"
+                  :title="field.tooltip"
+                  :value="Math.round((configForm.categoryWeights?.[field.key] ?? 0) * 100)"
+                  @input="setCategoryWeightPct(field.key, Number(($event.target as HTMLInputElement).value))"
+                >
+              </label>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div
+                class="bg-white rounded-lg shadow-sm px-3 py-3 space-y-2"
+                :title="MATCH_TUNING_TOOLTIPS.minTotalScore"
+              >
+                <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
+                  <span>Minimum score (0–100)</span>
+                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.minTotalScore" />
                 </p>
-                <p class="text-[11px] text-neutral-body">
-                  Weights apply per matched phrase; score includes phrase word count. Use 0 on a surface to ignore it. With a target/current title, at least one primary phrase must match on a surface with non-zero primary weights.
+                <input
+                  v-model.number="configForm.thresholds.minTotalScore"
+                  type="range"
+                  min="0"
+                  max="100"
+                  class="w-full"
+                  :title="MATCH_TUNING_TOOLTIPS.minTotalScore"
+                >
+                <p class="text-[11px] text-neutral-body font-mono">
+                  Include jobs with score ≥ {{ configForm.thresholds?.minTotalScore ?? 0 }}
                 </p>
-                <div class="flex flex-wrap items-center gap-2">
+              </div>
+              <div class="bg-white rounded-lg shadow-sm px-3 py-3 space-y-2">
+                <div>
+                  <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
+                    <span>Hard gates</span>
+                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionHardGates" />
+                  </p>
+                  <p class="text-[11px] text-neutral-body mt-0.5">
+                    {{ MATCH_SECTION_INTROS.hardGates }}
+                  </p>
+                </div>
+                <label
+                  class="flex items-center gap-2 text-[11px] text-neutral-body cursor-pointer"
+                  :title="MATCH_TUNING_TOOLTIPS.phraseGate"
+                >
                   <input
-                    v-model.number="configForm.phraseMatching!.minPrimaryWords"
+                    v-model="configForm.phraseGate.requirePrimaryOrIndustry"
+                    type="checkbox"
+                    class="rounded border-neutral-border"
+                    :title="MATCH_TUNING_TOOLTIPS.phraseGate"
+                  >
+                  <span class="inline-flex items-center gap-1">
+                    <span>Require primary or industry phrase match</span>
+                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.phraseGate" />
+                  </span>
+                </label>
+                <label
+                  class="flex items-center gap-2 text-[11px] text-neutral-body cursor-pointer"
+                  :title="MATCH_TUNING_TOOLTIPS.payHardFloorEnabled"
+                >
+                  <input
+                    v-model="configForm.pay.hardFloorEnabled"
+                    type="checkbox"
+                    class="rounded border-neutral-border"
+                    :title="MATCH_TUNING_TOOLTIPS.payHardFloorEnabled"
+                  >
+                  <span class="inline-flex items-center gap-1">
+                    <span>Exclude pay far below range</span>
+                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.payHardFloorEnabled" />
+                  </span>
+                </label>
+                <div
+                  v-if="configForm.pay?.hardFloorEnabled"
+                  class="flex items-center gap-2"
+                  :title="MATCH_TUNING_TOOLTIPS.payHardFloorFraction"
+                >
+                  <input
+                    v-model.number="configForm.pay.hardFloorFraction"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    class="input w-28 shrink-0 text-sm"
+                    :title="MATCH_TUNING_TOOLTIPS.payHardFloorFraction"
+                  >
+                  <span
+                    class="text-[11px] text-neutral-body"
+                    :title="MATCH_TUNING_TOOLTIPS.payHardFloorFraction"
+                  >
+                    Below-min cutoff (fraction)
+                  </span>
+                </div>
+                <label
+                  class="flex items-center gap-2 text-[11px] text-neutral-body cursor-pointer"
+                  :title="MATCH_TUNING_TOOLTIPS.relocationGate"
+                >
+                  <input
+                    v-model="configForm.location.relocationGateEnabled"
+                    type="checkbox"
+                    class="rounded border-neutral-border"
+                    :title="MATCH_TUNING_TOOLTIPS.relocationGate"
+                  >
+                  <span class="inline-flex items-center gap-1">
+                    <span>Exclude far jobs unless remote / relocation</span>
+                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.relocationGate" />
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm px-3 py-2">
+              <div class="flex items-start gap-1.5 pt-2">
+                <details class="min-w-0 flex-1">
+                  <summary class="cursor-pointer text-xs font-semibold text-brand-charcoal list-none pb-2">
+                    Phrase tuning
+                  </summary>
+                  <div class="pb-3 space-y-2 border-t border-neutral-border/60 pt-2">
+                <p class="text-[11px] text-neutral-body">
+                  {{ MATCH_SECTION_INTROS.phrase }}
+                </p>
+                <p
+                  class="text-[11px]"
+                  :class="phraseSurfaceWeightsValid ? 'text-neutral-body' : 'text-red-700'"
+                >
+                  Title / description / briefing weights must sum to 100% (now {{ phraseSurfaceWeightSumPct }}%).
+                </p>
+                <div
+                  class="flex flex-wrap items-center gap-2"
+                  :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
+                >
+                  <input
+                    v-model.number="configForm.phrase.minPrimaryWords"
                     type="number"
                     min="1"
                     class="input w-28 shrink-0 text-sm"
-                    title="Minimum words for a title/industry n-gram to count as primary (single-word primaries allowed only when not a stop word)"
+                    :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
                   >
-                  <span class="text-[11px] text-neutral-body">minPrimaryWords</span>
+                  <span
+                    class="text-[11px] text-neutral-body"
+                    :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
+                  >
+                    minPrimaryWords
+                  </span>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-3">
-                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
-                    <p class="text-[11px] font-semibold text-brand-charcoal">
-                      Primary (title intent)
-                    </p>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.title" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">title</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.description" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">description</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.primary!.briefing" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
-                    </div>
-                  </div>
-                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
-                    <p class="text-[11px] font-semibold text-brand-charcoal">
-                      Secondary (title)
-                    </p>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.title" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">title</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.description" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">description</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.secondary!.briefing" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
-                    </div>
-                  </div>
-                  <div class="space-y-1.5 rounded border border-neutral-border/60 p-2">
-                    <p class="text-[11px] font-semibold text-brand-charcoal">
-                      Industry
-                    </p>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.title" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">title</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.description" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">description</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <input v-model.number="configForm.phraseWeights!.industry!.briefing" type="number" class="input w-28 shrink-0 text-sm">
-                      <span class="text-[11px] text-neutral-body truncate">briefing</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Pay weights</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
+                <p class="text-[11px] text-neutral-subtle">
+                  Match strength by tier; surface weights = how much title vs description vs briefing count.
+                </p>
+                <div class="grid gap-2 sm:grid-cols-3 text-[11px]">
+                  <label
+                    v-for="field in phraseTierFields"
+                    :key="field.key"
+                    class="flex items-center gap-2 cursor-pointer"
+                    :title="field.tooltip"
+                  >
+                    <span class="shrink-0">{{ field.label }}</span>
                     <input
-                      v-model.number="configForm.payWeights!.insideRange"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Score when job salary range overlaps your desired range"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Score when job salary range overlaps your desired range">insideRange</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.payWeights!.nearRange"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Score when job salary is slightly above or below your range (within tolerance)"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Score when job salary is slightly above or below your range (within tolerance)">nearRange</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.payWeights!.missingSalary"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Score when job has no salary listed"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Score when job has no salary listed">missingSalary</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.payWeights!.belowRangePenalty"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Penalty when job salary is below your range (beyond tolerance)"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Penalty when job salary is below your range (beyond tolerance)">belowRangePenalty</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Recency weights</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.recencyWeights!.baseRecency"
+                      v-model.number="configForm.phrase.tierFactors[field.key]"
                       type="number"
                       step="0.1"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Base score for job recency; decay is applied per day"
+                      min="0"
+                      max="1"
+                      class="input w-20 text-sm"
+                      :title="field.tooltip"
                     >
-                    <span class="text-[11px] text-neutral-body truncate" title="Base score for job recency; decay is applied per day">baseRecency</span>
-                  </div>
-                  <div class="flex items-center gap-2">
+                  </label>
+                  <label
+                    v-for="field in phraseSurfaceFields"
+                    :key="field.key"
+                    class="flex items-center gap-2 cursor-pointer"
+                    :title="field.tooltip"
+                  >
+                    <span class="shrink-0">{{ field.label }}</span>
                     <input
-                      v-model.number="configForm.recencyWeights!.perDayDecay"
+                      v-model.number="configForm.phrase.surfaceWeights[field.key]"
                       type="number"
-                      step="0.01"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Amount subtracted from recency score per day since posted"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      class="input w-20 text-sm"
+                      :title="field.tooltip"
                     >
-                    <span class="text-[11px] text-neutral-body truncate" title="Amount subtracted from recency score per day since posted">perDayDecay</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.recencyWeights!.maxAgeDays"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Jobs older than this many days are excluded before scoring (SQL + in-memory hard filter)">maxAgeDays</span>
-                  </div>
+                  </label>
                 </div>
+                  </div>
+                </details>
+                <AdminTuningHintIcon
+                  class="mt-0.5"
+                  :tooltip="MATCH_TUNING_TOOLTIPS.sectionPhrase"
+                />
               </div>
+            </div>
 
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Thresholds</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.thresholds!.minTotalScore"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Minimum total score for a job to be included in results"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Minimum total score for a job to be included in results">minTotalScore</span>
+            <div class="bg-white rounded-lg shadow-sm px-3 py-2">
+              <div class="flex items-start gap-1.5 pt-2">
+                <details class="min-w-0 flex-1">
+                  <summary class="cursor-pointer text-xs font-semibold text-brand-charcoal list-none pb-2">
+                    Pay tuning (0–1 per situation)
+                  </summary>
+                  <div class="pb-3 grid gap-2 sm:grid-cols-2 text-[11px] border-t border-neutral-border/60 pt-2">
+                <p class="sm:col-span-2 text-neutral-body">
+                  {{ MATCH_SECTION_INTROS.pay }}
+                </p>
+                <label
+                  v-for="field in payQualityFields"
+                  :key="field.modelKey"
+                  class="flex items-center gap-2 cursor-pointer"
+                  :title="field.tooltip"
+                >
+                  <span class="shrink-0">{{ field.label }}</span>
+                  <input
+                    v-model.number="configForm.pay[field.modelKey]"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    class="input w-20 text-sm"
+                    :title="field.tooltip"
+                  >
+                </label>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.thresholds!.noKeywordMatchPenalty"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Penalty when user has title (target else current) or industry keywords but the job matches none (job is excluded if role score drops below half this magnitude)"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Penalty when user has title (target else current) or industry keywords but the job matches none (job is excluded if role score drops below half this magnitude)"
-                    >noKeywordMatchPenalty</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.thresholds!.overPayTolerancePct"
-                      type="number"
-                      step="0.01"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.25 = 25%) above your max salary still counts as nearRange">overPayTolerancePct</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.thresholds!.underPayTolerancePct"
-                      type="number"
-                      step="0.01"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange"
-                    >
-                    <span class="text-[11px] text-neutral-body truncate" title="Tolerance (e.g. 0.15 = 15%) below your min salary still counts as nearRange">underPayTolerancePct</span>
-                  </div>
-                </div>
+                </details>
+                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionPay" />
               </div>
+            </div>
 
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Location - Distance</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
+            <div class="bg-white rounded-lg shadow-sm px-3 py-2">
+              <div class="flex items-start gap-1.5 pt-2">
+                <details class="min-w-0 flex-1">
+                  <summary class="cursor-pointer text-xs font-semibold text-brand-charcoal list-none pb-2">
+                    Location tuning (in-range = 1.0; bands = past radius)
+                  </summary>
+                  <div class="pb-3 space-y-2 text-[11px] border-t border-neutral-border/60 pt-2">
+                <p class="text-neutral-body">
+                  {{ MATCH_SECTION_INTROS.location }}
+                </p>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label
+                    v-for="field in locationBandFields"
+                    :key="field.modelKey"
+                    class="flex items-center gap-2 cursor-pointer"
+                    :title="field.tooltip"
+                  >
+                    <span class="shrink-0">{{ field.label }}</span>
                     <input
-                      v-model.number="configForm.locationWeights!.distance0to10"
+                      v-model.number="configForm.location.bandQualities[field.modelKey]"
                       type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      class="input w-20 text-sm"
+                      :title="field.tooltip"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Distance-based mode: score added when the closest preferred location is within 0–10 miles"
-                    >distance0to10</span>
-                  </div>
-                  <div class="flex items-center gap-2">
+                  </label>
+                  <label
+                    class="flex items-center gap-2 cursor-pointer"
+                    :title="MATCH_TUNING_TOOLTIPS.locSameMetro"
+                  >
+                    <span class="shrink-0">sameMetro</span>
                     <input
-                      v-model.number="configForm.locationWeights!.distance10to25"
+                      v-model.number="configForm.location.sameMetroQuality"
                       type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      class="input w-20 text-sm"
+                      :title="MATCH_TUNING_TOOLTIPS.locSameMetro"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Distance-based mode: score added when the closest preferred location is within 10–25 miles"
-                    >distance10to25</span>
-                  </div>
-                  <div class="flex items-center gap-2">
+                  </label>
+                  <label
+                    class="flex items-center gap-2 cursor-pointer"
+                    :title="MATCH_TUNING_TOOLTIPS.locSameState"
+                  >
+                    <span class="shrink-0">sameState</span>
                     <input
-                      v-model.number="configForm.locationWeights!.distance25to50"
+                      v-model.number="configForm.location.sameStateQuality"
                       type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      class="input w-20 text-sm"
+                      :title="MATCH_TUNING_TOOLTIPS.locSameState"
                     >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Distance-based mode: score added when the closest preferred location is within 25–50 miles"
-                    >distance25to50</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.distance50to100"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Distance-based mode: score added when the closest preferred location is within 50–100 miles"
-                    >distance50to100</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.distanceBeyond100"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Distance-based mode: score added when the closest preferred location is more than 100 miles away"
-                    >distanceBeyond100</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.withinRadiusBonus"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Extra distance-based bonus when the closest preferred location is within the user-selected radius (added on top of the distance band)"
-                    >withinRadiusBonus</span>
-                  </div>
+                  </label>
                 </div>
+                <label
+                  class="flex items-center gap-2 text-neutral-body cursor-pointer"
+                  :title="MATCH_TUNING_TOOLTIPS.locRemoteAsPerfect"
+                >
+                  <input
+                    v-model="configForm.location.remoteAsPerfect"
+                    type="checkbox"
+                    class="rounded border-neutral-border"
+                    :title="MATCH_TUNING_TOOLTIPS.locRemoteAsPerfect"
+                  >
+                  <span :title="MATCH_TUNING_TOOLTIPS.locRemoteAsPerfect">
+                    Count remote as full location score
+                  </span>
+                </label>
+                  </div>
+                </details>
+                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionLocation" />
               </div>
+            </div>
 
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Location - Categorical (Fallback)</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.sameMetro"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied only when distance-based scoring is not used and the job location string matches a preferred location (metro-level match)"
-                    >sameMetro</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.sameState"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied only when distance-based scoring is not used and the job is in the same state/region as a preferred location"
-                    >sameState</span>
-                  </div>
+            <div class="bg-white rounded-lg shadow-sm px-3 py-2">
+              <div class="flex items-start gap-1.5 pt-2">
+                <details class="min-w-0 flex-1">
+                  <summary class="cursor-pointer text-xs font-semibold text-brand-charcoal list-none pb-2">
+                    Recency tuning
+                  </summary>
+                  <div class="pb-3 space-y-2 text-[11px] border-t border-neutral-border/60 pt-2">
+                <p class="text-neutral-body">
+                  {{ MATCH_SECTION_INTROS.recency }}
+                </p>
+                <div
+                  class="flex items-center gap-2"
+                  :title="MATCH_TUNING_TOOLTIPS.recencyMaxAgeDays"
+                >
+                  <input
+                    v-model.number="configForm.recency.maxAgeDays"
+                    type="number"
+                    min="1"
+                    class="input w-28 shrink-0 text-sm"
+                    :title="MATCH_TUNING_TOOLTIPS.recencyMaxAgeDays"
+                  >
+                  <span class="text-neutral-body">maxAgeDays</span>
                 </div>
-              </div>
-
-              <div class="space-y-2 bg-white rounded-lg shadow-sm px-3 py-2.5">
-                <p class="text-xs font-semibold text-neutral-body">Location - Shared</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.remotePreferred"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Always applied when job is remote and you are open to remote (in both categorical and distance-based modes)"
-                    >remotePreferred</span>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.relocationAllowed"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Applied when job is outside preferred locations and far away but you are open to relocation"
-                    >relocationAllowed</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model.number="configForm.locationWeights!.otherLocationPenalty"
-                      type="number"
-                      class="input w-28 shrink-0 text-sm"
-                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
-                    >
-                    <span
-                      class="text-[11px] text-neutral-body truncate"
-                      title="Penalty when job is in a non-preferred location, far away, and you are not open to relocation"
-                    >otherLocationPenalty</span>
-                  </div>
-                </div>
+                </details>
+                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionRecency" />
               </div>
             </div>
           </div>
@@ -1130,23 +1375,24 @@ onMounted(async () => {
               <span>{{ debug.filters.excludedByRemoteOptOut }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by location:</span>
-              <span>{{ debug.filters.excludedByLocation }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by recency:</span>
               <span>{{ debug.filters.excludedByRecency }}</span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by phrase gate / no match:</span>
-              <span>{{ debug.filters.excludedByNoKeywordMatch }}</span>
+              <span class="font-semibold">Excluded by phrase gate:</span>
+              <span>{{ debug.filters.excludedByPhraseGate ?? 0 }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by pay hard floor:</span>
+              <span>{{ debug.filters.excludedByPayHardFloor ?? 0 }}</span>
+            </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Excluded by relocation gate:</span>
+              <span>{{ debug.filters.excludedByRelocationGate ?? 0 }}</span>
             </p>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by minTotalScore:</span>
               <span>{{ debug.filters.excludedByMinTotalScore }}</span>
-            </p>
-            <p class="text-[11px] text-neutral-subtle mt-2">
-              “Excluded by location” is reserved for future use; location is scored, not a hard filter in the current implementation.
             </p>
           </div>
 
@@ -1179,37 +1425,37 @@ onMounted(async () => {
               </span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Average role score:</span>
+              <span class="font-semibold">Avg phrase quality:</span>
               <span>
-                <span v-if="debug.scores.averageRoleScore !== null">
-                  {{ debug.scores.averageRoleScore.toFixed(2) }}
+                <span v-if="debug.scores.averagePhraseQuality != null">
+                  {{ (debug.scores.averagePhraseQuality * 100).toFixed(1) }}%
                 </span>
                 <span v-else>—</span>
               </span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Average pay score:</span>
+              <span class="font-semibold">Avg pay quality:</span>
               <span>
-                <span v-if="typeof debug.scores.averagePayScore === 'number'">
-                  {{ debug.scores.averagePayScore.toFixed(2) }}
+                <span v-if="debug.scores.averagePayQuality != null">
+                  {{ (debug.scores.averagePayQuality * 100).toFixed(1) }}%
                 </span>
                 <span v-else>—</span>
               </span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Average location score:</span>
+              <span class="font-semibold">Avg location quality:</span>
               <span>
-                <span v-if="debug.scores.averageLocationScore !== null">
-                  {{ debug.scores.averageLocationScore.toFixed(2) }}
+                <span v-if="debug.scores.averageLocationQuality != null">
+                  {{ (debug.scores.averageLocationQuality * 100).toFixed(1) }}%
                 </span>
                 <span v-else>—</span>
               </span>
             </p>
             <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Average recency score:</span>
+              <span class="font-semibold">Avg recency quality:</span>
               <span>
-                <span v-if="debug.scores.averageRecencyScore !== null">
-                  {{ debug.scores.averageRecencyScore.toFixed(2) }}
+                <span v-if="debug.scores.averageRecencyQuality != null">
+                  {{ (debug.scores.averageRecencyQuality * 100).toFixed(1) }}%
                 </span>
                 <span v-else>—</span>
               </span>
@@ -1277,7 +1523,7 @@ onMounted(async () => {
           <table class="min-w-full divide-y divide-neutral-border text-xs sm:text-sm">
             <thead class="bg-neutral-surface">
               <tr>
-                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Score / % of max</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Score (0–100)</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Title</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Company</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
@@ -1285,7 +1531,7 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Posted</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
-                  Role / Pay / Location / Recency
+                  Contributions
                 </th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">
                   Phrase match
@@ -1295,11 +1541,8 @@ onMounted(async () => {
             </thead>
             <tbody class="divide-y divide-neutral-border bg-white">
               <tr v-for="job in pagedJobs" :key="job.id" class="align-top">
-                <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">
-                  {{ job.score.toFixed(2) }}
-                  <span v-if="debug?.scores?.maxPossibleScore != null && debug.scores.maxPossibleScore > 0">
-                    ({{ ((100 * job.score) / debug.scores.maxPossibleScore).toFixed(1) }}%)
-                  </span>
+                <td class="px-3 py-2 whitespace-nowrap font-mono text-xs font-semibold">
+                  {{ job.score.toFixed(1) }}
                 </td>
                 <td class="px-3 py-2">
                   <div class="font-semibold text-brand-charcoal">
@@ -1355,11 +1598,20 @@ onMounted(async () => {
                     (created)
                   </div>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
-                  <div>Role: {{ job.components?.role ?? '—' }}</div>
-                  <div>Pay: {{ job.components?.pay ?? '—' }}</div>
-                  <div>Location: {{ job.components?.location ?? '—' }}</div>
-                  <div>Recency: {{ job.components?.recency != null ? job.components.recency.toFixed(2) : '—' }}</div>
+                <td class="px-3 py-2 whitespace-nowrap text-neutral-body text-[11px]">
+                  <template v-if="job.scoreContributions">
+                    <div>Phrase: {{ job.scoreContributions.phrase.toFixed(1) }}</div>
+                    <div>Pay: {{ job.scoreContributions.pay.toFixed(1) }}</div>
+                    <div>Loc: {{ job.scoreContributions.location.toFixed(1) }}</div>
+                    <div>Rec: {{ job.scoreContributions.recency.toFixed(1) }}</div>
+                  </template>
+                  <template v-else-if="job.components">
+                    <div>Phrase: {{ (job.components.phrase * 100).toFixed(0) }}% q</div>
+                    <div>Pay: {{ (job.components.pay * 100).toFixed(0) }}% q</div>
+                    <div>Loc: {{ (job.components.location * 100).toFixed(0) }}% q</div>
+                    <div>Rec: {{ (job.components.recency * 100).toFixed(0) }}% q</div>
+                  </template>
+                  <span v-else>—</span>
                 </td>
                 <td class="px-3 py-2 text-neutral-body text-[11px] max-w-xs">
                   {{ formatPhraseMatchCell(job) }}

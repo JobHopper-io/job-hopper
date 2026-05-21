@@ -6,6 +6,8 @@ const props = defineProps<{
   modelValue: string[]
   label?: string
   inputId?: string
+  /** Shown on hover over the label, info icon, and location input. */
+  tooltip?: string
 }>()
 
 const emit = defineEmits<{
@@ -105,10 +107,27 @@ const listAriaLabel = computed(() =>
 
 <template>
   <div class="space-y-2">
-    <label v-if="label" :for="inputId ?? 'preferred-locations-input'" class="block text-sm font-medium text-brand-charcoal">
-      {{ label }}
+    <label
+      v-if="label"
+      :for="inputId ?? 'preferred-locations-input'"
+      class="block text-sm font-medium text-brand-charcoal"
+      :title="tooltip"
+    >
+      <span class="inline-flex items-center gap-1">
+        <span>{{ label }}</span>
+        <font-awesome-icon
+          v-if="tooltip"
+          :icon="['fas', 'circle-info']"
+          class="text-neutral-muted text-xs cursor-help shrink-0"
+          :title="tooltip"
+          aria-hidden="true"
+        />
+      </span>
     </label>
-    <div class="flex flex-wrap items-center gap-2 rounded-[12px] border-2 border-neutral-border bg-white p-2 focus-within:border-brand-primary/50">
+    <div
+      class="flex flex-wrap items-center gap-2 rounded-[12px] border-2 border-neutral-border bg-white p-2 focus-within:border-brand-primary/50"
+      :title="tooltip"
+    >
       <ul
         v-if="modelValue.length > 0"
         class="flex flex-wrap gap-2 contents"
@@ -136,6 +155,7 @@ const listAriaLabel = computed(() =>
         v-model="inputValue"
         type="text"
         class="input min-w-[12rem] flex-1 border-0 p-1 shadow-none focus:ring-0"
+        :title="tooltip"
         placeholder="City, State or ZIP — tab away or press Enter to add"
         autocomplete="off"
         @blur="onInputBlur"

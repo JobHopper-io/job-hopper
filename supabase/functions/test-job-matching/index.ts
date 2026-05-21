@@ -1,13 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import type { Database } from '../_shared/database.ts'
 import { fetchJobRecordsForMatching } from '../_shared/fetch-jobs-for-matching.ts'
+import { fetchMatchSynonymsForMatching } from '../_shared/fetch-match-synonyms.ts'
+import { subscriberPreferencesFromProfile } from '../_shared/subscriber-preferences-from-profile.ts'
+import type { MatchSynonymEntry } from '../_shared/match-synonym-row.ts'
+import type { ProfileMatchingFields } from '../_shared/subscriber-preferences-from-profile.ts'
 import {
   type MatchConfig,
   type SubscriberPreferences,
   matchJobsWithDebug,
 } from '../_shared/job-matching-algorithm.ts'
-import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
+import {
+  assertSubscriptionTierKeysForMatching,
+  getSubscriptionTierProductKeysForProfile,
+} from '../_shared/subscription-tier-product-keys.ts'
 import { configRowToOverride } from '../_shared/matching-algorithm-config-row.ts'
+import { mergeConfigOverrides } from '../_shared/merge-match-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,52 +28,6 @@ interface TestJobMatchingBody {
   targetProfileId?: string
   preferencesOverride?: Partial<SubscriberPreferences>
   matchConfigOverride?: Partial<MatchConfig>
-}
-
-function mergeConfigOverrides(
-  base: Partial<MatchConfig> | null | undefined,
-  override: Partial<MatchConfig> | null | undefined,
-): Partial<MatchConfig> | undefined {
-  if (!base && !override) return undefined
-  if (!base && override) return override
-  if (base && !override) return base
-
-  const b = base as Partial<MatchConfig>
-  const o = override as Partial<MatchConfig>
-
-  return {
-    ...b,
-    ...o,
-    phraseWeights: {
-      primary: { ...(b.phraseWeights?.primary ?? {}), ...(o.phraseWeights?.primary ?? {}) },
-      secondary: { ...(b.phraseWeights?.secondary ?? {}), ...(o.phraseWeights?.secondary ?? {}) },
-      industry: { ...(b.phraseWeights?.industry ?? {}), ...(o.phraseWeights?.industry ?? {}) },
-    },
-    phraseMatching: {
-      ...(b.phraseMatching ?? {}),
-      ...(o.phraseMatching ?? {}),
-    },
-    payWeights: {
-      ...(b.payWeights ?? {}),
-      ...(o.payWeights ?? {}),
-    },
-    locationWeights: {
-      ...(b.locationWeights ?? {}),
-      ...(o.locationWeights ?? {}),
-    },
-    recencyWeights: {
-      ...(b.recencyWeights ?? {}),
-      ...(o.recencyWeights ?? {}),
-    },
-    thresholds: {
-      ...(b.thresholds ?? {}),
-      ...(o.thresholds ?? {}),
-    },
-    debug: {
-      ...(b.debug ?? {}),
-      ...(o.debug ?? {}),
-    },
-  }
 }
 
 function mergePreferences(
@@ -175,7 +138,7 @@ serve(async (req) => {
       throw new Error('Service role key not configured')
     }
 
-    const supabaseAdminClient = createClient(
+    const supabaseAdminClient = createClient<Database>(
       Deno.env.get('SUPABASE_URL') ?? '',
       serviceRoleKey,
       {
@@ -188,19 +151,12 @@ serve(async (req) => {
     const targetProfileId =
       typeof body.targetProfileId === 'string' ? body.targetProfileId.trim() : ''
 
-    let profile: {
+    type ProfileRow = ProfileMatchingFields & {
       id: string
-      current_job_title: string | null
-      target_job_title: string | null
-      current_industry: string | null
-      target_role_categories: unknown
-      desired_salary_min: number | null
-      desired_salary_max: number | null
-      preferred_locations: unknown
-      open_to_relocation: boolean | null
-      open_to_remote: boolean | null
-      location_radius_miles: number | null
+      onboarding_completed?: boolean
     }
+
+    let profile: ProfileRow
 
     if (targetProfileId.length > 0) {
       const { data: targetProfile, error: targetProfileError } = await supabaseAdminClient
@@ -271,21 +227,22 @@ serve(async (req) => {
       profile.id,
     )
 
-    const basePreferences: SubscriberPreferences = {
+    const basePreferences: SubscriberPreferences = subscriberPreferencesFromProfile(
+      profile,
       subscriptionTierProductKeys,
-      roles: (profile.target_role_categories ?? []) as string[],
-      targetJobTitle: profile.target_job_title,
-      currentJobTitle: profile.current_job_title,
-      currentIndustry: profile.current_industry,
-      payRangeMin: profile.desired_salary_min,
-      payRangeMax: profile.desired_salary_max,
-      preferredLocations: (profile.preferred_locations ?? []) as string[],
-      openToRelocation: profile.open_to_relocation,
-      openToRemote: profile.open_to_remote,
-      locationRadiusMiles: profile.location_radius_miles ?? null,
-    }
+    )
 
     const preferences = mergePreferences(basePreferences, body.preferencesOverride)
+
+    try {
+      assertSubscriptionTierKeysForMatching(preferences.subscriptionTierProductKeys)
+    } catch (tierKeysError) {
+      const message = tierKeysError instanceof Error ? tierKeysError.message : String(tierKeysError)
+      return new Response(JSON.stringify({ error: message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
 
     const url = new URL(req.url)
     const limitParam = url.searchParams.get('limit')
@@ -310,6 +267,15 @@ serve(async (req) => {
     const dbOverride = activeConfig ? configRowToOverride(activeConfig) : null
     const combinedOverride = mergeConfigOverrides(dbOverride, body.matchConfigOverride ?? null)
 
+    let matchSynonyms: MatchSynonymEntry[] = []
+    try {
+      matchSynonyms = await fetchMatchSynonymsForMatching(supabaseAdminClient)
+    } catch (synonymError) {
+      console.error('test-job-matching: failed to load match_synonyms', {
+        error: synonymError instanceof Error ? synonymError.message : String(synonymError),
+      })
+    }
+
     const jobRecords = await fetchJobRecordsForMatching(
       supabaseAdminClient,
       preferences,
@@ -317,7 +283,9 @@ serve(async (req) => {
       { maxJobs },
     )
 
-    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride)
+    const { ranked, debug } = matchJobsWithDebug(preferences, jobRecords, combinedOverride, {
+      synonyms: matchSynonyms,
+    })
 
     return new Response(
       JSON.stringify({

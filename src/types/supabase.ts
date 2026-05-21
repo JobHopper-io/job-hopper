@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   public: {
     Tables: {
       apollo_limits: {
@@ -43,21 +38,18 @@ export type Database = {
           company_name: string | null
           created_at: string
           id: number
-          linkedin_url: string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
           company_name?: string | null
           created_at?: string
           id?: number
-          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
           company_name?: string | null
           created_at?: string
           id?: number
-          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Relationships: []
@@ -566,125 +558,143 @@ export type Database = {
         }
         Relationships: []
       }
+      match_synonyms: {
+        Row: {
+          aliases: string[]
+          canonical: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          aliases?: string[]
+          canonical: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          aliases?: string[]
+          canonical?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       matching_algorithm_config: {
         Row: {
           active: boolean
           archived: boolean
+          cat_weight_location: number
+          cat_weight_pay: number
+          cat_weight_phrase: number
+          cat_weight_recency: number
           created_at: string
           id: string
-          loc_distance_0_10_weight: number
-          loc_distance_10_25_weight: number
-          loc_distance_25_50_weight: number
-          loc_distance_50_100_weight: number
-          loc_distance_beyond_100_weight: number
-          loc_other_location_penalty: number
-          loc_relocation_allowed_weight: number
-          loc_remote_preferred_weight: number
-          loc_same_metro_weight: number
-          loc_same_state_weight: number
-          loc_within_radius_bonus_weight: number
+          loc_band_beyond_100: number
+          loc_band_d0_10: number
+          loc_band_d10_25: number
+          loc_band_d25_50: number
+          loc_band_d50_100: number
+          loc_relocation_gate_enabled: boolean
+          loc_remote_as_perfect: boolean
+          loc_same_metro_quality: number
+          loc_same_state_quality: number
           name: string
-          pay_below_range_penalty: number
-          pay_inside_range_weight: number
-          pay_missing_salary_weight: number
-          pay_near_range_weight: number
-          phrase_industry_briefing_weight: number
-          phrase_industry_description_weight: number
-          phrase_industry_title_weight: number
+          pay_above_range_quality: number
+          pay_hard_floor_enabled: boolean
+          pay_hard_floor_fraction: number
+          pay_missing_salary_quality: number
+          pay_near_range_quality: number
+          pay_over_tolerance_fraction: number
+          pay_under_tolerance_fraction: number
+          phrase_gate_require_primary_or_industry: boolean
           phrase_min_primary_words: number
-          phrase_primary_briefing_weight: number
-          phrase_primary_description_weight: number
-          phrase_primary_title_weight: number
-          phrase_secondary_briefing_weight: number
-          phrase_secondary_description_weight: number
-          phrase_secondary_title_weight: number
-          recency_base_weight: number
+          phrase_surface_weight_briefing: number
+          phrase_surface_weight_description: number
+          phrase_surface_weight_title: number
+          phrase_tier_factor_industry: number
+          phrase_tier_factor_primary: number
+          phrase_tier_factor_secondary: number
           recency_max_age_days: number
-          recency_per_day_decay: number
           threshold_min_total_score: number
-          threshold_no_keyword_match_penalty: number
-          threshold_over_pay_tolerance_pct: number
-          threshold_under_pay_tolerance_pct: number
           updated_at: string
         }
         Insert: {
           active?: boolean
           archived?: boolean
+          cat_weight_location: number
+          cat_weight_pay: number
+          cat_weight_phrase: number
+          cat_weight_recency: number
           created_at?: string
           id?: string
-          loc_distance_0_10_weight: number
-          loc_distance_10_25_weight: number
-          loc_distance_25_50_weight: number
-          loc_distance_50_100_weight: number
-          loc_distance_beyond_100_weight: number
-          loc_other_location_penalty: number
-          loc_relocation_allowed_weight: number
-          loc_remote_preferred_weight: number
-          loc_same_metro_weight: number
-          loc_same_state_weight: number
-          loc_within_radius_bonus_weight: number
+          loc_band_beyond_100: number
+          loc_band_d0_10: number
+          loc_band_d10_25: number
+          loc_band_d25_50: number
+          loc_band_d50_100: number
+          loc_relocation_gate_enabled: boolean
+          loc_remote_as_perfect: boolean
+          loc_same_metro_quality: number
+          loc_same_state_quality: number
           name: string
-          pay_below_range_penalty: number
-          pay_inside_range_weight: number
-          pay_missing_salary_weight: number
-          pay_near_range_weight: number
-          phrase_industry_briefing_weight: number
-          phrase_industry_description_weight: number
-          phrase_industry_title_weight: number
+          pay_above_range_quality: number
+          pay_hard_floor_enabled: boolean
+          pay_hard_floor_fraction: number
+          pay_missing_salary_quality: number
+          pay_near_range_quality: number
+          pay_over_tolerance_fraction: number
+          pay_under_tolerance_fraction: number
+          phrase_gate_require_primary_or_industry: boolean
           phrase_min_primary_words: number
-          phrase_primary_briefing_weight: number
-          phrase_primary_description_weight: number
-          phrase_primary_title_weight: number
-          phrase_secondary_briefing_weight: number
-          phrase_secondary_description_weight: number
-          phrase_secondary_title_weight: number
-          recency_base_weight: number
+          phrase_surface_weight_briefing: number
+          phrase_surface_weight_description: number
+          phrase_surface_weight_title: number
+          phrase_tier_factor_industry: number
+          phrase_tier_factor_primary: number
+          phrase_tier_factor_secondary: number
           recency_max_age_days: number
-          recency_per_day_decay: number
           threshold_min_total_score: number
-          threshold_no_keyword_match_penalty: number
-          threshold_over_pay_tolerance_pct: number
-          threshold_under_pay_tolerance_pct: number
           updated_at?: string
         }
         Update: {
           active?: boolean
           archived?: boolean
+          cat_weight_location?: number
+          cat_weight_pay?: number
+          cat_weight_phrase?: number
+          cat_weight_recency?: number
           created_at?: string
           id?: string
-          loc_distance_0_10_weight?: number
-          loc_distance_10_25_weight?: number
-          loc_distance_25_50_weight?: number
-          loc_distance_50_100_weight?: number
-          loc_distance_beyond_100_weight?: number
-          loc_other_location_penalty?: number
-          loc_relocation_allowed_weight?: number
-          loc_remote_preferred_weight?: number
-          loc_same_metro_weight?: number
-          loc_same_state_weight?: number
-          loc_within_radius_bonus_weight?: number
+          loc_band_beyond_100?: number
+          loc_band_d0_10?: number
+          loc_band_d10_25?: number
+          loc_band_d25_50?: number
+          loc_band_d50_100?: number
+          loc_relocation_gate_enabled?: boolean
+          loc_remote_as_perfect?: boolean
+          loc_same_metro_quality?: number
+          loc_same_state_quality?: number
           name?: string
-          pay_below_range_penalty?: number
-          pay_inside_range_weight?: number
-          pay_missing_salary_weight?: number
-          pay_near_range_weight?: number
-          phrase_industry_briefing_weight?: number
-          phrase_industry_description_weight?: number
-          phrase_industry_title_weight?: number
+          pay_above_range_quality?: number
+          pay_hard_floor_enabled?: boolean
+          pay_hard_floor_fraction?: number
+          pay_missing_salary_quality?: number
+          pay_near_range_quality?: number
+          pay_over_tolerance_fraction?: number
+          pay_under_tolerance_fraction?: number
+          phrase_gate_require_primary_or_industry?: boolean
           phrase_min_primary_words?: number
-          phrase_primary_briefing_weight?: number
-          phrase_primary_description_weight?: number
-          phrase_primary_title_weight?: number
-          phrase_secondary_briefing_weight?: number
-          phrase_secondary_description_weight?: number
-          phrase_secondary_title_weight?: number
-          recency_base_weight?: number
+          phrase_surface_weight_briefing?: number
+          phrase_surface_weight_description?: number
+          phrase_surface_weight_title?: number
+          phrase_tier_factor_industry?: number
+          phrase_tier_factor_primary?: number
+          phrase_tier_factor_secondary?: number
           recency_max_age_days?: number
-          recency_per_day_decay?: number
           threshold_min_total_score?: number
-          threshold_no_keyword_match_penalty?: number
-          threshold_over_pay_tolerance_pct?: number
-          threshold_under_pay_tolerance_pct?: number
           updated_at?: string
         }
         Relationships: []
@@ -1608,3 +1618,4 @@ export const Constants = {
     },
   },
 } as const
+

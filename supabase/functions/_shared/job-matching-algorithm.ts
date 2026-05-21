@@ -4,25 +4,27 @@ import {
   inferSponsorshipLikelihood,
   type JobDataForInference,
 } from './infer-sponsorship-likelihood.ts'
+import type { MatchSynonymEntry } from './match-synonym-row.ts'
 import {
   evaluatePhraseMatch,
   getAllProfilePhrasesForDebug,
-  getMaxPhraseScore,
   effectiveJobTitleForKeywords as effectiveJobTitleForKeywordsFromPhrase,
-  type MatchConfigPhraseMatching,
-  type MatchConfigPhraseWeights,
+  type MatchConfigPhrase,
   type PhraseMatchDetails,
   type PhraseMatchJobSurfaces,
   type PhraseMatchSubscriberInput,
 } from './phrase-matching.ts'
 
 export { getEffectiveSponsorshipLikelihood, inferSponsorshipLikelihood }
+export type { MatchConfigPhrase, PhraseMatchDetails }
+
+export interface MatchJobsRunOptions {
+  synonyms?: MatchSynonymEntry[]
+}
 
 export interface SubscriberPreferences {
-  /** `products.key` for base_plan rows on the subscriber's active subscriptions; must align with `job_hopper_live.subscription_tier`. */
   subscriptionTierProductKeys: string[]
   roles: string[]
-  /** When set (non-empty), title keywords are derived from this; otherwise {@link currentJobTitle} is used. */
   targetJobTitle: string | null
   currentJobTitle: string | null
   currentIndustry: string | null
@@ -49,49 +51,54 @@ export interface JobRecord {
   payType: string | null
   createdAt: string
   postedDate: string | null
-  /** `job_hopper_live.subscription_tier` → `products.key` */
   subscriptionTier: string | null
-  /** Optional: used for sponsorship inference when sponsorshipLikelihood is N/A */
   employeeCount?: number | null
-  /** Optional: stored value from DB; when N/A, inference is used */
   sponsorshipLikelihood?: 'Low' | 'Medium' | 'High' | 'N/A' | null
 }
 
-export type { MatchConfigPhraseMatching, MatchConfigPhraseWeights, PhraseMatchDetails }
-
-export interface MatchConfigPayWeights {
-  insideRange: number
-  nearRange: number
-  missingSalary: number
-  belowRangePenalty: number
+export interface MatchConfigCategoryWeights {
+  phrase: number
+  pay: number
+  location: number
+  recency: number
 }
 
-export interface MatchConfigLocationWeights {
-  sameMetro: number
-  sameState: number
-  remotePreferred: number
-  relocationAllowed: number
-  otherLocationPenalty: number
-  distance0to10: number
-  distance10to25: number
-  distance25to50: number
-  distance50to100: number
-  distanceBeyond100: number
-  withinRadiusBonus: number
+export interface MatchConfigPay {
+  missingSalaryQuality: number
+  nearRangeQuality: number
+  aboveRangeQuality: number
+  overToleranceFraction: number
+  underToleranceFraction: number
+  hardFloorEnabled: boolean
+  hardFloorFraction: number
 }
 
-export interface MatchConfigRecencyWeights {
-  baseRecency: number
-  perDayDecay: number
+export interface MatchConfigLocationBandQualities {
+  d0to10: number
+  d10to25: number
+  d25to50: number
+  d50to100: number
+  dBeyond100: number
+}
+
+export interface MatchConfigLocation {
+  bandQualities: MatchConfigLocationBandQualities
+  sameMetroQuality: number
+  sameStateQuality: number
+  remoteAsPerfect: boolean
+  relocationGateEnabled: boolean
+}
+
+export interface MatchConfigRecency {
   maxAgeDays: number
 }
 
 export interface MatchConfigThresholds {
   minTotalScore: number
-  /** When user has title/industry keywords but job matches none, this penalty is applied so the job is excluded. */
-  noKeywordMatchPenalty: number
-  overPayTolerancePct: number
-  underPayTolerancePct: number
+}
+
+export interface MatchConfigPhraseGate {
+  requirePrimaryOrIndustry: boolean
 }
 
 export interface MatchConfigDebug {
@@ -99,19 +106,28 @@ export interface MatchConfigDebug {
 }
 
 export interface MatchConfig {
-  phraseWeights: MatchConfigPhraseWeights
-  phraseMatching: MatchConfigPhraseMatching
-  payWeights: MatchConfigPayWeights
-  locationWeights: MatchConfigLocationWeights
-  recencyWeights: MatchConfigRecencyWeights
+  categoryWeights: MatchConfigCategoryWeights
+  phrase: MatchConfigPhrase
+  pay: MatchConfigPay
+  location: MatchConfigLocation
+  recency: MatchConfigRecency
   thresholds: MatchConfigThresholds
+  phraseGate: MatchConfigPhraseGate
   debug: MatchConfigDebug
 }
 
 export interface RankedJob extends JobRecord {
+  /** Total match score on 0–100 scale. */
   score: number
   components?: {
-    role: number
+    phrase: number
+    pay: number
+    location: number
+    recency: number
+  }
+  /** Points contributed per category on 0–100 scale (categoryWeight × quality × 100). */
+  scoreContributions?: {
+    phrase: number
     pay: number
     location: number
     recency: number
@@ -120,94 +136,96 @@ export interface RankedJob extends JobRecord {
   locationDistanceMiles?: number | null
   withinRadius?: boolean
   locationParsed?: boolean
-  /** Effective sponsorship likelihood: stored value if not N/A, else inferred from job data */
   effectiveSponsorshipLikelihood?: 'Low' | 'Medium' | 'High'
 }
 
 export const defaultConfig: MatchConfig = {
-  phraseWeights: {
-    primary: { title: 4, description: 1, briefing: 0 },
-    secondary: { title: 1, description: 0.5, briefing: 0 },
-    industry: { title: 2, description: 1, briefing: 0 },
+  categoryWeights: {
+    phrase: 0.5,
+    pay: 0.15,
+    location: 0.25,
+    recency: 0.1,
   },
-  phraseMatching: {
+  phrase: {
+    tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
+    surfaceWeights: { title: 0.6, description: 0.3, briefing: 0.1 },
     minPrimaryWords: 2,
   },
-  payWeights: {
-    insideRange: 4,
-    nearRange: 2,
-    missingSalary: 1,
-    belowRangePenalty: -2,
+  pay: {
+    missingSalaryQuality: 0.3,
+    nearRangeQuality: 0.5,
+    aboveRangeQuality: 0.7,
+    overToleranceFraction: 0.25,
+    underToleranceFraction: 0.15,
+    hardFloorEnabled: false,
+    hardFloorFraction: 0.3,
   },
-  locationWeights: {
-    sameMetro: 4,
-    sameState: 2,
-    remotePreferred: 3,
-    relocationAllowed: 1,
-    otherLocationPenalty: -3,
-    distance0to10: 4,
-    distance10to25: 3,
-    distance25to50: 2,
-    distance50to100: 1,
-    distanceBeyond100: 0,
-    withinRadiusBonus: 3,
+  location: {
+    bandQualities: {
+      d0to10: 1,
+      d10to25: 0.85,
+      d25to50: 0.65,
+      d50to100: 0.35,
+      dBeyond100: 0,
+    },
+    sameMetroQuality: 0.7,
+    sameStateQuality: 0.4,
+    remoteAsPerfect: true,
+    relocationGateEnabled: false,
   },
-  recencyWeights: {
-    baseRecency: 3,
-    perDayDecay: 0.1,
+  recency: {
     maxAgeDays: 45,
   },
   thresholds: {
-    minTotalScore: 5,
-    noKeywordMatchPenalty: -100,
-    overPayTolerancePct: 0.25,
-    underPayTolerancePct: 0.15,
+    minTotalScore: 40,
+  },
+  phraseGate: {
+    requirePrimaryOrIndustry: true,
   },
   debug: {
     includeReasonBreakdown: false,
   },
 }
 
+function mergeNested<T extends object>(base: T, override: Partial<T> | undefined): T {
+  if (!override) return { ...base }
+  return { ...base, ...override }
+}
+
 export function mergeConfig(overrides: Partial<MatchConfig> | null | undefined): MatchConfig {
   if (!overrides) return defaultConfig
 
-  const ow = overrides.phraseWeights
-  const defPw = defaultConfig.phraseWeights
-  const phraseWeights: MatchConfigPhraseWeights = {
-    primary: { ...defPw.primary, ...(ow?.primary ?? {}) },
-    secondary: { ...defPw.secondary, ...(ow?.secondary ?? {}) },
-    industry: { ...defPw.industry, ...(ow?.industry ?? {}) },
-  }
-
   return {
-    ...defaultConfig,
-    ...overrides,
-    phraseWeights,
-    phraseMatching: {
-      ...defaultConfig.phraseMatching,
-      ...(overrides.phraseMatching ?? {}),
-    },
-    payWeights: {
-      ...defaultConfig.payWeights,
-      ...(overrides.payWeights ?? {}),
-    },
-    locationWeights: {
-      ...defaultConfig.locationWeights,
-      ...(overrides.locationWeights ?? {}),
-    },
-    recencyWeights: {
-      ...defaultConfig.recencyWeights,
-      ...(overrides.recencyWeights ?? {}),
-    },
-    thresholds: {
-      ...defaultConfig.thresholds,
-      ...(overrides.thresholds ?? {}),
-    },
-    debug: {
-      ...defaultConfig.debug,
-      ...(overrides.debug ?? {}),
-    },
+    categoryWeights: mergeNested(defaultConfig.categoryWeights, overrides.categoryWeights),
+    phrase: mergeNested(defaultConfig.phrase, {
+      ...overrides.phrase,
+      tierFactors: mergeNested(
+        defaultConfig.phrase.tierFactors,
+        overrides.phrase?.tierFactors,
+      ),
+      surfaceWeights: mergeNested(
+        defaultConfig.phrase.surfaceWeights,
+        overrides.phrase?.surfaceWeights,
+      ),
+    }),
+    pay: mergeNested(defaultConfig.pay, overrides.pay),
+    location: mergeNested(defaultConfig.location, {
+      ...overrides.location,
+      bandQualities: mergeNested(
+        defaultConfig.location.bandQualities,
+        overrides.location?.bandQualities,
+      ),
+    }),
+    recency: mergeNested(defaultConfig.recency, overrides.recency),
+    thresholds: mergeNested(defaultConfig.thresholds, overrides.thresholds),
+    phraseGate: mergeNested(defaultConfig.phraseGate, overrides.phraseGate),
+    debug: mergeNested(defaultConfig.debug, overrides.debug),
   }
+}
+
+/** Theoretical maximum total score is always 100 on the bounded scale. */
+export function getMaxPossibleScore(): number {
+  return 100
 }
 
 function toJobDataForInference(job: JobRecord): JobDataForInference {
@@ -222,10 +240,6 @@ function toJobDataForInference(job: JobRecord): JobDataForInference {
   }
 }
 
-/**
- * Text used for job-title phrase extraction: trimmed target title when present,
- * otherwise the subscriber's current job title (non-empty after trim).
- */
 export function effectiveJobTitleForKeywords(prefs: SubscriberPreferences): string | null {
   return effectiveJobTitleForKeywordsFromPhrase({
     targetJobTitle: prefs.targetJobTitle,
@@ -250,72 +264,18 @@ function jobToPhraseSurfaces(job: JobRecord): PhraseMatchJobSurfaces {
   }
 }
 
-function computePhraseRoleScore(
-  prefs: SubscriberPreferences,
-  job: JobRecord,
-  cfg: MatchConfig,
-): { roleScore: number; phraseMatch: PhraseMatchDetails } {
-  const { phraseScore, phraseMatch, passesGate, hasSearchIntent } = evaluatePhraseMatch(
-    prefsToPhraseInput(prefs),
-    jobToPhraseSurfaces(job),
-    cfg.phraseWeights,
-    cfg.phraseMatching,
-  )
-  let roleScore = phraseScore
-  if (hasSearchIntent && !passesGate) {
-    roleScore += cfg.thresholds.noKeywordMatchPenalty
-  }
-  return { roleScore, phraseMatch }
-}
-
-/** True if the job's catalog tier matches one of the subscriber's base plan product keys. */
 function jobMatchesSubscriptionTier(job: JobRecord, prefs: SubscriberPreferences): boolean {
-  if (prefs.subscriptionTierProductKeys.length === 0) {
-    return false
-  }
+  if (prefs.subscriptionTierProductKeys.length === 0) return false
   const tier = job.subscriptionTier
-  if (tier == null || tier === '') {
-    return false
-  }
+  if (tier == null || tier === '') return false
   return prefs.subscriptionTierProductKeys.includes(tier)
 }
 
-/** True if job is in scope: user has no target roles, or job's role_category is one of them. */
 function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): boolean {
   if (prefs.roles.length === 0) return true
   if (!job.roleCategory) return false
   const lowerCategory = job.roleCategory.toLowerCase()
   return prefs.roles.some((role) => role.toLowerCase() === lowerCategory)
-}
-
-/**
- * Highest possible total score for the given prefs and config (theoretical maximum).
- * Used to show score as percentage of max on the admin job-matching page.
- */
-function getMaxLocationScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
-  const lw = cfg.locationWeights
-  const remotePart = prefs.openToRemote ? lw.remotePreferred : 0
-  if ((prefs.preferredLocations ?? []).length === 0) {
-    return remotePart
-  }
-
-  const radiusBonus =
-    prefs.locationRadiusMiles != null && prefs.locationRadiusMiles > 0
-      ? lw.withinRadiusBonus
-      : 0
-
-  // Scoring uses distance bands OR categorical fallback, not both; remote stacks with either.
-  const distanceBest = remotePart + lw.distance0to10 + radiusBonus
-  const categoricalBest = remotePart + lw.sameMetro
-  return Math.max(distanceBest, categoricalBest)
-}
-
-export function getMaxPossibleScore(prefs: SubscriberPreferences, cfg: MatchConfig): number {
-  const maxPhrase = getMaxPhraseScore(prefsToPhraseInput(prefs), cfg.phraseWeights, cfg.phraseMatching)
-  const maxPay = cfg.payWeights.insideRange
-  const maxLocation = getMaxLocationScore(prefs, cfg)
-  const maxRecency = cfg.recencyWeights.baseRecency
-  return maxPhrase + maxPay + maxLocation + maxRecency
 }
 
 function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: number | null } {
@@ -349,7 +309,7 @@ function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: numb
   return { min, max }
 }
 
-function computePayScore(
+function computePayQuality(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
@@ -357,38 +317,53 @@ function computePayScore(
   const userMin = prefs.payRangeMin
   const userMax = prefs.payRangeMax
   const { min: jobMin, max: jobMax } = normalizeAnnualFromJob(job)
+  const pay = cfg.pay
 
   if (userMin == null || userMax == null || jobMin == null || jobMax == null) {
-    return cfg.payWeights.missingSalary
+    return pay.missingSalaryQuality
   }
 
   const overlapMin = Math.max(userMin, jobMin)
   const overlapMax = Math.min(userMax, jobMax)
-  const hasOverlap = overlapMin <= overlapMax
-
-  if (hasOverlap) {
-    return cfg.payWeights.insideRange
+  if (overlapMin <= overlapMax) {
+    return 1
   }
 
   const userCenter = (userMin + userMax) / 2
   const jobCenter = (jobMin + jobMax) / 2
-
   const diff = jobCenter - userCenter
   const diffPct = diff / userCenter
 
-  if (diffPct > 0 && diffPct <= cfg.thresholds.overPayTolerancePct) {
-    return cfg.payWeights.nearRange
+  if (diffPct > 0 && diffPct <= pay.overToleranceFraction) {
+    return pay.aboveRangeQuality
   }
 
-  if (diffPct < 0 && Math.abs(diffPct) <= cfg.thresholds.underPayTolerancePct) {
-    return cfg.payWeights.nearRange
+  if (diffPct < 0 && Math.abs(diffPct) <= pay.underToleranceFraction) {
+    return pay.nearRangeQuality
   }
 
-  if (diffPct < 0 && Math.abs(diffPct) > cfg.thresholds.underPayTolerancePct) {
-    return cfg.payWeights.belowRangePenalty
+  if (diffPct < 0 && Math.abs(diffPct) > pay.underToleranceFraction) {
+    return 0
   }
 
-  return 0
+  return pay.aboveRangeQuality
+}
+
+/** Hard gate: job pay is more than hardFloorFraction below user minimum. */
+export function failsPayHardFloor(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+): boolean {
+  if (!cfg.pay.hardFloorEnabled) return false
+  const userMin = prefs.payRangeMin
+  if (userMin == null) return false
+  const { min: jobMin, max: jobMax } = normalizeAnnualFromJob(job)
+  if (jobMin == null && jobMax == null) return false
+  const jobTop = jobMax ?? jobMin
+  if (jobTop == null) return false
+  const floor = userMin * (1 - cfg.pay.hardFloorFraction)
+  return jobTop < floor
 }
 
 type NormalizedWithCoords = {
@@ -410,7 +385,7 @@ function normalizeWithCoords(raw: string | null | undefined): NormalizedWithCoor
 
 function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (v: number) => (v * Math.PI) / 180
-  const R = 3959 // Earth radius in miles
+  const R = 3959
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
   const a =
@@ -420,98 +395,113 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
   return R * c
 }
 
-function computeCategoricalLocationScore(
+function bandQualityForDistance(miles: number, bands: MatchConfigLocationBandQualities): number {
+  const d = Math.max(0, miles)
+  if (d <= 10) return bands.d0to10
+  if (d <= 25) return bands.d10to25
+  if (d <= 50) return bands.d25to50
+  if (d <= 100) return bands.d50to100
+  return bands.dBeyond100
+}
+
+/**
+ * Location quality from nearest preferred place (miles) and subscriber radius.
+ * Inside radius → 1.0. Outside → admin band weights apply to miles beyond the radius.
+ * If radius is unset, bands use absolute distance (legacy fallback).
+ */
+export function locationQualityFromDistance(
+  minDistanceMiles: number,
+  locationRadiusMiles: number | null,
+  bands: MatchConfigLocationBandQualities,
+): { quality: number; withinRadius: boolean } {
+  const radius =
+    locationRadiusMiles != null && locationRadiusMiles > 0 ? locationRadiusMiles : null
+
+  if (radius != null && minDistanceMiles <= radius) {
+    return { quality: 1, withinRadius: true }
+  }
+
+  const milesBeyondRadius = radius != null ? minDistanceMiles - radius : minDistanceMiles
+  return {
+    quality: bandQualityForDistance(milesBeyondRadius, bands),
+    withinRadius: false,
+  }
+}
+
+function computeCategoricalLocationQuality(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
 ): number {
+  const loc = cfg.location
   const normalizedJobLocation = normalizeLocationInput(job.location ?? '').normalized ?? ''
   const isRemote = job.isRemote
   const prefersRemote = !!prefs.openToRemote
 
-  const preferredLocations = (prefs.preferredLocations ?? [])
-    .map((loc) => normalizeLocationInput(loc ?? '').normalized ?? '')
-    .filter((loc) => loc.length > 0)
-
-  let score = 0
-
-  if (isRemote && prefersRemote) {
-    score += cfg.locationWeights.remotePreferred
+  if (isRemote && prefersRemote && loc.remoteAsPerfect) {
+    return 1
   }
+
+  const preferredLocations = (prefs.preferredLocations ?? [])
+    .map((l) => normalizeLocationInput(l ?? '').normalized ?? '')
+    .filter((l) => l.length > 0)
 
   if (preferredLocations.length === 0) {
-    return score
+    return 0
   }
 
-  let matchedPreferred = false
   if (normalizedJobLocation) {
     for (const pref of preferredLocations) {
       if (normalizedJobLocation.includes(pref) || pref.includes(normalizedJobLocation)) {
-        matchedPreferred = true
-        score += cfg.locationWeights.sameMetro
-        break
+        return loc.sameMetroQuality
       }
     }
   }
 
-  if (!matchedPreferred && normalizedJobLocation) {
+  if (normalizedJobLocation) {
     const jobTokens = normalizedJobLocation.split(/[^a-z0-9]+/i).filter((t) => t.length > 0)
     for (const token of jobTokens) {
       for (const pref of preferredLocations) {
         if (pref.includes(token) || token.includes(pref)) {
-          matchedPreferred = true
-          score += cfg.locationWeights.sameState
-          break
+          return loc.sameStateQuality
         }
       }
-      if (matchedPreferred) {
-        break
-      }
     }
   }
 
-  if (!matchedPreferred && !isRemote) {
-    if (prefs.openToRelocation) {
-      score += cfg.locationWeights.relocationAllowed
-    } else {
-      score += cfg.locationWeights.otherLocationPenalty
-    }
-  }
-
-  return score
+  return 0
 }
 
-function computeLocationScore(
+function computeLocationQuality(
   prefs: SubscriberPreferences,
   job: JobRecord,
   cfg: MatchConfig,
-): { score: number; distanceMiles: number | null; withinRadius: boolean; parsed: boolean } {
+): { quality: number; distanceMiles: number | null; withinRadius: boolean; parsed: boolean } {
+  const loc = cfg.location
   const isRemote = job.isRemote
   const prefersRemote = !!prefs.openToRemote
 
-  let score = 0
-
-  if (isRemote && prefersRemote) {
-    score += cfg.locationWeights.remotePreferred
+  if (isRemote && prefersRemote && loc.remoteAsPerfect) {
+    return { quality: 1, distanceMiles: null, withinRadius: false, parsed: false }
   }
 
   const jobNorm = normalizeWithCoords(job.location ?? '')
-
   const preferredLocationsRaw = prefs.preferredLocations ?? []
+
   if (preferredLocationsRaw.length === 0) {
-    return { score, distanceMiles: null, withinRadius: false, parsed: jobNorm.parsed }
+    return { quality: 0, distanceMiles: null, withinRadius: false, parsed: jobNorm.parsed }
   }
+
   const preferred = preferredLocationsRaw
-    .map((loc) => normalizeWithCoords(loc))
-    .filter((loc) => loc.normalized)
+    .map((l) => normalizeWithCoords(l))
+    .filter((p) => p.normalized)
 
   const hasJobCoords = jobNorm.lat != null && jobNorm.lon != null
   const hasAnyPreferredCoords = preferred.some((p) => p.lat != null && p.lon != null)
 
-  // If we don't have coordinates on either side, fall back to the old categorical rules.
   if (!hasJobCoords || !hasAnyPreferredCoords) {
     return {
-      score: score + computeCategoricalLocationScore(prefs, job, cfg),
+      quality: computeCategoricalLocationQuality(prefs, job, cfg),
       distanceMiles: null,
       withinRadius: false,
       parsed: jobNorm.parsed,
@@ -526,7 +516,7 @@ function computeLocationScore(
 
   if (distances.length === 0) {
     return {
-      score: score + computeCategoricalLocationScore(prefs, job, cfg),
+      quality: computeCategoricalLocationQuality(prefs, job, cfg),
       distanceMiles: null,
       withinRadius: false,
       parsed: jobNorm.parsed,
@@ -534,49 +524,33 @@ function computeLocationScore(
   }
 
   const minDistance = Math.min(...distances)
-  let withinRadius = false
-
-  // Distance band scoring
-  if (minDistance <= 10) {
-    score += cfg.locationWeights.distance0to10
-  } else if (minDistance <= 25) {
-    score += cfg.locationWeights.distance10to25
-  } else if (minDistance <= 50) {
-    score += cfg.locationWeights.distance25to50
-  } else if (minDistance <= 100) {
-    score += cfg.locationWeights.distance50to100
-  } else {
-    score += cfg.locationWeights.distanceBeyond100
-  }
-
-  // Radius bonus when inside user-selected radius
-  if (prefs.locationRadiusMiles != null && prefs.locationRadiusMiles > 0) {
-    if (minDistance <= prefs.locationRadiusMiles) {
-      score += cfg.locationWeights.withinRadiusBonus
-      withinRadius = true
-    }
-  }
-
-  // If far away, non-remote, and user not open to relocation, apply penalty
-  if (minDistance > 100 && !isRemote && !prefs.openToRelocation) {
-    score += cfg.locationWeights.otherLocationPenalty
-  } else if (minDistance > 100 && !isRemote && prefs.openToRelocation) {
-    score += cfg.locationWeights.relocationAllowed
-  }
-
-  return { score, distanceMiles: minDistance, withinRadius, parsed: jobNorm.parsed }
+  const { quality, withinRadius } = locationQualityFromDistance(
+    minDistance,
+    prefs.locationRadiusMiles,
+    loc.bandQualities,
+  )
+  return { quality, distanceMiles: minDistance, withinRadius, parsed: jobNorm.parsed }
 }
 
-/** ISO timestamp for jobs at or after the recency window (matches {@link jobExceedsMaxAge} / SQL prefilter). */
+/** Hard gate: far job when relocation gate enabled and user not open to relocation/remote. */
+export function failsRelocationGate(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  distanceMiles: number | null,
+  cfg: MatchConfig,
+): boolean {
+  if (!cfg.location.relocationGateEnabled) return false
+  if (job.isRemote) return false
+  if (prefs.openToRelocation) return false
+  if (distanceMiles == null) return false
+  return distanceMiles > 100
+}
+
 export function getRecencyCutoffIso(maxAgeDays: number, nowMs: number = Date.now()): string {
   const cutoffMs = nowMs - maxAgeDays * 24 * 60 * 60 * 1000
   return new Date(cutoffMs).toISOString()
 }
 
-/**
- * Hard recency filter: uses {@link JobRecord.postedDate} when set, otherwise {@link JobRecord.createdAt}.
- * Missing or unparseable dates are not treated as too old (same as legacy scoring behavior).
- */
 export function jobExceedsMaxAge(job: JobRecord, cfg: MatchConfig, nowMs: number = Date.now()): boolean {
   const ts = job.postedDate ?? job.createdAt
   if (!ts) return false
@@ -585,14 +559,10 @@ export function jobExceedsMaxAge(job: JobRecord, cfg: MatchConfig, nowMs: number
   if (Number.isNaN(dateMs)) return false
 
   const days = (nowMs - dateMs) / (1000 * 60 * 60 * 24)
-  return days > cfg.recencyWeights.maxAgeDays
+  return days > cfg.recency.maxAgeDays
 }
 
-function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
-  if (jobExceedsMaxAge(job, cfg, nowMs)) {
-    return -Infinity
-  }
-
+function computeRecencyQuality(job: JobRecord, cfg: MatchConfig, nowMs: number): number {
   const ts = job.postedDate ?? job.createdAt
   if (!ts) return 0
 
@@ -600,50 +570,129 @@ function computeRecencyScore(job: JobRecord, cfg: MatchConfig, nowMs: number): n
   if (Number.isNaN(dateMs)) return 0
 
   const days = (nowMs - dateMs) / (1000 * 60 * 60 * 24)
-  const score = cfg.recencyWeights.baseRecency - days * cfg.recencyWeights.perDayDecay
-  return score > 0 ? score : 0
+  const maxDays = Math.max(1, cfg.recency.maxAgeDays)
+  return Math.max(0, 1 - days / maxDays)
+}
+
+export interface JobMatchQualities {
+  phraseRelevance: number
+  payQuality: number
+  locationQuality: number
+  recencyQuality: number
+  phraseMatch: PhraseMatchDetails
+  locationDistanceMiles: number | null
+  withinRadius: boolean
+  locationParsed: boolean
+}
+
+function computeJobQualities(
+  prefs: SubscriberPreferences,
+  job: JobRecord,
+  cfg: MatchConfig,
+  nowMs: number,
+  synonyms: MatchSynonymEntry[],
+): JobMatchQualities {
+  const { phraseRelevance, phraseMatch } = evaluatePhraseMatch(
+    prefsToPhraseInput(prefs),
+    jobToPhraseSurfaces(job),
+    cfg.phrase,
+    synonyms,
+  )
+  const payQuality = computePayQuality(prefs, job, cfg)
+  const {
+    quality: locationQuality,
+    distanceMiles,
+    withinRadius,
+    parsed: locationParsed,
+  } = computeLocationQuality(prefs, job, cfg)
+  const recencyQuality = computeRecencyQuality(job, cfg, nowMs)
+
+  return {
+    phraseRelevance,
+    payQuality,
+    locationQuality,
+    recencyQuality,
+    phraseMatch,
+    locationDistanceMiles: distanceMiles,
+    withinRadius,
+    locationParsed,
+  }
+}
+
+function totalScoreFromQualities(qualities: JobMatchQualities, cfg: MatchConfig): {
+  score: number
+  components: RankedJob['components']
+  scoreContributions: RankedJob['scoreContributions']
+} {
+  const w = cfg.categoryWeights
+  const components = {
+    phrase: qualities.phraseRelevance,
+    pay: qualities.payQuality,
+    location: qualities.locationQuality,
+    recency: qualities.recencyQuality,
+  }
+  const scoreContributions = {
+    phrase: 100 * w.phrase * qualities.phraseRelevance,
+    pay: 100 * w.pay * qualities.payQuality,
+    location: 100 * w.location * qualities.locationQuality,
+    recency: 100 * w.recency * qualities.recencyQuality,
+  }
+  const score =
+    scoreContributions.phrase +
+    scoreContributions.pay +
+    scoreContributions.location +
+    scoreContributions.recency
+  return {
+    score: Math.round(score * 100) / 100,
+    components,
+    scoreContributions,
+  }
+}
+
+function passesPhraseGate(
+  hasSearchIntent: boolean,
+  passesGate: boolean,
+  cfg: MatchConfig,
+): boolean {
+  if (!cfg.phraseGate.requirePrimaryOrIndustry) return true
+  if (!hasSearchIntent) return true
+  return passesGate
 }
 
 export function matchJobs(
   prefs: SubscriberPreferences,
   jobs: JobRecord[],
   overrides?: Partial<MatchConfig> | null,
+  runOptions?: MatchJobsRunOptions,
 ): RankedJob[] {
   const cfg = mergeConfig(overrides)
+  const synonyms = runOptions?.synonyms ?? []
   const nowMs = Date.now()
-
   const ranked: RankedJob[] = []
 
   for (const job of jobs) {
-    if (!jobMatchesSubscriptionTier(job, prefs)) {
-      continue
-    }
+    if (!jobMatchesSubscriptionTier(job, prefs)) continue
+    if (!jobMatchesTargetRoles(job, prefs)) continue
+    if (jobExceedsMaxAge(job, cfg, nowMs)) continue
+    if (job.isRemote && prefs.openToRemote === false) continue
 
-    if (!jobMatchesTargetRoles(job, prefs)) {
-      continue
-    }
+    const { phraseRelevance, phraseMatch, passesGate, hasSearchIntent } = evaluatePhraseMatch(
+      prefsToPhraseInput(prefs),
+      jobToPhraseSurfaces(job),
+      cfg.phrase,
+      synonyms,
+    )
+    if (!passesPhraseGate(hasSearchIntent, passesGate, cfg)) continue
+    if (failsPayHardFloor(prefs, job, cfg)) continue
 
-    if (jobExceedsMaxAge(job, cfg, nowMs)) {
-      continue
-    }
+    const qualities = computeJobQualities(prefs, job, cfg, nowMs, synonyms)
+    qualities.phraseRelevance = phraseRelevance
+    qualities.phraseMatch = phraseMatch
 
-    if (job.isRemote && prefs.openToRemote === false) {
-      continue
-    }
+    if (failsRelocationGate(prefs, job, qualities.locationDistanceMiles, cfg)) continue
 
-    const { roleScore } = computePhraseRoleScore(prefs, job, cfg)
-    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
-      continue
-    }
-
-    const payScore = computePayScore(prefs, job, cfg)
-    const { score: locationScore } = computeLocationScore(prefs, job, cfg)
-    const recencyScore = computeRecencyScore(job, cfg, nowMs)
-
-    const totalScore = roleScore + payScore + locationScore + recencyScore
-    if (totalScore < cfg.thresholds.minTotalScore) {
-      continue
-    }
+    const { score, components, scoreContributions } = totalScoreFromQualities(qualities, cfg)
+    if (score < cfg.thresholds.minTotalScore) continue
 
     const effectiveSponsorship = getEffectiveSponsorshipLikelihood(
       job.sponsorshipLikelihood ?? 'N/A',
@@ -652,17 +701,17 @@ export function matchJobs(
 
     const base: RankedJob = {
       ...job,
-      score: totalScore,
+      score,
       effectiveSponsorshipLikelihood: effectiveSponsorship,
     }
 
     if (cfg.debug.includeReasonBreakdown) {
-      base.components = {
-        role: roleScore,
-        pay: payScore,
-        location: locationScore,
-        recency: recencyScore,
-      }
+      base.components = components
+      base.scoreContributions = scoreContributions
+      base.phraseMatch = phraseMatch
+      base.locationDistanceMiles = qualities.locationDistanceMiles
+      base.withinRadius = qualities.withinRadius
+      base.locationParsed = qualities.locationParsed
     }
 
     ranked.push(base)
@@ -670,14 +719,9 @@ export function matchJobs(
 
   ranked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
-
     const aMs = Date.parse(a.postedDate ?? a.createdAt)
     const bMs = Date.parse(b.postedDate ?? b.createdAt)
-
-    if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) {
-      return bMs - aMs
-    }
-
+    if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) return bMs - aMs
     return 0
   })
 
@@ -690,9 +734,10 @@ export interface MatchJobsDebugPayload {
     excludedBySubscriptionTier: number
     excludedByRole: number
     excludedByRemoteOptOut: number
-    excludedByLocation: number
     excludedByRecency: number
-    excludedByNoKeywordMatch: number
+    excludedByPhraseGate: number
+    excludedByPayHardFloor: number
+    excludedByRelocationGate: number
     excludedByMinTotalScore: number
     includedAfterFilters: number
   }
@@ -700,10 +745,10 @@ export interface MatchJobsDebugPayload {
     minScore: number | null
     maxScore: number | null
     averageScore: number | null
-    averageRoleScore: number | null
-    averagePayScore: number | null
-    averageLocationScore: number | null
-    averageRecencyScore: number | null
+    averagePhraseQuality: number | null
+    averagePayQuality: number | null
+    averageLocationQuality: number | null
+    averageRecencyQuality: number | null
     maxPossibleScore: number
   }
   phrases: {
@@ -722,19 +767,22 @@ export function matchJobsWithDebug(
   prefs: SubscriberPreferences,
   jobs: JobRecord[],
   overrides?: Partial<MatchConfig> | null,
+  runOptions?: MatchJobsRunOptions,
 ): { ranked: RankedJob[]; debug: MatchJobsDebugPayload } {
   const cfg = mergeConfig({
     ...overrides,
     debug: { includeReasonBreakdown: true },
   })
+  const synonyms = runOptions?.synonyms ?? []
   const nowMs = Date.now()
 
   let excludedBySubscriptionTier = 0
   let excludedByRole = 0
   let excludedByRemoteOptOut = 0
-  const excludedByLocation = 0
   let excludedByRecency = 0
-  let excludedByNoKeywordMatch = 0
+  let excludedByPhraseGate = 0
+  let excludedByPayHardFloor = 0
+  let excludedByRelocationGate = 0
   let excludedByMinTotalScore = 0
 
   const ranked: RankedJob[] = []
@@ -742,14 +790,14 @@ export function matchJobsWithDebug(
   let minScore: number | null = null
   let maxScore: number | null = null
   let sumScore = 0
-  let sumRoleScore = 0
-  let sumPayScore = 0
-  let sumLocationScore = 0
-  let sumRecencyScore = 0
+  let sumPhrase = 0
+  let sumPay = 0
+  let sumLocation = 0
+  let sumRecency = 0
 
   const phraseDebugList = getAllProfilePhrasesForDebug(
     prefsToPhraseInput(prefs),
-    cfg.phraseMatching,
+    cfg.phrase.minPrimaryWords,
   )
   const phraseCounts = new Map<string, number>()
   const phraseKey = (kind: string, phrase: string) => `${kind}\x1f${phrase}`
@@ -780,28 +828,35 @@ export function matchJobsWithDebug(
       continue
     }
 
-    const { roleScore, phraseMatch } = computePhraseRoleScore(prefs, job, cfg)
+    const { phraseRelevance, phraseMatch, passesGate, hasSearchIntent } = evaluatePhraseMatch(
+      prefsToPhraseInput(prefs),
+      jobToPhraseSurfaces(job),
+      cfg.phrase,
+      synonyms,
+    )
 
-    if (roleScore <= cfg.thresholds.noKeywordMatchPenalty / 2) {
-      excludedByNoKeywordMatch += 1
+    if (!passesPhraseGate(hasSearchIntent, passesGate, cfg)) {
+      excludedByPhraseGate += 1
       continue
     }
 
-    const payScore = computePayScore(prefs, job, cfg)
-    const {
-      score: locationScore,
-      distanceMiles,
-      withinRadius,
-      parsed: locationParsed,
-    } = computeLocationScore(
-      prefs,
-      job,
-      cfg,
-    )
-    const recencyScore = computeRecencyScore(job, cfg, nowMs)
+    if (failsPayHardFloor(prefs, job, cfg)) {
+      excludedByPayHardFloor += 1
+      continue
+    }
 
-    const totalScore = roleScore + payScore + locationScore + recencyScore
-    if (totalScore < cfg.thresholds.minTotalScore) {
+    const qualities = computeJobQualities(prefs, job, cfg, nowMs, synonyms)
+    qualities.phraseRelevance = phraseRelevance
+    qualities.phraseMatch = phraseMatch
+
+    if (failsRelocationGate(prefs, job, qualities.locationDistanceMiles, cfg)) {
+      excludedByRelocationGate += 1
+      continue
+    }
+
+    const { score, components, scoreContributions } = totalScoreFromQualities(qualities, cfg)
+
+    if (score < cfg.thresholds.minTotalScore) {
       excludedByMinTotalScore += 1
       continue
     }
@@ -813,29 +868,25 @@ export function matchJobsWithDebug(
 
     const rankedJob: RankedJob = {
       ...job,
-      score: totalScore,
-      components: {
-        role: roleScore,
-        pay: payScore,
-        location: locationScore,
-        recency: recencyScore,
-      },
+      score,
+      components,
+      scoreContributions,
       phraseMatch,
-      locationDistanceMiles: distanceMiles,
-      withinRadius,
-      locationParsed,
+      locationDistanceMiles: qualities.locationDistanceMiles,
+      withinRadius: qualities.withinRadius,
+      locationParsed: qualities.locationParsed,
       effectiveSponsorshipLikelihood: effectiveSponsorship,
     }
 
     ranked.push(rankedJob)
 
-    if (minScore === null || totalScore < minScore) minScore = totalScore
-    if (maxScore === null || totalScore > maxScore) maxScore = totalScore
-    sumScore += totalScore
-    sumRoleScore += roleScore
-    sumPayScore += payScore
-    sumLocationScore += locationScore
-    sumRecencyScore += recencyScore
+    if (minScore === null || score < minScore) minScore = score
+    if (maxScore === null || score > maxScore) maxScore = score
+    sumScore += score
+    sumPhrase += components.phrase
+    sumPay += components.pay
+    sumLocation += components.location
+    sumRecency += components.recency
 
     for (const [tier, bySurf] of Object.entries(phraseMatch.matchedBySurface)) {
       const kind = tier as 'primary' | 'secondary' | 'industry'
@@ -861,19 +912,13 @@ export function matchJobsWithDebug(
 
   ranked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
-
     const aMs = Date.parse(a.postedDate ?? a.createdAt)
     const bMs = Date.parse(b.postedDate ?? b.createdAt)
-
-    if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) {
-      return bMs - aMs
-    }
-
+    if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) return bMs - aMs
     return 0
   })
 
   const count = ranked.length
-  const maxPossibleScore = getMaxPossibleScore(prefs, cfg)
 
   const debug: MatchJobsDebugPayload = {
     filters: {
@@ -881,9 +926,10 @@ export function matchJobsWithDebug(
       excludedBySubscriptionTier,
       excludedByRole,
       excludedByRemoteOptOut,
-      excludedByLocation,
       excludedByRecency,
-      excludedByNoKeywordMatch,
+      excludedByPhraseGate,
+      excludedByPayHardFloor,
+      excludedByRelocationGate,
       excludedByMinTotalScore,
       includedAfterFilters: count,
     },
@@ -891,11 +937,11 @@ export function matchJobsWithDebug(
       minScore,
       maxScore,
       averageScore: count > 0 ? sumScore / count : null,
-      averageRoleScore: count > 0 ? sumRoleScore / count : null,
-      averagePayScore: count > 0 ? sumPayScore / count : null,
-      averageLocationScore: count > 0 ? sumLocationScore / count : null,
-      averageRecencyScore: count > 0 ? sumRecencyScore / count : null,
-      maxPossibleScore,
+      averagePhraseQuality: count > 0 ? sumPhrase / count : null,
+      averagePayQuality: count > 0 ? sumPay / count : null,
+      averageLocationQuality: count > 0 ? sumLocation / count : null,
+      averageRecencyQuality: count > 0 ? sumRecency / count : null,
+      maxPossibleScore: getMaxPossibleScore(),
     },
     phrases: Array.from(phraseCounts.entries())
       .map(([key, matchedJobCount]) => {
@@ -910,4 +956,3 @@ export function matchJobsWithDebug(
 
   return { ranked, debug }
 }
-

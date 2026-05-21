@@ -151,6 +151,11 @@ export type MatchingAlgorithmConfig = Tables<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigInsert = TablesInsert<'matching_algorithm_config'>
 export type MatchingAlgorithmConfigUpdate = TablesUpdate<'matching_algorithm_config'>
 
+// Phrase synonym expansion for job matching (admin-editable)
+export type MatchSynonym = Tables<'match_synonyms'>
+export type MatchSynonymInsert = TablesInsert<'match_synonyms'>
+export type MatchSynonymUpdate = TablesUpdate<'match_synonyms'>
+
 // Apollo org resolution (service_role; premium-insights). Not exposed to the client via RLS.
 export type CompanyApolloCache = Tables<'company_apollo_cache'>
 export type CompanyApolloCacheInsert = TablesInsert<'company_apollo_cache'>

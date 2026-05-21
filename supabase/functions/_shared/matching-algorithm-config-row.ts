@@ -1,98 +1,59 @@
 import type { MatchConfig } from './job-matching-algorithm.ts'
+import type { Tables } from './database.ts'
 
-/** Mirrors `public.matching_algorithm_config` Row (keep in sync with regenerated `src/types/supabase.ts`). */
-export interface MatchingAlgorithmConfigRow {
-  id: string
-  name: string
-  active: boolean
-  archived: boolean
-  created_at: string
-  updated_at: string
-  phrase_primary_title_weight: number
-  phrase_primary_description_weight: number
-  phrase_primary_briefing_weight: number
-  phrase_secondary_title_weight: number
-  phrase_secondary_description_weight: number
-  phrase_secondary_briefing_weight: number
-  phrase_industry_title_weight: number
-  phrase_industry_description_weight: number
-  phrase_industry_briefing_weight: number
-  phrase_min_primary_words: number
-  pay_inside_range_weight: number
-  pay_near_range_weight: number
-  pay_missing_salary_weight: number
-  pay_below_range_penalty: number
-  loc_same_metro_weight: number
-  loc_same_state_weight: number
-  loc_remote_preferred_weight: number
-  loc_relocation_allowed_weight: number
-  loc_other_location_penalty: number
-  loc_distance_0_10_weight: number
-  loc_distance_10_25_weight: number
-  loc_distance_25_50_weight: number
-  loc_distance_50_100_weight: number
-  loc_distance_beyond_100_weight: number
-  loc_within_radius_bonus_weight: number
-  recency_base_weight: number
-  recency_per_day_decay: number
-  recency_max_age_days: number
-  threshold_min_total_score: number
-  threshold_no_keyword_match_penalty: number
-  threshold_over_pay_tolerance_pct: number
-  threshold_under_pay_tolerance_pct: number
-}
+export type MatchingAlgorithmConfigRow = Tables<'matching_algorithm_config'>
 
 export function configRowToOverride(row: MatchingAlgorithmConfigRow): Partial<MatchConfig> {
   return {
-    phraseWeights: {
-      primary: {
-        title: row.phrase_primary_title_weight,
-        description: row.phrase_primary_description_weight,
-        briefing: row.phrase_primary_briefing_weight,
-      },
-      secondary: {
-        title: row.phrase_secondary_title_weight,
-        description: row.phrase_secondary_description_weight,
-        briefing: row.phrase_secondary_briefing_weight,
-      },
-      industry: {
-        title: row.phrase_industry_title_weight,
-        description: row.phrase_industry_description_weight,
-        briefing: row.phrase_industry_briefing_weight,
-      },
+    categoryWeights: {
+      phrase: row.cat_weight_phrase,
+      pay: row.cat_weight_pay,
+      location: row.cat_weight_location,
+      recency: row.cat_weight_recency,
     },
-    phraseMatching: {
+    phrase: {
+      tierFactors: {
+        primary: row.phrase_tier_factor_primary,
+        industry: row.phrase_tier_factor_industry,
+        secondary: row.phrase_tier_factor_secondary,
+      },
+      surfaceWeights: {
+        title: row.phrase_surface_weight_title,
+        description: row.phrase_surface_weight_description,
+        briefing: row.phrase_surface_weight_briefing,
+      },
       minPrimaryWords: row.phrase_min_primary_words,
     },
-    payWeights: {
-      insideRange: row.pay_inside_range_weight,
-      nearRange: row.pay_near_range_weight,
-      missingSalary: row.pay_missing_salary_weight,
-      belowRangePenalty: row.pay_below_range_penalty,
+    pay: {
+      missingSalaryQuality: row.pay_missing_salary_quality,
+      nearRangeQuality: row.pay_near_range_quality,
+      aboveRangeQuality: row.pay_above_range_quality,
+      overToleranceFraction: row.pay_over_tolerance_fraction,
+      underToleranceFraction: row.pay_under_tolerance_fraction,
+      hardFloorEnabled: row.pay_hard_floor_enabled,
+      hardFloorFraction: row.pay_hard_floor_fraction,
     },
-    locationWeights: {
-      sameMetro: row.loc_same_metro_weight,
-      sameState: row.loc_same_state_weight,
-      remotePreferred: row.loc_remote_preferred_weight,
-      relocationAllowed: row.loc_relocation_allowed_weight,
-      otherLocationPenalty: row.loc_other_location_penalty,
-      distance0to10: row.loc_distance_0_10_weight,
-      distance10to25: row.loc_distance_10_25_weight,
-      distance25to50: row.loc_distance_25_50_weight,
-      distance50to100: row.loc_distance_50_100_weight,
-      distanceBeyond100: row.loc_distance_beyond_100_weight,
-      withinRadiusBonus: row.loc_within_radius_bonus_weight,
+    location: {
+      bandQualities: {
+        d0to10: row.loc_band_d0_10,
+        d10to25: row.loc_band_d10_25,
+        d25to50: row.loc_band_d25_50,
+        d50to100: row.loc_band_d50_100,
+        dBeyond100: row.loc_band_beyond_100,
+      },
+      sameMetroQuality: row.loc_same_metro_quality,
+      sameStateQuality: row.loc_same_state_quality,
+      remoteAsPerfect: row.loc_remote_as_perfect,
+      relocationGateEnabled: row.loc_relocation_gate_enabled,
     },
-    recencyWeights: {
-      baseRecency: row.recency_base_weight,
-      perDayDecay: row.recency_per_day_decay,
+    recency: {
       maxAgeDays: row.recency_max_age_days,
     },
     thresholds: {
       minTotalScore: row.threshold_min_total_score,
-      noKeywordMatchPenalty: row.threshold_no_keyword_match_penalty,
-      overPayTolerancePct: row.threshold_over_pay_tolerance_pct,
-      underPayTolerancePct: row.threshold_under_pay_tolerance_pct,
+    },
+    phraseGate: {
+      requirePrimaryOrIndustry: row.phrase_gate_require_primary_or_industry,
     },
   }
 }

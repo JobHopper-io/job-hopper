@@ -138,6 +138,19 @@
 - **Meaning**: Single-row table (`id = 1`) holding an optional in-app dashboard notice: `message` (Markdown in the app; rendered with sanitization) plus optional `starts_at` / `ends_at` (timestamptz).
 - **Non‑obvious rules**: Any authenticated user may read the row; only profiles with the `admin` or `super_admin` role may update it (RLS). The dashboard shows the message when it is non-empty and the current time is within `[starts_at, ends_at)` (null start means “already started”; null end means “no end yet”).
 
+### matching_algorithm_config
+- **Meaning**: Named tuning presets for the job-matching scorer (category weights, phrase/pay/location/recency parameters, hard gates). One row may be `active` at a time; others are inactive or `archived`.
+- **Key columns**: Flattened `cat_weight_*`, `phrase_*`, `pay_*`, `loc_*`, `recency_max_age_days`, `threshold_min_total_score`, `phrase_gate_require_primary_or_industry`. See `src/types/supabase.ts` for the full list.
+- **Non‑obvious rules**:
+  - Production `match-jobs` loads the single row where `active = true` and `archived = false`, then merges with any request overrides.
+  - Phrase relevance uses subscriber phrase length in code; there is no fixed “specificity word count” column.
+  - Admins manage rows via the `admin-matching-configs` edge function; archived configs are hidden from the picker but retained in the database.
+
+### match_synonyms
+- **Meaning**: Canonical phrase → alias list used only during phrase matching (e.g. expand `RN` to match `registered nurse` on jobs). Not shown to end users.
+- **Key columns**: `canonical` (text), `aliases` (text array).
+- **Non‑obvious rules**: Loaded on each match run by edge functions; empty table is valid. Matching behavior is documented in `docs/job-matching-rules.md`.
+
 ## Function scheduling (scheduled_jobs)
 
 - **Meaning**: Table of jobs to run at a given time. The `run-scheduled-jobs` edge function is invoked every 15 minutes by pg_cron + pg_net, selects pending rows (up to a limit), and HTTP-invokes the target edge function with the stored payload. Only system/cron-designed edge functions (no user JWT) should be scheduled.

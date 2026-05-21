@@ -165,13 +165,13 @@ serve(async (req) => {
 
     const preferences = {
       subscriptionTierProductKeys,
-      roles: (profile.target_role_categories ?? []) as string[],
+      roles: profile.target_role_categories ?? [],
       targetJobTitle: profile.target_job_title,
       currentJobTitle: profile.current_job_title,
       currentIndustry: profile.current_industry,
       payRangeMin: profile.desired_salary_min,
       payRangeMax: profile.desired_salary_max,
-      preferredLocations: (profile.preferred_locations ?? []) as string[],
+      preferredLocations: profile.preferred_locations ?? [],
       openToRelocation: profile.open_to_relocation,
       openToRemote: profile.open_to_remote,
       locationRadiusMiles: profile.location_radius_miles ?? null,
