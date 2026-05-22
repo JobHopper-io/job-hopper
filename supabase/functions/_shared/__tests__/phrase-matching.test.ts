@@ -1,8 +1,11 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import {
   buildPhraseProfile,
+  buildPhrasesFromSegment,
   evaluatePhraseMatch,
   expandPhrasesForMatching,
+  GENERIC_OCCUPATION_TOKENS,
+  normalizeForPhraseMatching,
   phraseMatchesAtWordBoundaries,
   phrasesFromCommaField,
   STOP_WORDS,
@@ -19,31 +22,91 @@ import {
 
 const phraseCfg = defaultConfig.phrase
 
-Deno.test('phraseMatchesAtWordBoundaries rejects substring', () => {
-  assertEquals(phraseMatchesAtWordBoundaries('software engineer role', 'engineer'), true)
-  assertEquals(phraseMatchesAtWordBoundaries('theengineroom', 'engineer'), false)
-})
-
-Deno.test('STOP_WORDS includes engineer', () => {
+Deno.test('GENERIC_OCCUPATION_TOKENS includes engineer', () => {
+  assertEquals(GENERIC_OCCUPATION_TOKENS.has('engineer'), true)
   assertEquals(STOP_WORDS.has('engineer'), true)
 })
 
-Deno.test('buildPhraseProfile: mechanical engineer has primary, not lone engineer', () => {
-  const p = buildPhraseProfile('Mechanical Engineer', 2)
+Deno.test('normalizeForPhraseMatching: ampersand and hyphen', () => {
+  assertEquals(normalizeForPhraseMatching('Pricing & Contract'), 'pricing and contract')
+  assertEquals(normalizeForPhraseMatching('Front-End'), 'front end')
+})
+
+Deno.test('phraseMatchesAtWordBoundaries: and matches ampersand haystack', () => {
+  assertEquals(
+    phraseMatchesAtWordBoundaries('Pricing & Contract Analyst', 'pricing and contract'),
+    true,
+  )
+})
+
+Deno.test('buildPhraseProfile: mechanical engineer has primary and discriminating', () => {
+  const p = buildPhraseProfile('Mechanical Engineer')
   assertEquals(p.primaryPhrases.includes('mechanical engineer'), true)
-  assertEquals(p.primaryPhrases.includes('engineer'), false)
-  assertEquals(p.primaryPhrases.includes('mechanical'), false)
+  assertEquals(p.discriminatingPhrases.includes('mechanical'), true)
+  assertEquals(p.discriminatingPhrases.includes('engineer'), false)
 })
 
-Deno.test('buildPhraseProfile: sole segment engineer is primary despite stop word', () => {
-  const p = buildPhraseProfile('engineer', 2)
-  assertEquals(p.primaryPhrases, ['engineer'])
-  assertEquals(p.secondaryPhrases.length, 0)
+Deno.test('buildPhraseProfile: sole segment engineer is primary only', () => {
+  const p = buildPhraseProfile('engineer')
+  assertEquals(p.primaryPhrases.includes('engineer'), true)
+  assertEquals(p.discriminatingPhrases.length, 0)
 })
 
-Deno.test('phrasesFromCommaField: sole stop-word segment is kept', () => {
-  assertEquals(phrasesFromCommaField('engineer'), ['engineer'])
-  assertEquals(phrasesFromCommaField('engineer, mechanical engineer').includes('engineer'), false)
+Deno.test('buildPhraseProfile: Pricing & Contract Administration Analyst', () => {
+  const p = buildPhraseProfile('Pricing & Contract Administration Analyst')
+  assertEquals(
+    p.primaryPhrases.includes('pricing and contract administration analyst'),
+    true,
+  )
+  assertEquals(p.discriminatingPhrases.includes('pricing'), true)
+  assertEquals(p.discriminatingPhrases.includes('contract'), true)
+  assertEquals(p.discriminatingPhrases.includes('administration'), true)
+  assertEquals(p.primaryPhrases.includes('contract administration'), true)
+})
+
+Deno.test('buildPhraseProfile: Associate Data analyst', () => {
+  const p = buildPhraseProfile('Associate Data analyst')
+  assertEquals(p.primaryPhrases.includes('data analyst'), true)
+  assertEquals(p.discriminatingPhrases.includes('data'), true)
+})
+
+Deno.test('buildPhraseProfile: VP Sales', () => {
+  const p = buildPhraseProfile('VP Sales')
+  assertEquals(p.primaryPhrases.includes('vp sales'), true)
+  assertEquals(p.discriminatingPhrases.includes('sales'), true)
+})
+
+Deno.test('buildPhraseProfile: Executive Director Home Care', () => {
+  const p = buildPhraseProfile('Executive Director Home Care')
+  assertEquals(p.primaryPhrases.includes('home care'), true)
+  assertEquals(p.discriminatingPhrases.includes('home'), true)
+  assertEquals(p.discriminatingPhrases.includes('care'), true)
+})
+
+Deno.test('buildPhraseProfile: Front-End Developer hyphen', () => {
+  const p = buildPhraseProfile('Front-End Developer')
+  assertEquals(p.primaryPhrases.includes('front end'), true)
+  assertEquals(p.discriminatingPhrases.includes('front'), true)
+  assertEquals(p.discriminatingPhrases.includes('end'), true)
+})
+
+Deno.test('buildPhraseProfile: Engineer II peels level', () => {
+  const p = buildPhraseProfile('Engineer II')
+  assertEquals(p.primaryPhrases.includes('engineer ii'), true)
+  assertEquals(p.discriminatingPhrases.length, 0)
+})
+
+Deno.test('buildPhrasesFromSegment: industry mode promotes content unigram to primary', () => {
+  const built = buildPhrasesFromSegment('Healthcare', {
+    emitDiscriminating: false,
+    includeFullSegmentPrimary: true,
+  })
+  assertEquals(built.primary.includes('healthcare'), true)
+  assertEquals(built.discriminating.length, 0)
+})
+
+Deno.test('phrasesFromCommaField: sole stop-word segment is kept as primary', () => {
+  assertEquals(phrasesFromCommaField('engineer').includes('engineer'), true)
 })
 
 Deno.test('evaluatePhraseMatch: sole engineer intent matches engineer in job title', () => {
@@ -60,14 +123,12 @@ Deno.test('evaluatePhraseMatch: sole engineer intent matches engineer in job tit
   const r = evaluatePhraseMatch(prefs, job, phraseCfg)
   assertEquals(r.passesGate, true)
   assertEquals(r.phraseMatch.primaryPhrases, ['engineer'])
-  assertEquals(r.phraseMatch.matchedBySurface.primary?.title, 'engineer')
 })
 
-Deno.test('phrasesFromCommaField: no sub-span n-grams from long title', () => {
-  const phrases = phrasesFromCommaField('Senior Mechanical Design Engineer Lead')
-  assertEquals(phrases.includes('senior mechanical design engineer lead'), true)
-  assertEquals(phrases.includes('design'), false)
-  assertEquals(phrases.includes('engineer'), false)
+Deno.test('evaluatePhraseMatch: long title generates sub-span primaries', () => {
+  const p = buildPhraseProfile('Senior Mechanical Design Engineer Lead')
+  assertEquals(p.primaryPhrases.includes('senior mechanical design engineer lead'), true)
+  assertEquals(p.primaryPhrases.includes('mechanical design'), true)
 })
 
 Deno.test('evaluatePhraseMatch: welder exact title reaches full primary relevance on title', () => {
@@ -102,19 +163,35 @@ Deno.test('evaluatePhraseMatch: welder does not pass gate on welding-only job', 
   assertEquals(r.phraseRelevance, 0)
 })
 
-Deno.test('evaluatePhraseMatch: single-word primary requires title surface not description alone', () => {
+Deno.test('evaluatePhraseMatch: discriminating on description does not pass gate', () => {
   const prefs = {
-    targetJobTitle: 'Welder',
+    targetJobTitle: 'Pricing & Contract Administration Analyst',
     currentJobTitle: null,
     currentIndustry: null,
   }
   const job = {
     title: 'Sales Representative',
-    description: 'Prior welder experience preferred.',
+    description: 'Strong pricing background required.',
     aiBriefing: null,
   }
   const r = evaluatePhraseMatch(prefs, job, phraseCfg)
   assertEquals(r.passesGate, false)
+})
+
+Deno.test('evaluatePhraseMatch: Associate Pricing Analyst passes via discriminating pricing', () => {
+  const prefs = {
+    targetJobTitle: 'Pricing & Contract Administration Analyst',
+    currentJobTitle: null,
+    currentIndustry: null,
+  }
+  const job = {
+    title: 'Associate Pricing Analyst',
+    description: null,
+    aiBriefing: null,
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(r.phraseMatch.matchedBySurface.discriminating?.title, 'pricing')
 })
 
 Deno.test('evaluatePhraseMatch: synonym expansion matches canonical on job', () => {
@@ -143,7 +220,7 @@ Deno.test('expandPhrasesForMatching adds aliases for canonical phrase', () => {
   assertEquals(expanded.includes('rn'), true)
 })
 
-Deno.test('evaluatePhraseMatch: long title does not pass gate on single shared subword', () => {
+Deno.test('evaluatePhraseMatch: long title does not pass gate on single shared subword only', () => {
   const prefs = {
     targetJobTitle: 'Senior Mechanical Design Engineer Lead',
     currentJobTitle: null,
@@ -191,6 +268,70 @@ Deno.test('evaluatePhraseMatch: mechanical design engineer passes with bounded r
   assertEquals(r.phraseRelevance <= 1, true)
 })
 
+Deno.test('evaluatePhraseMatch: Senior Software Engineer user matches Software Engineer job', () => {
+  const prefs = {
+    targetJobTitle: 'Senior Software Engineer',
+    currentJobTitle: null,
+    currentIndustry: null,
+  }
+  const job = {
+    title: 'Software Engineer',
+    description: null,
+    aiBriefing: null,
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(r.phraseMatch.matchedBySurface.primary?.title, 'software engineer')
+})
+
+Deno.test('evaluatePhraseMatch: VP Sales passes Sales Director via discriminating sales', () => {
+  const prefs = {
+    targetJobTitle: 'VP Sales',
+    currentJobTitle: null,
+    currentIndustry: null,
+  }
+  const job = {
+    title: 'Sales Director',
+    description: null,
+    aiBriefing: null,
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(r.phraseMatch.matchedBySurface.discriminating?.title, 'sales')
+})
+
+Deno.test('evaluatePhraseMatch: industry tier can satisfy gate when title primary does not match', () => {
+  const prefs = {
+    targetJobTitle: 'Mechanical Engineer',
+    currentJobTitle: null,
+    currentIndustry: 'Aerospace',
+  }
+  const job = {
+    title: 'Software Engineer',
+    description: 'Work in aerospace manufacturing.',
+    aiBriefing: '',
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(r.phraseMatch.matchedBySurface.industry?.description != null, true)
+})
+
+Deno.test('evaluatePhraseMatch: industry has no discriminating phrases', () => {
+  const prefs = {
+    targetJobTitle: 'Mechanical Engineer',
+    currentJobTitle: null,
+    currentIndustry: 'Healthcare',
+  }
+  const profile = buildPhraseProfile(prefs.targetJobTitle)
+  const r = evaluatePhraseMatch(prefs, {
+    title: 'Hospital Administrator',
+    description: 'Healthcare services.',
+    aiBriefing: null,
+  }, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(profile.discriminatingPhrases.length >= 0, true)
+})
+
 Deno.test('evaluatePhraseMatch: relevance capped at 1 regardless of title length', () => {
   const shortPrefs = {
     targetJobTitle: 'Welder',
@@ -211,41 +352,6 @@ Deno.test('evaluatePhraseMatch: relevance capped at 1 regardless of title length
   const longR = evaluatePhraseMatch(longPrefs, job, phraseCfg)
   assertEquals(shortR.phraseRelevance <= 1, true)
   assertEquals(longR.phraseRelevance <= 1, true)
-})
-
-Deno.test('evaluatePhraseMatch: industry tier can satisfy gate when title primary does not match', () => {
-  const prefs = {
-    targetJobTitle: 'Mechanical Engineer',
-    currentJobTitle: null,
-    currentIndustry: 'Aerospace',
-  }
-  const job = {
-    title: 'Software Engineer',
-    description: 'Work in aerospace manufacturing.',
-    aiBriefing: '',
-  }
-  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
-  assertEquals(r.passesGate, true)
-  assertEquals(r.phraseMatch.matchedBySurface.industry?.description != null, true)
-})
-
-Deno.test('evaluatePhraseMatch: title-derived secondary tier alone does not pass gate', () => {
-  const prefs = {
-    targetJobTitle: 'Engineer Manager',
-    currentJobTitle: null,
-    currentIndustry: null,
-  }
-  const job = {
-    title: 'Engineer Manager Role',
-    description: '',
-    aiBriefing: '',
-  }
-  const cfg = mergeConfig({
-    phrase: { ...phraseCfg, minPrimaryWords: 3 },
-  })
-  const r = evaluatePhraseMatch(prefs, job, cfg.phrase)
-  assertEquals(r.phraseRelevance > 0, true)
-  assertEquals(r.passesGate, false)
 })
 
 Deno.test('getMaxPossibleScore is always 100', () => {

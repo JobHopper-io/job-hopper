@@ -6,16 +6,16 @@ import {
 
 export interface PhraseMatchSurfaceDetail {
   primaryPhrases: string[]
-  secondaryPhrases: string[]
+  discriminatingPhrases?: string[]
   industryPhrases: string[]
   matchedBySurface: {
     primary?: Partial<Record<'title' | 'description' | 'briefing', string>>
-    secondary?: Partial<Record<'title' | 'description' | 'briefing', string>>
+    discriminating?: Partial<Record<'title' | 'description' | 'briefing', string>>
     industry?: Partial<Record<'title' | 'description' | 'briefing', string>>
   }
   surfaceScores: {
     primary: Record<'title' | 'description' | 'briefing', number>
-    secondary: Record<'title' | 'description' | 'briefing', number>
+    discriminating: Record<'title' | 'description' | 'briefing', number>
     industry: Record<'title' | 'description' | 'briefing', number>
   }
 }
@@ -78,7 +78,7 @@ export interface MatchJobsDebugPayload {
   }
   phrases: {
     phrase: string
-    kind: 'primary' | 'secondary' | 'industry'
+    kind: 'primary' | 'discriminating' | 'industry'
     matchedJobCount: number
   }[]
   matchSurfaces?: {
@@ -119,7 +119,6 @@ export interface MatchConfigCategoryWeights {
 export interface MatchConfigPhrase {
   tierFactors?: { primary?: number; industry?: number; secondary?: number }
   surfaceWeights?: { title?: number; description?: number; briefing?: number }
-  minPrimaryWords?: number
 }
 
 export interface MatchConfigPay {
@@ -181,7 +180,6 @@ export interface AdminMatchConfigForm {
   phrase: {
     tierFactors: { primary: number; industry: number; secondary: number }
     surfaceWeights: { title: number; description: number; briefing: number }
-    minPrimaryWords: number
   }
   pay: {
     missingSalaryQuality: number
@@ -278,7 +276,6 @@ export const DEFAULT_ADMIN_MATCH_CONFIG = {
   phrase: {
     tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
     surfaceWeights: { title: 0.6, description: 0.3, briefing: 0.1 },
-    minPrimaryWords: 2,
   },
   pay: {
     missingSalaryQuality: 0.3,
@@ -341,7 +338,6 @@ export function normalizeMatchConfigForm(
       recency: num(src?.categoryWeights?.recency, base.categoryWeights.recency),
     },
     phrase: {
-      minPrimaryWords: num(phrase?.minPrimaryWords, base.phrase.minPrimaryWords),
       tierFactors: {
         primary: num(tier?.primary, base.phrase.tierFactors.primary),
         industry: num(tier?.industry, base.phrase.tierFactors.industry),

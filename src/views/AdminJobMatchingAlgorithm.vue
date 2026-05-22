@@ -37,7 +37,7 @@ const MATCH_SECTION_INTROS = {
   hardGates:
     'On/off filters applied before scoring. Failed gates remove the job entirely.',
   phrase:
-    'How strongly title and industry keywords match job text. Score scales by matched words vs your longest target phrase.',
+    'Sub-span phrases from each title segment plus title-only discriminating words (e.g. pricing on Associate Pricing Analyst).',
   pay: 'How pay compares to the subscriber range (missing salary uses its own score).',
   location:
     'Inside the subscriber’s radius → full score. Outside → band weights by miles past that radius (or by absolute miles if no radius set).',
@@ -75,15 +75,14 @@ const MATCH_TUNING_TOOLTIPS = {
   categoryRecency: 'How recently the job was posted.',
   minTotalScore: 'Cutoff after scoring; jobs below this are hidden (default 40).',
   phraseGate:
-    'Requires a real title or industry keyword hit—not description-only matches.',
+    'Requires primary or industry match, or a discriminating word on the job title (not description-only).',
   payHardFloorEnabled: 'Drop jobs paid far below the subscriber’s minimum.',
   payHardFloorFraction: 'How far below min salary still counts as “far” (e.g. 0.3 = 30% under).',
   relocationGate: 'Drop distant on-site jobs when the subscriber won’t relocate.',
-  phraseMinPrimaryWords:
-    'When there are multiple comma-separated phrases, sets the minimum word count for primary vs secondary. Ignored when the user entered only one phrase (that always becomes primary).',
   tierPrimary: 'Strength when target title phrases match.',
   tierIndustry: 'Strength when industry keywords match.',
-  tierSecondary: 'Strength for weaker title phrase matches.',
+  tierSecondary:
+    'Strength for discriminating (title-only) phrase matches.',
   surfaceTitle: 'How much the job title counts in phrase score.',
   surfaceDescription: 'How much the job description counts.',
   surfaceBriefing: 'How much the AI briefing counts.',
@@ -579,7 +578,7 @@ function formatPhraseMatchCell(job: RankedJob): string {
   const pm = job.phraseMatch
   if (!pm) return '—'
   const parts: string[] = []
-  for (const tier of ['primary', 'secondary', 'industry'] as const) {
+  for (const tier of ['primary', 'discriminating', 'industry'] as const) {
     const by = pm.matchedBySurface[tier]
     if (!by) continue
     for (const surf of ['title', 'description', 'briefing'] as const) {
@@ -1095,24 +1094,6 @@ onMounted(async () => {
                 >
                   Title / description / briefing weights must sum to 100% (now {{ phraseSurfaceWeightSumPct }}%).
                 </p>
-                <div
-                  class="flex flex-wrap items-center gap-2"
-                  :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
-                >
-                  <input
-                    v-model.number="configForm.phrase.minPrimaryWords"
-                    type="number"
-                    min="1"
-                    class="input w-28 shrink-0 text-sm"
-                    :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
-                  >
-                  <span
-                    class="text-[11px] text-neutral-body"
-                    :title="MATCH_TUNING_TOOLTIPS.phraseMinPrimaryWords"
-                  >
-                    minPrimaryWords
-                  </span>
-                </div>
                 <p class="text-[11px] text-neutral-subtle">
                   Match strength by tier; surface weights = how much title vs description vs briefing count.
                 </p>
@@ -1465,6 +1446,9 @@ onMounted(async () => {
               <p class="text-xs font-semibold text-neutral-body mb-1">
                 Phrase histogram (profile phrases × included jobs)
               </p>
+              <p class="text-[10px] text-neutral-subtle mb-1">
+                <span class="text-neutral-subtle">disc (title)</span> = title-only discriminating unigram (can pass gate)
+              </p>
               <p
                 v-if="debug.matchSurfaces"
                 class="text-[11px] text-neutral-body mb-1"
@@ -1482,7 +1466,10 @@ onMounted(async () => {
                     :key="`${row.kind}-${row.phrase}`"
                     class="flex justify-between gap-2"
                   >
-                    <span class="truncate"><span class="text-neutral-subtle">{{ row.kind }}</span> {{ row.phrase }}</span>
+                    <span class="truncate">
+                      <span class="text-neutral-subtle">{{ row.kind === 'discriminating' ? 'disc (title)' : row.kind }}</span>
+                      {{ row.phrase }}
+                    </span>
                     <span class="font-mono text-[10px]">
                       {{ row.matchedJobCount }}
                     </span>

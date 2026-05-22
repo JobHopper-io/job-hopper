@@ -22,7 +22,6 @@ export function configRowToOverride(row: MatchingAlgorithmConfigRow): Partial<Ma
         description: row.phrase_surface_weight_description,
         briefing: row.phrase_surface_weight_briefing,
       },
-      minPrimaryWords: row.phrase_min_primary_words,
     },
     pay: {
       missingSalaryQuality: row.pay_missing_salary_quality,

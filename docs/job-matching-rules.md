@@ -38,7 +38,7 @@ Jobs that fail any gate are **not ranked** and do not receive a score:
 2. **Role category** — if subscriber has target roles, job `role_category` must match.
 3. **Recency** — `posted_date` (else `created_at`) must not be older than `recency.maxAgeDays`.
 4. **Remote opt-out** — remote jobs excluded when subscriber is not open to remote.
-5. **Phrase gate** (when enabled) — if subscriber has title/industry intent, job must match at least one **primary** or **industry** phrase (secondary-only matches do not pass).
+5. **Phrase gate** (when enabled) — if subscriber has title/industry intent, job must match at least one **primary** or **industry** phrase on any surface, or a **discriminating** (title-only) phrase on the job **title** surface. Description/briefing-only discriminating matches do not pass.
 6. **Pay hard floor** (when enabled) — exclude jobs more than `pay.hardFloorFraction` below subscriber `pay_range_min`.
 7. **Relocation gate** (when enabled) — exclude non-remote jobs **> 100 mi** from preferred locations when subscriber is not open to relocation.
 
@@ -48,11 +48,22 @@ There is **no** negative penalty added to the score; failed gates mean exclusion
 
 ## Phrase relevance (0–1)
 
-- Build phrases from **comma-separated segments** on **target job title** (else current title) and **current industry**: each segment is one full phrase (no sub-span n-grams). If the field is **only one segment**, that phrase is always **primary** (even generic stop words like `engineer`). With multiple segments, single-word stop words are dropped and other bucketing rules apply (`minPrimaryWords`, etc.).
-- Match with **word boundaries** on job **title**, **description**, and **AI briefing**. Optional rows in `match_synonyms` expand aliases (e.g. `RN` ↔ `registered nurse`) for matching only.
-- Per surface: best match across tiers. Relevance scales by **matched word count ÷ longest subscriber primary phrase length** (not a fixed constant), so a one-word target can score 1.0 on an exact one-word job title match.
-- **Single-word title primaries:** the phrase gate requires a primary match on the job **title** surface (or an industry-tier match on any surface); description/briefing alone is insufficient.
-- **Tier factors** (default): primary 1.0, industry 0.7, secondary 0.4.
+### Profile building
+
+- Input fields: **target job title** (else current title) and **current industry**, comma-separated **segments**.
+- Each segment is normalized (`&` → `and`, hyphens → spaces, lowercase) and kept as a **full primary** phrase.
+- **Sub-span primaries:** contiguous n-grams (length ≥ 2) from content after splitting on **connectors** (`and`, `of`, `for`, …) and peeling **seniority** tokens (`senior`, `vp`, `associate`, `director`, level numbers, …) from edges.
+- **Discriminating unigrams:** single **content** tokens from peeled sub-segments (not generic occupation words like `engineer`, `analyst`, `manager`). Used for matching and gating on the job **title** only.
+- **Industry** uses the same sub-span logic but does **not** emit discriminating unigrams (single content words become industry primaries).
+
+Token classes: `CONNECTOR_TOKENS`, `SENIORITY_TOKENS`, `GENERIC_OCCUPATION_TOKENS` in `phrase-matching.ts`. Words in none of these sets are **content**.
+
+### Matching
+
+- Match with **word boundaries** on normalized job **title**, **description**, and **AI briefing**.
+- Optional `match_synonyms` expand aliases for all tiers.
+- Relevance scales by **matched word count ÷ longest subscriber primary phrase length**.
+- **Tier factors** (default): primary 1.0, industry 0.7, secondary 0.4 (discriminating uses the secondary factor).
 - **Surface weights** (default, sum to 1): title 0.6, description 0.3, briefing 0.1.
 
 ---

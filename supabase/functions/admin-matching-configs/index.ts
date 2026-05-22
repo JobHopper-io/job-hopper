@@ -39,7 +39,6 @@ function overrideToDbColumns(full: MatchConfig): Record<string, number | boolean
     phrase_surface_weight_title: full.phrase.surfaceWeights.title,
     phrase_surface_weight_description: full.phrase.surfaceWeights.description,
     phrase_surface_weight_briefing: full.phrase.surfaceWeights.briefing,
-    phrase_min_primary_words: full.phrase.minPrimaryWords,
     pay_missing_salary_quality: full.pay.missingSalaryQuality,
     pay_near_range_quality: full.pay.nearRangeQuality,
     pay_above_range_quality: full.pay.aboveRangeQuality,

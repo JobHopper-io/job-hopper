@@ -149,7 +149,6 @@ export const defaultConfig: MatchConfig = {
   phrase: {
     tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
     surfaceWeights: { title: 0.6, description: 0.3, briefing: 0.1 },
-    minPrimaryWords: 2,
   },
   pay: {
     missingSalaryQuality: 0.3,
@@ -753,7 +752,7 @@ export interface MatchJobsDebugPayload {
   }
   phrases: {
     phrase: string
-    kind: 'primary' | 'secondary' | 'industry'
+    kind: 'primary' | 'discriminating' | 'industry'
     matchedJobCount: number
   }[]
   matchSurfaces: {
@@ -795,10 +794,7 @@ export function matchJobsWithDebug(
   let sumLocation = 0
   let sumRecency = 0
 
-  const phraseDebugList = getAllProfilePhrasesForDebug(
-    prefsToPhraseInput(prefs),
-    cfg.phrase.minPrimaryWords,
-  )
+  const phraseDebugList = getAllProfilePhrasesForDebug(prefsToPhraseInput(prefs))
   const phraseCounts = new Map<string, number>()
   const phraseKey = (kind: string, phrase: string) => `${kind}\x1f${phrase}`
   for (const { phrase, kind } of phraseDebugList) {
@@ -889,7 +885,7 @@ export function matchJobsWithDebug(
     sumRecency += components.recency
 
     for (const [tier, bySurf] of Object.entries(phraseMatch.matchedBySurface)) {
-      const kind = tier as 'primary' | 'secondary' | 'industry'
+      const kind = tier as 'primary' | 'discriminating' | 'industry'
       if (!bySurf) continue
       for (const phrase of Object.values(bySurf)) {
         if (!phrase) continue
@@ -900,7 +896,7 @@ export function matchJobsWithDebug(
 
     for (const surface of ['title', 'description', 'briefing'] as const) {
       let hit = false
-      for (const tier of ['primary', 'secondary', 'industry'] as const) {
+      for (const tier of ['primary', 'discriminating', 'industry'] as const) {
         if (phraseMatch.surfaceScores[tier][surface] > 0) {
           hit = true
           break

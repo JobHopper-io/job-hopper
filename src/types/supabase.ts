@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   public: {
     Tables: {
       apollo_limits: {
@@ -38,18 +43,21 @@ export type Database = {
           company_name: string | null
           created_at: string
           id: number
+          linkedin_url: string | null
           status: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Insert: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Update: {
           company_name?: string | null
           created_at?: string
           id?: number
+          linkedin_url?: string | null
           status?: Database["public"]["Enums"]["bd_leads_status"] | null
         }
         Relationships: []
@@ -610,7 +618,6 @@ export type Database = {
           pay_over_tolerance_fraction: number
           pay_under_tolerance_fraction: number
           phrase_gate_require_primary_or_industry: boolean
-          phrase_min_primary_words: number
           phrase_surface_weight_briefing: number
           phrase_surface_weight_description: number
           phrase_surface_weight_title: number
@@ -648,7 +655,6 @@ export type Database = {
           pay_over_tolerance_fraction: number
           pay_under_tolerance_fraction: number
           phrase_gate_require_primary_or_industry: boolean
-          phrase_min_primary_words: number
           phrase_surface_weight_briefing: number
           phrase_surface_weight_description: number
           phrase_surface_weight_title: number
@@ -686,7 +692,6 @@ export type Database = {
           pay_over_tolerance_fraction?: number
           pay_under_tolerance_fraction?: number
           phrase_gate_require_primary_or_industry?: boolean
-          phrase_min_primary_words?: number
           phrase_surface_weight_briefing?: number
           phrase_surface_weight_description?: number
           phrase_surface_weight_title?: number
@@ -1618,4 +1623,3 @@ export const Constants = {
     },
   },
 } as const
-
