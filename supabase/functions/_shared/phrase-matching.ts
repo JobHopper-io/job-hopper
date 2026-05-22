@@ -277,13 +277,26 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function buildPhraseRegex(normalizedPhrase: string): RegExp {
+  return new RegExp(`\\b${escapeRegex(normalizedPhrase)}\\b`, 'i')
+}
+
+/** Pre-checked variant: both inputs already normalized (no allocation). */
+function phraseMatchesNormalized(
+  normalizedHaystack: string,
+  normalizedPhrase: string,
+  regex: RegExp,
+): boolean {
+  if (!normalizedPhrase || !normalizedHaystack) return false
+  return regex.test(normalizedHaystack)
+}
+
 /** True if `phrase` appears in `haystack` as whole words (case-insensitive on normalized strings). */
 export function phraseMatchesAtWordBoundaries(haystack: string, phrase: string): boolean {
   const p = normalizeForPhraseMatching(phrase)
   const h = normalizeForPhraseMatching(haystack)
   if (!p || !h) return false
-  const re = new RegExp(`\\b${escapeRegex(p)}\\b`, 'i')
-  return re.test(h)
+  return buildPhraseRegex(p).test(h)
 }
 
 function tokenizeNormalized(normalized: string): string[] {
@@ -534,20 +547,26 @@ function emptySurfaceScores(): PhraseMatchDetails['surfaceScores'] {
   }
 }
 
-function bestMatchOnSurface(phrases: string[], haystack: string): string | null {
-  if (!haystack || phrases.length === 0) return null
-  let best: string | null = null
-  let bestLen = -1
+interface CompiledPhrase {
+  phrase: string
+  regex: RegExp
+  wordCount: number
+}
+
+function compilePhraseList(phrases: string[]): CompiledPhrase[] {
+  const out: CompiledPhrase[] = []
+  const seen = new Set<string>()
   for (const phrase of phrases) {
-    if (phraseMatchesAtWordBoundaries(haystack, phrase)) {
-      const len = phrase.split(/\s+/).length
-      if (len > bestLen) {
-        bestLen = len
-        best = phrase
-      }
-    }
+    const trimmed = phrase.trim()
+    if (!trimmed || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    out.push({
+      phrase: trimmed,
+      regex: buildPhraseRegex(trimmed),
+      wordCount: trimmed.split(/\s+/).filter(Boolean).length,
+    })
   }
-  return best
+  return out
 }
 
 /** Relevance factor from matched length vs subscriber's longest primary phrase (not a fixed constant). */
@@ -558,52 +577,108 @@ function specificityScore(matchedWordCount: number, longestSubscriberPrimaryWord
 
 function tierMatchRelevance(
   phrase: string | null,
+  wordCount: number,
   tierFactor: number,
   longestSubscriberPrimaryWords: number,
 ): number {
   if (phrase == null || tierFactor <= 0) return 0
-  const words = phrase.split(/\s+/).length
-  return Math.min(1, tierFactor * specificityScore(words, longestSubscriberPrimaryWords))
+  return Math.min(1, tierFactor * specificityScore(wordCount, longestSubscriberPrimaryWords))
 }
 
-function matchBestPhrase(
-  haystack: string,
-  phrases: string[],
+function matchBestPhraseCompiled(
+  normalizedHaystack: string,
+  compiled: CompiledPhrase[],
   tierFactor: number,
   longestPrimaryWords: number,
 ): { relevance: number; matchedPhrase: string | null } {
-  const matched = bestMatchOnSurface(phrases, haystack)
-  const relevance = tierMatchRelevance(matched, tierFactor, longestPrimaryWords)
-  return { relevance, matchedPhrase: matched }
+  if (compiled.length === 0 || !normalizedHaystack) {
+    return { relevance: 0, matchedPhrase: null }
+  }
+  let best: CompiledPhrase | null = null
+  for (const entry of compiled) {
+    if (!phraseMatchesNormalized(normalizedHaystack, entry.phrase, entry.regex)) continue
+    if (best == null || entry.wordCount > best.wordCount) {
+      best = entry
+    }
+  }
+  if (best == null) return { relevance: 0, matchedPhrase: null }
+  return {
+    relevance: tierMatchRelevance(best.phrase, best.wordCount, tierFactor, longestPrimaryWords),
+    matchedPhrase: best.phrase,
+  }
 }
 
-export function evaluatePhraseMatch(
+/**
+ * Subscriber-side phrase work hoisted out of the per-job loop:
+ * builds profile, expands synonyms, precompiles regex+wordCount per phrase.
+ *
+ * Build once per match run (per subscriber) and reuse across all jobs via
+ * {@link evaluatePhraseMatchWithContext}.
+ */
+export interface PhraseEvaluationContext {
+  phraseConfig: MatchConfigPhrase
+  primaryPhrases: string[]
+  discriminatingPhrases: string[]
+  industryPhrases: string[]
+  titlePrimaryCompiled: CompiledPhrase[]
+  titleDiscriminatingCompiled: CompiledPhrase[]
+  industryPrimaryCompiled: CompiledPhrase[]
+  longestTitlePrimary: number
+  longestIndustryPrimary: number
+  hasTitleIntent: boolean
+  hasIndustryIntent: boolean
+  hasSearchIntent: boolean
+}
+
+export function buildPhraseEvaluationContext(
   prefs: PhraseMatchSubscriberInput,
-  job: PhraseMatchJobSurfaces,
   phraseConfig: MatchConfigPhrase,
   synonyms: MatchSynonymEntry[] = [],
-): {
-  phraseRelevance: number
-  phraseMatch: PhraseMatchDetails
-  passesGate: boolean
-  hasSearchIntent: boolean
-} {
+): PhraseEvaluationContext {
   const titleText = effectiveJobTitleForKeywords(prefs)
   const industryText = prefs.currentIndustry
 
   const titleProfile = buildPhraseProfile(titleText)
   const industryPrimaryPhrases = industryTierPhrases(industryText)
 
-  const titlePrimaryMatch = expandPhrasesForMatching(titleProfile.primaryPhrases, synonyms)
-  const titleDiscriminatingMatch = expandPhrasesForMatching(
+  const titlePrimaryExpanded = expandPhrasesForMatching(titleProfile.primaryPhrases, synonyms)
+  const titleDiscriminatingExpanded = expandPhrasesForMatching(
     titleProfile.discriminatingPhrases,
     synonyms,
   )
-  const industryPrimaryMatch = expandPhrasesForMatching(industryPrimaryPhrases, synonyms)
+  const industryPrimaryExpanded = expandPhrasesForMatching(industryPrimaryPhrases, synonyms)
 
-  const longestTitlePrimary = longestPhraseWordCount(titleProfile.primaryPhrases)
-  const longestTitleDiscriminating = longestPhraseWordCount(titleProfile.discriminatingPhrases)
-  const longestIndustryPrimary = longestPhraseWordCount(industryPrimaryPhrases)
+  const hasTitleIntent =
+    titleProfile.primaryPhrases.length > 0 || titleProfile.discriminatingPhrases.length > 0
+  const hasIndustryIntent = industryPrimaryPhrases.length > 0
+
+  return {
+    phraseConfig,
+    primaryPhrases: titleProfile.primaryPhrases,
+    discriminatingPhrases: titleProfile.discriminatingPhrases,
+    industryPhrases: Array.from(new Set(industryPrimaryPhrases)),
+    titlePrimaryCompiled: compilePhraseList(titlePrimaryExpanded),
+    titleDiscriminatingCompiled: compilePhraseList(titleDiscriminatingExpanded),
+    industryPrimaryCompiled: compilePhraseList(industryPrimaryExpanded),
+    longestTitlePrimary: longestPhraseWordCount(titleProfile.primaryPhrases),
+    longestIndustryPrimary: longestPhraseWordCount(industryPrimaryPhrases),
+    hasTitleIntent,
+    hasIndustryIntent,
+    hasSearchIntent: hasTitleIntent || hasIndustryIntent,
+  }
+}
+
+export function evaluatePhraseMatchWithContext(
+  ctx: PhraseEvaluationContext,
+  job: PhraseMatchJobSurfaces,
+): {
+  phraseRelevance: number
+  phraseMatch: PhraseMatchDetails
+  passesGate: boolean
+  hasSearchIntent: boolean
+} {
+  const sw = ctx.phraseConfig.surfaceWeights
+  const tf = ctx.phraseConfig.tierFactors
 
   const surfaces: Record<PhraseSurface, string> = {
     title: normalizeText(job.title),
@@ -614,24 +689,22 @@ export function evaluatePhraseMatch(
   const matchedBySurface: PhraseMatchDetails['matchedBySurface'] = {}
   const surfaceScores = emptySurfaceScores()
 
-  const hasTitleIntent =
-    titleProfile.primaryPhrases.length > 0 || titleProfile.discriminatingPhrases.length > 0
-  const industryAll = industryTierPhrases(industryText)
-  const hasIndustryIntent = industryAll.length > 0
-
-  const sw = phraseConfig.surfaceWeights
-  const tf = phraseConfig.tierFactors
-
   let phraseRelevance = 0
   let hasPrimaryOrIndustryMatch = false
   let discMatchedOnTitleSurface = false
 
   for (const surface of ['title', 'description', 'briefing'] as const) {
-    const hay = surfaces[surface]
     const surfaceWeight = sw[surface]
     if (surfaceWeight <= 0) continue
+    const hay = surfaces[surface]
+    if (!hay) continue
 
-    const primaryResult = matchBestPhrase(hay, titlePrimaryMatch, tf.primary, longestTitlePrimary)
+    const primaryResult = matchBestPhraseCompiled(
+      hay,
+      ctx.titlePrimaryCompiled,
+      tf.primary,
+      ctx.longestTitlePrimary,
+    )
     surfaceScores.primary[surface] = primaryResult.relevance
     if (primaryResult.matchedPhrase) {
       const prev = matchedBySurface.primary ?? {}
@@ -642,11 +715,11 @@ export function evaluatePhraseMatch(
 
     const discriminatingResult =
       surface === 'title'
-        ? matchBestPhrase(
+        ? matchBestPhraseCompiled(
             hay,
-            titleDiscriminatingMatch,
+            ctx.titleDiscriminatingCompiled,
             tf.secondary,
-            longestTitlePrimary,
+            ctx.longestTitlePrimary,
           )
         : { relevance: 0, matchedPhrase: null }
 
@@ -660,11 +733,11 @@ export function evaluatePhraseMatch(
       }
     }
 
-    const industryResult = matchBestPhrase(
+    const industryResult = matchBestPhraseCompiled(
       hay,
-      industryPrimaryMatch,
+      ctx.industryPrimaryCompiled,
       tf.industry,
-      longestIndustryPrimary,
+      ctx.longestIndustryPrimary,
     )
     surfaceScores.industry[surface] = industryResult.relevance
     if (industryResult.matchedPhrase) {
@@ -685,21 +758,39 @@ export function evaluatePhraseMatch(
   phraseRelevance = Math.min(1, Math.max(0, phraseRelevance))
 
   let passesGate = true
-  if (hasTitleIntent || hasIndustryIntent) {
+  if (ctx.hasSearchIntent) {
     passesGate = hasPrimaryOrIndustryMatch || discMatchedOnTitleSurface
   }
 
   const phraseMatch: PhraseMatchDetails = {
-    primaryPhrases: titleProfile.primaryPhrases,
-    discriminatingPhrases: titleProfile.discriminatingPhrases,
-    industryPhrases: Array.from(new Set(industryAll)),
+    primaryPhrases: ctx.primaryPhrases,
+    discriminatingPhrases: ctx.discriminatingPhrases,
+    industryPhrases: ctx.industryPhrases,
     matchedBySurface,
     surfaceScores,
   }
 
-  const hasSearchIntent = hasTitleIntent || hasIndustryIntent
+  return {
+    phraseRelevance,
+    phraseMatch,
+    passesGate,
+    hasSearchIntent: ctx.hasSearchIntent,
+  }
+}
 
-  return { phraseRelevance, phraseMatch, passesGate, hasSearchIntent }
+export function evaluatePhraseMatch(
+  prefs: PhraseMatchSubscriberInput,
+  job: PhraseMatchJobSurfaces,
+  phraseConfig: MatchConfigPhrase,
+  synonyms: MatchSynonymEntry[] = [],
+): {
+  phraseRelevance: number
+  phraseMatch: PhraseMatchDetails
+  passesGate: boolean
+  hasSearchIntent: boolean
+} {
+  const ctx = buildPhraseEvaluationContext(prefs, phraseConfig, synonyms)
+  return evaluatePhraseMatchWithContext(ctx, job)
 }
 
 export type ProfilePhraseDebugKind = 'primary' | 'discriminating' | 'industry'
