@@ -626,7 +626,10 @@ function totalScoreFromQualities(qualities: JobMatchQualities, cfg: MatchConfig)
   components: RankedJob['components']
   scoreContributions: RankedJob['scoreContributions']
 } {
-  const w = cfg.categoryWeights
+  const w = {
+    ...defaultConfig.categoryWeights,
+    ...cfg.categoryWeights,
+  }
   const components = {
     phrase: qualities.phraseRelevance,
     pay: qualities.payQuality,

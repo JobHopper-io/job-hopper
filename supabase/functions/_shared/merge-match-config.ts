@@ -21,7 +21,7 @@ export function overrideToFullConfig(
 const SUM_TOLERANCE = 0.02
 
 export function validateMatchConfig(config: MatchConfig): string | null {
-  const cw = config.categoryWeights
+  const cw = { ...defaultConfig.categoryWeights, ...config.categoryWeights }
   const catSum =
     cw.phrase + cw.pay + cw.location + cw.recency + cw.filterMatches
   if (Math.abs(catSum - 1) > SUM_TOLERANCE) {

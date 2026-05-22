@@ -576,6 +576,16 @@ async function loadMatches() {
   }
 }
 
+function formatScorePoints(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  return value.toFixed(1)
+}
+
+function formatQualityPercent(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(0)}%`
+}
+
 function formatJobPostedDate(job: RankedJob): string {
   const iso = job.postedDate ?? job.createdAt
   if (!iso) return '—'
@@ -1653,18 +1663,18 @@ onMounted(async () => {
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body text-[11px]">
                   <template v-if="job.scoreContributions">
-                    <div>Phrase: {{ job.scoreContributions.phrase.toFixed(1) }}</div>
-                    <div>Pay: {{ job.scoreContributions.pay.toFixed(1) }}</div>
-                    <div>Loc: {{ job.scoreContributions.location.toFixed(1) }}</div>
-                    <div>Rec: {{ job.scoreContributions.recency.toFixed(1) }}</div>
-                    <div>Filter: {{ job.scoreContributions.filterMatches.toFixed(1) }}</div>
+                    <div>Phrase: {{ formatScorePoints(job.scoreContributions.phrase) }}</div>
+                    <div>Pay: {{ formatScorePoints(job.scoreContributions.pay) }}</div>
+                    <div>Loc: {{ formatScorePoints(job.scoreContributions.location) }}</div>
+                    <div>Rec: {{ formatScorePoints(job.scoreContributions.recency) }}</div>
+                    <div>Filter: {{ formatScorePoints(job.scoreContributions.filterMatches) }}</div>
                   </template>
                   <template v-else-if="job.components">
-                    <div>Phrase: {{ (job.components.phrase * 100).toFixed(0) }}% q</div>
-                    <div>Pay: {{ (job.components.pay * 100).toFixed(0) }}% q</div>
-                    <div>Loc: {{ (job.components.location * 100).toFixed(0) }}% q</div>
-                    <div>Rec: {{ (job.components.recency * 100).toFixed(0) }}% q</div>
-                    <div>Filter: {{ (job.components.filterMatches * 100).toFixed(0) }}% q</div>
+                    <div>Phrase: {{ formatQualityPercent(job.components.phrase) }} q</div>
+                    <div>Pay: {{ formatQualityPercent(job.components.pay) }} q</div>
+                    <div>Loc: {{ formatQualityPercent(job.components.location) }} q</div>
+                    <div>Rec: {{ formatQualityPercent(job.components.recency) }} q</div>
+                    <div>Filter: {{ formatQualityPercent(job.components.filterMatches) }} q</div>
                   </template>
                   <span v-else>—</span>
                 </td>
