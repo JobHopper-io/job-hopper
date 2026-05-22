@@ -5,6 +5,7 @@ import {
   type JobDataForInference,
 } from './infer-sponsorship-likelihood.ts'
 import type { MatchSynonymEntry } from './match-synonym-row.ts'
+import { computeFilterMatchesQuality } from './filter-matching.ts'
 import {
   evaluatePhraseMatch,
   getAllProfilePhrasesForDebug,
@@ -14,6 +15,8 @@ import {
   type PhraseMatchJobSurfaces,
   type PhraseMatchSubscriberInput,
 } from './phrase-matching.ts'
+
+export { computeFilterMatchesQuality, computeRoleCategoryMatchQuality } from './filter-matching.ts'
 
 export { getEffectiveSponsorshipLikelihood, inferSponsorshipLikelihood }
 export type { MatchConfigPhrase, PhraseMatchDetails }
@@ -61,6 +64,7 @@ export interface MatchConfigCategoryWeights {
   pay: number
   location: number
   recency: number
+  filterMatches: number
 }
 
 export interface MatchConfigPay {
@@ -124,6 +128,7 @@ export interface RankedJob extends JobRecord {
     pay: number
     location: number
     recency: number
+    filterMatches: number
   }
   /** Points contributed per category on 0–100 scale (categoryWeight × quality × 100). */
   scoreContributions?: {
@@ -131,6 +136,7 @@ export interface RankedJob extends JobRecord {
     pay: number
     location: number
     recency: number
+    filterMatches: number
   }
   phraseMatch?: PhraseMatchDetails
   locationDistanceMiles?: number | null
@@ -141,10 +147,11 @@ export interface RankedJob extends JobRecord {
 
 export const defaultConfig: MatchConfig = {
   categoryWeights: {
-    phrase: 0.5,
+    phrase: 0.45,
     pay: 0.15,
     location: 0.25,
     recency: 0.1,
+    filterMatches: 0.05,
   },
   phrase: {
     tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
@@ -268,13 +275,6 @@ function jobMatchesSubscriptionTier(job: JobRecord, prefs: SubscriberPreferences
   const tier = job.subscriptionTier
   if (tier == null || tier === '') return false
   return prefs.subscriptionTierProductKeys.includes(tier)
-}
-
-function jobMatchesTargetRoles(job: JobRecord, prefs: SubscriberPreferences): boolean {
-  if (prefs.roles.length === 0) return true
-  if (!job.roleCategory) return false
-  const lowerCategory = job.roleCategory.toLowerCase()
-  return prefs.roles.some((role) => role.toLowerCase() === lowerCategory)
 }
 
 function normalizeAnnualFromJob(job: JobRecord): { min: number | null; max: number | null } {
@@ -578,6 +578,7 @@ export interface JobMatchQualities {
   payQuality: number
   locationQuality: number
   recencyQuality: number
+  filterMatchesQuality: number
   phraseMatch: PhraseMatchDetails
   locationDistanceMiles: number | null
   withinRadius: boolean
@@ -605,12 +606,14 @@ function computeJobQualities(
     parsed: locationParsed,
   } = computeLocationQuality(prefs, job, cfg)
   const recencyQuality = computeRecencyQuality(job, cfg, nowMs)
+  const filterMatchesQuality = computeFilterMatchesQuality(prefs.roles, job.roleCategory)
 
   return {
     phraseRelevance,
     payQuality,
     locationQuality,
     recencyQuality,
+    filterMatchesQuality,
     phraseMatch,
     locationDistanceMiles: distanceMiles,
     withinRadius,
@@ -629,18 +632,21 @@ function totalScoreFromQualities(qualities: JobMatchQualities, cfg: MatchConfig)
     pay: qualities.payQuality,
     location: qualities.locationQuality,
     recency: qualities.recencyQuality,
+    filterMatches: qualities.filterMatchesQuality,
   }
   const scoreContributions = {
     phrase: 100 * w.phrase * qualities.phraseRelevance,
     pay: 100 * w.pay * qualities.payQuality,
     location: 100 * w.location * qualities.locationQuality,
     recency: 100 * w.recency * qualities.recencyQuality,
+    filterMatches: 100 * w.filterMatches * qualities.filterMatchesQuality,
   }
   const score =
     scoreContributions.phrase +
     scoreContributions.pay +
     scoreContributions.location +
-    scoreContributions.recency
+    scoreContributions.recency +
+    scoreContributions.filterMatches
   return {
     score: Math.round(score * 100) / 100,
     components,
@@ -671,7 +677,6 @@ export function matchJobs(
 
   for (const job of jobs) {
     if (!jobMatchesSubscriptionTier(job, prefs)) continue
-    if (!jobMatchesTargetRoles(job, prefs)) continue
     if (jobExceedsMaxAge(job, cfg, nowMs)) continue
     if (job.isRemote && prefs.openToRemote === false) continue
 
@@ -731,7 +736,6 @@ export interface MatchJobsDebugPayload {
   filters: {
     totalJobs: number
     excludedBySubscriptionTier: number
-    excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByRecency: number
     excludedByPhraseGate: number
@@ -748,6 +752,7 @@ export interface MatchJobsDebugPayload {
     averagePayQuality: number | null
     averageLocationQuality: number | null
     averageRecencyQuality: number | null
+    averageFilterMatchesQuality: number | null
     maxPossibleScore: number
   }
   phrases: {
@@ -776,7 +781,6 @@ export function matchJobsWithDebug(
   const nowMs = Date.now()
 
   let excludedBySubscriptionTier = 0
-  let excludedByRole = 0
   let excludedByRemoteOptOut = 0
   let excludedByRecency = 0
   let excludedByPhraseGate = 0
@@ -793,6 +797,7 @@ export function matchJobsWithDebug(
   let sumPay = 0
   let sumLocation = 0
   let sumRecency = 0
+  let sumFilterMatches = 0
 
   const phraseDebugList = getAllProfilePhrasesForDebug(prefsToPhraseInput(prefs))
   const phraseCounts = new Map<string, number>()
@@ -806,11 +811,6 @@ export function matchJobsWithDebug(
   for (const job of jobs) {
     if (!jobMatchesSubscriptionTier(job, prefs)) {
       excludedBySubscriptionTier += 1
-      continue
-    }
-
-    if (!jobMatchesTargetRoles(job, prefs)) {
-      excludedByRole += 1
       continue
     }
 
@@ -883,6 +883,7 @@ export function matchJobsWithDebug(
     sumPay += components.pay
     sumLocation += components.location
     sumRecency += components.recency
+    sumFilterMatches += components.filterMatches
 
     for (const [tier, bySurf] of Object.entries(phraseMatch.matchedBySurface)) {
       const kind = tier as 'primary' | 'discriminating' | 'industry'
@@ -920,7 +921,6 @@ export function matchJobsWithDebug(
     filters: {
       totalJobs: jobs.length,
       excludedBySubscriptionTier,
-      excludedByRole,
       excludedByRemoteOptOut,
       excludedByRecency,
       excludedByPhraseGate,
@@ -937,6 +937,7 @@ export function matchJobsWithDebug(
       averagePayQuality: count > 0 ? sumPay / count : null,
       averageLocationQuality: count > 0 ? sumLocation / count : null,
       averageRecencyQuality: count > 0 ? sumRecency / count : null,
+      averageFilterMatchesQuality: count > 0 ? sumFilterMatches / count : null,
       maxPossibleScore: getMaxPossibleScore(),
     },
     phrases: Array.from(phraseCounts.entries())

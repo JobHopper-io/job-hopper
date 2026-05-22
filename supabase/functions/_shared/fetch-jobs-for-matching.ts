@@ -89,7 +89,7 @@ export interface JobHopperLiveFilterableQuery {
   or(filters: string): JobHopperLiveFilterableQuery
 }
 
-/** Applies hard filters that can be expressed in SQL (tier, role, remote opt-out, maxAgeDays). */
+/** Applies hard filters that can be expressed in SQL (tier, remote opt-out, maxAgeDays). */
 export function applyJobMatchingHardFiltersToQuery<T extends JobHopperLiveFilterableQuery>(
   query: T,
   prefs: SubscriberPreferences,
@@ -97,10 +97,6 @@ export function applyJobMatchingHardFiltersToQuery<T extends JobHopperLiveFilter
   nowMs: number = Date.now(),
 ): T {
   let q = query.in('subscription_tier', prefs.subscriptionTierProductKeys) as T
-
-  if (prefs.roles.length > 0) {
-    q = q.in('role_category', prefs.roles) as T
-  }
 
   if (prefs.openToRemote === false) {
     q = q.eq('is_remote', false) as T

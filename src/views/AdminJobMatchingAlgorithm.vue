@@ -27,13 +27,15 @@ import AdminTuningHintIcon from '@/components/AdminTuningHintIcon.vue'
 /** Short visible blurbs under section headers (always shown). */
 const MATCH_SECTION_INTROS = {
   page:
-    'Each job gets a 0–100 score from four parts (title fit, pay, location, freshness). Hard gates drop bad fits before scoring.',
+    'Each job gets a 0–100 score from five parts (title fit, pay, location, freshness, filter matches). Hard gates drop bad fits before scoring.',
   preferences:
     'Simulates a subscriber: what they want, where they work, and which job tiers they can see.',
   matchConfig:
     'Weights and rules for scoring. Saved configs apply in production when marked active.',
   categoryMix:
-    'Split 100% across the four score parts. Higher % = that part can move the total more.',
+    'Split 100% across the five score parts. Higher % = that part can move the total more.',
+  filterMatches:
+    'Subscriber filters scored here (not hard gates). Today: target role category match (1.0 or 0.0).',
   hardGates:
     'On/off filters applied before scoring. Failed gates remove the job entirely.',
   phrase:
@@ -58,7 +60,8 @@ const MATCH_TUNING_TOOLTIPS = {
   matchSubject: 'Test as this user’s preferences and subscription tier. Empty = your admin profile.',
   subscriptionTier:
     'Product keys the subscriber’s plan allows. Jobs must match one key. Empty = live keys from their subscription.',
-  roles: 'Only jobs in these categories are considered. Leave empty to allow all categories.',
+  roles:
+    'Target role categories; scored in Filter Matches (not a hard gate). Leave empty for neutral filter score.',
   targetJobTitle: 'Comma-separated job-title phrases to match (main signal for “right role”).',
   currentJobTitle: 'Used only when target job title is empty.',
   currentIndustry: 'Industry keywords; matched separately from title phrases.',
@@ -73,6 +76,8 @@ const MATCH_TUNING_TOOLTIPS = {
   categoryPay: 'Salary vs desired range.',
   categoryLocation: 'Distance, remote, metro/state.',
   categoryRecency: 'How recently the job was posted.',
+  categoryFilterMatches: 'Target role category and future subscriber filters.',
+  sectionFilterMatches: MATCH_SECTION_INTROS.filterMatches,
   minTotalScore: 'Cutoff after scoring; jobs below this are hidden (default 40).',
   phraseGate:
     'Requires primary or industry match, or a discriminating word on the job title (not description-only).',
@@ -103,7 +108,7 @@ const MATCH_TUNING_TOOLTIPS = {
 } as const
 
 const categoryWeightFields: {
-  key: 'phrase' | 'pay' | 'location' | 'recency'
+  key: 'phrase' | 'pay' | 'location' | 'recency' | 'filterMatches'
   label: string
   tooltip: string
 }[] = [
@@ -111,6 +116,11 @@ const categoryWeightFields: {
   { key: 'pay', label: 'Pay', tooltip: MATCH_TUNING_TOOLTIPS.categoryPay },
   { key: 'location', label: 'Location', tooltip: MATCH_TUNING_TOOLTIPS.categoryLocation },
   { key: 'recency', label: 'Recency', tooltip: MATCH_TUNING_TOOLTIPS.categoryRecency },
+  {
+    key: 'filterMatches',
+    label: 'Filter Matches',
+    tooltip: MATCH_TUNING_TOOLTIPS.categoryFilterMatches,
+  },
 ]
 
 type PhraseTierKey = 'primary' | 'industry' | 'secondary'
@@ -420,7 +430,7 @@ function applyConfigToForm(cfg: MatchConfigOverride | undefined) {
 }
 
 function setCategoryWeightPct(
-  key: 'phrase' | 'pay' | 'location' | 'recency',
+  key: 'phrase' | 'pay' | 'location' | 'recency' | 'filterMatches',
   pct: number,
 ) {
   configForm.categoryWeights[key] = Math.max(0, Math.min(100, pct)) / 100
@@ -572,6 +582,26 @@ function formatJobPostedDate(job: RankedJob): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatJobPay(job: RankedJob): string {
+  const { payMin, payMax, payType } = job
+  if (payMin == null && payMax == null) return '—'
+  const type = payType ?? 'year'
+  const suffix =
+    type === 'hour' || type === 'hourly'
+      ? '/hr'
+      : type === 'month'
+        ? '/mo'
+        : type === 'week'
+          ? '/wk'
+          : '/yr'
+  const fmt = (n: number) =>
+    type === 'year' ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`
+  if (payMin != null && payMax != null) return `${fmt(payMin)}–${fmt(payMax)}${suffix}`
+  if (payMin != null) return `${fmt(payMin)}+${suffix}`
+  if (payMax != null) return `≤${fmt(payMax)}${suffix}`
+  return '—'
 }
 
 function formatPhraseMatchCell(job: RankedJob): string {
@@ -1282,6 +1312,29 @@ onMounted(async () => {
                 <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionRecency" />
               </div>
             </div>
+
+            <div class="bg-white rounded-lg shadow-sm px-3 py-2">
+              <div class="flex items-start gap-1.5 pt-2">
+                <details class="min-w-0 flex-1">
+                  <summary class="cursor-pointer text-xs font-semibold text-brand-charcoal list-none pb-2">
+                    Filter Matches
+                  </summary>
+                  <div class="pb-3 space-y-2 text-[11px] border-t border-neutral-border/60 pt-2">
+                    <p class="text-neutral-body">
+                      {{ MATCH_SECTION_INTROS.filterMatches }}
+                    </p>
+                    <p class="text-neutral-subtle">
+                      Role category is read from subscriber target roles (preferences above). More
+                      filter signals will be added here later.
+                    </p>
+                  </div>
+                </details>
+                <AdminTuningHintIcon
+                  class="mt-0.5"
+                  :tooltip="MATCH_TUNING_TOOLTIPS.sectionFilterMatches"
+                />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1346,10 +1399,6 @@ onMounted(async () => {
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by subscription tier:</span>
               <span>{{ debug.filters.excludedBySubscriptionTier ?? 0 }}</span>
-            </p>
-            <p class="text-xs text-neutral-body">
-              <span class="font-semibold">Excluded by role:</span>
-              <span>{{ debug.filters.excludedByRole }}</span>
             </p>
             <p class="text-xs text-neutral-body">
               <span class="font-semibold">Excluded by remote opt-out:</span>
@@ -1441,6 +1490,15 @@ onMounted(async () => {
                 <span v-else>—</span>
               </span>
             </p>
+            <p class="text-xs text-neutral-body">
+              <span class="font-semibold">Avg filter matches quality:</span>
+              <span>
+                <span v-if="debug.scores.averageFilterMatchesQuality != null">
+                  {{ (debug.scores.averageFilterMatchesQuality * 100).toFixed(1) }}%
+                </span>
+                <span v-else>—</span>
+              </span>
+            </p>
 
             <div class="mt-2">
               <p class="text-xs font-semibold text-neutral-body mb-1">
@@ -1513,6 +1571,8 @@ onMounted(async () => {
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Score (0–100)</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Title</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Company</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Role</th>
+                <th class="px-3 py-2 text-left font-semibold text-neutral-body">Pay</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Sponsorship</th>
                 <th class="px-3 py-2 text-left font-semibold text-neutral-body">Location parsing</th>
@@ -1541,6 +1601,12 @@ onMounted(async () => {
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   {{ job.companyName || '—' }}
+                </td>
+                <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
+                  {{ job.roleCategory || '—' }}
+                </td>
+                <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
+                  {{ formatJobPay(job) }}
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap text-neutral-body">
                   {{ job.location || '—' }}
@@ -1591,12 +1657,14 @@ onMounted(async () => {
                     <div>Pay: {{ job.scoreContributions.pay.toFixed(1) }}</div>
                     <div>Loc: {{ job.scoreContributions.location.toFixed(1) }}</div>
                     <div>Rec: {{ job.scoreContributions.recency.toFixed(1) }}</div>
+                    <div>Filter: {{ job.scoreContributions.filterMatches.toFixed(1) }}</div>
                   </template>
                   <template v-else-if="job.components">
                     <div>Phrase: {{ (job.components.phrase * 100).toFixed(0) }}% q</div>
                     <div>Pay: {{ (job.components.pay * 100).toFixed(0) }}% q</div>
                     <div>Loc: {{ (job.components.location * 100).toFixed(0) }}% q</div>
                     <div>Rec: {{ (job.components.recency * 100).toFixed(0) }}% q</div>
+                    <div>Filter: {{ (job.components.filterMatches * 100).toFixed(0) }}% q</div>
                   </template>
                   <span v-else>—</span>
                 </td>

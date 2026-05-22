@@ -33,6 +33,7 @@ function overrideToDbColumns(full: MatchConfig): Record<string, number | boolean
     cat_weight_pay: full.categoryWeights.pay,
     cat_weight_location: full.categoryWeights.location,
     cat_weight_recency: full.categoryWeights.recency,
+    cat_weight_filter_matches: full.categoryWeights.filterMatches,
     phrase_tier_factor_primary: full.phrase.tierFactors.primary,
     phrase_tier_factor_industry: full.phrase.tierFactors.industry,
     phrase_tier_factor_secondary: full.phrase.tierFactors.secondary,

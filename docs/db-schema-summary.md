@@ -140,7 +140,7 @@
 
 ### matching_algorithm_config
 - **Meaning**: Named tuning presets for the job-matching scorer (category weights, phrase/pay/location/recency parameters, hard gates). One row may be `active` at a time; others are inactive or `archived`.
-- **Key columns**: Flattened `cat_weight_*`, `phrase_*`, `pay_*`, `loc_*`, `recency_max_age_days`, `threshold_min_total_score`, `phrase_gate_require_primary_or_industry`. See `src/types/supabase.ts` for the full list.
+- **Key columns**: Flattened `cat_weight_*` (phrase, pay, location, recency, filter_matches), `phrase_*`, `pay_*`, `loc_*`, `recency_max_age_days`, `threshold_min_total_score`, `phrase_gate_require_primary_or_industry`. See `src/types/supabase.ts` for the full list.
 - **Non‑obvious rules**:
   - Production `match-jobs` loads the single row where `active = true` and `archived = false`, then merges with any request overrides.
   - Phrase relevance uses subscriber phrase length in code; there is no fixed “specificity word count” column.

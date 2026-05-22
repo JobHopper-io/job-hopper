@@ -598,6 +598,7 @@ export type Database = {
           cat_weight_pay: number
           cat_weight_phrase: number
           cat_weight_recency: number
+          cat_weight_filter_matches: number
           created_at: string
           id: string
           loc_band_beyond_100: number
@@ -635,6 +636,7 @@ export type Database = {
           cat_weight_pay: number
           cat_weight_phrase: number
           cat_weight_recency: number
+          cat_weight_filter_matches: number
           created_at?: string
           id?: string
           loc_band_beyond_100: number
@@ -672,6 +674,7 @@ export type Database = {
           cat_weight_pay?: number
           cat_weight_phrase?: number
           cat_weight_recency?: number
+          cat_weight_filter_matches?: number
           created_at?: string
           id?: string
           loc_band_beyond_100?: number

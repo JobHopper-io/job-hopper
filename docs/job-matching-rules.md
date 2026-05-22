@@ -17,14 +17,15 @@ Every included job receives a **total score from 0 to 100**:
 
 ```
 total = 100 × (
-  w_phrase   × phrase_relevance   (0–1)
-+ w_pay      × pay_quality        (0–1)
-+ w_location × location_quality   (0–1)
-+ w_recency  × recency_quality    (0–1)
+  w_phrase         × phrase_relevance       (0–1)
++ w_pay            × pay_quality            (0–1)
++ w_location       × location_quality       (0–1)
++ w_recency        × recency_quality        (0–1)
++ w_filter_matches × filter_matches_quality (0–1)
 )
 ```
 
-Category weights `w_*` sum to **1.0** and define how much each dimension can contribute at most (e.g. `w_phrase = 0.5` → phrase can contribute up to 50 points).
+Category weights `w_*` sum to **1.0** and define how much each dimension can contribute at most (e.g. `w_phrase = 0.45` → phrase can contribute up to 45 points).
 
 `minTotalScore` is on the same 0–100 scale (default **40**).
 
@@ -35,12 +36,11 @@ Category weights `w_*` sum to **1.0** and define how much each dimension can con
 Jobs that fail any gate are **not ranked** and do not receive a score:
 
 1. **Subscription tier** — job tier must match subscriber’s base plan product keys.
-2. **Role category** — if subscriber has target roles, job `role_category` must match.
-3. **Recency** — `posted_date` (else `created_at`) must not be older than `recency.maxAgeDays`.
-4. **Remote opt-out** — remote jobs excluded when subscriber is not open to remote.
-5. **Phrase gate** (when enabled) — if subscriber has title/industry intent, job must match at least one **primary** or **industry** phrase on any surface, or a **discriminating** (title-only) phrase on the job **title** surface. Description/briefing-only discriminating matches do not pass.
-6. **Pay hard floor** (when enabled) — exclude jobs more than `pay.hardFloorFraction` below subscriber `pay_range_min`.
-7. **Relocation gate** (when enabled) — exclude non-remote jobs **> 100 mi** from preferred locations when subscriber is not open to relocation.
+2. **Recency** — `posted_date` (else `created_at`) must not be older than `recency.maxAgeDays`.
+3. **Remote opt-out** — remote jobs excluded when subscriber is not open to remote.
+4. **Phrase gate** (when enabled) — if subscriber has title/industry intent, job must match at least one **primary** or **industry** phrase on any surface, or a **discriminating** (title-only) phrase on the job **title** surface. Description/briefing-only discriminating matches do not pass.
+5. **Pay hard floor** (when enabled) — exclude jobs more than `pay.hardFloorFraction` below subscriber `pay_range_min`.
+6. **Relocation gate** (when enabled) — exclude non-remote jobs **> 100 mi** from preferred locations when subscriber is not open to relocation.
 
 There is **no** negative penalty added to the score; failed gates mean exclusion only.
 
@@ -102,6 +102,18 @@ recency_quality = max(0, 1 - days_since_posted / maxAgeDays)
 ```
 
 Same `maxAgeDays` drives the hard recency gate.
+
+---
+
+## Filter Matches quality (0–1)
+
+**Filter Matches** is a scored category (weight `w_filter_matches`, default **0.05**), not a hard gate. It will grow to include more subscriber filters; today it only reflects **target role categories**.
+
+- If the subscriber has **no** target roles → quality **1.0** (neutral).
+- If the job’s `role_category` matches one of the subscriber’s target roles (case-insensitive) → **1.0**.
+- Otherwise → **0.0** (the category contributes no points, but the job can still rank if other categories score well).
+
+Target roles are set on the subscriber profile / admin test preferences, not in `matching_algorithm_config`.
 
 ---
 

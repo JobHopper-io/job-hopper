@@ -10,6 +10,7 @@ export function configRowToOverride(row: MatchingAlgorithmConfigRow): Partial<Ma
       pay: row.cat_weight_pay,
       location: row.cat_weight_location,
       recency: row.cat_weight_recency,
+      filterMatches: row.cat_weight_filter_matches,
     },
     phrase: {
       tierFactors: {

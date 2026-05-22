@@ -22,7 +22,8 @@ const SUM_TOLERANCE = 0.02
 
 export function validateMatchConfig(config: MatchConfig): string | null {
   const cw = config.categoryWeights
-  const catSum = cw.phrase + cw.pay + cw.location + cw.recency
+  const catSum =
+    cw.phrase + cw.pay + cw.location + cw.recency + cw.filterMatches
   if (Math.abs(catSum - 1) > SUM_TOLERANCE) {
     return `Category weights must sum to 1.0 (got ${catSum.toFixed(3)})`
   }

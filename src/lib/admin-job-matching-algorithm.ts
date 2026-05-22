@@ -24,6 +24,10 @@ export interface RankedJob {
   id: string
   title: string | null
   companyName: string | null
+  roleCategory: string | null
+  payMin: number | null
+  payMax: number | null
+  payType: string | null
   location: string | null
   description: string | null
   aiBriefing: string | null
@@ -38,6 +42,7 @@ export interface RankedJob {
     pay: number
     location: number
     recency: number
+    filterMatches: number
   }
   /** Points contributed per category on 0–100 scale. */
   scoreContributions?: {
@@ -45,6 +50,7 @@ export interface RankedJob {
     pay: number
     location: number
     recency: number
+    filterMatches: number
   }
   phraseMatch?: PhraseMatchSurfaceDetail
   locationDistanceMiles?: number | null
@@ -57,7 +63,6 @@ export interface MatchJobsDebugPayload {
   filters: {
     totalJobs: number
     excludedBySubscriptionTier: number
-    excludedByRole: number
     excludedByRemoteOptOut: number
     excludedByRecency: number
     excludedByPhraseGate: number
@@ -74,6 +79,7 @@ export interface MatchJobsDebugPayload {
     averagePayQuality: number | null
     averageLocationQuality: number | null
     averageRecencyQuality: number | null
+    averageFilterMatchesQuality: number | null
     maxPossibleScore: number
   }
   phrases: {
@@ -114,6 +120,7 @@ export interface MatchConfigCategoryWeights {
   pay?: number
   location?: number
   recency?: number
+  filterMatches?: number
 }
 
 export interface MatchConfigPhrase {
@@ -176,6 +183,7 @@ export interface AdminMatchConfigForm {
     pay: number
     location: number
     recency: number
+    filterMatches: number
   }
   phrase: {
     tierFactors: { primary: number; industry: number; secondary: number }
@@ -268,10 +276,11 @@ export interface GetAdminMatchesOptions {
 /** Default admin match config (mirrors backend defaultConfig). */
 export const DEFAULT_ADMIN_MATCH_CONFIG = {
   categoryWeights: {
-    phrase: 0.5,
+    phrase: 0.45,
     pay: 0.15,
     location: 0.25,
     recency: 0.1,
+    filterMatches: 0.05,
   },
   phrase: {
     tierFactors: { primary: 1, industry: 0.7, secondary: 0.4 },
@@ -336,6 +345,10 @@ export function normalizeMatchConfigForm(
       pay: num(src?.categoryWeights?.pay, base.categoryWeights.pay),
       location: num(src?.categoryWeights?.location, base.categoryWeights.location),
       recency: num(src?.categoryWeights?.recency, base.categoryWeights.recency),
+      filterMatches: num(
+        src?.categoryWeights?.filterMatches,
+        base.categoryWeights.filterMatches,
+      ),
     },
     phrase: {
       tierFactors: {
@@ -400,7 +413,13 @@ function deepCloneConfig(src: AdminMatchConfigForm): AdminMatchConfigForm {
 export function categoryWeightSum(cfg: AdminMatchConfigForm | MatchConfigOverride): number {
   const w = cfg.categoryWeights
   if (!w) return 0
-  return (w.phrase ?? 0) + (w.pay ?? 0) + (w.location ?? 0) + (w.recency ?? 0)
+  return (
+    (w.phrase ?? 0) +
+    (w.pay ?? 0) +
+    (w.location ?? 0) +
+    (w.recency ?? 0) +
+    (w.filterMatches ?? 0)
+  )
 }
 
 export function phraseSurfaceWeightSum(cfg: AdminMatchConfigForm | MatchConfigOverride): number {

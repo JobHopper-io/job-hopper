@@ -395,6 +395,45 @@ Deno.test('matchJobs: total score in 0-100 range with default config', () => {
   assertEquals(ranked[0].score <= 100, true)
 })
 
+Deno.test('matchJobs: mismatched role category is scored not gated', () => {
+  const prefs: SubscriberPreferences = {
+    subscriptionTierProductKeys: ['tier_a'],
+    roles: ['engineering'],
+    targetJobTitle: 'Mechanical Engineer',
+    currentJobTitle: null,
+    currentIndustry: null,
+    payRangeMin: null,
+    payRangeMax: null,
+    preferredLocations: [],
+    openToRelocation: null,
+    openToRemote: null,
+    locationRadiusMiles: null,
+  }
+  const job: JobRecord = {
+    id: '1',
+    title: 'Mechanical Design Engineer',
+    companyName: 'Co',
+    roleCategory: 'operations',
+    location: null,
+    isRemote: false,
+    description: null,
+    aiBriefing: null,
+    applyLink: null,
+    payMin: null,
+    payMax: null,
+    payType: null,
+    createdAt: new Date().toISOString(),
+    postedDate: new Date().toISOString(),
+    subscriptionTier: 'tier_a',
+  }
+  const ranked = matchJobs(prefs, [job], {
+    thresholds: { minTotalScore: 0 },
+    debug: { includeReasonBreakdown: true },
+  })
+  assertEquals(ranked.length, 1)
+  assertEquals(ranked[0].components?.filterMatches, 0)
+})
+
 Deno.test('matchJobs excludes when phrase gate fails', () => {
   const prefs: SubscriberPreferences = {
     subscriptionTierProductKeys: ['tier_a'],
