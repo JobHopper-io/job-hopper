@@ -226,7 +226,7 @@ serve(async (req) => {
       const count = countByCategory.get(category) ?? 0
       const pct = totalProfiles > 0 ? Math.round((1000 * count) / totalProfiles) / 10 : 0
       return { category, count, pct }
-    })
+    }).filter((row) => row.category !== 'unclassified' || row.count > 0)
 
     return new Response(
       JSON.stringify({

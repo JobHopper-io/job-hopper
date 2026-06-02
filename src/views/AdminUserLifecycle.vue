@@ -2,7 +2,7 @@
   <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <header class="mb-8">
       <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal mb-2">
-        User lifecycle report
+        User Report
       </h1>
       <p class="text-sm text-neutral-body max-w-3xl">
         Counts and per-user categories are mutually exclusive: incomplete onboarding, Stripe free trial,
@@ -64,7 +64,7 @@
           </thead>
           <tbody class="divide-y divide-neutral-border">
             <tr
-              v-for="row in report.summary"
+              v-for="row in visibleSummary"
               :key="row.category"
               class="cursor-pointer hover:bg-neutral-bg/80"
               :class="{ 'bg-brand-primary/5': categoryFilter === row.category }"
@@ -219,6 +219,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { adminAPI } from '@/lib/admin'
 import {
+  isUserLifecycleSummaryRowVisible,
   USER_LIFECYCLE_CATEGORY_LABELS,
   USER_LIFECYCLE_CATEGORY_ORDER,
   type UserLifecycleCategory,
@@ -232,11 +233,24 @@ const truncated = ref(false)
 const categoryFilter = ref<UserLifecycleCategory | ''>('')
 const searchQuery = ref('')
 
-const categoryOptions = USER_LIFECYCLE_CATEGORY_ORDER
-
 function categoryLabel(category: UserLifecycleCategory): string {
   return USER_LIFECYCLE_CATEGORY_LABELS[category]
 }
+
+const visibleSummary = computed(() => {
+  if (!report.value) return []
+  return report.value.summary.filter(isUserLifecycleSummaryRowVisible)
+})
+
+const categoryOptions = computed(() => {
+  if (!report.value) return USER_LIFECYCLE_CATEGORY_ORDER.filter((c) => c !== 'unclassified')
+  const withUsers = new Set(
+    report.value.users.map((u) => u.category),
+  )
+  return USER_LIFECYCLE_CATEGORY_ORDER.filter(
+    (c) => c !== 'unclassified' || withUsers.has('unclassified'),
+  )
+})
 
 const filteredUsers = computed(() => {
   if (!report.value) return []

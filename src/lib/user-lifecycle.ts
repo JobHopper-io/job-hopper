@@ -21,7 +21,15 @@ export const USER_LIFECYCLE_CATEGORY_LABELS: Record<UserLifecycleCategory, strin
   freemium: 'Freemium',
   active_subscription: 'Active subscription',
   churned: 'Churned',
-  unclassified: 'Unclassified',
+  unclassified: 'Data Error',
+}
+
+/** Summary rows for categories that should not show when empty (e.g. data errors). */
+export function isUserLifecycleSummaryRowVisible(row: UserLifecycleSummaryRow): boolean {
+  if (row.category === 'unclassified' && row.count === 0) {
+    return false
+  }
+  return true
 }
 
 export interface UserLifecycleSummaryRow {

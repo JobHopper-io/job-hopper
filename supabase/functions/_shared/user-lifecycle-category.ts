@@ -5,7 +5,7 @@ export type UserLifecycleCategory =
   | 'active_subscription'
   | 'churned'
   | 'freemium'
-  | 'unclassified'
+  | 'unclassified' // UI label: "Data Error"
 
 export interface UserSubscriptionFlags {
   onboardingCompleted: boolean
