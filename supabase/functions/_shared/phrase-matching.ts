@@ -258,13 +258,48 @@ function allTokensNonContent(tokens: string[]): boolean {
   )
 }
 
+/** Collapse punctuation/spacing so placeholder inputs (e.g. N/A, n.a.) compare reliably. */
+function collapsePlaceholderKey(value: string): string {
+  return value.toLowerCase().replace(/[\s/.\-_'"]+/g, '')
+}
+
+const PLACEHOLDER_PHRASE_KEYS = new Set<string>([
+  'na',
+  'none',
+  'null',
+  'nil',
+  'unknown',
+  'tbd',
+  'tba',
+  'notapplicable',
+  'notavailable',
+])
+
+/** True when a subscriber field carries no usable phrase intent (empty, N/A, etc.). */
+export function isPlaceholderPhraseInput(value: string | null | undefined): boolean {
+  const trimmed = (value ?? '').trim()
+  if (!trimmed) return true
+  const key = collapsePlaceholderKey(trimmed)
+  if (key.length === 0) return true
+  return PLACEHOLDER_PHRASE_KEYS.has(key)
+}
+
+/** Split comma-, slash-, or pipe-separated alternatives (e.g. "Director / VP / Executive"). */
+function splitFieldAlternatives(input: string): string[] {
+  return input
+    .split(/[,/|]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !isPlaceholderPhraseInput(s))
+}
+
 /** Normalize text for phrase building and matching (& → and, hyphens → space, etc.). */
 export function normalizeForPhraseMatching(value: string | null | undefined): string {
   let s = (value ?? '').toLowerCase()
   s = s.replace(/[''`]/g, '')
   s = s.replace(/[()[\]{}"]/g, ' ')
   s = s.replace(/&/g, ' and ')
-  s = s.replace(/[-–—/|+]/g, ' ')
+  // Slashes and pipes are field-level alternative separators (see splitFieldAlternatives).
+  s = s.replace(/[-–—+]/g, ' ')
   s = s.replace(/\s+/g, ' ').trim()
   return s
 }
@@ -418,8 +453,8 @@ function collectPhrasesFromCommaField(
   input: string | null | undefined,
   emitDiscriminating: boolean,
 ): { primary: string[]; discriminating: string[] } {
-  if (!input) return { primary: [], discriminating: [] }
-  const rawParts = input.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+  if (!input || isPlaceholderPhraseInput(input)) return { primary: [], discriminating: [] }
+  const rawParts = splitFieldAlternatives(input)
   const primarySet = new Set<string>()
   const discriminatingSet = new Set<string>()
 
@@ -449,10 +484,12 @@ export function phrasesFromCommaField(
 
 export function effectiveJobTitleForKeywords(prefs: PhraseMatchSubscriberInput): string | null {
   const target = (prefs.targetJobTitle ?? '').trim()
-  if (target.length > 0) return target
+  if (target.length > 0 && !isPlaceholderPhraseInput(target)) return target
   const current = prefs.currentJobTitle
   if (current == null) return null
-  return String(current).trim().length > 0 ? String(current).trim() : null
+  const cur = String(current).trim()
+  if (cur.length === 0 || isPlaceholderPhraseInput(cur)) return null
+  return cur
 }
 
 export interface PhraseProfile {

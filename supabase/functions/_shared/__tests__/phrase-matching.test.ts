@@ -5,6 +5,7 @@ import {
   evaluatePhraseMatch,
   expandPhrasesForMatching,
   GENERIC_OCCUPATION_TOKENS,
+  isPlaceholderPhraseInput,
   normalizeForPhraseMatching,
   phraseMatchesAtWordBoundaries,
   phrasesFromCommaField,
@@ -30,6 +31,62 @@ Deno.test('GENERIC_OCCUPATION_TOKENS includes engineer', () => {
 Deno.test('normalizeForPhraseMatching: ampersand and hyphen', () => {
   assertEquals(normalizeForPhraseMatching('Pricing & Contract'), 'pricing and contract')
   assertEquals(normalizeForPhraseMatching('Front-End'), 'front end')
+})
+
+Deno.test('isPlaceholderPhraseInput: N/A and variants', () => {
+  assertEquals(isPlaceholderPhraseInput('N/A'), true)
+  assertEquals(isPlaceholderPhraseInput('n/a'), true)
+  assertEquals(isPlaceholderPhraseInput('n-a'), true)
+  assertEquals(isPlaceholderPhraseInput('none'), true)
+  assertEquals(isPlaceholderPhraseInput(''), true)
+  assertEquals(isPlaceholderPhraseInput(null), true)
+  assertEquals(isPlaceholderPhraseInput('Mechanical Engineer'), false)
+})
+
+Deno.test('buildPhraseProfile: N/A produces no phrases', () => {
+  const p = buildPhraseProfile('N/A')
+  assertEquals(p.primaryPhrases.length, 0)
+  assertEquals(p.discriminatingPhrases.length, 0)
+})
+
+Deno.test('buildPhraseProfile: Director / VP / Executive splits slash alternatives', () => {
+  const p = buildPhraseProfile('Director / VP / Executive')
+  assertEquals(p.primaryPhrases.includes('director'), true)
+  assertEquals(p.primaryPhrases.includes('vp'), true)
+  assertEquals(p.primaryPhrases.includes('executive'), true)
+  assertEquals(p.primaryPhrases.includes('director vp executive'), false)
+})
+
+Deno.test('evaluatePhraseMatch: Director / VP / Executive matches executive titles', () => {
+  const prefs = {
+    targetJobTitle: 'Director / VP / Executive',
+    currentJobTitle: null,
+    currentIndustry: null,
+  }
+  const job = {
+    title: 'VP of Operations',
+    description: null,
+    aiBriefing: null,
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.passesGate, true)
+  assertEquals(r.phraseMatch.matchedBySurface.primary?.title, 'vp')
+})
+
+Deno.test('evaluatePhraseMatch: N/A title and industry yields no search intent', () => {
+  const prefs = {
+    targetJobTitle: null,
+    currentJobTitle: 'N/A',
+    currentIndustry: 'N/A',
+  }
+  const job = {
+    title: 'Random Role',
+    description: null,
+    aiBriefing: null,
+  }
+  const r = evaluatePhraseMatch(prefs, job, phraseCfg)
+  assertEquals(r.hasSearchIntent, false)
+  assertEquals(r.passesGate, true)
 })
 
 Deno.test('phraseMatchesAtWordBoundaries: and matches ampersand haystack', () => {
