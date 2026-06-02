@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { UserLifecycleReport } from '@/lib/user-lifecycle'
 
 export type AdminTestEmailKind =
   | 'job_match_digest'
@@ -98,6 +99,18 @@ export const adminAPI = {
     }
 
     return { data: data as AdminSendTestEmailResult, error: null }
+  },
+
+  async getUserLifecycleReport(): Promise<{ data: UserLifecycleReport | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-user-lifecycle-report', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as UserLifecycleReport, error: null }
   },
 }
 

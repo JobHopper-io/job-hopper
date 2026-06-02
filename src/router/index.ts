@@ -34,6 +34,7 @@ const adminPaths = [
   '/admin/test-emails',
   '/admin/settings',
   '/admin/dashboard-banner',
+  '/admin/user-lifecycle',
 ]
 
 const router = createRouter({
@@ -176,6 +177,11 @@ const router = createRouter({
       path: '/admin/dashboard-banner',
       name: 'admin-dashboard-banner',
       component: () => import('../views/AdminDashboardBanner.vue'),
+    },
+    {
+      path: '/admin/user-lifecycle',
+      name: 'admin-user-lifecycle',
+      component: () => import('../views/AdminUserLifecycle.vue'),
     },
     {
       path: '/:pathMatch(.*)*',
