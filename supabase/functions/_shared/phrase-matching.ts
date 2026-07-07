@@ -428,16 +428,13 @@ export function buildPhrasesFromSegment(
     const peeled = peelSeniorityFromEdges(subTokens)
     if (peeled.length === 0) continue
 
-    if (peeled.length === 1) {
-      const t = peeled[0]
-      if (isContentToken(t)) {
-        if (options.emitDiscriminating) {
-          discriminatingSet.add(t)
-        } else {
-          primarySet.add(t)
-        }
+    for (const t of peeled) {
+      if (!isContentToken(t)) continue
+      if (options.emitDiscriminating) {
+        discriminatingSet.add(t)
+      } else {
+        primarySet.add(t)
       }
-      continue
     }
 
     generatePrimaryNgramsFromPeeled(peeled, primarySet)

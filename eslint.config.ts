@@ -17,4 +17,12 @@ export default defineConfigWithVueTs(
 
   pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
+
+  {
+    name: 'app/views-single-word-names',
+    files: ['src/views/**/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 )

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 
-defineProps<{
+const props = defineProps<{
   usedSearches: number
   maxSearches: number
   message: string | null
@@ -15,6 +16,11 @@ defineProps<{
 const emit = defineEmits<{
   run: []
 }>()
+
+/** One nudge step before the hard wall: exactly one free search left. */
+const showOneRemainingNudge = computed(
+  () => props.canRun && !props.message && props.maxSearches - props.usedSearches === 1,
+)
 </script>
 
 <template>
@@ -52,6 +58,13 @@ const emit = defineEmits<{
       You've used all included manual searches. Subscribe for automated matching, or check back if your limits are
       increased.
     </p>
+    <div
+      v-else-if="showOneRemainingNudge"
+      class="mb-4 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+      :class="centered ? 'text-left' : ''"
+    >
+      Just 1 free search left. Make it count, or upgrade anytime.
+    </div>
     <button
       type="button"
       class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"

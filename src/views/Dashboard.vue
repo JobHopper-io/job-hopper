@@ -4,10 +4,12 @@ import { storeToRefs } from 'pinia'
 import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
+import TrialCountdownBanner from '@/components/TrialCountdownBanner.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { freemiumAPI } from '@/lib/freemium'
+import { getProductPrice } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import { dashboardBannerAPI, isDashboardBannerActive } from '@/lib/dashboardBanner'
 import { markdownToSafeHtml } from '@/lib/markdown'
@@ -28,7 +30,28 @@ const {
   freemiumJobSearchesRemaining,
   freemiumMaxJobSearches,
   hasActiveSubscription,
+  trialEndsAt,
+  trialProducts,
 } = storeToRefs(userStore)
+
+const trialDaysRemaining = computed(() => {
+  if (!trialEndsAt.value) return null
+  const ms = new Date(trialEndsAt.value).getTime() - Date.now()
+  return Math.ceil(ms / (24 * 60 * 60 * 1000))
+})
+
+const trialChargeDateLabel = computed(() => {
+  if (!trialEndsAt.value) return ''
+  return new Date(trialEndsAt.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+})
+
+const trialAmountLabel = computed(() => {
+  const basePlanTrialProduct = trialProducts.value.find((p) => p.category === 'base_plan')
+  if (!basePlanTrialProduct) return ''
+  return `$${getProductPrice(basePlanTrialProduct)}`
+})
+
+const showTrialBanner = computed(() => trialDaysRemaining.value !== null)
 
 const profileCompletionDismissed = ref(
   typeof localStorage !== 'undefined' && localStorage.getItem(PROFILE_COMPLETION_DISMISSED_KEY) === '1'
@@ -250,6 +273,15 @@ onMounted(() => {
         <p class="text-sm text-neutral-body mt-1">
           Your matches update as new opportunities hit the Hopper and as you refine your profile.
         </p>
+      </div>
+
+      <!-- Trial countdown -->
+      <div v-if="showTrialBanner" class="mb-8">
+        <TrialCountdownBanner
+          :days-remaining="trialDaysRemaining!"
+          :charge-date-label="trialChargeDateLabel"
+          :amount-label="trialAmountLabel"
+        />
       </div>
 
       <!-- Summary cards: Subscription, Add-ons, Profile completion, Matching stats -->

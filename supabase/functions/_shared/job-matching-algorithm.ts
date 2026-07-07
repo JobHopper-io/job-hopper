@@ -8,12 +8,10 @@ import type { MatchSynonymEntry } from './match-synonym-row.ts'
 import { computeFilterMatchesQuality } from './filter-matching.ts'
 import {
   buildPhraseEvaluationContext,
-  evaluatePhraseMatch,
   evaluatePhraseMatchWithContext,
   getAllProfilePhrasesForDebug,
   effectiveJobTitleForKeywords as effectiveJobTitleForKeywordsFromPhrase,
   type MatchConfigPhrase,
-  type PhraseEvaluationContext,
   type PhraseMatchDetails,
   type PhraseMatchJobSurfaces,
   type PhraseMatchSubscriberInput,
@@ -622,8 +620,8 @@ function effectiveCategoryWeights(cfg: MatchConfig): MatchConfigCategoryWeights 
 
 function totalScoreFromQualities(qualities: JobMatchQualities, cfg: MatchConfig): {
   score: number
-  components: RankedJob['components']
-  scoreContributions: RankedJob['scoreContributions']
+  components: NonNullable<RankedJob['components']>
+  scoreContributions: NonNullable<RankedJob['scoreContributions']>
 } {
   const w = effectiveCategoryWeights(cfg)
   const components = {
@@ -990,7 +988,7 @@ export function matchJobsWithDebug(
     phrases: Array.from(phraseCounts.entries())
       .map(([key, matchedJobCount]) => {
         const i = key.indexOf('\x1f')
-        const kind = key.slice(0, i) as 'primary' | 'secondary' | 'industry'
+        const kind = key.slice(0, i) as 'primary' | 'discriminating' | 'industry'
         const phrase = key.slice(i + 1)
         return { phrase, kind, matchedJobCount }
       })

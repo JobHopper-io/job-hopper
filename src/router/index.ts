@@ -21,6 +21,8 @@ export const publicPaths = [
   '/terms',
   '/login',
   '/register',
+  '/forgot-password',
+  '/reset-password',
   '/confirm-email',
   '/unsubscribe-success',
 ]
@@ -99,6 +101,16 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('../views/ForgotPassword.vue'),
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('../views/ResetPassword.vue'),
     },
     {
       path: '/confirm-email',
@@ -227,6 +239,16 @@ function isPwaDisplayMode(): boolean {
 
 // Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
+  // Password recovery links can land on any allowed URL: Supabase falls back to the
+  // Site URL when the exact `redirectTo` isn't in its allow-list, and the host will
+  // change once we migrate off the Netlify subdomain. Detect the recovery token
+  // wherever it lands and always send the user to the reset form. Preserve the token
+  // hash so Supabase's detectSessionInUrl can still establish the recovery session.
+  const recoveryHash = to.hash || (typeof window !== 'undefined' ? window.location.hash : '')
+  if (recoveryHash.includes('type=recovery') && to.path !== '/reset-password') {
+    return { path: '/reset-password', hash: recoveryHash }
+  }
+
   const targetPath = to.path
   const isPublicPath = publicPaths.includes(targetPath)
   // Public routes that authenticated users should be redirected away from
