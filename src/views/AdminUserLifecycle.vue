@@ -111,6 +111,14 @@
           </span>
         </h2>
         <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <button
+            type="button"
+            class="btn-secondary text-sm whitespace-nowrap"
+            @click="downloadCsv"
+          >
+            <font-awesome-icon :icon="['fas', 'download']" class="mr-2" aria-hidden="true" />
+            Download all users (CSV)
+          </button>
           <div class="w-full sm:max-w-xs">
             <label
               for="lifecycle-category-filter"
@@ -269,6 +277,41 @@ const filteredUsers = computed(() => {
 function clearFilters() {
   categoryFilter.value = ''
   searchQuery.value = ''
+}
+
+/** Wrap in quotes and escape internal quotes if the field needs it (comma, quote, or newline). */
+function csvField(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function downloadCsv() {
+  if (!report.value) return
+
+  const header = ['Name', 'Email', 'Category']
+  const rows = report.value.users.map((user) => [
+    `${user.firstName} ${user.lastName}`.trim(),
+    user.email,
+    categoryLabel(user.category),
+  ])
+
+  const csv = [header, ...rows]
+    .map((row) => row.map(csvField).join(','))
+    .join('\r\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const date = new Date().toISOString().slice(0, 10)
+
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `job-hopper-user-report-${date}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 async function loadReport() {

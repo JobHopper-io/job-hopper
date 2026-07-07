@@ -16,6 +16,8 @@ import {
   faEnvelope,
   faUserTie,
   faGlobeAmericas,
+  faClock,
+  faDownload,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -33,6 +35,8 @@ library.add(
   faEnvelope,
   faUserTie,
   faGlobeAmericas,
+  faClock,
+  faDownload,
 )
 
 export function registerFontAwesome(app: App) {

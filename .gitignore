@@ -37,3 +37,19 @@ coverage
 # Supabase
 .supabase
 
+# Python (job-processor-service)
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Claude Code project instructions (local only)
+CLAUDE.md
+
