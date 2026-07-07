@@ -122,6 +122,28 @@ export const authAPI = {
     return { data, error }
   },
 
+  /**
+   * Sends a password recovery email. The link returns the user to `/reset-password`
+   * where Supabase consumes the recovery token and establishes a temporary session.
+   * Always resolves without disclosing whether the email is registered.
+   */
+  async requestPasswordReset(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+
+    return { error }
+  },
+
+  /** Sets a new password for the currently authenticated (or recovery-session) user. */
+  async updatePassword(newPassword: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    return { data, error }
+  },
+
   async signOut() {
     const { error } = await supabase.auth.signOut()
     return { error }

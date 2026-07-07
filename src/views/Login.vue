@@ -123,6 +123,11 @@ const goToRegister = () => {
                 </svg>
               </button>
             </div>
+            <div class="mt-2 text-right">
+              <router-link to="/forgot-password" class="text-sm font-medium text-brand-primary hover:underline">
+                Forgot your password?
+              </router-link>
+            </div>
           </div>
         </div>
 
