@@ -430,10 +430,7 @@ export async function matchPersonById(
   return { person, creditError: false }
 }
 
-export function personToMatchedContact(
-  person: Record<string, unknown>,
-  phrases: string[],
-): MatchedContact {
+export function personToMatchedContact(person: Record<string, unknown>): MatchedContact {
   const first = typeof person.first_name === 'string' ? person.first_name : ''
   const last = typeof person.last_name === 'string' ? person.last_name : ''
   const nameField = typeof person.name === 'string' ? person.name : `${first} ${last}`.trim()

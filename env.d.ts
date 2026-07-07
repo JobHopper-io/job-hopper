@@ -8,11 +8,8 @@ declare module 'https://esm.sh/zipcodes@8.0.0' {
     city: string
     state: string
   }
-  const zipcodes: {
-    lookup(zip: string): ZipRecord | undefined
-    lookupByName(city: string, state: string): ZipRecord[]
-  }
-  export default zipcodes
+  export function lookup(zip: string): ZipRecord | undefined
+  export function lookupByName(city: string, state: string): ZipRecord[]
 }
 
 interface ImportMetaEnv {

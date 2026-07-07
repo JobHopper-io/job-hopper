@@ -821,7 +821,7 @@ serve(async (req) => {
       })
     }
 
-    const contact = personToMatchedContact(person, phrases)
+    const contact = personToMatchedContact(person)
     const contacts = [
       {
         name: contact.name,
