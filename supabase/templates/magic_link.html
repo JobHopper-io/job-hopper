@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light only" />
+  <title>Your Job-Hopper sign-in link</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F9FAFB; -webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9FAFB;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background-color:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 0 32px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <span style="font-size:20px; font-weight:700; color:#2F6ECC; letter-spacing:-0.01em;">Job-Hopper</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 8px 32px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <h1 style="margin:0 0 16px 0; font-size:22px; font-weight:700; color:#111827;">Sign in to Job-Hopper</h1>
+              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.6; color:#374151;">Hi there,</p>
+              <p style="margin:0 0 24px 0; font-size:15px; line-height:1.6; color:#374151;">
+                Use the button below to securely sign in to your Job-Hopper account. No password required.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+                <tr>
+                  <td align="center" bgcolor="#2F6ECC" style="border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block; padding:12px 28px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; font-weight:600; color:#FFFFFF; text-decoration:none; border-radius:8px;">Sign in</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 16px 0; font-size:13px; line-height:1.6; color:#6B7280;">
+                This link expires in 1 hour and can only be used once. If it has expired, request a new one from the sign-in page.
+              </p>
+              <p style="margin:0 0 16px 0; font-size:13px; line-height:1.6; color:#6B7280;">
+                If you didn't try to sign in, you can safely ignore this email.
+              </p>
+              <p style="margin:0 0 8px 0; font-size:13px; line-height:1.6; color:#6B7280;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin:0 0 8px 0; font-size:13px; line-height:1.6; word-break:break-all;">
+                <a href="{{ .ConfirmationURL }}" target="_blank" style="color:#2F6ECC; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px 32px; border-top:1px solid #E5E7EB; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <p style="margin:0 0 6px 0; font-size:12px; line-height:1.5; color:#9CA3AF;">Job-Hopper — curated job matches for you.</p>
+              <p style="margin:0; font-size:12px; line-height:1.5; color:#9CA3AF;">
+                Need help? Contact <a href="mailto:support@job-hopper.io" style="color:#2F6ECC; text-decoration:none;">support@job-hopper.io</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

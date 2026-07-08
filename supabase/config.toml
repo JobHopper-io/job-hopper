@@ -103,7 +103,9 @@ enabled = true
 # in emails.
 site_url = "http://localhost:5173"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:5173"]
+# The `/**` wildcard allows sub-paths (e.g. /reset-password) as redirect targets; without it,
+# `redirectTo` values are silently ignored and fall back to `site_url`.
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # Path to JWT signing key. DO NOT commit your signing keys file to git.
@@ -157,6 +159,29 @@ max_frequency = "1s"
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
+
+# Branded email templates (GoTrue auth emails). `content_path` is relative to the project root.
+# NOTE: these apply to LOCAL Supabase only. For production, paste the same HTML into
+# Supabase Dashboard > Authentication > Emails for each corresponding template.
+[auth.email.template.recovery]
+subject = "Reset your Job-Hopper password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your Job-Hopper account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your Job-Hopper sign-in link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new email address"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.invite]
+subject = "You've been invited to Job-Hopper"
+content_path = "./supabase/templates/invite.html"
 
 # SMTP Configuration for Email Sending
 # 

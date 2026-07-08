@@ -7,6 +7,7 @@ import {
   getProductPrice,
 } from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
+import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import type { Product } from '@/types/database'
 
 const userStore = useUserStore()
@@ -303,6 +304,7 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+    <PostCheckoutConfirmation />
     <div class="max-w-4xl mx-auto">
       <div class="mb-6">
         <router-link

@@ -1,32 +1,52 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { authAPI } from '@/lib/auth'
 import type { Product } from '@/types/database'
 
 const faqOpen = ref<number | null>(null)
-const basePlanProducts = ref<Product[]>([])
 const resumeUpgradeProduct = ref<Product | null>(null)
 const resumeTailoringProduct = ref<Product | null>(null)
 
-/** Base plans in display order (by price from DB; no hardcoded tier keys). */
-const orderedBasePlans = computed(() =>
-  [...basePlanProducts.value].sort((a, b) => a.price_cents - b.price_cents)
-)
+// Premium is not sellable yet. Backend wiring for the waitlist is a separate follow-up
+// task, so for now this modal just captures intent (email + user id if signed in) and
+// confirms locally — it does not hit Stripe or any endpoint.
+const waitlistOpen = ref(false)
+const waitlistEmail = ref('')
+const waitlistSubmitted = ref(false)
+const currentUserId = ref<string | null>(null)
+
+const openWaitlist = () => {
+  waitlistSubmitted.value = false
+  waitlistOpen.value = true
+}
+const closeWaitlist = () => {
+  waitlistOpen.value = false
+}
+const submitWaitlist = () => {
+  if (!waitlistEmail.value.trim()) return
+  // TODO(waitlist-backend): persist { email: waitlistEmail, userId: currentUserId } once
+  // the waitlist table/endpoint exists. Captured here so the copy/UX task isn't blocked.
+  waitlistSubmitted.value = true
+}
 
 onMounted(async () => {
-  const [baseRes, addonRes, adviceRes] = await Promise.all([
-    subscriptionAPI.getBasePlanProducts(),
+  const [addonRes, adviceRes, userRes] = await Promise.all([
     subscriptionAPI.getAddonProducts(),
     resumeProductsAPI.getResumeAdviceProduct(),
+    authAPI.getCurrentUser(),
   ])
-  if (baseRes.data) basePlanProducts.value = baseRes.data
   if (addonRes.data) {
-    resumeUpgradeProduct.value =
-      addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
+    resumeUpgradeProduct.value = addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
   }
   if (!adviceRes.error) {
     resumeTailoringProduct.value = adviceRes.data
+  }
+  const user = userRes?.user
+  if (user) {
+    currentUserId.value = user.id
+    if (user.email) waitlistEmail.value = user.email
   }
 })
 
@@ -34,31 +54,88 @@ const toggleFaq = (index: number) => {
   faqOpen.value = faqOpen.value === index ? null : index
 }
 
+// ── Sellable tiers (Free / Core). Premium is rendered separately as a locked card. ──
+const sellableTiers = [
+  {
+    name: 'Free',
+    price: '$0',
+    note: 'No card required',
+    popular: false,
+    cta: 'Get started free',
+    features: [
+      { label: 'Manual job search (capped)', included: true },
+      { label: 'Sponsorship badge — teaser view only', included: true },
+      { label: 'Premium Insights — a few fields visible, rest blurred', included: true },
+      { label: 'Resume Advice — teaser', included: true },
+      { label: 'Application tracker', included: false },
+      { label: 'Automated matching & email digest', included: false },
+    ],
+  },
+  {
+    name: 'Core',
+    price: '$29',
+    note: 'Billed monthly',
+    popular: true,
+    cta: 'Start with Core',
+    features: [
+      { label: 'Unlimited, automated daily job search + email digest', included: true },
+      { label: 'Full sponsorship badge (heuristic)', included: true },
+      { label: 'Full Premium Insights', included: true },
+      { label: 'Full Resume Advice', included: true },
+      { label: 'Application tracker included', included: true },
+    ],
+  },
+]
+
+const premiumFeatures = [
+  'Real Sponsorship Score',
+  'Sponsor Watch',
+  'Apply Intelligence',
+  'Hiring manager contact',
+  'Ghost Listing Detector',
+]
+
+// ── Feature comparison. Cell values: true = included, false = not included, string = label. ──
+const comparisonColumns = ['Free', 'Core', 'Premium']
+const comparisonRows: { feature: string; cells: (boolean | string)[] }[] = [
+  { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
+  { feature: 'Automated matching + email digest', cells: [false, true, true] },
+  { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
+  { feature: 'Premium Insights', cells: ['Limited', 'Full', 'Full'] },
+  { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
+  { feature: 'Application tracker', cells: [false, true, true] },
+  { feature: 'Real Sponsorship Score', cells: [false, false, 'Coming soon'] },
+  { feature: 'Sponsor Watch', cells: [false, false, 'Coming soon'] },
+  { feature: 'Apply Intelligence', cells: [false, false, 'Coming soon'] },
+  { feature: 'Hiring manager contact', cells: [false, false, 'Coming soon'] },
+  { feature: 'Ghost Listing Detector', cells: [false, false, 'Coming soon'] },
+]
+
 const pricingFaq = [
   {
-    q: "Why are there different base prices?",
-    a: "Pricing is based on the level of roles you're targeting. Executive-level searches typically involve higher compensation ranges and narrower, more specialized opportunities, so they're priced differently than entry and mid-level searches."
+    q: 'Why are there different prices?',
+    a: "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium (coming soon) layers on a deeper sponsorship intelligence set.",
   },
   {
-    q: "Do higher-priced tiers come with different features?",
-    a: "All three tiers include the same core Job-Hopper experience. The main difference is the level of roles we're matching you with. Optional resume services—such as a one-time resume upgrade and per-job resume tailoring—are available as separate add-ons when you want them."
+    q: 'Do higher tiers come with different features?',
+    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Premium Insights, full Resume Advice, and the application tracker. Premium (coming soon) adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
   },
   {
-    q: "Can I change tiers later?",
-    a: "Yes. If your career level or target roles change, you can upgrade or downgrade your base plan from your dashboard at any time."
+    q: 'Can I change tiers later?',
+    a: 'Yes. You can upgrade or downgrade your plan from your dashboard at any time as your needs change.',
   },
   {
-    q: "Do I have to buy add-ons to get value?",
-    a: "No. The base plans are designed to stand on their own. Resume add-ons are there if you want help refreshing your resume or tailoring it for a specific role."
+    q: 'Do I have to buy add-ons to get value?',
+    a: "No. Core stands on its own. The resume add-ons — a one-time resume upgrade and per-job resume tailoring — are there only if you want extra help, and they're unaffected by your plan tier.",
   },
   {
-    q: "Is there a free trial?",
-    a: "Yes. Every base plan begins with a free trial so you can see the quality and relevance of your matches before you commit."
+    q: 'Is there a free trial?',
+    a: "Yes — Core starts with a free trial, so you can see the quality and relevance of your matches before you commit. Premium isn't purchasable yet, so there's no trial for it; join the waitlist and we'll notify you the moment it launches.",
   },
   {
-    q: "How do billing and cancellation work?",
-    a: "Plans are billed monthly. You can cancel at any time in just a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges."
-  }
+    q: 'How do billing and cancellation work?',
+    a: 'Core is billed monthly and you can cancel at any time in a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges.',
+  },
 ]
 </script>
 
@@ -68,89 +145,124 @@ const pricingFaq = [
       <!-- Intro -->
       <section class="mb-16 text-center">
         <h1 class="text-brand-charcoal mb-6">
-          Simple plans based on where you are in your career.
+          Simple plans, priced by depth — not seniority.
         </h1>
-        <p class="text-xl text-neutral-body mb-4">
-          Pick the level that matches the roles you're targeting. Add resume services only if you want them.
+        <p class="text-xl text-neutral-body mb-4 max-w-3xl mx-auto">
+          Job-Hopper gives every user the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by AI and human vetting.
         </p>
         <p class="text-neutral-body max-w-3xl mx-auto">
-          Job-Hopper is priced by career stage and job type, not just by features. Every plan starts with the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by AI and human vetting.
-        </p>
-        <p class="text-neutral-body max-w-3xl mx-auto mt-4">
-          The only difference between tiers is the type and level of roles you're using Job-Hopper to pursue - whether that's entry and mid-level positions, senior and management roles, or Director, VP, and C-level opportunities.
+          Pick the tier that matches how much you want automated for you.
         </p>
       </section>
 
-      <!-- Base Plans -->
+      <!-- Tiers -->
       <section class="mb-16">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <template v-for="(product, index) in orderedBasePlans" :key="product.id">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+          <!-- Free / Core -->
+          <div
+            v-for="tier in sellableTiers"
+            :key="tier.name"
+            :class="[
+              'card p-8 text-left flex flex-col',
+              tier.popular ? 'border-2 border-brand-primary' : '',
+            ]"
+          >
             <div
-              :class="[
-                'card p-8 text-left',
-                index === 1 ? 'border-2 border-brand-primary' : ''
-              ]"
+              v-if="tier.popular"
+              class="inline-block self-start bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4"
             >
-              <div v-if="index === 1" class="inline-block bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">Most popular</div>
-              <h3 class="text-xl font-heading font-semibold mb-2">{{ product.display_name }}</h3>
-              <p class="text-3xl font-bold text-brand-primary mb-1">From ${{ getProductPrice(product) }}<span class="text-lg font-normal text-neutral-body">/month</span></p>
-              <p class="text-sm text-neutral-body mb-6">{{ product.description || '' }}</p>
-              <div class="border-t border-neutral-border pt-6 mb-6">
-                <p class="text-sm font-semibold text-brand-charcoal mb-4">What's included:</p>
-                <ul class="space-y-2 text-sm text-neutral-body">
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Curated job matches aligned with your experience level</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Matching by role type, pay range, and location</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Active, vetted postings filtered for recency</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>AI-assisted job briefings</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Personal job feed in dashboard</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Email delivery of new matches</span>
-                  </li>
-                  <li class="flex items-start">
-                    <svg class="w-4 h-4 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Sponsorship-likelihood signal from metadata analysis on each posting (estimates only)</span>
-                  </li>
-                </ul>
-              </div>
-              <router-link to="/register" class="btn-primary w-full text-center block">
-                Start free trial
-              </router-link>
+              Most popular
             </div>
-          </template>
+            <h3 class="text-xl font-heading font-semibold mb-2">{{ tier.name }}</h3>
+            <p class="text-3xl font-bold text-brand-primary mb-1">
+              {{ tier.price }}<span class="text-lg font-normal text-neutral-body">/month</span>
+            </p>
+            <p class="text-sm text-neutral-body mb-6">{{ tier.note }}</p>
+            <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
+              <li v-for="f in tier.features" :key="f.label" class="flex items-start">
+                <font-awesome-icon
+                  :icon="['fas', f.included ? 'check' : 'xmark']"
+                  :class="['mr-2 mt-1 flex-shrink-0', f.included ? 'text-brand-success' : 'text-neutral-body/40']"
+                />
+                <span :class="f.included ? '' : 'text-neutral-body/60'">{{ f.label }}</span>
+              </li>
+            </ul>
+            <router-link to="/register" class="btn-primary w-full text-center block">
+              {{ tier.cta }}
+            </router-link>
+          </div>
+
+          <!-- Premium (locked / not yet buyable) -->
+          <div class="card p-8 text-left flex flex-col border-2 border-dashed border-neutral-border bg-neutral-bg">
+            <div class="inline-flex items-center gap-1.5 self-start bg-neutral-border text-brand-charcoal text-xs font-semibold px-3 py-1 rounded-full mb-4">
+              <font-awesome-icon :icon="['fas', 'lock']" /> Coming soon
+            </div>
+            <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
+            <p class="text-lg font-semibold text-neutral-body mb-1">$49/mo at launch</p>
+            <p class="text-sm text-neutral-body mb-6">Not purchasable yet — join the waitlist for early access.</p>
+            <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
+            <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
+              <li v-for="f in premiumFeatures" :key="f" class="flex items-start">
+                <font-awesome-icon :icon="['fas', 'lock']" class="mr-2 mt-1 flex-shrink-0 text-neutral-body/40" />
+                <span>{{ f }}</span>
+              </li>
+            </ul>
+            <p class="text-xs text-neutral-body mb-4">
+              These features are in active development. Join the waitlist to get early access and be notified the moment they launch.
+            </p>
+            <button
+              type="button"
+              class="btn-secondary w-full flex items-center justify-center gap-2"
+              @click="openWaitlist"
+            >
+              <font-awesome-icon :icon="['fas', 'envelope']" /> Join the waitlist
+            </button>
+          </div>
         </div>
       </section>
 
-      <!-- Resume add-ons -->
+      <!-- Feature comparison -->
+      <section class="mb-16">
+        <h2 class="text-brand-charcoal mb-8 text-center">Compare features across plans.</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-neutral-border">
+                <th class="text-left font-semibold text-brand-charcoal py-3 pr-4">Feature</th>
+                <th
+                  v-for="col in comparisonColumns"
+                  :key="col"
+                  class="text-center font-semibold text-brand-charcoal py-3 px-4"
+                >
+                  {{ col }}
+                  <span v-if="col === 'Premium'" class="block text-xs font-normal text-neutral-body">Coming soon</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in comparisonRows" :key="row.feature" class="border-b border-neutral-border">
+                <td class="text-left text-neutral-body py-3 pr-4">{{ row.feature }}</td>
+                <td v-for="(cell, ci) in row.cells" :key="ci" class="text-center py-3 px-4">
+                  <font-awesome-icon
+                    v-if="cell === true"
+                    :icon="['fas', 'check']"
+                    class="text-brand-success"
+                  />
+                  <span v-else-if="cell === false" class="text-neutral-body/30">—</span>
+                  <span
+                    v-else
+                    :class="cell === 'Coming soon' ? 'text-xs font-medium text-brand-primary' : 'text-neutral-body'"
+                  >
+                    {{ cell }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Resume add-ons (unchanged — unaffected by the tier restructure) -->
       <section class="mb-16">
         <h2 class="text-brand-charcoal mb-4 text-center">
           Optional resume services you can add to any plan.
@@ -201,31 +313,23 @@ const pricingFaq = [
           No matter which tier you choose, Job-Hopper gives you:
         </p>
         <p class="text-sm text-neutral-body mb-6 text-center max-w-2xl mx-auto">
-          That includes the same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood filtering when it is relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship-only service.
+          The same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood signals when they are relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship-only service.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
           <div class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+            <font-awesome-icon :icon="['fas', 'check']" class="text-brand-success mr-3 mt-1 flex-shrink-0" />
             <span class="text-neutral-body">Curated, vetted job matches instead of endless scrolling</span>
           </div>
           <div class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+            <font-awesome-icon :icon="['fas', 'check']" class="text-brand-success mr-3 mt-1 flex-shrink-0" />
             <span class="text-neutral-body">Matching powered by automation engine plus human review</span>
           </div>
           <div class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+            <font-awesome-icon :icon="['fas', 'check']" class="text-brand-success mr-3 mt-1 flex-shrink-0" />
             <span class="text-neutral-body">A personal job feed in your dashboard</span>
           </div>
           <div class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+            <font-awesome-icon :icon="['fas', 'check']" class="text-brand-success mr-3 mt-1 flex-shrink-0" />
             <span class="text-neutral-body">Email delivery of new opportunities</span>
           </div>
         </div>
@@ -239,18 +343,14 @@ const pricingFaq = [
         <div class="max-w-3xl mx-auto space-y-4">
           <div v-for="(item, index) in pricingFaq" :key="index" class="card">
             <button
-              @click="toggleFaq(index)"
               class="w-full text-left p-6 flex justify-between items-center hover:bg-neutral-bg transition-colors"
+              @click="toggleFaq(index)"
             >
               <span class="font-semibold text-brand-charcoal">{{ item.q }}</span>
-              <svg
-                :class="['w-5 h-5 text-neutral-body transition-transform', faqOpen === index ? 'rotate-180' : '']"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
+              <font-awesome-icon
+                :icon="['fas', 'chevron-down']"
+                :class="['text-neutral-body transition-transform', faqOpen === index ? 'rotate-180' : '']"
+              />
             </button>
             <div v-if="faqOpen === index" class="px-6 pb-6">
               <p class="text-neutral-body">{{ item.a }}</p>
@@ -262,10 +362,10 @@ const pricingFaq = [
       <!-- Final CTA -->
       <section class="text-center">
         <h2 class="text-brand-charcoal mb-4">
-          Pick your level. We'll handle the search.
+          Pick your plan. We'll handle the search.
         </h2>
         <p class="text-neutral-body mb-8 max-w-2xl mx-auto">
-          Choose the plan that matches your next step, set up your profile in about a minute, and start receiving curated job matches. Add premium tools only if and when you need them.
+          Choose Free or Core, set up your profile in about a minute, and start receiving curated job matches. Premium's deeper sponsorship tools are coming soon—join the waitlist to get early access.
         </p>
         <router-link to="/register" class="btn-primary inline-block mb-4">
           Start your free trial
@@ -275,6 +375,47 @@ const pricingFaq = [
         </p>
       </section>
     </div>
+
+    <!-- Premium waitlist modal (stub — captures intent locally; backend wiring is a follow-up) -->
+    <div
+      v-if="waitlistOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Join the Premium waitlist"
+      @click.self="closeWaitlist"
+    >
+      <div class="bg-white rounded-[12px] shadow-lg max-w-md w-full p-6">
+        <div class="flex items-start justify-between mb-4">
+          <h3 class="text-lg font-heading font-semibold text-brand-charcoal">Join the Premium waitlist</h3>
+          <button type="button" aria-label="Close" @click="closeWaitlist">
+            <font-awesome-icon :icon="['fas', 'xmark']" class="text-neutral-body" />
+          </button>
+        </div>
+        <template v-if="!waitlistSubmitted">
+          <p class="text-sm text-neutral-body mb-4">
+            Premium's deeper sponsorship intelligence is in active development. Leave your email and we'll notify you the moment it launches.
+          </p>
+          <form @submit.prevent="submitWaitlist">
+            <input
+              v-model="waitlistEmail"
+              type="email"
+              required
+              placeholder="you@example.com"
+              class="input mb-4"
+            >
+            <button type="submit" class="btn-primary w-full">Notify me</button>
+          </form>
+        </template>
+        <template v-else>
+          <p class="text-sm text-neutral-body">
+            Thanks—you're on the list. We'll email you at
+            <span class="font-semibold text-brand-charcoal">{{ waitlistEmail }}</span>
+            when Premium launches.
+          </p>
+          <button type="button" class="btn-primary w-full mt-4" @click="closeWaitlist">Done</button>
+        </template>
+      </div>
+    </div>
   </div>
 </template>
-
