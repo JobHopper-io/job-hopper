@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
-import TrialCountdownBanner from '@/components/TrialCountdownBanner.vue'
+import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
@@ -34,15 +34,9 @@ const {
   trialProducts,
 } = storeToRefs(userStore)
 
-const trialDaysRemaining = computed(() => {
-  if (!trialEndsAt.value) return null
-  const ms = new Date(trialEndsAt.value).getTime() - Date.now()
-  return Math.ceil(ms / (24 * 60 * 60 * 1000))
-})
-
 const trialChargeDateLabel = computed(() => {
   if (!trialEndsAt.value) return ''
-  return new Date(trialEndsAt.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return new Date(trialEndsAt.value).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 })
 
 const trialAmountLabel = computed(() => {
@@ -50,8 +44,6 @@ const trialAmountLabel = computed(() => {
   if (!basePlanTrialProduct) return ''
   return `$${getProductPrice(basePlanTrialProduct)}`
 })
-
-const showTrialBanner = computed(() => trialDaysRemaining.value !== null)
 
 const profileCompletionDismissed = ref(
   typeof localStorage !== 'undefined' && localStorage.getItem(PROFILE_COMPLETION_DISMISSED_KEY) === '1'
@@ -78,6 +70,8 @@ const showDashboardBanner = computed(() => isDashboardBannerActive(dashboardBann
 const dashboardBannerMessageHtml = computed(() => markdownToSafeHtml(dashboardBanner.value?.message))
 
 // Filters
+/** Hidden to match the current dashboard design; filtering logic stays wired in case the panel returns. */
+const showFiltersPanel = false
 const selectedRoleTypes = ref<RoleCategoryValue[]>([])
 const selectedLocation = ref('')
 const salaryRange = ref<[number, number]>([0, 200000])
@@ -275,16 +269,9 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Trial countdown -->
-      <div v-if="showTrialBanner" class="mb-8">
-        <TrialCountdownBanner
-          :days-remaining="trialDaysRemaining!"
-          :charge-date-label="trialChargeDateLabel"
-          :amount-label="trialAmountLabel"
-        />
-      </div>
+      <PostCheckoutConfirmation />
 
-      <!-- Summary cards: Subscription, Add-ons, Profile completion, Matching stats -->
+      <!-- Summary cards: Subscription, Add-ons, Matching stats, Profile strength -->
       <div class="grid-auto-fill mb-8">
         <!-- Subscription status and tier -->
         <div class="card p-5">
@@ -296,10 +283,13 @@ onMounted(() => {
           <p class="text-sm text-neutral-body mt-1">
             {{ subscriptionStatusLabel }}
           </p>
+          <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
+            Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+          </p>
           </div>
           <div v-else>
             <p class="text-sm text-neutral-body">No active plan</p>
-          </div>          
+          </div>
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Manage plan →
           </router-link>
@@ -308,29 +298,36 @@ onMounted(() => {
         <!-- Active add-ons -->
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Active add-ons</h3>
-          <div v-if="activeAddonsForDisplay.length" class="space-y-1.5">
-            <p v-for="label in activeAddonsForDisplay" :key="label" class="text-sm text-neutral-body">✓ {{ label }}</p>
-          </div>
-          <p v-else class="text-sm text-neutral-body">None</p>
+          <p class="font-heading font-semibold text-brand-charcoal">
+            {{ activeAddonsForDisplay.length }} active
+          </p>
+          <p class="text-sm text-neutral-body mt-1">
+            {{ activeAddonsForDisplay.length ? activeAddonsForDisplay.join(' + ') : 'No add-ons yet' }}
+          </p>
           <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
             Add-ons →
           </router-link>
         </div>
 
-        <!-- Profile completion status (hidden when 100% or dismissed) -->
-        <div v-if="showProfileCompletionCard" class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Profile completion</h3>
-          <div class="flex items-center gap-3">
-            <div class="flex-1 h-2.5 bg-neutral-bg rounded-full overflow-hidden">
-              <div
-                class="h-full rounded-full transition-all duration-300"
-                :class="profileCompletion.percent === 100 ? 'bg-green-500' : profileCompletion.percent >= 50 ? 'bg-brand-primary' : 'bg-amber-500'"
-                :style="{ width: `${profileCompletion.percent}%` }"
-              />
-            </div>
-            <span class="text-sm font-semibold text-brand-charcoal tabular-nums">{{ profileCompletion.percent }}%</span>
-          </div>
+        <!-- Matching statistics -->
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Matching statistics</h3>
+          <p class="font-heading font-semibold text-brand-charcoal">
+            {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
+          </p>
+          <p class="text-sm text-neutral-body mt-1">This week</p>
           <p class="text-xs text-neutral-body mt-2">
+            Total delivered: {{ matchingStats.totalDelivered != null ? matchingStats.totalDelivered : '—' }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
+          </p>
+        </div>
+
+        <!-- Profile strength (hidden when 100% or dismissed) -->
+        <div v-if="showProfileCompletionCard" class="card p-5">
+          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Profile strength</h3>
+          <p class="font-heading font-semibold text-brand-charcoal">
+            {{ profileCompletion.percent }}%
+          </p>
+          <p class="text-sm text-neutral-body mt-1">
             {{ profileCompletion.filled }} of {{ profileCompletion.total }} key fields
           </p>
           <div class="mt-2 flex flex-col items-start gap-0.5">
@@ -345,25 +342,6 @@ onMounted(() => {
             >
               Dismiss
             </button>
-          </div>
-        </div>
-
-        <!-- Matching statistics -->
-        <div class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Matching statistics</h3>
-          <div class="space-y-2 text-sm">
-            <p class="text-neutral-body">
-              <span class="font-medium text-brand-charcoal">This week:</span>
-              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }}
-            </p>
-            <p class="text-neutral-body">
-              <span class="font-medium text-brand-charcoal">Total delivered:</span>
-              {{ matchingStats.totalDelivered != null ? matchingStats.totalDelivered : '—' }}
-            </p>
-            <p class="text-neutral-body">
-              <span class="font-medium text-brand-charcoal">Avg. match score:</span>
-              {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
-            </p>
           </div>
         </div>
       </div>
@@ -385,7 +363,7 @@ onMounted(() => {
       <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
         Recent job matches
       </h2>
-      <div class="card p-6 mb-8">
+      <div v-if="showFiltersPanel" class="card p-6 mb-8">
         <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">
           Filters
         </h3>

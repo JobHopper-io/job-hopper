@@ -1,1015 +1,751 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { useAnimations } from '@/composables/useAnimations'
-import { useScrollReveal } from '@/composables/useScrollReveal'
+import { ref, computed } from 'vue'
+import { useWindowScroll } from '@vueuse/core'
+import jobHopperLogo from '@/assets/job-hopper-logo.png'
 
-gsap.registerPlugin(ScrollTrigger)
-
-const { textReveal, fadeInUp, float, pulse, counterAnimation } = useAnimations()
-const { revealOnScroll, staggerReveal, parallaxScroll } = useScrollReveal()
-
-const heroRef = ref<HTMLElement>()
-const heroTitleRef = ref<HTMLElement>()
-const heroSubtitleRef = ref<HTMLElement>()
-const heroListRef = ref<HTMLElement>()
-const heroButtonsRef = ref<HTMLElement>()
-const heroCardRef = ref<HTMLElement>()
-const particlesRef = ref<HTMLElement>()
-const scrollProgressRef = ref<HTMLElement>()
-
-const currentTestimonial = ref(0)
-const testimonialInterval = ref<ReturnType<typeof setTimeout> | null>(null)
-
-const testimonials = [
-  {
-    text: "The ghost listings and noise disappeared. Job-Hopper narrowed everything to a short list I could act on. I had two Data Analyst interviews within a month and accepted an offer that was a real step up.",
-    author: "Jordan M.",
-    location: "Austin, TX"
-  },
-  {
-    text: "I was skeptical about paying while between roles, but the trial won me over. The matches weren't perfect every day, but two applications turned into interviews—and one into my new Process Engineer job.",
-    author: "Megan T.",
-    location: "Kansas City, MO"
-  },
-  {
-    text: "I'm in retail leadership, not software or a plant floor, so I wasn't sure an AI tool would get my profile. It did. Steady, relevant roles—not a firehose—and every week I actually had time to apply well.",
-    author: "Priya S.",
-    location: "Denver, CO"
-  }
-]
-
-const createParticles = () => {
-  if (!particlesRef.value) return
-  
-  const particleCount = 20
-  for (let i = 0; i < particleCount; i++) {
-    const particle = document.createElement('div')
-    particle.className = 'particle'
-    particle.style.width = `${Math.random() * 4 + 2}px`
-    particle.style.height = particle.style.width
-    particle.style.left = `${Math.random() * 100}%`
-    particle.style.top = `${Math.random() * 100}%`
-    particle.style.background = `rgba(47, 110, 204, ${Math.random() * 0.5 + 0.2})`
-    particle.style.animationDelay = `${Math.random() * 20}s`
-    particle.style.animationDuration = `${15 + Math.random() * 10}s`
-    particlesRef.value.appendChild(particle)
-  }
-}
-
-const startTestimonialCarousel = () => {
-  if (testimonialInterval.value) return
-  
-  testimonialInterval.value = setInterval(() => {
-    currentTestimonial.value = (currentTestimonial.value + 1) % testimonials.length
-  }, 5000)
-}
-
-const stopTestimonialCarousel = () => {
-  if (testimonialInterval.value) {
-    clearInterval(testimonialInterval.value)
-    testimonialInterval.value = null
-  }
-}
-
-onMounted(() => {
-  // Hero animations
-  if (heroTitleRef.value) {
-    textReveal(heroTitleRef.value, 'words')
-  }
-  
-  if (heroSubtitleRef.value) {
-    fadeInUp(heroSubtitleRef.value, 0.3)
-  }
-  
-  if (heroListRef.value) {
-    const items = heroListRef.value.querySelectorAll('li')
-    gsap.fromTo(items, 
-      { opacity: 0, x: -30 },
-      { 
-        opacity: 1, 
-        x: 0, 
-        duration: 0.8, 
-        stagger: 0.15, 
-        delay: 0.6,
-        ease: 'power3.out'
-      }
-    )
-  }
-  
-  if (heroButtonsRef.value) {
-    const buttons = heroButtonsRef.value.querySelectorAll('a')
-    gsap.fromTo(buttons,
-      { opacity: 0, y: 30 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.8,
-        stagger: 0.1,
-        delay: 1.2,
-        ease: 'power3.out'
-      }
-    )
-    
-    // Floating effect on buttons
-    buttons.forEach(btn => {
-      float(btn, 5)
-    })
-  }
-  
-  if (heroCardRef.value) {
-    gsap.fromTo(heroCardRef.value,
-      { opacity: 0, scale: 0.9, rotationY: -15 },
-      {
-        opacity: 1,
-        scale: 1,
-        rotationY: 0,
-        duration: 1.2,
-        delay: 0.8,
-        ease: 'power3.out',
-        transformPerspective: 1000
-      }
-    )
-    
-    // Parallax effect on scroll
-    parallaxScroll(heroCardRef.value, -0.3)
-    
-    // 3D tilt on mouse move
-    if (heroCardRef.value) {
-      heroCardRef.value.addEventListener('mousemove', (e: MouseEvent) => {
-        const rect = heroCardRef.value!.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        const centerX = rect.width / 2
-        const centerY = rect.height / 2
-        const rotateX = (y - centerY) / 20
-        const rotateY = (centerX - x) / 20
-        
-        if (heroCardRef.value) {
-          gsap.to(heroCardRef.value, {
-            rotationX: rotateX,
-            rotationY: rotateY,
-            transformPerspective: 1000,
-            duration: 0.3,
-            ease: 'power2.out'
-          })
-        }
-      })
-      
-      heroCardRef.value.addEventListener('mouseleave', () => {
-        if (heroCardRef.value) {
-          gsap.to(heroCardRef.value, {
-            rotationX: 0,
-            rotationY: 0,
-            duration: 0.5,
-            ease: 'power2.out'
-          })
-        }
-      })
+// ── Scroll-reveal directive ───────────────────────────────────────────────────
+// Fade-up-on-scroll approximation of the design's framer-motion `FadeUp`.
+// The element starts hidden and transitions in once it enters the viewport.
+// An optional numeric binding value adds a stagger delay (seconds).
+const vReveal = {
+  mounted(el: HTMLElement, binding: { value?: number }) {
+    el.classList.add('reveal')
+    if (typeof binding.value === 'number' && binding.value > 0) {
+      el.style.transitionDelay = `${binding.value}s`
     }
-  }
-  
-  // Problem section animations
-  const problemCards = document.querySelectorAll('.problem-card')
-  problemCards.forEach((card, index) => {
-    const direction = index % 2 === 0 ? 'left' : 'right'
-    revealOnScroll(card, {
-      direction: direction as 'left' | 'right',
-      distance: 100,
-      delay: index * 0.1
-    })
-    
-    // Icon animation
-    const icon = card.querySelector('svg')
-    if (icon) {
-      ScrollTrigger.create({
-        trigger: card,
-        start: 'top 80%',
-        onEnter: () => {
-          gsap.fromTo(icon,
-            { rotation: -180, scale: 0 },
-            { rotation: 0, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }
-          )
-        }
-      })
-    }
-  })
-  
-  // How It Works section
-  const stepCards = document.querySelectorAll('.step-card')
-  stepCards.forEach((card, index) => {
-    revealOnScroll(card, {
-      direction: 'up',
-      distance: 80,
-      delay: index * 0.15
-    })
-    
-    const numberCircle = card.querySelector('.step-number')
-    if (numberCircle) {
-      ScrollTrigger.create({
-        trigger: card,
-        start: 'top 80%',
-        onEnter: () => {
-          gsap.fromTo(numberCircle,
-            { scale: 0, rotation: -180 },
-            { scale: 1, rotation: 0, duration: 0.8, ease: 'back.out(1.7)' }
-          )
-        }
-      })
-    }
-  })
-  
-  // Who It's For section
-  const roleCards = document.querySelectorAll('.role-card')
-  staggerReveal('.who-its-for-grid', '.role-card', {
-    direction: 'up',
-    distance: 60,
-    stagger: 0.1
-  })
-  
-  roleCards.forEach(card => {
-    const icon = card.querySelector('svg')
-    if (icon) {
-      ScrollTrigger.create({
-        trigger: card,
-        start: 'top 80%',
-        onEnter: () => {
-          gsap.fromTo(icon,
-            { rotation: -90, scale: 0.5 },
-            { rotation: 0, scale: 1, duration: 0.6, ease: 'back.out(1.7)' }
-          )
-        }
-      })
-    }
-    
-    // 3D hover effect
-    const cardElement = card as HTMLElement
-    cardElement.addEventListener('mousemove', (e: MouseEvent) => {
-      const rect = cardElement.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const centerX = rect.width / 2
-      const centerY = rect.height / 2
-      const rotateX = (y - centerY) / 15
-      const rotateY = (centerX - x) / 15
-      
-      gsap.to(cardElement, {
-        rotationX: rotateX,
-        rotationY: rotateY,
-        z: 20,
-        transformPerspective: 1000,
-        duration: 0.3,
-        ease: 'power2.out'
-      })
-    })
-    
-    cardElement.addEventListener('mouseleave', () => {
-      gsap.to(cardElement, {
-        rotationX: 0,
-        rotationY: 0,
-        z: 0,
-        duration: 0.5,
-        ease: 'power2.out'
-      })
-    })
-  })
-  
-  // Pricing section
-  const pricingCards = document.querySelectorAll('.pricing-card')
-  staggerReveal('.pricing-grid', '.pricing-card', {
-    direction: 'up',
-    distance: 50,
-    stagger: 0.1
-  })
-  
-  pricingCards.forEach(card => {
-    const priceElement = card.querySelector('.price-number')
-    if (priceElement) {
-      ScrollTrigger.create({
-        trigger: card,
-        start: 'top 80%',
-        onEnter: () => {
-          const priceText = priceElement.textContent || '0'
-          const price = parseInt(priceText.replace(/[^0-9]/g, ''))
-          if (price > 0) {
-            counterAnimation(priceElement as HTMLElement, price, 1.5)
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            el.classList.add('reveal-in')
+            io.unobserve(el)
           }
         }
-      })
-    }
-    
-    // Most popular badge pulse
-    const badge = card.querySelector('.popular-badge')
-    if (badge) {
-      pulse(badge)
-    }
-    
-    // Gradient border animation
-    const gradientBorder = card.querySelector('.gradient-border')
-    if (gradientBorder) {
-      gsap.to(gradientBorder, {
-        backgroundPosition: '200% 0',
-        duration: 3,
-        repeat: -1,
-        ease: 'linear'
-      })
-    }
-  })
-  
-  // Testimonials
-  startTestimonialCarousel()
-  staggerReveal('.testimonials-grid', '.testimonial-card', {
-    direction: 'up',
-    distance: 50,
-    stagger: 0.15
-  })
-  
-  // Final CTA
-  const ctaSection = document.querySelector('.final-cta')
-  if (ctaSection) {
-    revealOnScroll(ctaSection, {
-      direction: 'up',
-      distance: 80
-    })
-    
-    const ctaTitle = ctaSection.querySelector('h2')
-    if (ctaTitle) {
-      textReveal(ctaTitle, 'words')
-    }
-    
-    const ctaButton = ctaSection.querySelector('.cta-button')
-    if (ctaButton) {
-      pulse(ctaButton)
-    }
-  }
-  
-  // Logged-in UI preview panels
-  const appPreviewPanels = document.querySelectorAll('.app-preview-panel')
-  appPreviewPanels.forEach((panel, index) => {
-    revealOnScroll(panel, {
-      direction: 'up',
-      distance: 48,
-      delay: index * 0.08,
-    })
-  })
+      },
+      { rootMargin: '0px 0px -60px 0px', threshold: 0.05 },
+    )
+    io.observe(el)
+  },
+}
 
-  // Create particles
-  createParticles()
-  
-  // Smooth scroll
-  document.documentElement.style.scrollBehavior = 'smooth'
-  
-  // Scroll progress indicator
-  if (scrollProgressRef.value) {
-    ScrollTrigger.create({
-      trigger: 'body',
-      start: 'top top',
-      end: 'bottom bottom',
-      onUpdate: (self) => {
-        if (scrollProgressRef.value) {
-          gsap.to(scrollProgressRef.value, {
-            width: `${self.progress * 100}%`,
-            duration: 0.1,
-            ease: 'none'
-          })
-        }
-      }
-    })
-  }
-})
+// ── Nav state ─────────────────────────────────────────────────────────────────
+const { y: scrollY } = useWindowScroll()
+const scrolled = computed(() => scrollY.value > 8)
+const mobileOpen = ref(false)
 
-onUnmounted(() => {
-  stopTestimonialCarousel()
-  ScrollTrigger.getAll().forEach(trigger => trigger.kill())
-})
+const navLinks = [
+  { label: 'How It Works', to: '/how-it-works' },
+  { label: 'Pricing', to: '/pricing' },
+  { label: 'Get the App', to: '/install-app' },
+  { label: 'FAQ', to: '/faq' },
+]
+
+// ── Hero ──────────────────────────────────────────────────────────────────────
+const heroChecks = [
+  'AI-matched to your role, pay, and location',
+  'Only active, high-quality postings',
+  'Hiring-contact insights and interview prep on premium plans',
+  'Sponsorship-likelihood signal (estimate only, not a guarantee)',
+]
+
+// ── Hero graphic bars ─────────────────────────────────────────────────────────
+const funnelBars = [
+  { w: 160, o: 0.3 },
+  { w: 112, o: 0.4 },
+  { w: 64, o: 0.6 },
+]
+const ghostCards = [
+  { role: 'UX Lead', co: 'Stripe' },
+  { role: 'Product Designer', co: 'Linear' },
+]
+
+// ── Problem ───────────────────────────────────────────────────────────────────
+const problemCards = [
+  { icon: 'paper-plane', text: 'Apply to hundreds, hear back from none' },
+  { icon: 'sliders', text: 'Keyword filters that miss the point' },
+  { icon: 'clock', text: 'Stale listings buried in fresh searches' },
+  { icon: 'crosshairs', text: 'Shotgun applications that go nowhere' },
+]
+
+// ── How It Works ──────────────────────────────────────────────────────────────
+const steps = [
+  { title: "Tell us what you're looking for", body: 'Role, pay range, location — in under a minute.' },
+  { title: 'We curate and match in real time', body: 'Active postings only, enriched with sponsorship signal when relevant.' },
+  { title: 'You get quality matches, not noise', body: 'Delivered to your dashboard and inbox, ready to apply.' },
+]
+
+// ── Who It's For ──────────────────────────────────────────────────────────────
+const tiers = [
+  { label: '01', title: 'Entry & Mid Level', body: 'Early-career and hourly roles, matched to your experience and pay.' },
+  { label: '02', title: 'Senior & Management', body: 'Leadership roles matched to scope, comp, and responsibility.' },
+  { label: '03', title: 'Director, VP & C-Level', body: 'Executive opportunities matched to strategic fit.' },
+]
+
+// ── Pricing ───────────────────────────────────────────────────────────────────
+const plans = [
+  { name: 'Free', price: '$0', period: '/month', note: 'No card required', desc: 'Try it out: capped searches, teaser insights.', cta: 'Get started free', primary: false, badge: null as string | null },
+  { name: 'Core', price: '$29', period: '/month', note: null as string | null, desc: 'Automated matching, tracker, full insights.', cta: 'Start with Core', primary: false, badge: null as string | null },
+  { name: 'Premium', price: '$49', period: '/month', note: null as string | null, desc: 'Everything in Core, plus sponsorship intelligence as it rolls out.', cta: 'Start with Premium', primary: true, badge: 'Most popular' },
+]
+
+// ── Testimonials ──────────────────────────────────────────────────────────────
+const testimonials = [
+  { name: 'Jordan M.', role: 'Software Engineer', quote: "I got two interviews in my first week on Job-Hopper. The matches were actually relevant — something I'd never say about Indeed." },
+  { name: 'Megan T.', role: 'Marketing Manager', quote: "The sponsorship signal alone is worth it. I stopped wasting applications on companies that can't hire me." },
+  { name: 'Priya S.', role: 'Product Designer', quote: 'Every match fit my salary range and location. No more filtering through 200 listings to find three worth applying to.' },
+]
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+const footerColumns = [
+  {
+    label: 'Product',
+    items: [
+      { label: 'How It Works', to: '/how-it-works' },
+      { label: 'Pricing', to: '/pricing' },
+      { label: 'Get the App', to: '/install-app' },
+      { label: 'Job Tracker', to: null },
+      { label: 'Match Score', to: null },
+    ],
+  },
+  {
+    label: 'Company',
+    items: [
+      { label: 'About', to: '/about' },
+      { label: 'Blog', to: null },
+      { label: 'Careers', to: null },
+      { label: 'Contact', to: '/support' },
+      { label: 'Press', to: null },
+    ],
+  },
+  {
+    label: 'Legal',
+    items: [
+      { label: 'Privacy Policy', to: '/privacy' },
+      { label: 'Terms of Service', to: '/terms' },
+      { label: 'Cookie Policy', to: null },
+    ],
+  },
+]
 </script>
 
 <template>
-  <div class="min-h-screen overflow-x-clip">
-    <!-- Scroll Progress Indicator -->
-    <div ref="scrollProgressRef" class="fixed top-0 left-0 h-1 bg-brand-primary z-50" style="width: 0%;"></div>
-    
-    <!-- Hero Section -->
-    <section ref="heroRef" class="relative bg-white py-16 lg:py-24 xl:py-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      <!-- Animated gradient background -->
-      <div class="absolute inset-0 gradient-mesh opacity-30"></div>
-      
-      <!-- Particles -->
-      <div ref="particlesRef" class="absolute inset-0 pointer-events-none"></div>
-      
-      <div class="max-w-7xl mx-auto relative z-10">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+  <div class="landing font-sans">
+    <!-- ── Nav ─────────────────────────────────────────────────────────────── -->
+    <header
+      class="fixed top-0 left-0 right-0 z-50 nav-shell"
+      :class="scrolled ? 'nav-scrolled' : 'nav-top'"
+    >
+      <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+        <router-link to="/" class="flex items-center shrink-0">
+          <img :src="jobHopperLogo" alt="Job-Hopper" class="h-[34px] w-auto" >
+        </router-link>
+
+        <nav class="hidden md:flex items-center gap-6">
+          <router-link
+            v-for="l in navLinks"
+            :key="l.label"
+            :to="l.to"
+            class="text-sm font-medium text-neutral-body nav-link"
+          >
+            {{ l.label }}
+          </router-link>
+        </nav>
+
+        <div class="hidden md:flex items-center gap-3">
+          <router-link to="/login" class="text-sm font-medium text-neutral-body nav-link">
+            Login
+          </router-link>
+          <router-link to="/register" class="btn-hop-primary">
+            Get Started
+          </router-link>
+        </div>
+
+        <button class="md:hidden p-2 text-brand-charcoal" aria-label="Toggle menu" @click="mobileOpen = !mobileOpen">
+          <font-awesome-icon :icon="['fas', mobileOpen ? 'xmark' : 'bars']" class="text-xl" />
+        </button>
+      </div>
+
+      <div
+        v-if="mobileOpen"
+        class="md:hidden bg-white border-t border-neutral-border px-5 py-4 flex flex-col gap-4"
+      >
+        <router-link
+          v-for="l in navLinks"
+          :key="l.label"
+          :to="l.to"
+          class="text-sm font-medium py-1 text-neutral-body"
+          @click="mobileOpen = false"
+        >
+          {{ l.label }}
+        </router-link>
+        <div class="flex flex-col gap-3 pt-2 border-t border-neutral-border">
+          <router-link to="/login" class="text-sm font-medium text-neutral-body" @click="mobileOpen = false">
+            Login
+          </router-link>
+          <router-link to="/register" class="btn-hop-primary justify-center" @click="mobileOpen = false">
+            Get Started
+          </router-link>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- ── Hero ──────────────────────────────────────────────────────────── -->
+      <section class="min-h-screen flex items-center pt-24 pb-16 px-5 bg-neutral-bg">
+        <div class="max-w-6xl mx-auto w-full grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <h1 ref="heroTitleRef" class="text-brand-charcoal mb-6 will-change-opacity">
+            <div v-reveal class="w-10 h-1 rounded-full mb-5 amber-grad" />
+            <h1 v-reveal="0.08" class="mb-4 leading-tight font-heading font-bold text-brand-charcoal hero-title">
               The AI that does your job search for you.
             </h1>
-            <p ref="heroSubtitleRef" class="text-xl text-neutral-body mb-6 will-change-opacity">
-              Job-Hopper is a new kind of job search for people in the United States: we scan the market, cut the junk, and deliver curated matches that fit your background—straight to your inbox and dashboard. Stop applying into the void.
+            <p v-reveal="0.16" class="mb-6 text-base leading-relaxed text-neutral-body" style="max-width: 460px">
+              We scan the market, cut the junk, and send you curated matches. Stop applying into the void.
             </p>
-            <ul ref="heroListRef" class="space-y-3 mb-8">
-              <li class="flex items-start will-change-transform">
-                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="text-neutral-body">AI plus human judgment surfaces active, high-quality openings</span>
-              </li>
-              <li class="flex items-start will-change-transform">
-                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="text-neutral-body">Matched to your role, pay range, and location—not random feeds</span>
-              </li>
-              <li class="flex items-start will-change-transform">
-                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="text-neutral-body">Optional hiring-contact insights and interview prep on premium plans</span>
-              </li>
-              <li class="flex items-start will-change-transform">
-                <svg class="w-6 h-6 text-brand-success mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="text-neutral-body">Sponsorship-likelihood signal—deep analysis of each posting’s metadata when you want to prioritize roles where employer visa sponsorship is more plausible (estimates only; not a guarantee)</span>
+            <ul v-reveal="0.24" class="flex flex-col gap-3 mb-8">
+              <li v-for="c in heroChecks" :key="c" class="flex items-start gap-3">
+                <span class="mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center check-chip">
+                  <font-awesome-icon :icon="['fas', 'check']" class="text-brand-success text-[11px]" />
+                </span>
+                <span class="text-sm leading-snug text-neutral-body">{{ c }}</span>
               </li>
             </ul>
-            <div ref="heroButtonsRef" class="flex flex-col sm:flex-row gap-4 mb-4">
-              <router-link to="/register" class="btn-primary text-center glow-effect will-change-transform">
-                Start your free trial
-              </router-link>
-              <router-link to="/how-it-works" class="btn-secondary text-center will-change-transform">
-                See how it works
-              </router-link>
+            <div v-reveal="0.32">
+              <div class="flex flex-wrap gap-3 mb-4">
+                <router-link to="/register" class="btn-hop-primary">Start your free trial</router-link>
+                <router-link to="/how-it-works" class="btn-hop-secondary">See how it works</router-link>
+              </div>
+              <p class="text-xs text-gray-400">No spam. No random jobs. Cancel anytime.</p>
             </div>
-            <p class="text-sm text-neutral-body">
-              No spam. No random jobs. Cancel anytime.
+          </div>
+
+          <!-- Hero graphic -->
+          <div v-reveal="0.1" class="relative flex items-center justify-center" style="min-height: 380px">
+            <div class="absolute inset-0 rounded-3xl blur-3xl hop-glow hero-blob" />
+
+            <div class="relative flex flex-col items-center gap-3 w-full max-w-sm">
+              <!-- Many-in indicator -->
+              <div class="flex items-center gap-1.5 mb-1">
+                <div
+                  v-for="i in 5"
+                  :key="i"
+                  class="rounded-full"
+                  :style="{
+                    width: `${20 + (i - 1) * 8}px`,
+                    height: '6px',
+                    background: (i - 1) % 2 === 0 ? '#2F6ECC' : '#CBD5E1',
+                    opacity: 0.4,
+                  }"
+                />
+                <span class="text-xs font-medium ml-1 text-gray-400">1,000s of postings</span>
+              </div>
+
+              <!-- Funnel lines -->
+              <div class="flex flex-col items-center gap-0.5">
+                <div
+                  v-for="(line, i) in funnelBars"
+                  :key="i"
+                  class="rounded-full"
+                  :style="{ width: `${line.w}px`, height: '4px', background: '#2F6ECC', opacity: line.o }"
+                />
+                <div class="rounded-full" style="width: 2px; height: 24px; background: #2f6ecc" />
+              </div>
+
+              <!-- Primary match card -->
+              <div class="w-full rounded-xl p-4 shadow-xl border border-neutral-border bg-white relative z-10 hop-float">
+                <div class="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl amber-grad" />
+                <div class="flex items-start justify-between mb-3">
+                  <div>
+                    <p class="text-xs font-medium mb-0.5 text-gray-400">Good morning, Jordan</p>
+                    <p class="font-semibold text-sm font-heading text-brand-charcoal">Senior Product Designer</p>
+                    <p class="text-xs mt-0.5 text-neutral-body">Figma · Remote · $160–190k</p>
+                  </div>
+                  <div class="flex flex-col items-end gap-1.5 shrink-0">
+                    <div class="px-2 py-0.5 rounded-full text-xs font-semibold match-badge">97% match</div>
+                    <div class="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 sponsor-badge">
+                      🛂 Sponsor: likely<span class="text-[10px] opacity-60"> (est.)</span>
+                    </div>
+                  </div>
+                </div>
+                <button class="w-full py-2 rounded-lg text-xs font-semibold text-white bg-brand-primary hover:opacity-90 transition-opacity">
+                  View details
+                </button>
+              </div>
+
+              <!-- Ghost cards -->
+              <div class="flex gap-2 w-full justify-center">
+                <div
+                  v-for="c in ghostCards"
+                  :key="c.co"
+                  class="flex-1 rounded-xl p-3 border border-neutral-border bg-white"
+                  style="opacity: 0.5"
+                >
+                  <p class="text-xs font-semibold font-heading text-brand-charcoal">{{ c.role }}</p>
+                  <p class="text-[11px] text-gray-400">{{ c.co }}</p>
+                </div>
+              </div>
+
+              <p class="text-[11px] text-center mt-1 text-gray-400">One great match. Not a flood.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Problem ───────────────────────────────────────────────────────── -->
+      <section class="py-20 px-5 bg-white">
+        <div class="max-w-5xl mx-auto">
+          <div v-reveal class="text-center mb-12">
+            <h2 class="font-heading font-semibold text-brand-charcoal section-title">
+              Job boards are crowded. Your time shouldn't be.
+            </h2>
+            <p class="mt-3 text-sm text-neutral-body mx-auto" style="max-width: 440px">
+              The old way wastes hours on applications that go nowhere. There's a better model.
             </p>
           </div>
-          <div class="hidden lg:block perspective-1000">
-            <div
-              ref="heroCardRef"
-              class="bg-gradient-to-br from-brand-rabbit-start to-brand-rabbit-end rounded-[12px] p-6 min-h-[20rem] flex items-center justify-center preserve-3d will-change-transform"
-              style="transform-style: preserve-3d;"
-            >
-              <div class="w-full max-w-md bg-white/95 rounded-2xl shadow-lg p-4 text-left text-[0.8rem] leading-snug">
-                <!-- Dashboard header -->
-                <div class="mb-3">
-                  <p class="text-2xl font-heading font-bold text-brand-charcoal">
-                    Good morning, Jordan
-                  </p>
-                  <p class="text-xs text-neutral-body mt-0.5">
-                    Here are your latest job matches.
-                  </p>
-                  <p class="text-[0.65rem] text-neutral-body mt-1">
-                    Your matches update as new opportunities hit the Hopper and as you refine your profile.
-                  </p>
+
+          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            <div v-for="(c, i) in problemCards" :key="c.text" v-reveal="i * 0.08">
+              <div class="rounded-xl p-5 border border-neutral-border bg-neutral-bg h-full hop-card">
+                <div class="mb-3 text-gray-500 text-[18px]">
+                  <font-awesome-icon :icon="['fas', c.icon]" />
                 </div>
+                <p class="text-sm font-medium leading-snug text-neutral-body">{{ c.text }}</p>
+              </div>
+            </div>
+          </div>
 
-                <!-- Summary cards — matches live Dashboard.vue -->
-                <div class="grid grid-cols-2 gap-2 mb-3">
-                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
-                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
-                      Subscription
-                    </p>
-                    <p class="text-xs font-heading font-semibold text-brand-charcoal">
-                      Senior &amp; Management
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      Active · Trial
-                    </p>
-                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
-                      Manage plan →
-                    </p>
-                  </div>
-                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
-                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
-                      Active add-ons
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      ✓ Hiring contact details
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      ✓ Interview prep
-                    </p>
-                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
-                      Add-ons →
-                    </p>
-                  </div>
-                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
-                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
-                      Profile completion
-                    </p>
-                    <div class="mt-1 flex items-center gap-1">
-                      <div class="h-1.5 flex-1 rounded-full bg-neutral-bg overflow-hidden">
-                        <div class="h-full w-4/5 rounded-full bg-brand-primary"></div>
-                      </div>
-                      <span class="text-[0.6rem] font-semibold text-brand-charcoal tabular-nums">
-                        80%
-                      </span>
-                    </div>
-                    <p class="text-[0.6rem] text-brand-primary font-medium mt-1">
-                      Complete profile →
-                    </p>
-                  </div>
-                  <div class="rounded-xl border border-neutral-border bg-white px-2 py-2 shadow-sm">
-                    <p class="text-[0.6rem] font-semibold text-brand-charcoal uppercase tracking-wide mb-1">
-                      Matching statistics
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      <span class="font-medium text-brand-charcoal">This week:</span> 5
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      <span class="font-medium text-brand-charcoal">Total delivered:</span> 28
-                    </p>
-                    <p class="text-[0.65rem] text-neutral-body">
-                      <span class="font-medium text-brand-charcoal">Avg. match score:</span> 87
-                    </p>
-                  </div>
+          <p v-reveal class="text-center text-sm font-medium text-neutral-body">
+            Job-Hopper flips that experience.
+            <span style="color: #ff8a34">Fewer, better opportunities, curated for you.</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- ── How It Works ──────────────────────────────────────────────────── -->
+      <section class="py-20 px-5 bg-neutral-bg">
+        <div class="max-w-5xl mx-auto">
+          <div v-reveal class="mb-12 text-center">
+            <h2 class="font-heading font-semibold text-brand-charcoal section-title">How Job-Hopper works for you.</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-6 mb-10">
+            <div v-for="(s, i) in steps" :key="s.title" v-reveal="i * 0.08">
+              <div class="rounded-xl p-6 border border-neutral-border bg-white h-full relative overflow-hidden hop-card">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-4 text-sm font-bold amber-grad text-brand-charcoal">
+                  {{ i + 1 }}
                 </div>
+                <h3 class="mb-2 leading-snug font-heading font-semibold text-brand-charcoal card-title">{{ s.title }}</h3>
+                <p class="text-sm leading-relaxed text-neutral-body">{{ s.body }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-                <h2 class="mb-2 text-xl font-heading font-semibold text-brand-charcoal">
-                  Recent job matches
-                </h2>
+      <!-- ── Who It's For ──────────────────────────────────────────────────── -->
+      <section class="py-20 px-5 bg-white">
+        <div class="max-w-5xl mx-auto">
+          <div v-reveal class="text-center mb-12">
+            <h2 class="font-heading font-semibold text-brand-charcoal section-title">
+              A smarter job search for everyone in the U.S.
+            </h2>
+            <p class="mt-3 text-sm leading-relaxed text-neutral-body mx-auto" style="max-width: 520px">
+              Job-Hopper isn't built for one industry — it's built for anyone who works for a living. From entry-level to
+              executive, across tech, healthcare, operations, and the trades, we apply the same curation everywhere.
+            </p>
+          </div>
 
-                <!-- Filters card — matches live Dashboard filters panel -->
-                <div class="mb-3 rounded-xl border border-neutral-border bg-white px-3 py-2 shadow-sm">
-                  <p class="text-[0.7rem] font-heading font-semibold text-brand-charcoal mb-2">
-                    Filters
-                  </p>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
-                        Role type
-                      </p>
-                      <div class="rounded border border-neutral-border bg-neutral-bg px-1.5 py-1 text-[0.6rem] text-neutral-body">
-                        Analytics, Software development…
-                      </div>
-                    </div>
-                    <div>
-                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
-                        Location
-                      </p>
-                      <div class="rounded border border-neutral-border bg-white px-1.5 py-1 text-[0.6rem] text-neutral-body">
-                        Austin, TX
-                      </div>
-                    </div>
-                    <div>
-                      <p class="text-[0.55rem] font-medium text-brand-charcoal mb-0.5">
-                        Salary range
-                      </p>
-                      <div class="flex gap-1">
-                        <div class="flex-1 rounded border border-neutral-border px-1 py-0.5 text-[0.55rem] text-neutral-body">
-                          75000
-                        </div>
-                        <div class="flex-1 rounded border border-neutral-border px-1 py-0.5 text-[0.55rem] text-neutral-body">
-                          95000
-                        </div>
-                      </div>
-                    </div>
-                    <div class="flex items-end pb-0.5">
-                      <span class="inline-flex items-center gap-1 text-[0.6rem] text-neutral-body">
-                        <span class="inline-block h-2.5 w-2.5 rounded border border-neutral-body/70 bg-white" />
-                        Show saved jobs only
-                      </span>
-                    </div>
-                  </div>
-                  <p class="text-[0.55rem] text-neutral-body mt-2">
-                    Use filters to broaden or narrow what you see.
-                  </p>
+          <div class="grid md:grid-cols-3 gap-5">
+            <div v-for="(t, i) in tiers" :key="t.label" v-reveal="i * 0.08">
+              <div class="rounded-xl p-6 border border-neutral-border bg-neutral-bg h-full hop-card">
+                <p class="text-xs font-bold mb-4 tracking-widest amber-grad-text">{{ t.label }}</p>
+                <h3 class="mb-2 font-heading font-semibold text-brand-charcoal card-title">{{ t.title }}</h3>
+                <p class="text-sm leading-relaxed text-neutral-body">{{ t.body }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Pricing ───────────────────────────────────────────────────────── -->
+      <section class="py-20 px-5 bg-neutral-bg">
+        <div class="max-w-4xl mx-auto">
+          <div v-reveal class="mb-12 text-center">
+            <h2 class="font-heading font-semibold text-brand-charcoal section-title">Simple plans, real support.</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-5 mb-8">
+            <div v-for="(p, i) in plans" :key="p.name" v-reveal="i * 0.08">
+              <div
+                class="rounded-xl border h-full flex flex-col relative overflow-hidden"
+                :class="p.primary ? 'plan-primary hop-scale' : 'border-neutral-border bg-white hop-card'"
+              >
+                <div
+                  v-if="p.badge"
+                  class="absolute top-0 right-0 text-xs font-semibold px-3 py-1 rounded-bl-xl amber-grad text-brand-charcoal"
+                >
+                  {{ p.badge }}
                 </div>
-
-                <!-- Job cards — aligned with JobCard.vue (match score label; sponsorship badge when profile requests it) -->
-                <div class="space-y-1.5">
-                  <div
-                    class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
-                    style="border-left: 4px solid var(--color-brand-primary);"
+                <div class="p-6 flex flex-col flex-1">
+                  <p
+                    class="text-xs font-semibold uppercase tracking-wider mb-3"
+                    :class="p.primary ? 'text-white/70' : 'text-gray-400'"
                   >
-                    <div class="flex items-start justify-between gap-2">
-                      <div class="min-w-0 pr-14">
-                        <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Data Analyst · Hybrid
-                        </p>
-                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
-                          <span class="font-medium text-brand-primary">
-                            Summit Metrics Co.
-                          </span>
-                          <span>
-                            · Austin, TX
-                          </span>
-                          <span>
-                            · $78k–$88k
-                          </span>
-                          <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
-                            Match score: 92
-                          </span>
-                        </div>
-                        <p class="mt-1.5 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[0.55rem] font-medium text-emerald-800">
-                          Chance to provide sponsorship: High
-                        </p>
-                        <p class="mt-1.5 text-[0.6rem] text-neutral-body line-clamp-2">
-                          Brief AI summary of the role and why it fits your profile…
-                        </p>
-                      </div>
-                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full bg-brand-primary px-2 py-[2px] text-[0.6rem] font-semibold text-white shadow-sm">
-                        Saved
-                      </span>
-                    </div>
-                    <div class="mt-2 flex flex-wrap gap-1.5 text-[0.6rem]">
-                      <span class="inline-flex min-w-[5rem] flex-1 items-center justify-center rounded-md bg-brand-primary px-2 py-1.5 font-medium text-white">
-                        View details
-                      </span>
-                      <span class="inline-flex items-center justify-center rounded-md border border-neutral-border bg-white px-3 py-1.5 font-medium text-neutral-body">
-                        Apply
-                      </span>
-                    </div>
+                    {{ p.name }}
+                  </p>
+                  <div class="flex items-end gap-1 mb-1">
+                    <span class="text-3xl font-bold font-heading" :class="p.primary ? 'text-white' : 'text-brand-charcoal'">{{ p.price }}</span>
+                    <span class="text-sm mb-1" :class="p.primary ? 'text-white/70' : 'text-gray-400'">{{ p.period }}</span>
                   </div>
-
-                  <div
-                    class="relative overflow-hidden rounded-xl border border-neutral-border bg-neutral-card px-3 py-2"
-                    style="border-left: 4px solid var(--color-brand-primary);"
+                  <p v-if="p.note" class="text-xs mb-3" :class="p.primary ? 'text-white/60' : 'text-gray-400'">{{ p.note }}</p>
+                  <p class="text-sm mb-6 flex-1 leading-relaxed" :class="p.primary ? 'text-white/90' : 'text-neutral-body'">{{ p.desc }}</p>
+                  <router-link
+                    to="/register"
+                    class="w-full py-2.5 rounded-xl text-sm font-semibold text-center hover:opacity-90 transition-opacity"
+                    :class="p.primary ? 'bg-white text-brand-primary' : 'bg-brand-primary text-white'"
                   >
-                    <div class="flex items-start justify-between gap-2">
-                      <div class="min-w-0 pr-14">
-                        <p class="text-[0.8rem] font-heading font-semibold text-brand-charcoal leading-snug">
-                          Full Stack Developer · Remote
-                        </p>
-                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.65rem] text-neutral-body">
-                          <span class="font-medium text-brand-primary">
-                            Northwind Labs
-                          </span>
-                          <span>
-                            · Remote (US)
-                          </span>
-                          <span>
-                            · $115k–$135k
-                          </span>
-                          <span class="inline-flex rounded-full bg-neutral-bg px-2 py-[1px] text-[0.6rem] font-semibold text-brand-charcoal">
-                            Match score: 88
-                          </span>
-                        </div>
-                        <p class="mt-1.5 text-[0.6rem] text-neutral-body line-clamp-2">
-                          Stack matches your targets; team is hiring for product roadmap…
-                        </p>
-                      </div>
-                      <span class="absolute right-2 top-2 inline-flex items-center justify-center rounded-full border border-neutral-border bg-neutral-bg px-2 py-[2px] text-[0.6rem] font-semibold text-neutral-body">
-                        Save
-                      </span>
-                    </div>
-                    <div class="mt-2 flex flex-wrap gap-1.5 text-[0.6rem]">
-                      <span class="inline-flex min-w-[5rem] flex-1 items-center justify-center rounded-md bg-brand-primary px-2 py-1.5 font-medium text-white">
-                        View details
-                      </span>
-                      <span class="inline-flex items-center justify-center rounded-md border border-neutral-border bg-white px-3 py-1.5 font-medium text-neutral-body">
-                        Apply
-                      </span>
-                    </div>
+                    {{ p.cta }}
+                  </router-link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-reveal class="text-center">
+            <router-link to="/pricing" class="ghost-link">
+              See full pricing <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-[13px]" />
+            </router-link>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Testimonials ──────────────────────────────────────────────────── -->
+      <section class="py-20 px-5 bg-white">
+        <div class="max-w-5xl mx-auto">
+          <div v-reveal class="mb-12 text-center">
+            <h2 class="font-heading font-semibold text-brand-charcoal section-title">Hear from job seekers using Job-Hopper.</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-5">
+            <div v-for="(t, i) in testimonials" :key="t.name" v-reveal="i * 0.08">
+              <div class="rounded-xl p-6 border border-neutral-border bg-neutral-bg h-full flex flex-col hop-card">
+                <div class="flex gap-0.5 mb-4">
+                  <font-awesome-icon v-for="j in 5" :key="j" :icon="['fas', 'star']" class="text-[14px]" style="color: #ffd75a" />
+                </div>
+                <p class="text-sm leading-relaxed flex-1 mb-5 italic text-neutral-body">"{{ t.quote }}"</p>
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 amber-grad text-brand-charcoal">
+                    {{ t.name[0] }}
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-brand-charcoal">{{ t.name }}</p>
+                    <p class="text-xs text-gray-400">{{ t.role }}</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Problem Section -->
-    <section class="bg-neutral-bg py-20 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-4xl mx-auto">
-        <h2 class="text-brand-charcoal mb-6 text-center">
-          Job boards are crowded. Your time shouldn't be.
-        </h2>
-        <p class="text-lg text-neutral-body mb-8 text-center">
-          Most job platforms make it feel like a numbers game: hundreds of applications, endless screening questions, and almost no responses. Companies post roles they might need someday, and you are left guessing which applications are actually worth your time.
-        </p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div class="card p-6 problem-card card-3d will-change-transform">
-            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </div>
-            <p class="text-neutral-body">You apply to dozens—or hundreds—of jobs and never hear back.</p>
+      <!-- ── Final CTA ─────────────────────────────────────────────────────── -->
+      <section class="py-24 px-5 relative overflow-hidden cta-light">
+        <div class="absolute inset-0 cta-noise" />
+        <div v-reveal class="max-w-2xl mx-auto text-center relative z-10">
+          <div class="flex justify-center mb-6">
+            <img :src="jobHopperLogo" alt="Job-Hopper" class="h-14 w-auto" >
           </div>
-          <div class="card p-6 problem-card card-3d will-change-transform">
-            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-            <p class="text-neutral-body">Postings stay up long after roles are filled.</p>
+          <h2 class="mb-4 font-heading font-bold text-brand-charcoal cta-title">
+            Ready for the new standard in job search?
+          </h2>
+          <p class="mb-8 text-sm leading-relaxed" style="color: rgba(17, 24, 39, 0.7)">
+            Create your profile and let Job-Hopper do the heavy lifting. Cancel anytime.
+          </p>
+          <div class="flex flex-wrap justify-center gap-3 mb-5">
+            <router-link
+              to="/register"
+              class="px-7 py-3 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+              style="background: #111827"
+            >
+              Start your free trial
+            </router-link>
           </div>
-          <div class="card p-6 problem-card card-3d will-change-transform">
-            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-            <p class="text-neutral-body">Screening questions and assessments chew up your evenings.</p>
-          </div>
-          <div class="card p-6 problem-card card-3d will-change-transform">
-            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-            <p class="text-neutral-body">You rarely know who's actually hiring on the other end.</p>
-          </div>
-        </div>
-        <p class="text-lg text-neutral-body text-center font-medium">
-          Job-Hopper flips that experience. Fewer, better opportunities—curated for you.
-        </p>
-      </div>
-    </section>
-
-    <!-- Logged-in UI previews (styling aligned with live Dashboard / JobDetail / Profile) -->
-    <section class="bg-white py-20 px-4 sm:px-6 lg:px-8 border-t border-neutral-border">
-      <div class="max-w-6xl mx-auto">
-        <h2 class="text-brand-charcoal mb-4 text-center">
-          What you see after you sign in
-        </h2>
-        <p class="text-lg text-neutral-body mb-12 text-center max-w-3xl mx-auto">
-          The product is a dashboard feed plus job detail pages—not a static job board grid. Below are simplified previews of the same layouts subscribers use: summary cards and filters above your matches, rich job cards, and profile-driven options like sponsorship estimates when they apply to your search.
-        </p>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-          <article
-            class="app-preview-panel card p-6 overflow-hidden border-l-4 border-brand-primary"
+          <router-link
+            to="/faq"
+            class="text-sm font-medium underline underline-offset-2 hover:opacity-60 transition-opacity"
+            style="color: rgba(17, 24, 39, 0.65)"
           >
-            <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-3">
-              Job detail view
-            </p>
-            <div class="flex flex-wrap items-start gap-2 mb-3">
-              <h3 class="text-xl font-heading font-bold text-brand-charcoal leading-tight flex-1 min-w-0">
-                Senior Business Analyst
-              </h3>
-              <span class="inline-flex shrink-0 rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body">
-                Senior &amp; Management
-              </span>
-            </div>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-body mb-4">
-              <span class="font-medium text-brand-primary">
-                Cascade Health Systems
-              </span>
-              <span>
-                · Nashville, TN · Hybrid
-              </span>
-              <span class="inline-flex rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal">
-                Match score: 91
-              </span>
-              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-900">
-                Chance to provide sponsorship: Medium
-              </span>
-            </div>
-            <div class="rounded-lg bg-neutral-bg p-4 text-sm text-neutral-body mb-4">
-              <p class="font-medium text-brand-charcoal mb-2">
-                Role briefing
-              </p>
-              <p class="leading-relaxed">
-                AI-generated summary of responsibilities, team context, and why this posting lines up with your targets—so you open the application knowing what matters.
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <span class="btn-primary text-sm px-4 py-2 rounded-lg pointer-events-none">Apply</span>
-              <span class="btn-secondary text-sm px-4 py-2 rounded-lg pointer-events-none">Save</span>
-            </div>
-          </article>
-          <div class="space-y-6">
-            <div class="app-preview-panel card p-6">
-              <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-3">
-                Profile &amp; sponsorship
-              </p>
-              <p class="text-sm text-neutral-body mb-4">
-                Sponsorship estimates appear on job rows only when you indicate in your profile that you require U.S. employer sponsorship—otherwise your feed stays focused on fit and pay without visa labels.
-              </p>
-              <div class="rounded-lg border border-neutral-border bg-neutral-bg px-4 py-3 text-sm">
-                <p class="font-medium text-brand-charcoal mb-2">
-                  Requires U.S. employer sponsorship for work authorization
-                </p>
-                <div class="flex gap-4 text-neutral-body">
-                  <label class="flex items-center gap-2">
-                    <span class="h-3 w-3 rounded-full border border-neutral-border bg-brand-primary" />
-                    Yes
-                  </label>
-                  <label class="flex items-center gap-2">
-                    <span class="h-3 w-3 rounded-full border border-neutral-border bg-white" />
-                    No
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div class="app-preview-panel card p-6">
-              <p class="text-xs font-semibold uppercase tracking-wide text-brand-primary mb-2">
-                Announcements
-              </p>
-              <p class="text-sm text-neutral-body">
-                When there is news—billing reminders, product updates—the live dashboard can show a banner at the top (styled like your subscription tier accent color), similar to in-product messaging you see in other SaaS apps.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- How It Works Preview -->
-    <section class="bg-white py-20 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-4xl mx-auto">
-        <h2 class="text-brand-charcoal mb-12 text-center">
-          How Job-Hopper works for you
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div class="text-center step-card will-change-transform">
-            <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">
-              <span class="text-white text-2xl font-bold">1</span>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">Tell us what you're looking for</h3>
-            <p class="text-neutral-body">In 60 seconds, share your background, role targets, salary range, and where you're willing to work.</p>
-          </div>
-          <div class="text-center step-card will-change-transform">
-            <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">
-              <span class="text-white text-2xl font-bold">2</span>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">We curate and match jobs in real time</h3>
-            <p class="text-neutral-body">Our team and AI scan job boards and company postings, strip out the junk, and enrich each match—including optional sponsorship-likelihood when your profile calls for it—so you see active roles that fit, not noise.</p>
-          </div>
-          <div class="text-center step-card will-change-transform">
-            <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 step-number will-change-transform">
-              <span class="text-white text-2xl font-bold">3</span>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">You get high-quality matches, not noise</h3>
-            <p class="text-neutral-body">New matches land in your dashboard and inbox with links to apply directly—and on premium plans, hiring contact info and exclusive interview prep tips.</p>
-          </div>
-        </div>
-        <div class="text-center mt-12">
-          <router-link to="/how-it-works" class="text-brand-primary hover:underline font-medium">
-            Learn how matching works →
+            Questions? Check our FAQ.
           </router-link>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
 
-    <!-- Who It's For -->
-    <section class="bg-neutral-bg py-20 px-4 sm:px-6 lg:px-8">
+    <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+    <footer class="px-5 pt-14 pb-8 border-t footer-shell">
       <div class="max-w-6xl mx-auto">
-        <h2 class="text-brand-charcoal mb-6 text-center">
-          A smarter job search for everyone in the U.S.
-        </h2>
-        <p class="text-lg text-neutral-body mb-6 text-center max-w-3xl mx-auto">
-          Job-Hopper is not built for one industry—it is built for anyone who works for a living. The same AI-driven pipeline that saves analysts and engineers time also works for nurses, managers, tradespeople, and roles across the economy.
-        </p>
-            <p class="text-neutral-body mb-12 text-center max-w-3xl mx-auto">
-              Job-Hopper casts a wide net across the U.S. economy—the kind of coverage you expect from a major job board—with tech, analytics, and engineering roles featured alongside operations, healthcare, trades, professional services, and more. Our earliest traction included strong results in data, software, and engineering paths; we also have roots serving manufacturing and industrial talent, and we apply the same curation everywhere we operate.
-            </p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 who-its-for-grid">
-          <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
-            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
-              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">Entry & Mid Level Roles</h3>
-            <p class="text-neutral-body">From support and hourly roles through early-career professional tracks—tech, analytics, engineering, operations, retail, healthcare, and more. We match to your experience, pay, schedule, and location without locking you to one industry.</p>
-          </div>
-          <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">Senior & Management Level Roles</h3>
-            <p class="text-neutral-body">Targeted searches for experienced professionals and people leaders, including salaried, supervisory and management positions with greater responsibility, broader scope, and stronger compensation alignment.</p>
-          </div>
-          <div class="card p-8 role-card card-3d preserve-3d will-change-transform">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
-              <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-3">Director, VP & C-Level Roles</h3>
-            <p class="text-neutral-body">Executive and leadership-level opportunities aligned with strategic responsibility, organizational impact, and compensation range - focused on relevance, seniority, and long-term fit.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pricing Teaser -->
-    <section class="bg-white py-20 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-6xl mx-auto">
-        <h2 class="text-brand-charcoal mb-6 text-center">
-          Simple plans, real support
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 pricing-grid">
-          <div class="card p-8 pricing-card card-3d will-change-transform">
-            <h3 class="text-xl font-heading font-semibold mb-2">Entry & Mid Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-4">
-              From $<span class="price-number">19</span><span class="text-lg font-normal text-neutral-body">/month</span>
-            </p>
-            <p class="text-neutral-body mb-6">For hourly, administrative, and early-career salaried roles.</p>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+          <div class="col-span-2 md:col-span-1">
+            <router-link to="/" class="flex items-center mb-3">
+              <img :src="jobHopperLogo" alt="Job-Hopper" class="h-8 w-auto" >
             </router-link>
+            <p class="text-xs leading-relaxed text-neutral-body">Smarter job search, curated for you.</p>
+            <div class="w-8 h-0.5 rounded-full mt-3 amber-grad" />
           </div>
-          <div class="card p-8 pricing-card border-2 border-brand-primary relative overflow-hidden card-3d will-change-transform">
-            <div class="absolute top-0 left-0 right-0 h-1 gradient-border" style="background: linear-gradient(90deg, #2F6ECC, #FFD75A, #FF8A34, #2F6ECC); background-size: 200% 100%;"></div>
-            <div class="popular-badge inline-block bg-brand-primary text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">Most popular</div>
-            <h3 class="text-xl font-heading font-semibold mb-2">Senior & Management Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-4">
-              From $<span class="price-number">29</span><span class="text-lg font-normal text-neutral-body">/month</span>
-            </p>
-            <p class="text-neutral-body mb-6">For experienced professionals, supervisors, and managers.</p>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
-            </router-link>
-          </div>
-          <div class="card p-8 pricing-card card-3d will-change-transform">
-            <h3 class="text-xl font-heading font-semibold mb-2">Director, VP & C-Level Roles</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-4">
-              From $<span class="price-number">49</span><span class="text-lg font-normal text-neutral-body">/month</span>
-            </p>
-            <p class="text-neutral-body mb-6">For executives and senior leaders.</p>
-            <router-link to="/register" class="btn-primary w-full text-center block">
-              Start free trial
-            </router-link>
-          </div>
-        </div>
-        <div class="text-center">
-          <router-link to="/pricing" class="text-brand-primary hover:underline font-medium">
-            See full pricing & features →
-          </router-link>
-        </div>
-      </div>
-    </section>
 
-    <!-- Testimonials -->
-    <section class="bg-neutral-bg py-20 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-4xl mx-auto">
-        <h2 class="text-brand-charcoal mb-12 text-center">
-          Hear from job seekers using Job-Hopper
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 testimonials-grid">
-          <TransitionGroup name="testimonial" tag="div" class="contents">
-            <div 
-              v-for="(testimonial, index) in testimonials" 
-              :key="index"
-              :class="['card p-6 testimonial-card will-change-opacity', { 'opacity-100': index === currentTestimonial, 'opacity-60': index !== currentTestimonial }]"
-              @mouseenter="currentTestimonial = index; stopTestimonialCarousel()"
-              @mouseleave="startTestimonialCarousel()"
-            >
-              <p class="text-neutral-body mb-4 italic">"{{ testimonial.text }}"</p>
-              <p class="text-sm font-semibold text-brand-charcoal">– {{ testimonial.author }}, {{ testimonial.location }}</p>
-            </div>
-          </TransitionGroup>
+          <div v-for="col in footerColumns" :key="col.label">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-4 text-gray-500">{{ col.label }}</p>
+            <ul class="flex flex-col gap-2.5">
+              <li v-for="item in col.items" :key="item.label">
+                <router-link v-if="item.to" :to="item.to" class="text-sm footer-link">{{ item.label }}</router-link>
+                <a v-else href="#" class="text-sm footer-link">{{ item.label }}</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pt-6 border-t footer-divider flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p class="text-xs text-neutral-body">© 2025 Job-Hopper. All rights reserved.</p>
+          <p class="text-xs italic text-neutral-body">Job search, the way it should work.</p>
         </div>
       </div>
-    </section>
-
-    <!-- Final CTA -->
-    <section class="final-cta relative bg-gradient-to-r from-brand-primary to-blue-700 py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      <!-- Animated gradient waves -->
-      <div class="absolute inset-0 animate-gradient" style="background: linear-gradient(135deg, rgba(47, 110, 204, 0.8) 0%, rgba(59, 130, 246, 0.8) 50%, rgba(47, 110, 204, 0.8) 100%); background-size: 200% 200%;"></div>
-      
-      <!-- Floating particles -->
-      <div class="absolute inset-0">
-        <div v-for="i in 15" :key="i" class="particle" :style="{
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          width: `${Math.random() * 6 + 2}px`,
-          height: `${Math.random() * 6 + 2}px`,
-          background: `rgba(255, 255, 255, ${Math.random() * 0.5 + 0.2})`,
-          animationDelay: `${Math.random() * 5}s`,
-          animationDuration: `${10 + Math.random() * 10}s`
-        }"></div>
-      </div>
-      
-      <div class="max-w-4xl mx-auto text-center relative z-10">
-        <h2 class="text-white mb-6">
-          Ready for the new standard in job search?
-        </h2>
-        <p class="text-xl text-white/90 mb-8">
-          Create your profile and let Job-Hopper run the heavy lifting. Curated U.S. matches, your pace, your applications—cancel anytime in a couple of clicks if it is not for you.
-        </p>
-        <router-link to="/register" class="cta-button btn-secondary bg-white text-brand-primary hover:bg-neutral-bg inline-block mb-4">
-          Start your free trial
-        </router-link>
-        <p class="text-white/80 text-sm">
-          <router-link to="/faq" class="underline hover:text-white">Questions? Check our FAQ.</router-link>
-        </p>
-      </div>
-    </section>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-.testimonial-enter-active,
-.testimonial-leave-active {
-  transition: opacity 0.5s ease;
+/* Fluid type matching the design's clamp() values */
+.hero-title {
+  font-size: clamp(26px, 4vw, 40px);
+}
+.section-title {
+  font-size: clamp(24px, 3vw, 32px);
+}
+.card-title {
+  font-size: clamp(17px, 2vw, 19px);
+}
+.cta-title {
+  font-size: clamp(24px, 3.5vw, 36px);
 }
 
-.testimonial-enter-from,
-.testimonial-leave-to {
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+.nav-shell {
+  backdrop-filter: blur(12px);
+  transition: background 0.25s, border-color 0.25s;
+  border-bottom: 1px solid transparent;
+}
+.nav-top {
+  background: rgba(249, 250, 251, 0.85);
+}
+.nav-scrolled {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #e5e7eb;
+}
+.nav-link {
+  transition: opacity 0.18s;
+}
+.nav-link:hover {
+  opacity: 0.6;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-hop-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: #2f6ecc;
+  transition: transform 0.18s, opacity 0.18s;
+}
+.btn-hop-primary:hover {
+  opacity: 0.92;
+  transform: scale(1.03);
+}
+.btn-hop-primary:active {
+  transform: scale(0.97);
+}
+.btn-hop-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #2f6ecc;
+  border: 2px solid #2f6ecc;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+.btn-hop-secondary:hover {
+  background: #2f6ecc;
+  color: #fff;
+  transform: scale(1.03);
+}
+.btn-hop-secondary:active {
+  transform: scale(0.97);
+}
+
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2f6ecc;
+  transition: transform 0.18s;
+}
+.ghost-link:hover {
+  transform: translateX(3px);
+}
+
+/* ── Accent fills ─────────────────────────────────────────────────────────── */
+.amber-grad {
+  background: linear-gradient(135deg, #ffd75a 0%, #ff8a34 100%);
+}
+.amber-grad-text {
+  background: linear-gradient(135deg, #ffd75a 0%, #ff8a34 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.check-chip {
+  background: #dcfce7;
+}
+.match-badge {
+  background: #eff4fc;
+  color: #2f6ecc;
+}
+.sponsor-badge {
+  background: #fff7ed;
+  color: #ea580c;
+}
+.hero-blob {
+  background: linear-gradient(135deg, #ffd75a 0%, #ff8a34 40%, #2f6ecc 100%);
+}
+
+/* ── Pricing primary tier ─────────────────────────────────────────────────── */
+.plan-primary {
+  background: #2f6ecc;
+  border-color: #2f6ecc;
+  box-shadow: 0 8px 30px rgba(47, 110, 204, 0.22);
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.footer-shell {
+  background: #fff;
+  border-color: #e5e7eb;
+}
+.footer-divider {
+  border-color: #e5e7eb;
+}
+.footer-link {
+  color: #374151;
+  display: inline-block;
+  transition: transform 0.18s, color 0.18s;
+}
+.footer-link:hover {
+  color: #2f6ecc;
+  transform: translateX(3px);
+}
+
+/* ── Final CTA ────────────────────────────────────────────────────────────── */
+/* Subtle warm amber wash (not the full-strength gradient) so the brand logo
+   and copy stay clearly legible. */
+.cta-light {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffe9c7 100%);
+}
+.cta-noise {
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000' fill-opacity='1'%3E%3Cpath d='M0 0h1v1H0zm2 2h1v1H2zm2 0h1v1H4zm2-2h1v1H6zm2 2h1v1H8zm2-2h1v1h-1zm2 2h1v1h-1zm2-2h1v1h-1z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ── Scroll reveal ────────────────────────────────────────────────────────── */
+.reveal {
   opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
 }
 
-.gradient-border {
-  background-size: 200% 100%;
+/* ── Hover lift / scale ───────────────────────────────────────────────────── */
+.hop-card {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hop-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+.hop-scale {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hop-scale:hover {
+  transform: scale(1.02);
+}
+
+/* ── Hero graphic motion ──────────────────────────────────────────────────── */
+@keyframes hopFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.hop-float {
+  animation: hopFloat 3.8s ease-in-out infinite;
+}
+@keyframes hopGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.28;
+  }
+}
+.hop-glow {
+  animation: hopGlow 5s ease-in-out infinite;
+}
+
+/* main.css ships a global `prefers-reduced-motion: reduce` guard that forces every
+   transition/animation in the app to ~0ms. That silently disables this marketing
+   page's intentional hover, float, glow, and reveal motion. Re-enable it for the
+   landing's own elements only — the rest of the app still honors the preference. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition-duration: 0.52s !important;
+  }
+  .hop-card,
+  .hop-scale,
+  .btn-hop-primary,
+  .btn-hop-secondary,
+  .ghost-link,
+  .footer-link,
+  .nav-link {
+    transition-duration: 0.3s !important;
+  }
+  .hop-float {
+    animation-duration: 3.8s !important;
+    animation-iteration-count: infinite !important;
+  }
+  .hop-glow {
+    animation-duration: 5s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 </style>

@@ -17,7 +17,7 @@
             From there, our team and proprietary matching engine combine your profile, preferences, and career level with enriched company data and behind-the-scenes hiring insights to deliver only the most relevant opportunities, in real time.
           </p>
           <p class="mb-4">
-            On higher tiers, Job-Hopper goes further - providing company intelligence, role context, hiring contact insights, and interview-prep guidance so you're not just applying blindly, but approaching opportunities with clarity and confidence.
+            Job-Hopper shows you company size and background on each posting, so you're not applying blind. On Premium — currently rolling out, <router-link to="/pricing" class="text-brand-primary hover:underline">join the waitlist</router-link> — you'll also get verified hiring contact info, so outreach isn't guesswork.
           </p>
           <p class="mb-4">
             For every role that passes through the Hopper, we also run deep metadata analysis. One outcome of that pipeline is a sponsorship-likelihood signal: when visa sponsorship is part of your situation, you can use it to spend less time on postings that are unlikely to line up—without Job-Hopper becoming a sponsorship-only product. The signal is a practical filter and estimate, not a promise that a given employer will sponsor.
@@ -194,7 +194,7 @@
                   <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                   </svg>
-                  <span>On premium plans, suggested outreach messages and hiring contact info where available</span>
+                  <span>On Premium (rolling out — <router-link to="/pricing" class="text-brand-primary hover:underline">join the waitlist</router-link>): verified hiring contact info</span>
                 </li>
               </ul>
             </div>
