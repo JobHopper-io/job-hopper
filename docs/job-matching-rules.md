@@ -86,28 +86,8 @@ When subscriber has preferred locations and coordinates are available:
 
 1. Compute distance (miles) from the job to the nearest preferred location.
 2. If `location_radius_miles` is set and distance **≤ radius**, location quality is **1.0** (full points anywhere inside the subscriber’s range).
-3. If distance **> radius**, apply admin **distance bands** to **miles beyond the radius** (not absolute distance). Default band qualities: 0–10 mi past range → 1.0, 10–25 → 0.85, 25–50 → 0.65, 50–100 → 0.35, 100+ → 0.
-4. If `location_radius_miles` is unset, bands use **absolute** distance from the nearest preferred place (same band breakpoints as above).
-
-Without coordinates, **string fallback**: same metro → `sameMetroQuality`, same state → `sameStateQuality`.
-
-**Remote:** When `remoteAsPerfect` and subscriber is open to remote, remote jobs → location quality **1.0**.
-
----
-
-## Recency quality (0–1)
-
-```
-recency_quality = max(0, 1 - days_since_posted / maxAgeDays)
-```
-
-Same `maxAgeDays` drives the hard recency gate.
-
----
-
-## Filter Matches quality (0–1)
-
-**Filter Matches** is a scored category (weight `w_filter_matches`, default **0.05**), not a hard gate. It will grow to include more subscriber filters; today it only reflects **target role categories**.
+3. If distance **> radius**, apply admin **distance bands** to **miles beyond the radius** (not absolute distance). Default band qualit
+subscriber filters; today it only reflects **target role categories**.
 
 - If the subscriber has **no** target roles → quality **1.0** (neutral).
 - If the job’s `role_category` matches one of the subscriber’s target roles (case-insensitive) → **1.0**.

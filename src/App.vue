@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterView, useRouter } from 'vue-router'
+import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
@@ -9,7 +9,13 @@ import jobHopperWordsLogo from '@/assets/job-hopper-words.png'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
+
+// The public landing page (`/`) ships its own bespoke fixed nav + dark footer that
+// match the redesign, so suppress the shared app chrome there. Authenticated users are
+// redirected away from `/` by the router guard, so this only ever affects the marketing page.
+const isLandingPage = computed(() => route.path === '/')
 
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
@@ -53,8 +59,14 @@ watch(isAuthenticated, (authenticated) => {
 // Use a distinct name to avoid confusion with domain "Subscription" model
 const {
   data: { subscription: authListener },
-} = onAuthStateChange(async (_event, session) => {
+} = onAuthStateChange(async (event, session) => {
   isAuthenticated.value = !!session?.user
+
+  // A recovery session must always land on the reset form, regardless of which URL the
+  // email link resolved to. Fires once Supabase consumes the recovery token.
+  if (event === 'PASSWORD_RECOVERY' && router.currentRoute.value.path !== '/reset-password') {
+    void router.push('/reset-password')
+  }
 })
 
 // Cleanup auth listener on unmount
@@ -69,8 +81,14 @@ onMounted(async () => {
     // watch(isAuthenticated) above handles loadUserData() / clear() when this changes
 
     // Strip auth tokens from URL after Supabase has consumed them (e.g. after email confirmation).
+    // Exception: leave recovery tokens intact so the reset-password flow can consume them; that
+    // flow clears the hash by navigating to /dashboard on success.
     const hash = window.location.hash
-    if (hash && (hash.includes('access_token=') || hash.includes('refresh_token='))) {
+    if (
+      hash &&
+      !hash.includes('type=recovery') &&
+      (hash.includes('access_token=') || hash.includes('refresh_token='))
+    ) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
     }
   } catch (error) {
@@ -100,8 +118,8 @@ const handleSignOutAndCloseMenu = async () => {
 <template>
   <div class="min-h-screen bg-neutral-bg">
       <!-- Navigation Header -->
-      <nav class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav v-if="!isLandingPage" class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-5">
           <div class="flex justify-between items-center h-16">
             <!-- Logo -->
             <div class="flex items-center">
@@ -117,83 +135,80 @@ const handleSignOutAndCloseMenu = async () => {
               </router-link>
             </div>
 
-            <!-- Desktop Navigation -->
-            <div class="hidden md:flex items-center space-x-8">
+            <!-- Desktop Navigation (centered links, matching the landing nav) -->
+            <div class="hidden md:flex items-center gap-6">
               <template v-if="!isAuthenticated">
                 <router-link
                   to="/how-it-works"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   How It Works
                 </router-link>
                 <router-link
                   to="/pricing"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Pricing
                 </router-link>
                 <router-link
                   to="/install-app"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Get the app
                 </router-link>
                 <router-link
                   to="/faq"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   FAQ
-                </router-link>
-                <router-link
-                  to="/login"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Login
-                </router-link>
-                <router-link
-                  to="/register"
-                  class="btn-primary text-sm"
-                >
-                  Get Started
                 </router-link>
               </template>
               <template v-else-if="isOnboarded">
                 <router-link
                   to="/dashboard"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Dashboard
                 </router-link>
                 <router-link
                   to="/profile"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Profile
                 </router-link>
                 <router-link
                   to="/billing"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Billing
                 </router-link>
                 <router-link
                   v-if="canAccessAdmin"
                   to="/admin/dashboard"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Admin
                 </router-link>
-                <button
-                  @click="handleSignOut"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              </template>
+            </div>
+
+            <!-- Desktop actions (right, matching the landing nav) -->
+            <div class="hidden md:flex items-center gap-3">
+              <template v-if="!isAuthenticated">
+                <router-link
+                  to="/login"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
-                  Sign Out
-                </button>
+                  Login
+                </router-link>
+                <router-link to="/register" class="btn-primary text-sm">
+                  Get Started
+                </router-link>
               </template>
               <template v-else>
                 <button
                   @click="handleSignOut"
-                  class="text-neutral-body hover:text-brand-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
                   Sign Out
                 </button>
@@ -317,7 +332,7 @@ const handleSignOutAndCloseMenu = async () => {
       </main>
 
       <!-- Footer -->
-      <footer class="bg-white border-t border-neutral-border mt-16">
+      <footer v-if="!isLandingPage" class="bg-white border-t border-neutral-border mt-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">

@@ -13,11 +13,20 @@ import {
   faBuilding,
   faXmark,
   faCircleInfo,
+  faCircleCheck,
   faEnvelope,
   faUserTie,
   faGlobeAmericas,
   faClock,
   faDownload,
+  faArrowRight,
+  faBars,
+  faStar,
+  faPaperPlane,
+  faSliders,
+  faCrosshairs,
+  faLock,
+  faChevronDown,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -32,11 +41,20 @@ library.add(
   faBuilding,
   faXmark,
   faCircleInfo,
+  faCircleCheck,
   faEnvelope,
   faUserTie,
   faGlobeAmericas,
   faClock,
   faDownload,
+  faArrowRight,
+  faBars,
+  faStar,
+  faPaperPlane,
+  faSliders,
+  faCrosshairs,
+  faLock,
+  faChevronDown,
 )
 
 export function registerFontAwesome(app: App) {
