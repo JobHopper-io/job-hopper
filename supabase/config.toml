@@ -196,6 +196,12 @@ verify_jwt = false
 [functions.reset-apollo-limits]
 verify_jwt = false
 
+# Premium waitlist capture is called from /pricing for logged-out visitors too, so no
+# JWT is required. When an Authorization header is present the function still resolves
+# the caller's profile_id from it; the client never supplies profile_id directly.
+[functions.premium-waitlist]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

@@ -46,9 +46,11 @@ const addonProducts = ref<Product[]>([])
 const selectedBasePlanId = ref<string | null>(null)
 const selectedAddonIds = ref<string[]>([])
 const startFreePlan = ref(false)
-const selectedFreemiumTier = ref<FreemiumBasePlanTierKey | ''>('')
+// Career level is required for everyone (free and paid). It is the job-matching tier and
+// is stored on profiles.career_level -- never derived from the plan/product the user picks.
+const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 
-const freemiumTierOptions: { value: FreemiumBasePlanTierKey; label: string }[] = [
+const careerLevelOptions: { value: FreemiumBasePlanTierKey; label: string }[] = [
   { value: 'entry_mid', label: 'Entry & Mid Level' },
   { value: 'senior_management', label: 'Senior & Management' },
   { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
@@ -77,10 +79,11 @@ const canProceedStep2 = computed(() => {
 })
 
 const canProceedStep4 = computed(() => {
-  if (startFreePlan.value) {
-    return FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)
-  }
-  return selectedBasePlanId.value !== null
+  const hasCareerLevel = FREEMIUM_BASE_PLAN_TIER_KEYS.includes(
+    careerLevel.value as FreemiumBasePlanTierKey,
+  )
+  if (!hasCareerLevel) return false
+  return startFreePlan.value || selectedBasePlanId.value !== null
 })
 
 const canProceedCurrentStep = computed(() => {
@@ -107,6 +110,7 @@ function populateFromProfile() {
   currentJobTitle.value = p.current_job_title ?? ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry ?? ''
+  careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
 
   targetJobTitle.value = p.target_job_title ?? ''
   const validCategories = (p.target_role_categories ?? []).filter(
@@ -199,7 +203,6 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 
 function selectPaidPlan(productId: string) {
   startFreePlan.value = false
-  selectedFreemiumTier.value = ''
   selectedBasePlanId.value = productId
 }
 
@@ -214,6 +217,7 @@ async function persistProfileAndResume(): Promise<boolean> {
     first_name: firstName.value.trim() || undefined,
     last_name: lastName.value.trim() || undefined,
     current_job_title: currentJobTitle.value,
+    career_level: careerLevel.value || undefined,
     target_job_title: targetJobTitle.value.trim(),
     years_of_experience: yearsOfExperience.value ?? undefined,
     current_industry: currentIndustry.value,
@@ -251,14 +255,14 @@ const handleContinueForFree = async () => {
   try {
     isLoading.value = true
     error.value = ''
-    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)) {
-      error.value = 'Please choose which plan level best describes the roles you want.'
+    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(careerLevel.value as FreemiumBasePlanTierKey)) {
+      error.value = 'Please choose which level best describes the roles you want.'
       return
     }
     const ok = await persistProfileAndResume()
     if (!ok) return
 
-    const { error: freeError } = await freemiumAPI.completeOnboarding(selectedFreemiumTier.value)
+    const { error: freeError } = await freemiumAPI.completeOnboarding(careerLevel.value)
     if (freeError) {
       error.value = freeError.message || 'Could not finish free signup. Please try again.'
       return
@@ -565,6 +569,25 @@ const handleProceedToCheckout = async () => {
           </p>
 
           <div class="space-y-6">
+            <div class="max-w-md">
+              <label for="career-level" class="block text-sm font-medium text-brand-charcoal mb-1">
+                Which level best describes the roles you want? <span class="text-red-600">*</span>
+              </label>
+              <p class="text-sm text-neutral-body mb-2">
+                This determines which jobs we match you with, on any plan.
+              </p>
+              <select id="career-level" v-model="careerLevel" class="input w-full">
+                <option disabled value="">Select a level</option>
+                <option
+                  v-for="opt in careerLevelOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
                 :class="[
@@ -580,25 +603,6 @@ const handleProceedToCheckout = async () => {
                 <button type="button" class="btn-secondary w-full mb-3" @click="selectFreePlan">
                   Choose free
                 </button>
-                <div v-if="startFreePlan">
-                  <label for="freemium-tier" class="block text-sm font-medium text-brand-charcoal mb-1">
-                    Which level of roles are you targeting? <span class="text-red-600">*</span>
-                  </label>
-                  <select
-                    id="freemium-tier"
-                    v-model="selectedFreemiumTier"
-                    class="input w-full"
-                  >
-                    <option disabled value="">Select a category</option>
-                    <option
-                      v-for="opt in freemiumTierOptions"
-                      :key="opt.value"
-                      :value="opt.value"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
               </div>
 
               <div

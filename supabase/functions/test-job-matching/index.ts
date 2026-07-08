@@ -13,7 +13,7 @@ import {
 } from '../_shared/job-matching-algorithm.ts'
 import {
   assertSubscriptionTierKeysForMatching,
-  getSubscriptionTierProductKeysForProfile,
+  getCareerLevelTierKeysForProfile,
 } from '../_shared/subscription-tier-product-keys.ts'
 import { configRowToOverride } from '../_shared/matching-algorithm-config-row.ts'
 import { mergeConfigOverrides } from '../_shared/merge-match-config.ts'
@@ -222,7 +222,7 @@ serve(async (req) => {
       profile = selfProfile
     }
 
-    const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+    const subscriptionTierProductKeys = await getCareerLevelTierKeysForProfile(
       supabaseAdminClient,
       profile.id,
     )

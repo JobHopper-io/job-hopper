@@ -38,19 +38,28 @@ const FREEMIUM_TIER_KEYS = new Set(['entry_mid', 'senior_management', 'director_
 async function upsertFreemiumUsageForCheckout(
   supabaseAdmin: SupabaseAdmin,
   profileId: string,
-  opts: { preferTierKey: string | null },
 ) {
-  const { data: existing } = await supabaseAdmin
-    .from('freemium_usage')
-    .select('selected_tier_key, job_searches_used, resume_advice_used, premium_insights_used')
-    .eq('profile_id', profileId)
-    .maybeSingle()
+  const [{ data: existing }, { data: profileRow }] = await Promise.all([
+    supabaseAdmin
+      .from('freemium_usage')
+      .select('selected_tier_key, job_searches_used, resume_advice_used, premium_insights_used')
+      .eq('profile_id', profileId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('profiles')
+      .select('career_level')
+      .eq('id', profileId)
+      .maybeSingle(),
+  ])
 
-  const prefer = opts.preferTierKey
-  const tierFromPrefer =
-    typeof prefer === 'string' && FREEMIUM_TIER_KEYS.has(prefer) ? prefer : null
+  // Career level comes from the profile, never from the purchased product. (Under the
+  // Free/Core/Premium model the base-plan key no longer encodes a career tier.)
+  const careerLevel =
+    typeof profileRow?.career_level === 'string' && FREEMIUM_TIER_KEYS.has(profileRow.career_level)
+      ? (profileRow.career_level as string)
+      : null
   const selectedTierKey =
-    tierFromPrefer ?? existing?.selected_tier_key ?? 'entry_mid'
+    careerLevel ?? existing?.selected_tier_key ?? 'entry_mid'
 
   const { error } = await supabaseAdmin.from('freemium_usage').upsert(
     {
@@ -164,7 +173,6 @@ serve(async (req) => {
         }
 
         let subscriptionCheckoutInsertSucceeded = false
-        let preferTierKeyFromSubscription: string | null = null
 
         if (session.subscription) {
           const stripeSubscription = await stripe.subscriptions.retrieve(
@@ -265,29 +273,6 @@ serve(async (req) => {
                   },
                   { onConflict: 'subscription_id,product_id' },
                 )
-            }
-
-            const { data: spRows } = await supabaseAdmin
-              .from('subscription_product')
-              .select('product_id')
-              .eq('subscription_id', subscriptionId)
-
-            const supabaseProductIds = (spRows ?? [])
-              .map((r) => r.product_id)
-              .filter((id): id is string => typeof id === 'string')
-
-            if (supabaseProductIds.length > 0) {
-              const { data: basePlanRows } = await supabaseAdmin
-                .from('products')
-                .select('key')
-                .in('id', supabaseProductIds)
-                .eq('category', 'base_plan')
-                .limit(1)
-
-              const k = basePlanRows?.[0]?.key
-              if (typeof k === 'string' && FREEMIUM_TIER_KEYS.has(k)) {
-                preferTierKeyFromSubscription = k
-              }
             }
           }
         } else {
@@ -454,9 +439,7 @@ serve(async (req) => {
           }
         }
 
-        await upsertFreemiumUsageForCheckout(supabaseAdmin, profileId, {
-          preferTierKey: subscriptionCheckoutInsertSucceeded ? preferTierKeyFromSubscription : null,
-        })
+        await upsertFreemiumUsageForCheckout(supabaseAdmin, profileId)
 
         if (subscriptionCheckoutInsertSucceeded) {
           // Schedule initial job matching for this profile ~45 minutes after subscription checkout.

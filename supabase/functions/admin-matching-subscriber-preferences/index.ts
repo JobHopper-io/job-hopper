@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
-import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
+import { getCareerLevelTierKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,7 +158,7 @@ serve(async (req) => {
 
     const hasActiveSubscription = (count ?? 0) > 0
 
-    const subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+    const subscriptionTierProductKeys = await getCareerLevelTierKeysForProfile(
       supabaseAdminClient,
       profileId,
     )

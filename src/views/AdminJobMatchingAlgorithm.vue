@@ -261,7 +261,7 @@ function goToPage(page: number) {
 }
 
 async function loadSubscriptionTierKeys(profileId: string) {
-  const { data } = await subscriptionAPI.getSubscriptionTierProductKeysForProfile(profileId)
+  const { data } = await subscriptionAPI.getCareerLevelTierKeysForProfile(profileId)
   prefsForm.subscriptionTierProductKeys = (data ?? []).join(', ')
 }
 

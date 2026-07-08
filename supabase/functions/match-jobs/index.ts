@@ -10,7 +10,7 @@ import {
   type SubscriberPreferences,
   matchJobs,
 } from '../_shared/job-matching-algorithm.ts'
-import { getSubscriptionTierProductKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
+import { getCareerLevelTierKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 import { isFreemiumBasePlanTierKey } from '../_shared/freemium-tier-keys.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
@@ -157,7 +157,7 @@ serve(async (req) => {
         )
       }
     } else {
-      subscriptionTierProductKeys = await getSubscriptionTierProductKeysForProfile(
+      subscriptionTierProductKeys = await getCareerLevelTierKeysForProfile(
         supabaseAdminClient,
         profile.id,
       )
