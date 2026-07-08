@@ -129,6 +129,23 @@ export const subscriptionAPI = {
   },
 
   /**
+   * Fetch a single base-plan product by key, regardless of `available_for_purchase`.
+   * Used to render a not-yet-sellable tier (e.g. Premium) as a locked "coming soon" card.
+   */
+  async getBasePlanByKey(
+    key: string,
+  ): Promise<{ data: Product | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('products')
+      .select(productColumns)
+      .eq('category', 'base_plan')
+      .eq('key', key)
+      .maybeSingle()
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data: data ?? null, error: null }
+  },
+
+  /**
    * All `products.key` values for base plans (including not currently for sale), for admin UI and matching hints.
    */
   async listBasePlanProductKeys(): Promise<{ data: string[]; error: Error | null }> {

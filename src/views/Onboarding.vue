@@ -43,6 +43,10 @@ const resumeFile = ref<File | null>(null)
 // Step 4: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
 const addonProducts = ref<Product[]>([])
+// Premium is not sellable yet: shown as a locked "coming soon" tier with a waitlist CTA.
+const premiumPlan = ref<Product | null>(null)
+const waitlistState = ref<'idle' | 'loading' | 'done' | 'error'>('idle')
+const waitlistError = ref('')
 const selectedBasePlanId = ref<string | null>(null)
 const selectedAddonIds = ref<string[]>([])
 const startFreePlan = ref(false)
@@ -55,6 +59,15 @@ const careerLevelOptions: { value: FreemiumBasePlanTierKey; label: string }[] = 
   { value: 'senior_management', label: 'Senior & Management' },
   { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
 ]
+
+// Show Premium as a locked tier only while it isn't purchasable. When it ships and
+// available_for_purchase flips to true, it drops out of here and getBasePlanProducts()
+// renders it as a normal selectable plan instead.
+const premiumComingSoon = computed<Product | null>(() =>
+  premiumPlan.value && premiumPlan.value.available_for_purchase === false
+    ? premiumPlan.value
+    : null,
+)
 
 const isLoading = ref(false)
 const error = ref('')
@@ -134,12 +147,14 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  const [baseRes, addonRes] = await Promise.all([
+  const [baseRes, addonRes, premiumRes] = await Promise.all([
     subscriptionAPI.getBasePlanProducts(),
-    subscriptionAPI.getAddonProducts()
+    subscriptionAPI.getAddonProducts(),
+    subscriptionAPI.getBasePlanByKey('premium'),
   ])
   if (baseRes.data) basePlanProducts.value = baseRes.data
   if (addonRes.data) addonProducts.value = addonRes.data
+  if (premiumRes.data) premiumPlan.value = premiumRes.data
 })
 
 watch(
@@ -204,6 +219,24 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 function selectPaidPlan(productId: string) {
   startFreePlan.value = false
   selectedBasePlanId.value = productId
+}
+
+async function handleJoinWaitlist() {
+  const email = userStore.profile?.email
+  if (!email) {
+    waitlistState.value = 'error'
+    waitlistError.value = 'We couldn’t find your email. Try again from the pricing page.'
+    return
+  }
+  waitlistState.value = 'loading'
+  waitlistError.value = ''
+  const { error: waitlistErr } = await subscriptionAPI.joinPremiumWaitlist(email)
+  if (waitlistErr) {
+    waitlistState.value = 'error'
+    waitlistError.value = 'Could not join the waitlist. Please try again.'
+    return
+  }
+  waitlistState.value = 'done'
 }
 
 function selectFreePlan() {
@@ -623,6 +656,33 @@ const handleProceedToCheckout = async () => {
                 >
                   Select plan
                 </button>
+              </div>
+
+              <div
+                v-if="premiumComingSoon"
+                class="card p-6 text-left transition-all flex flex-col border-2 border-dashed border-neutral-border"
+              >
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="font-semibold">{{ premiumComingSoon.display_name }}</h3>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">
+                    Coming soon
+                  </span>
+                </div>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getProductPrice(premiumComingSoon) }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <p class="text-sm text-neutral-body mb-4 grow">{{ premiumComingSoon.description || '' }}</p>
+                <button
+                  v-if="waitlistState !== 'done'"
+                  type="button"
+                  class="btn-secondary w-full"
+                  :disabled="waitlistState === 'loading'"
+                  @click="handleJoinWaitlist"
+                >
+                  {{ waitlistState === 'loading' ? 'Joining…' : 'Join the waitlist' }}
+                </button>
+                <p v-else class="text-sm font-medium text-brand-primary">
+                  You’re on the waitlist — we’ll email you when Premium launches.
+                </p>
+                <p v-if="waitlistState === 'error'" class="text-sm text-red-600 mt-2">{{ waitlistError }}</p>
               </div>
             </div>
 
