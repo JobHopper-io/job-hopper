@@ -111,6 +111,22 @@ export const useUserStore = defineStore('user', () => {
   /** Trial/active subscription rows only (from subscriptionAPI). */
   const hasActiveSubscription = computed(() => subscriptions.value.length > 0)
 
+  /**
+   * Feature-depth tier for the dashboard: Free / Core / Premium.
+   * - No trial/active subscription -> 'free'.
+   * - Owns the `premium` base plan -> 'premium'.
+   * - Anything else with a base plan -> 'core'. This deliberately maps the legacy
+   *   career-level base plans (entry_mid / senior_management / director_vp_c_level)
+   *   to Core-equivalent so in-flight trial users keep the full dashboard rather than
+   *   dropping to the Free-capped view. Premium *features* are gated separately by the
+   *   premium_insights add-on (see hasPremiumInsightsAddon), not by this tier.
+   */
+  const baseTier = computed<'free' | 'core' | 'premium'>(() => {
+    if (!hasActiveSubscription.value || !basePlan.value) return 'free'
+    if (basePlan.value.key === 'premium') return 'premium'
+    return 'core'
+  })
+
   const freemiumMaxJobSearches = computed(
     () => freemiumSettings.value?.max_job_searches ?? 3,
   )
@@ -346,6 +362,7 @@ export const useUserStore = defineStore('user', () => {
     canRequestPremiumInsights,
     clear,
     basePlan,
+    baseTier,
     addonProducts,
     subscriptionAddonProducts,
     oneTimeAddonProducts,

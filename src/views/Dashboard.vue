@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
+import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
@@ -23,6 +24,7 @@ const {
   profile,
   isLoading,
   basePlan,
+  baseTier,
   subscriptionStatusLabel,
   subscriptionAddonProducts,
   showFreemiumJobSearchCta,
@@ -92,6 +94,31 @@ const userName = computed(() => {
 const activeAddonsForDisplay = computed(() =>
   subscriptionAddonProducts.value.map((p: Product) => p.display_name),
 )
+
+// Free-tier teaser copy: first items shown, the rest blurred behind an upgrade lock.
+// Illustrative only — real values come from the paid Resume Advice / Premium Insights flows.
+const resumeAdviceTeaser = {
+  real: [
+    '✓ Strong keyword match for your target title',
+    '✓ Experience level aligns with the roles you want',
+  ],
+  blurred: [
+    '○ Skills to highlight so you pass ATS screens',
+    '○ Sections worth adding to your resume',
+    '○ Estimated salary band for your profile',
+  ],
+}
+const premiumInsightsTeaser = {
+  real: [
+    '→ See which employers are actively hiring now',
+    '→ How your profile ranks against the role',
+  ],
+  blurred: [
+    '→ Visa sponsorship likelihood score',
+    '→ Average time from application to offer',
+    '→ Hiring manager contact identified',
+  ],
+}
 
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
@@ -264,7 +291,8 @@ onMounted(() => {
         <p class="text-neutral-body">
           Here are your latest job matches.
         </p>
-        <p class="text-sm text-neutral-body mt-1">
+        <!-- Implies background/automated matching — hidden on Free, which is manual-only. -->
+        <p v-if="baseTier !== 'free'" class="text-sm text-neutral-body mt-1">
           Your matches update as new opportunities hit the Hopper and as you refine your profile.
         </p>
       </div>
@@ -276,23 +304,36 @@ onMounted(() => {
         <!-- Subscription status and tier -->
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
-          <div v-if="basePlan">
-            <p class="font-heading font-semibold text-brand-charcoal">
-            {{ basePlan?.display_name }}
-          </p>
-          <p class="text-sm text-neutral-body mt-1">
-            {{ subscriptionStatusLabel }}
-          </p>
-          <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
-            Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
-          </p>
-          </div>
-          <div v-else>
-            <p class="text-sm text-neutral-body">No active plan</p>
-          </div>
-          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Manage plan →
-          </router-link>
+          <!-- Free tier: plain, low-pressure upgrade prompt (no urgency styling). -->
+          <template v-if="baseTier === 'free'">
+            <p class="font-heading font-semibold text-brand-charcoal">Free</p>
+            <p class="text-sm text-neutral-body mt-1">No card on file</p>
+            <router-link
+              :to="{ name: 'billing-purchase' }"
+              class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline"
+            >
+              Upgrade
+            </router-link>
+          </template>
+          <template v-else>
+            <div v-if="basePlan">
+              <p class="font-heading font-semibold text-brand-charcoal">
+                {{ basePlan?.display_name }}
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                {{ subscriptionStatusLabel }}
+              </p>
+              <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
+                Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+              </p>
+            </div>
+            <div v-else>
+              <p class="text-sm text-neutral-body">No active plan</p>
+            </div>
+            <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+              Manage plan →
+            </router-link>
+          </template>
         </div>
 
         <!-- Active add-ons -->
@@ -346,18 +387,48 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Manual job search (freemium): below status cards, above Recent matches -->
-      <div v-if="showFreemiumJobSearchCta" class="mb-8">
-        <FreemiumManualJobSearchPanel
-          :centered="false"
-          :can-run="freemiumCanRunManualJobSearch"
-          :used-searches="freemiumJobSearchesUsed"
-          :max-searches="freemiumMaxJobSearches"
-          :message="freemiumSearchMessage"
-          :loading="freemiumSearchLoading"
-          @run="runFreemiumJobSearch"
-        />
-      </div>
+      <!--
+        Tier-specific main panel. Switched on baseTier so Core/Premium slot in cleanly.
+        Only the Free branch is built in this task.
+      -->
+      <template v-if="baseTier === 'free'">
+        <!-- Manual job search (freemium): below status cards, above Recent matches -->
+        <div v-if="showFreemiumJobSearchCta" class="mb-8">
+          <FreemiumManualJobSearchPanel
+            :centered="false"
+            :can-run="freemiumCanRunManualJobSearch"
+            :used-searches="freemiumJobSearchesUsed"
+            :max-searches="freemiumMaxJobSearches"
+            :message="freemiumSearchMessage"
+            :loading="freemiumSearchLoading"
+            @run="runFreemiumJobSearch"
+          />
+        </div>
+
+        <!-- Locked upgrade teasers for the paid-only feature depth. -->
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
+          <FeatureTeaserCard
+            title="Resume Advice"
+            :real-fields="resumeAdviceTeaser.real"
+            :blurred-fields="resumeAdviceTeaser.blurred"
+          />
+          <FeatureTeaserCard
+            title="Premium Insights"
+            :real-fields="premiumInsightsTeaser.real"
+            :blurred-fields="premiumInsightsTeaser.blurred"
+          />
+        </div>
+      </template>
+
+      <!--
+        TODO(core dashboard — next task): render under v-else-if="baseTier === 'core'".
+        Automated-matching status banner, Application Tracker, and unblurred Resume Advice
+        + Premium Insights cards.
+      -->
+      <!--
+        TODO(premium dashboard — task after): render under v-else-if="baseTier === 'premium'".
+        Everything in Core plus the five Premium Tools concept cards.
+      -->
 
       <!-- Recent job matches -->
       <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">

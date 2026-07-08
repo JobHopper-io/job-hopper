@@ -27,6 +27,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const userStore = useUserStore()
 const {
+  baseTier,
   freemiumResumeAdviceRemaining,
   freemiumMaxResumeAdvice,
   hasPremiumInsightsAddon,
@@ -34,6 +35,14 @@ const {
   freemiumMaxPremiumInsights,
   canRequestPremiumInsights,
 } = storeToRefs(userStore)
+
+/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are shown
+ * as locked upgrade teasers instead of functional controls. Core/Premium are unaffected. */
+const isFree = computed(() => baseTier.value === 'free')
+
+function goUpgrade() {
+  void router.push({ name: 'billing-purchase' })
+}
 
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
@@ -295,10 +304,16 @@ async function onConfirmOrgDisambiguation(
 const showSponsorshipBadge = computed(() => {
   const profile = userStore.profile
   const value = props.job.sponsorshipLikelihood
+  if (isFree.value) return false
   if (!profile || profile.requires_us_sponsorship !== true) return false
   if (!value || value === 'N/A') return false
   return true
 })
+
+/** Free tier sees a blurred, locked sponsorship badge when they require sponsorship. */
+const showSponsorshipTeaser = computed(
+  () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
+)
 
 function handleViewDetails() {
   void router.push(`/job/${props.job.jobId}`)
@@ -388,6 +403,11 @@ async function runAdviceCheckout() {
               v-if="showSponsorshipBadge"
               :value="job.sponsorshipLikelihood"
             />
+            <JobSponsorshipBadge
+              v-else-if="showSponsorshipTeaser"
+              :value="null"
+              locked
+            />
           </div>
         </div>
         <button
@@ -433,31 +453,53 @@ async function runAdviceCheckout() {
         >
           Apply
         </button>
+        <!-- Free tier: locked upgrade teaser instead of the functional advice flow. -->
         <button
-          v-if="showAdviceButton"
+          v-if="isFree"
           type="button"
-          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-          :disabled="adviceLoading"
-          @click="handleGetResumeAdviceClick"
+          class="inline-flex w-[11.5rem] shrink-0 items-center justify-center gap-1.5 rounded-[12px] border border-neutral-border bg-neutral-bg px-3.5 py-1.5 text-sm font-semibold text-gray-400"
+          @click="goUpgrade"
         >
-          <font-awesome-icon
-            v-if="adviceLoading"
-            :icon="['fas', 'spinner']"
-            spin
-            class="mr-1.5"
-            aria-hidden="true"
-          />
-          {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
+          <font-awesome-icon :icon="['fas', 'lock']" aria-hidden="true" />
+          Get resume advice
         </button>
+        <template v-else>
+          <button
+            v-if="showAdviceButton"
+            type="button"
+            class="btn-secondary w-[11.5rem] shrink-0 text-sm"
+            :disabled="adviceLoading"
+            @click="handleGetResumeAdviceClick"
+          >
+            <font-awesome-icon
+              v-if="adviceLoading"
+              :icon="['fas', 'spinner']"
+              spin
+              class="mr-1.5"
+              aria-hidden="true"
+            />
+            {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
+          </button>
+          <button
+            v-if="showResumeAdviceButton"
+            type="button"
+            class="btn-secondary w-[11.5rem] shrink-0 text-sm"
+            @click="adviceModalOpen = true"
+          >
+            View resume advice
+          </button>
+        </template>
+        <!-- Free tier: locked Premium Insights teaser. -->
         <button
-          v-if="showResumeAdviceButton"
+          v-if="isFree"
           type="button"
-          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-          @click="adviceModalOpen = true"
+          class="inline-flex w-[12.5rem] shrink-0 items-center justify-center gap-1.5 rounded-[12px] border border-neutral-border bg-neutral-bg px-3.5 py-1.5 text-sm font-semibold text-gray-400"
+          @click="goUpgrade"
         >
-          View resume advice
+          <font-awesome-icon :icon="['fas', 'lock']" aria-hidden="true" />
+          Premium Insights
         </button>
-        <template v-if="showPremiumInsightsRow">
+        <template v-else-if="showPremiumInsightsRow">
           <button
             v-if="showPremiumInsightsGetButton"
             type="button"

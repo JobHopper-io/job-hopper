@@ -1,0 +1,92 @@
+Design three complete, side-by-side web dashboard mockups for a job-matching SaaS called
+Job-Hopper — one per subscription tier (Free, Core, Premium). All three must read as the SAME
+app in three states, not three different designs. Lay them out left-to-right, equal width, with
+the header at an identical vertical position in each, so a reviewer scanning left→right sees a
+clear value ladder: Free (capped + teased) → Core (full working product) → Premium (working
+product + labeled roadmap preview).
+
+There is NO trial state anywhere. Subscriptions are only: Free (no card on file), Core (active),
+Premium (active). Never show a "Free Trial", countdown, or billing-date urgency.
+
+=== DESIGN TOKENS (use these exactly, no substitutions) ===
+- Brand blue (primary actions, links): #2F6ECC
+- Charcoal (headings): #111827
+- Body text: #374151
+- Page background: #F9FAFB
+- Card background: #FFFFFF
+- Border: #E5E7EB
+- Warning strip: amber-50 bg / amber-200 border / amber-800 text
+- Success: green-50 bg / green-200 border / green-700 text
+- Fonts: Poppins for all headings, Inter for all body text
+- Corner radius: 12px on every card, button, input, and badge
+- Cards: white fill, 1px #E5E7EB border, subtle shadow-sm, generous internal padding
+- Primary button: solid #2F6ECC, white text, 12px radius. Secondary/link: #2F6ECC text, no fill.
+
+=== SHARED LAYOUT SKELETON (identical in all three frames) ===
+Top: a slim app nav bar (logo left; "Dashboard / Profile / Billing / Sign Out" right).
+Then the page body on #F9FAFB with comfortable max-width and horizontal padding:
+1. HEADER: "Good morning, Alex" in large bold Poppins charcoal, with a one-line body-text
+   subtitle "Here are your latest job matches."
+2. SUMMARY CARD ROW: a row of 4 equal cards. Each card = small uppercase gray label, a large
+   bold headline stat, one caption line, and (where relevant) a #2F6ECC text link. The 4 cards
+   are: Subscription · Active add-ons/features · Matching statistics · Profile strength.
+3. MAIN PANEL: one wide feature card directly under the summary row (contents differ per tier —
+   see each frame).
+4. RECENT JOB MATCHES: an "H2" section heading, then a vertical list of 2 job-match cards. Each
+   job card shows: job title (bold), company name + location, a "Match score: NN" chip, a
+   sponsorship badge, a 2-line company/role description, and an action row with buttons
+   "View details" (primary), "Apply", "Get resume advice", "Premium Insights".
+
+Keep this skeleton visually consistent across all three frames. The differences between tiers are
+in the CONTENT and STATE of these regions, not the layout.
+
+=== FRAME 1 — FREE TIER ===
+- Subscription card: headline "Free", caption "No card on file", and a plain "Upgrade" text link
+  in #2F6ECC. No urgency styling, no color escalation.
+- MAIN PANEL = "Run another job search" manual-search card: heading, explanatory line, and a
+  credit counter reading "You have used 2 of 3 manual searches." Show the amber nudge state as an
+  inline strip INSIDE the card (amber-50/200/800, 12px radius, not a full recolor):
+  "Just 1 free search left. Make it count, or upgrade anytime." Keep the primary "Run job search"
+  button solid #2F6ECC and enabled. Add a small caption note beside/below the frame:
+  "(Separate hard-wall state exists at 0 remaining: button disabled, 'Upgrade to continue'.)"
+- Premium Insights and Resume Advice appear in TEASER state: a card showing 2–3 real fields
+  visible at top, and the remainder of the content blurred/obscured with a small lock icon
+  overlay and an "Upgrade to unlock" CTA (#2F6ECC).
+- Sponsorship badge on job cards appears in teaser form (e.g. partially blurred label with a lock).
+- Do NOT show any application tracker widget and do NOT show any automated-matching status.
+
+=== FRAME 2 — CORE TIER ===
+- Subscription card: headline "Core", caption showing the next digest date (e.g.
+  "Next digest: tomorrow, 9:00am"). No manual-search button anywhere in this frame.
+- MAIN PANEL = "Automated matching active" status card REPLACING the manual search panel:
+  a success-tinted status (green-50/200/700 accents used sparingly), reading e.g.
+  "Automated matching active · Next digest: tomorrow 9:00am · 14 new matches this week."
+- Premium Insights and Resume Advice shown FULLY unblurred with complete, realistic content
+  (no lock, no teaser).
+- Sponsorship badge on job cards shown fully (real value, not blurred).
+- Include an Application Tracker widget: a compact card listing a few applications with statuses
+  (e.g. Applied / Interviewing / Offer) as small colored status chips.
+- Show NO Premium-only features anywhere on this frame — not even as a teaser or upsell. Core must
+  not advertise Premium.
+
+=== FRAME 3 — PREMIUM TIER ===
+- Everything Core has, fully working and unblurred (Core subscription card now reads "Premium",
+  automated-matching status, full Insights/Resume Advice, Application Tracker).
+- PLUS five additional feature sections, each rendered as its own card in the layout:
+  1. Sponsor Watch
+  2. Apply Intelligence
+  3. Sponsorship Score (a real numeric/graphical score, not a teaser)
+  4. Ghost Listing Detector
+  5. Hiring Manager Contact
+- CRITICAL, NON-NEGOTIABLE LABELING: put a small, consistent corner tag reading
+  "Concept — not yet built" (or "Roadmap preview") in a top corner of EACH of these five cards.
+  It must be a clearly visible corner tag ON the card, using a muted/neutral style (e.g. a small
+  pill with border #E5E7EB and gray body text) — NOT a footnote, NOT hidden. Use the exact same
+  tag styling on all five so it reads as a deliberate system. Do NOT remove, shrink to
+  illegibility, or soften this label for the sake of polish — the label is a required part of the
+  brief. These five features are not real yet and the frame must not read as finished/shippable.
+
+=== COMPOSITION ===
+Place Frame 1, Frame 2, Frame 3 side by side, equal width, headers aligned on the same baseline.
+Label each frame above it: "FREE", "CORE", "PREMIUM". The left-to-right read should make the
+value ladder obvious: capped + teased → full working product → full product + labeled roadmap.
