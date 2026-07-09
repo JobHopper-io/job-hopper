@@ -30,6 +30,7 @@ import {
   faClipboardList,
   faArrowUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons'
+import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
 library.add(
   faTrash,
@@ -59,6 +60,8 @@ library.add(
   faChevronDown,
   faClipboardList,
   faArrowUpRightFromSquare,
+  faTiktok,
+  faInstagram,
 )
 
 export function registerFontAwesome(app: App) {

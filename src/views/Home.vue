@@ -505,6 +505,26 @@ const footerColumns = [
 
         <div class="pt-6 border-t footer-divider flex flex-col sm:flex-row items-center justify-between gap-3">
           <p class="text-xs text-neutral-body">© 2025 Job-Hopper. All rights reserved.</p>
+          <div class="flex items-center gap-3">
+            <a
+              href="https://www.tiktok.com/@jobhopperofficial"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Job-Hopper on TikTok"
+              class="footer-social inline-flex h-8 w-8 items-center justify-center rounded-full border"
+            >
+              <font-awesome-icon :icon="['fab', 'tiktok']" class="text-sm" aria-hidden="true" />
+            </a>
+            <a
+              href="https://www.instagram.com/jobhopperofficial"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Job-Hopper on Instagram"
+              class="footer-social inline-flex h-8 w-8 items-center justify-center rounded-full border"
+            >
+              <font-awesome-icon :icon="['fab', 'instagram']" class="text-sm" aria-hidden="true" />
+            </a>
+          </div>
           <p class="text-xs italic text-neutral-body">Job search, the way it should work.</p>
         </div>
       </div>
@@ -651,6 +671,17 @@ const footerColumns = [
 .footer-link:hover {
   color: #2f6ecc;
   transform: translateX(3px);
+}
+/* Social icon buttons: same palette as footer links, but flex-centered and
+   without the text-link hover nudge. */
+.footer-social {
+  color: #374151;
+  border-color: #e5e7eb;
+  transition: color 0.18s, border-color 0.18s;
+}
+.footer-social:hover {
+  color: #2f6ecc;
+  border-color: #2f6ecc;
 }
 
 /* ── Final CTA ────────────────────────────────────────────────────────────── */
