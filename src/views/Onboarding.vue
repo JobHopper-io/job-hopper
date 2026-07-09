@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
-import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
+import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -43,16 +43,27 @@ const resumeFile = ref<File | null>(null)
 // Step 4: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
 const addonProducts = ref<Product[]>([])
+// Premium is not sellable yet: shown as a locked "coming soon" tier with a waitlist CTA.
+const premiumPlan = ref<Product | null>(null)
+const waitlistState = ref<'idle' | 'loading' | 'done' | 'error'>('idle')
+const waitlistError = ref('')
 const selectedBasePlanId = ref<string | null>(null)
 const selectedAddonIds = ref<string[]>([])
 const startFreePlan = ref(false)
-const selectedFreemiumTier = ref<FreemiumBasePlanTierKey | ''>('')
+// Career level is required for everyone (free and paid). It is the job-matching tier and
+// is stored on profiles.career_level -- never derived from the plan/product the user picks.
+const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 
-const freemiumTierOptions: { value: FreemiumBasePlanTierKey; label: string }[] = [
-  { value: 'entry_mid', label: 'Entry & Mid Level' },
-  { value: 'senior_management', label: 'Senior & Management' },
-  { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
-]
+const careerLevelOptions = CAREER_LEVEL_OPTIONS
+
+// Show Premium as a locked tier only while it isn't purchasable. When it ships and
+// available_for_purchase flips to true, it drops out of here and getBasePlanProducts()
+// renders it as a normal selectable plan instead.
+const premiumComingSoon = computed<Product | null>(() =>
+  premiumPlan.value && premiumPlan.value.available_for_purchase === false
+    ? premiumPlan.value
+    : null,
+)
 
 const isLoading = ref(false)
 const error = ref('')
@@ -77,10 +88,11 @@ const canProceedStep2 = computed(() => {
 })
 
 const canProceedStep4 = computed(() => {
-  if (startFreePlan.value) {
-    return FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)
-  }
-  return selectedBasePlanId.value !== null
+  const hasCareerLevel = FREEMIUM_BASE_PLAN_TIER_KEYS.includes(
+    careerLevel.value as FreemiumBasePlanTierKey,
+  )
+  if (!hasCareerLevel) return false
+  return startFreePlan.value || selectedBasePlanId.value !== null
 })
 
 const canProceedCurrentStep = computed(() => {
@@ -107,6 +119,7 @@ function populateFromProfile() {
   currentJobTitle.value = p.current_job_title ?? ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry ?? ''
+  careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
 
   targetJobTitle.value = p.target_job_title ?? ''
   const validCategories = (p.target_role_categories ?? []).filter(
@@ -130,12 +143,14 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  const [baseRes, addonRes] = await Promise.all([
+  const [baseRes, addonRes, premiumRes] = await Promise.all([
     subscriptionAPI.getBasePlanProducts(),
-    subscriptionAPI.getAddonProducts()
+    subscriptionAPI.getAddonProducts(),
+    subscriptionAPI.getBasePlanByKey('premium'),
   ])
   if (baseRes.data) basePlanProducts.value = baseRes.data
   if (addonRes.data) addonProducts.value = addonRes.data
+  if (premiumRes.data) premiumPlan.value = premiumRes.data
 })
 
 watch(
@@ -199,8 +214,25 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 
 function selectPaidPlan(productId: string) {
   startFreePlan.value = false
-  selectedFreemiumTier.value = ''
   selectedBasePlanId.value = productId
+}
+
+async function handleJoinWaitlist() {
+  const email = userStore.profile?.email
+  if (!email) {
+    waitlistState.value = 'error'
+    waitlistError.value = 'We couldn’t find your email. Try again from the pricing page.'
+    return
+  }
+  waitlistState.value = 'loading'
+  waitlistError.value = ''
+  const { error: waitlistErr } = await subscriptionAPI.joinPremiumWaitlist(email)
+  if (waitlistErr) {
+    waitlistState.value = 'error'
+    waitlistError.value = 'Could not join the waitlist. Please try again.'
+    return
+  }
+  waitlistState.value = 'done'
 }
 
 function selectFreePlan() {
@@ -214,6 +246,7 @@ async function persistProfileAndResume(): Promise<boolean> {
     first_name: firstName.value.trim() || undefined,
     last_name: lastName.value.trim() || undefined,
     current_job_title: currentJobTitle.value,
+    career_level: careerLevel.value || undefined,
     target_job_title: targetJobTitle.value.trim(),
     years_of_experience: yearsOfExperience.value ?? undefined,
     current_industry: currentIndustry.value,
@@ -251,14 +284,14 @@ const handleContinueForFree = async () => {
   try {
     isLoading.value = true
     error.value = ''
-    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(selectedFreemiumTier.value as FreemiumBasePlanTierKey)) {
-      error.value = 'Please choose which plan level best describes the roles you want.'
+    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(careerLevel.value as FreemiumBasePlanTierKey)) {
+      error.value = 'Please choose which level best describes the roles you want.'
       return
     }
     const ok = await persistProfileAndResume()
     if (!ok) return
 
-    const { error: freeError } = await freemiumAPI.completeOnboarding(selectedFreemiumTier.value)
+    const { error: freeError } = await freemiumAPI.completeOnboarding(careerLevel.value)
     if (freeError) {
       error.value = freeError.message || 'Could not finish free signup. Please try again.'
       return
@@ -565,6 +598,25 @@ const handleProceedToCheckout = async () => {
           </p>
 
           <div class="space-y-6">
+            <div class="max-w-md">
+              <label for="career-level" class="block text-sm font-medium text-brand-charcoal mb-1">
+                Which level best describes the roles you want? <span class="text-red-600">*</span>
+              </label>
+              <p class="text-sm text-neutral-body mb-2">
+                This determines which jobs we match you with, on any plan.
+              </p>
+              <select id="career-level" v-model="careerLevel" class="input w-full">
+                <option disabled value="">Select a level</option>
+                <option
+                  v-for="opt in careerLevelOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
                 :class="[
@@ -580,25 +632,6 @@ const handleProceedToCheckout = async () => {
                 <button type="button" class="btn-secondary w-full mb-3" @click="selectFreePlan">
                   Choose free
                 </button>
-                <div v-if="startFreePlan">
-                  <label for="freemium-tier" class="block text-sm font-medium text-brand-charcoal mb-1">
-                    Which level of roles are you targeting? <span class="text-red-600">*</span>
-                  </label>
-                  <select
-                    id="freemium-tier"
-                    v-model="selectedFreemiumTier"
-                    class="input w-full"
-                  >
-                    <option disabled value="">Select a category</option>
-                    <option
-                      v-for="opt in freemiumTierOptions"
-                      :key="opt.value"
-                      :value="opt.value"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
               </div>
 
               <div
@@ -619,6 +652,33 @@ const handleProceedToCheckout = async () => {
                 >
                   Select plan
                 </button>
+              </div>
+
+              <div
+                v-if="premiumComingSoon"
+                class="card p-6 text-left transition-all flex flex-col border-2 border-dashed border-neutral-border"
+              >
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="font-semibold">{{ premiumComingSoon.display_name }}</h3>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">
+                    Coming soon
+                  </span>
+                </div>
+                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getProductPrice(premiumComingSoon) }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
+                <p class="text-sm text-neutral-body mb-4 grow">{{ premiumComingSoon.description || '' }}</p>
+                <button
+                  v-if="waitlistState !== 'done'"
+                  type="button"
+                  class="btn-secondary w-full"
+                  :disabled="waitlistState === 'loading'"
+                  @click="handleJoinWaitlist"
+                >
+                  {{ waitlistState === 'loading' ? 'Joining…' : 'Join the waitlist' }}
+                </button>
+                <p v-else class="text-sm font-medium text-brand-primary">
+                  You’re on the waitlist — we’ll email you when Premium launches.
+                </p>
+                <p v-if="waitlistState === 'error'" class="text-sm text-red-600 mt-2">{{ waitlistError }}</p>
               </div>
             </div>
 

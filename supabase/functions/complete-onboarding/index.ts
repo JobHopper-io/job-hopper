@@ -103,9 +103,11 @@ serve(async (req) => {
       )
     }
 
+    // Career level is the single source of truth for job matching (profiles.career_level),
+    // independent of any plan/product. The validated freemium tier IS the career level.
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
-      .update({ onboarding_completed: true })
+      .update({ onboarding_completed: true, career_level: tier })
       .eq('id', profile.id)
 
     if (profileUpdateError) {

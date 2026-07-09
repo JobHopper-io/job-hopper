@@ -129,6 +129,23 @@ export const subscriptionAPI = {
   },
 
   /**
+   * Fetch a single base-plan product by key, regardless of `available_for_purchase`.
+   * Used to render a not-yet-sellable tier (e.g. Premium) as a locked "coming soon" card.
+   */
+  async getBasePlanByKey(
+    key: string,
+  ): Promise<{ data: Product | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('products')
+      .select(productColumns)
+      .eq('category', 'base_plan')
+      .eq('key', key)
+      .maybeSingle()
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data: data ?? null, error: null }
+  },
+
+  /**
    * All `products.key` values for base plans (including not currently for sale), for admin UI and matching hints.
    */
   async listBasePlanProductKeys(): Promise<{ data: string[]; error: Error | null }> {
@@ -256,55 +273,39 @@ export const subscriptionAPI = {
   },
 
   /**
-   * Base plan `products.key` values for the profile's trial/active subscriptions (matches job_hopper_live.subscription_tier).
+   * Career-level tier key(s) for a profile, read from `profiles.career_level` (matches
+   * job_hopper_live.subscription_tier). Single source of truth for matching; NOT derived
+   * from the base plan the user bought. Returns `[]` when career level is unset.
    */
-  async getSubscriptionTierProductKeysForProfile(
+  async getCareerLevelTierKeysForProfile(
     profileId: string,
   ): Promise<{ data: string[]; error: Error | null }> {
-    const { data: subs, error: subsError } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('profile_id', profileId)
-      .in('status', ['trial', 'active'])
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('career_level')
+      .eq('id', profileId)
+      .maybeSingle()
 
-    if (subsError) {
-      return { data: [], error: new Error(subsError.message) }
+    if (error) {
+      return { data: [], error: new Error(error.message) }
     }
-    if (!subs?.length) {
-      return { data: [], error: null }
+    return { data: profile?.career_level ? [profile.career_level] : [], error: null }
+  },
+
+  /**
+   * Capture interest in the (not-yet-sellable) Premium tier from the /pricing waitlist
+   * CTA. Works for logged-out visitors too; the edge function attaches profile_id from
+   * the JWT when the caller is signed in.
+   */
+  async joinPremiumWaitlist(
+    email: string,
+  ): Promise<{ data: { success: true } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('premium-waitlist', {
+      body: { email },
+    })
+    if (error) {
+      return { data: null, error }
     }
-
-    const subIds = subs.map((s) => s.id)
-    const { data: subProducts, error: spError } = await supabase
-      .from('subscription_product')
-      .select('product_id')
-      .in('subscription_id', subIds)
-
-    if (spError) {
-      return { data: [], error: new Error(spError.message) }
-    }
-    if (!subProducts?.length) {
-      return { data: [], error: null }
-    }
-
-    const productIds = [...new Set(subProducts.map((sp) => sp.product_id))]
-    const { data: baseProducts, error: pError } = await supabase
-      .from('products')
-      .select('key')
-      .in('id', productIds)
-      .eq('category', 'base_plan')
-
-    if (pError) {
-      return { data: [], error: new Error(pError.message) }
-    }
-
-    const keys = [
-      ...new Set(
-        (baseProducts ?? [])
-          .map((p) => p.key)
-          .filter((k): k is string => typeof k === 'string' && k.length > 0),
-      ),
-    ]
-    return { data: keys, error: null }
+    return { data, error: null }
   },
 }

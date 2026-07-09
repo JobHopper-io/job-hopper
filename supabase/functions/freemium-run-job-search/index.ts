@@ -55,7 +55,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, onboarding_completed')
+      .select('id, onboarding_completed, career_level')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
@@ -181,7 +181,9 @@ serve(async (req) => {
       body: JSON.stringify({
         profile_id: profile.id,
         limit: FREEMIUM_MANUAL_RUN_MATCH_LIMIT,
-        subscription_tier_product_keys: [limitsRow.selected_tier_key],
+        // Career level comes from the profile; fall back to the freemium row for legacy
+        // profiles whose career_level backfill may be missing.
+        subscription_tier_product_keys: [profile.career_level ?? limitsRow.selected_tier_key],
       }),
     })
 

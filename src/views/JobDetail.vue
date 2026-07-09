@@ -16,7 +16,15 @@ import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice, hasPremiumInsightsAddon, freemiumPremiumInsightsRemaining, freemiumMaxPremiumInsights, canRequestPremiumInsights } = storeToRefs(userStore)
+const { baseTier, freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice, hasPremiumInsightsAddon, freemiumPremiumInsightsRemaining, freemiumMaxPremiumInsights, canRequestPremiumInsights } = storeToRefs(userStore)
+
+/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are locked
+ * upgrade teasers here too — same gating as JobCard on the dashboard. */
+const isFree = computed(() => baseTier.value === 'free')
+
+function goUpgrade() {
+  void router.push({ name: 'billing-purchase' })
+}
 
 const jobIdParam = route.params.id as string
 const job = ref<MatchedJob | null>(null)
@@ -169,10 +177,16 @@ const tailoringStatusLabel = computed(() => {
 const showSponsorshipBadge = computed(() => {
   const profile = userStore.profile
   const value = job.value?.sponsorshipLikelihood ?? null
+  if (isFree.value) return false
   if (!profile || profile.requires_us_sponsorship !== true) return false
   if (!value || value === 'N/A') return false
   return true
 })
+
+/** Free tier sees a blurred, locked sponsorship badge when they require sponsorship. */
+const showSponsorshipTeaser = computed(
+  () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
+)
 
 const tierTagLabel = computed(() => {
   return job.value?.subscriptionTierDisplayName ?? null
@@ -557,6 +571,11 @@ async function executeTailoringCheckout() {
                     v-if="showSponsorshipBadge"
                     :value="job.sponsorshipLikelihood"
                   />
+                  <JobSponsorshipBadge
+                    v-else-if="showSponsorshipTeaser"
+                    :value="null"
+                    locked
+                  />
                 </div>
               </div>
               <button
@@ -601,6 +620,26 @@ async function executeTailoringCheckout() {
                 >
                   Apply on company site
                 </button>
+                <!-- Free tier: locked upgrade teasers instead of the functional flows. -->
+                <template v-if="isFree">
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-[12px] border border-neutral-border bg-neutral-bg px-6 py-3 font-medium text-gray-400 transition-colors hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+                    @click="goUpgrade"
+                  >
+                    <font-awesome-icon :icon="['fas', 'lock']" class="text-sm" aria-hidden="true" />
+                    Get resume advice
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-[12px] border border-neutral-border bg-neutral-bg px-6 py-3 font-medium text-gray-400 transition-colors hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+                    @click="goUpgrade"
+                  >
+                    <font-awesome-icon :icon="['fas', 'lock']" class="text-sm" aria-hidden="true" />
+                    Premium Insights
+                  </button>
+                </template>
+                <template v-else>
                 <button
                   v-if="canPurchaseAdvice"
                   type="button"
@@ -672,6 +711,7 @@ async function executeTailoringCheckout() {
                   >
                     View hiring contacts
                   </button>
+                </template>
                 </template>
               </div>
             </div>

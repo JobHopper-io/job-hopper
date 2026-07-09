@@ -79,7 +79,7 @@ const showOneRemainingNudge = computed(
         class="h-4 w-4"
         aria-hidden="true"
       />
-      {{ loading ? 'Searching…' : 'Run job search' }}
+      {{ loading ? 'Searching…' : !canRun ? 'Upgrade to continue' : 'Run job search' }}
     </button>
     <p :class="centered ? 'text-xs text-neutral-body mt-4' : 'text-xs text-neutral-body mt-4'">
       Upgrade to a subscription for automated daily matching and email digests.

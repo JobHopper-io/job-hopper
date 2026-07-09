@@ -1,54 +1,39 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4'
 
 /**
- * Product `key` values (see `products.key`) for base_plan products on the profile's
- * active (trial or active) subscriptions. Used to align job matching with `job_hopper_live.subscription_tier`.
+ * Career-level tier key(s) for a profile, read from `profiles.career_level`.
+ *
+ * This is the single source of truth for aligning job matching with
+ * `job_hopper_live.subscription_tier`. It is NEVER derived from the base-plan the user
+ * bought: under the Free/Core/Premium model base plans are feature depth, not career
+ * level, so `products.key` no longer encodes a career tier.
+ *
+ * Returns `[]` when the profile has no career level set yet (which, by design, matches
+ * no jobs -- same as a not-yet-onboarded profile).
  */
-export async function getSubscriptionTierProductKeysForProfile(
+export async function getCareerLevelTierKeysForProfile(
   client: SupabaseClient,
   profileId: string,
 ): Promise<string[]> {
-  const { data: subs, error: subsError } = await client
-    .from('subscriptions')
-    .select('id')
-    .eq('profile_id', profileId)
-    .in('status', ['trial', 'active'])
+  const { data: profile, error } = await client
+    .from('profiles')
+    .select('career_level')
+    .eq('id', profileId)
+    .maybeSingle()
 
-  if (subsError || !subs?.length) {
+  if (error || !profile?.career_level) {
     return []
   }
 
-  const subIds = subs.map((s) => s.id)
-  const { data: subProducts, error: spError } = await client
-    .from('subscription_product')
-    .select('product_id')
-    .in('subscription_id', subIds)
-
-  if (spError || !subProducts?.length) {
-    return []
-  }
-
-  const productIds = [...new Set(subProducts.map((sp) => sp.product_id))]
-  const { data: baseProducts, error: pError } = await client
-    .from('products')
-    .select('key')
-    .in('id', productIds)
-    .eq('category', 'base_plan')
-
-  if (pError || !baseProducts?.length) {
-    return []
-  }
-
-  return [...new Set(baseProducts.map((p) => p.key).filter((k): k is string => typeof k === 'string' && k.length > 0))]
+  return [profile.career_level as string]
 }
 
-/** User-facing error when matching cannot load jobs without tier keys. */
+/** User-facing error when matching cannot run because the profile has no career level. */
 export function subscriptionTierKeysRequiredMessage(): string {
   return (
-    'No subscription tier product keys are available. The profile has no trial/active base plan ' +
-    'subscription (or none were resolved), and the tier keys override field is empty. ' +
-    'Enter comma-separated products.key values that match job_hopper_live.subscription_tier, ' +
-    'or test as a profile with an active base plan subscription.'
+    'No career level is set for this profile, and the tier keys override field is empty. ' +
+    'Set profiles.career_level (entry_mid / senior_management / director_vp_c_level), ' +
+    'or enter comma-separated tier keys that match job_hopper_live.subscription_tier.'
   )
 }
 

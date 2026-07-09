@@ -11,6 +11,7 @@ import type {
   ResumeProduct,
 } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import { CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
@@ -48,6 +49,8 @@ const isSyncingFromProfile = ref(false)
 // Profile fields
 const currentJobTitle = ref('')
 const targetJobTitle = ref('')
+// Job-matching tier; changing it re-scopes which jobs the matcher considers.
+const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
@@ -88,6 +91,7 @@ function syncFormFromProfile() {
   if (!p) return
   currentJobTitle.value = p.current_job_title || ''
   targetJobTitle.value = p.target_job_title || ''
+  careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry || ''
   targetRoleCategories.value = (p.target_role_categories ?? []).filter(
@@ -203,6 +207,7 @@ const saveProfile = async () => {
     await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
       target_job_title: targetJobTitle.value,
+      career_level: careerLevel.value || undefined,
       years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
       target_role_categories: targetRoleCategories.value,
@@ -237,6 +242,7 @@ watch(
   () => ({
     currentJobTitle: currentJobTitle.value,
     targetJobTitle: targetJobTitle.value,
+    careerLevel: careerLevel.value,
     yearsOfExperience: yearsOfExperience.value,
     currentIndustry: currentIndustry.value,
     targetRoleCategories: [...(targetRoleCategories.value ?? [])],
@@ -311,6 +317,20 @@ watch(
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>
               <input v-model.number="yearsOfExperience" type="number" min="0" class="input" />
+            </div>
+            <div>
+              <label for="profile-career-level" class="block text-sm font-medium text-brand-charcoal mb-2">
+                Career level
+              </label>
+              <p class="text-sm text-neutral-body mb-2">
+                This determines which jobs we match you with, on any plan.
+              </p>
+              <select id="profile-career-level" v-model="careerLevel" class="input">
+                <option disabled value="">Select a level</option>
+                <option v-for="opt in CAREER_LEVEL_OPTIONS" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Current industry</label>

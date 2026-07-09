@@ -12,6 +12,7 @@ import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
+import InfoHint from '@/components/InfoHint.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -27,13 +28,20 @@ const emit = defineEmits<{
 const router = useRouter()
 const userStore = useUserStore()
 const {
+  baseTier,
   freemiumResumeAdviceRemaining,
   freemiumMaxResumeAdvice,
   hasPremiumInsightsAddon,
-  freemiumPremiumInsightsRemaining,
-  freemiumMaxPremiumInsights,
   canRequestPremiumInsights,
 } = storeToRefs(userStore)
+
+/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are shown
+ * as locked upgrade teasers instead of functional controls. Core/Premium are unaffected. */
+const isFree = computed(() => baseTier.value === 'free')
+
+function goUpgrade() {
+  void router.push({ name: 'billing-purchase' })
+}
 
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
@@ -42,7 +50,6 @@ const adviceModalOpen = ref(false)
 const precheckOpen = ref(false)
 const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
 
-const insightsPrecheckOpen = ref(false)
 const insightsLoading = ref(false)
 const insightsModalOpen = ref(false)
 const insightsModalLoading = ref(false)
@@ -88,7 +95,9 @@ function handleGetResumeAdviceClick() {
     precheckOpen.value = true
     return
   }
-  if (freemiumResumeAdviceRemaining.value > 0) {
+  // Only Free tier sees the freemium credit confirmation. Core/Premium get full,
+  // unlimited Resume Advice — run directly, no popup, no credit check.
+  if (isFree.value && freemiumResumeAdviceRemaining.value > 0) {
     precheckVariant.value = 'confirm-free-credit'
     precheckOpen.value = true
     return
@@ -119,10 +128,6 @@ const adviceStatusText = computed<string | null>(() => {
   if (p.status === 'pending') return 'Generating resume advice'
   return null
 })
-
-function closeInsightsPrecheck() {
-  insightsPrecheckOpen.value = false
-}
 
 function onCloseInsightsModal() {
   insightsModalOpen.value = false
@@ -155,17 +160,8 @@ function openOrgChoiceModal() {
 }
 
 function handlePremiumInsightsClick() {
-  if (hasPremiumInsightsAddon.value) {
-    void runPremiumInsights()
-    return
-  }
-  if (freemiumPremiumInsightsRemaining.value > 0) {
-    insightsPrecheckOpen.value = true
-  }
-}
-
-function onConfirmInsightsCredit() {
-  closeInsightsPrecheck()
+  // Reachable only on Core/Premium (Free shows a locked upgrade teaser instead). Both
+  // get full, unlimited Premium Insights — run directly, no popup, no credit check.
   void runPremiumInsights()
 }
 
@@ -295,10 +291,25 @@ async function onConfirmOrgDisambiguation(
 const showSponsorshipBadge = computed(() => {
   const profile = userStore.profile
   const value = props.job.sponsorshipLikelihood
+  if (isFree.value) return false
   if (!profile || profile.requires_us_sponsorship !== true) return false
   if (!value || value === 'N/A') return false
   return true
 })
+
+/** Free tier sees a blurred, locked sponsorship badge when they require sponsorship. */
+const showSponsorshipTeaser = computed(
+  () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
+)
+
+/* Compact action-row buttons: one shared size so the footer reads as a single
+ * balanced toolbar (the global btn-primary/btn-secondary are heavier and sized
+ * for standalone CTAs). */
+const actionBtn =
+  'inline-flex items-center justify-center gap-1.5 rounded-[12px] px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed'
+const actionBtnPrimary = `${actionBtn} bg-brand-primary text-white shadow-sm hover:opacity-90`
+const actionBtnOutline = `${actionBtn} border border-brand-primary/40 bg-white text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5`
+const actionBtnLocked = `${actionBtn} border border-neutral-border bg-neutral-bg text-gray-400 hover:text-gray-500`
 
 function handleViewDetails() {
   void router.push(`/job/${props.job.jobId}`)
@@ -321,6 +332,8 @@ async function runAdviceCheckout() {
     const { data, error } = await resumeProductsAPI.startAdviceCheckout(
       props.job.matchId,
       '/dashboard',
+      // Subscribers (Core/Premium) never hit the paid checkout — always the free path.
+      { forceFree: !isFree.value },
     )
     if (error) {
       adviceLoading.value = false
@@ -358,7 +371,7 @@ async function runAdviceCheckout() {
 
 <template>
   <article
-    class="relative overflow-hidden rounded-2xl border border-neutral-border bg-neutral-card shadow-sm transition-shadow hover:shadow-md"
+    class="relative rounded-2xl border border-neutral-border bg-neutral-card shadow-sm transition-shadow hover:shadow-md"
     style="border-left: 4px solid var(--color-brand-primary);"
   >
     <div class="p-5 sm:p-6">
@@ -388,6 +401,11 @@ async function runAdviceCheckout() {
               v-if="showSponsorshipBadge"
               :value="job.sponsorshipLikelihood"
             />
+            <JobSponsorshipBadge
+              v-else-if="showSponsorshipTeaser"
+              :value="null"
+              locked
+            />
           </div>
         </div>
         <button
@@ -416,95 +434,123 @@ async function runAdviceCheckout() {
         {{ job.aiBriefing }}
       </p>
 
-      <!-- Actions -->
+      <!-- Actions: Apply is the one solid CTA; feature actions are quiet outlines;
+           View details sits apart on the right as a text link. -->
       <div class="mt-4 flex w-full flex-wrap items-center gap-2 border-t border-neutral-border pt-4">
         <button
           type="button"
-          class="btn-primary min-w-0 flex-1 text-sm"
-          @click="handleViewDetails"
-        >
-          View details
-        </button>
-        <button
-          type="button"
-          class="btn-secondary shrink-0 text-sm"
+          :class="actionBtnPrimary"
           :disabled="!job.applyLink"
           @click="handleApply"
         >
           Apply
-        </button>
-        <button
-          v-if="showAdviceButton"
-          type="button"
-          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-          :disabled="adviceLoading"
-          @click="handleGetResumeAdviceClick"
-        >
           <font-awesome-icon
-            v-if="adviceLoading"
-            :icon="['fas', 'spinner']"
-            spin
-            class="mr-1.5"
+            :icon="['fas', 'arrow-up-right-from-square']"
+            class="text-xs opacity-90"
             aria-hidden="true"
           />
-          {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
         </button>
-        <button
-          v-if="showResumeAdviceButton"
-          type="button"
-          class="btn-secondary w-[11.5rem] shrink-0 text-sm"
-          @click="adviceModalOpen = true"
-        >
-          View resume advice
-        </button>
-        <template v-if="showPremiumInsightsRow">
-          <button
-            v-if="showPremiumInsightsGetButton"
-            type="button"
-            class="btn-secondary w-[12.5rem] shrink-0 text-sm inline-flex items-center justify-center gap-2"
-            :disabled="insightsLoading"
-            @click="handlePremiumInsightsClick"
-          >
-            <font-awesome-icon
-              v-if="insightsLoading"
-              :icon="['fas', 'spinner']"
-              spin
-              aria-hidden="true"
-            />
-            <font-awesome-icon
-              v-else
-              :icon="['fas', 'user-tie']"
-              class="opacity-80"
-              aria-hidden="true"
-            />
-            {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+        <!-- Free tier: locked upgrade teasers instead of the functional flows. -->
+        <template v-if="isFree">
+          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+            <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
+            Get resume advice
           </button>
-          <button
-            v-if="showPremiumInsightsOrgChoiceHint"
-            type="button"
-            class="btn-secondary w-[12.5rem] shrink-0 text-sm"
-            @click="openOrgChoiceModal"
-          >
-            Choose employer…
-          </button>
-          <button
-            v-if="showPremiumInsightsPending"
-            type="button"
-            class="btn-secondary w-[12.5rem] shrink-0 text-sm opacity-80"
-            disabled
-          >
-            <font-awesome-icon :icon="['fas', 'spinner']" spin class="mr-1.5" aria-hidden="true" />
-            Finding contacts…
-          </button>
-          <button
-            v-if="showPremiumInsightsViewButton"
-            type="button"
-            class="btn-secondary w-[12.5rem] shrink-0 text-sm"
-            @click="openInsightsViewModal"
-          >
-            View hiring contacts
+          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+            <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
+            Premium Insights
           </button>
         </template>
+        <template v-else>
+          <span v-if="showAdviceButton" class="inline-flex items-center gap-1.5">
+            <button
+              type="button"
+              :class="actionBtnOutline"
+              :disabled="adviceLoading"
+              @click="handleGetResumeAdviceClick"
+            >
+              <font-awesome-icon
+                v-if="adviceLoading"
+                :icon="['fas', 'spinner']"
+                spin
+                aria-hidden="true"
+              />
+              {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
+            </button>
+            <InfoHint
+              tooltip="Get tailored feedback on how well your resume matches this specific role."
+            />
+          </span>
+          <button
+            v-if="showResumeAdviceButton"
+            type="button"
+            :class="actionBtnOutline"
+            @click="adviceModalOpen = true"
+          >
+            View resume advice
+          </button>
+          <template v-if="showPremiumInsightsRow">
+            <span v-if="showPremiumInsightsGetButton" class="inline-flex items-center gap-1.5">
+              <button
+                type="button"
+                :class="actionBtnOutline"
+                :disabled="insightsLoading"
+                @click="handlePremiumInsightsClick"
+              >
+                <font-awesome-icon
+                  v-if="insightsLoading"
+                  :icon="['fas', 'spinner']"
+                  spin
+                  aria-hidden="true"
+                />
+                <font-awesome-icon
+                  v-else
+                  :icon="['fas', 'user-tie']"
+                  class="opacity-80"
+                  aria-hidden="true"
+                />
+                {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+              </button>
+              <InfoHint
+                tooltip="See hiring activity, sponsorship likelihood, and hiring-manager contacts for this role."
+              />
+            </span>
+            <button
+              v-if="showPremiumInsightsOrgChoiceHint"
+              type="button"
+              :class="actionBtnOutline"
+              @click="openOrgChoiceModal"
+            >
+              Choose employer…
+            </button>
+            <button
+              v-if="showPremiumInsightsPending"
+              type="button"
+              :class="actionBtnOutline"
+              class="opacity-80"
+              disabled
+            >
+              <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
+              Finding contacts…
+            </button>
+            <button
+              v-if="showPremiumInsightsViewButton"
+              type="button"
+              :class="actionBtnOutline"
+              @click="openInsightsViewModal"
+            >
+              View hiring contacts
+            </button>
+          </template>
+        </template>
+        <button
+          type="button"
+          class="ml-auto inline-flex items-center gap-1.5 rounded-[12px] px-2 py-2 text-sm font-semibold text-brand-primary transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+          @click="handleViewDetails"
+        >
+          View details
+          <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
+        </button>
       </div>
       <ResumeAdvicePrecheckModal
         :open="precheckOpen"
@@ -513,14 +559,6 @@ async function runAdviceCheckout() {
         :remaining-free-credits="freemiumResumeAdviceRemaining"
         @close="closePrecheck"
         @confirm="onConfirmFreeCredit"
-      />
-      <ResumeAdvicePrecheckModal
-        :open="insightsPrecheckOpen"
-        variant="confirm-premium-insights-credit"
-        :max-free-credits="freemiumMaxPremiumInsights"
-        :remaining-free-credits="freemiumPremiumInsightsRemaining"
-        @close="closeInsightsPrecheck"
-        @confirm="onConfirmInsightsCredit"
       />
       <ResumeAdviceModal
         :open="adviceModalOpen"

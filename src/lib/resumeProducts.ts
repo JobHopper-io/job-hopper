@@ -144,6 +144,7 @@ export const resumeProductsAPI = {
   async startAdviceCheckout(
     matchId: string,
     returnPath?: string,
+    opts?: { forceFree?: boolean },
   ): Promise<{
     data: { url: string } | { freemium: true } | null
     error: Error | null
@@ -169,18 +170,27 @@ export const resumeProductsAPI = {
       }
     }
 
-    const profileId = await getCurrentProfileId()
+    // Core/Premium subscribers get full, unlimited Resume Advice: always use the free
+    // generation path, never the paid checkout / credit gate. Free tier keeps the
+    // freemium-credit-then-purchase flow. (The edge function still enforces its own
+    // server-side guardrails.)
+    let freeRemaining: number
+    if (opts?.forceFree) {
+      freeRemaining = 1
+    } else {
+      const profileId = await getCurrentProfileId()
 
-    const [{ data: limitsRow }, { data: settingsRow }] = await Promise.all([
-      supabase.from('freemium_usage').select('resume_advice_used').eq('profile_id', profileId).maybeSingle(),
-      supabase.from('freemium_settings').select('max_resume_advice').eq('id', 1).maybeSingle(),
-    ])
+      const [{ data: limitsRow }, { data: settingsRow }] = await Promise.all([
+        supabase.from('freemium_usage').select('resume_advice_used').eq('profile_id', profileId).maybeSingle(),
+        supabase.from('freemium_settings').select('max_resume_advice').eq('id', 1).maybeSingle(),
+      ])
 
-    const maxAdvice =
-      typeof settingsRow?.max_resume_advice === 'number' ? settingsRow.max_resume_advice : 3
-    const usedAdvice =
-      typeof limitsRow?.resume_advice_used === 'number' ? limitsRow.resume_advice_used : 0
-    const freeRemaining = maxAdvice > 0 ? Math.max(0, maxAdvice - usedAdvice) : 0
+      const maxAdvice =
+        typeof settingsRow?.max_resume_advice === 'number' ? settingsRow.max_resume_advice : 3
+      const usedAdvice =
+        typeof limitsRow?.resume_advice_used === 'number' ? limitsRow.resume_advice_used : 0
+      freeRemaining = maxAdvice > 0 ? Math.max(0, maxAdvice - usedAdvice) : 0
+    }
 
     if (freeRemaining > 0) {
       const { data: fnData, error: fnError } = await supabase.functions.invoke<{

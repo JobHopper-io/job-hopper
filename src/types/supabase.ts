@@ -823,6 +823,7 @@ export type Database = {
       profiles: {
         Row: {
           auth_user_id: string | null
+          career_level: Database["public"]["Enums"]["career_level"] | null
           created_at: string | null
           current_industry: string | null
           current_job_title: string | null
@@ -848,6 +849,7 @@ export type Database = {
         }
         Insert: {
           auth_user_id?: string | null
+          career_level?: Database["public"]["Enums"]["career_level"] | null
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
@@ -873,6 +875,7 @@ export type Database = {
         }
         Update: {
           auth_user_id?: string | null
+          career_level?: Database["public"]["Enums"]["career_level"] | null
           created_at?: string | null
           current_industry?: string | null
           current_job_title?: string | null
@@ -1422,6 +1425,7 @@ export type Database = {
         | "NOT FOUND"
         | "Ready for AI Personalization"
         | "Invalid Email"
+      career_level: "entry_mid" | "senior_management" | "director_vp_c_level"
       email_event_status: "sent" | "failed"
       email_event_type:
         | "job_match_digest"
@@ -1588,6 +1592,7 @@ export const Constants = {
         "Ready for AI Personalization",
         "Invalid Email",
       ],
+      career_level: ["entry_mid", "senior_management", "director_vp_c_level"],
       email_event_status: ["sent", "failed"],
       email_event_type: [
         "job_match_digest",
