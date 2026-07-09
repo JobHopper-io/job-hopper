@@ -1,14 +1,21 @@
 <script setup lang="ts">
 /**
- * Free-tier teaser card: shows 2-3 real fields, then blurs the rest under a
- * lock + "Upgrade to unlock" CTA. Presentational only — the real data lives in
- * PremiumInsightsModal / ResumeAdviceModal for paid tiers. Used on the Free dashboard.
+ * Feature summary card, shared by Free and Core.
+ * - Free passes `blurredFields`: the extra rows render blurred under a lock +
+ *   "Upgrade to unlock" CTA.
+ * - Core omits `blurredFields` (defaults to `[]`): the card renders fully
+ *   unblurred with no lock/CTA — every row shown as real content.
+ * Presentational only — the real per-job data lives in PremiumInsightsModal /
+ * ResumeAdviceModal, reached from the job cards.
  */
-defineProps<{
-  title: string
-  realFields: string[]
-  blurredFields: string[]
-}>()
+withDefaults(
+  defineProps<{
+    title: string
+    realFields: string[]
+    blurredFields?: string[]
+  }>(),
+  { blurredFields: () => [] },
+)
 </script>
 
 <template>
@@ -21,7 +28,7 @@ defineProps<{
       </p>
     </div>
 
-    <div class="relative mt-1.5">
+    <div v-if="blurredFields.length" class="relative mt-1.5">
       <div class="select-none space-y-1.5 blur-[4px]" aria-hidden="true">
         <p v-for="field in blurredFields" :key="field" class="text-sm leading-relaxed text-neutral-body">
           {{ field }}

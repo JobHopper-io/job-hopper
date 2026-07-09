@@ -12,6 +12,7 @@ import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
+import InfoHint from '@/components/InfoHint.vue'
 
 const props = defineProps<{
   job: MatchedJob
@@ -31,8 +32,6 @@ const {
   freemiumResumeAdviceRemaining,
   freemiumMaxResumeAdvice,
   hasPremiumInsightsAddon,
-  freemiumPremiumInsightsRemaining,
-  freemiumMaxPremiumInsights,
   canRequestPremiumInsights,
 } = storeToRefs(userStore)
 
@@ -51,7 +50,6 @@ const adviceModalOpen = ref(false)
 const precheckOpen = ref(false)
 const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
 
-const insightsPrecheckOpen = ref(false)
 const insightsLoading = ref(false)
 const insightsModalOpen = ref(false)
 const insightsModalLoading = ref(false)
@@ -97,7 +95,9 @@ function handleGetResumeAdviceClick() {
     precheckOpen.value = true
     return
   }
-  if (freemiumResumeAdviceRemaining.value > 0) {
+  // Only Free tier sees the freemium credit confirmation. Core/Premium get full,
+  // unlimited Resume Advice — run directly, no popup, no credit check.
+  if (isFree.value && freemiumResumeAdviceRemaining.value > 0) {
     precheckVariant.value = 'confirm-free-credit'
     precheckOpen.value = true
     return
@@ -128,10 +128,6 @@ const adviceStatusText = computed<string | null>(() => {
   if (p.status === 'pending') return 'Generating resume advice'
   return null
 })
-
-function closeInsightsPrecheck() {
-  insightsPrecheckOpen.value = false
-}
 
 function onCloseInsightsModal() {
   insightsModalOpen.value = false
@@ -164,17 +160,8 @@ function openOrgChoiceModal() {
 }
 
 function handlePremiumInsightsClick() {
-  if (hasPremiumInsightsAddon.value) {
-    void runPremiumInsights()
-    return
-  }
-  if (freemiumPremiumInsightsRemaining.value > 0) {
-    insightsPrecheckOpen.value = true
-  }
-}
-
-function onConfirmInsightsCredit() {
-  closeInsightsPrecheck()
+  // Reachable only on Core/Premium (Free shows a locked upgrade teaser instead). Both
+  // get full, unlimited Premium Insights — run directly, no popup, no credit check.
   void runPremiumInsights()
 }
 
@@ -336,6 +323,8 @@ async function runAdviceCheckout() {
     const { data, error } = await resumeProductsAPI.startAdviceCheckout(
       props.job.matchId,
       '/dashboard',
+      // Subscribers (Core/Premium) never hit the paid checkout — always the free path.
+      { forceFree: !isFree.value },
     )
     if (error) {
       adviceLoading.value = false
@@ -373,7 +362,7 @@ async function runAdviceCheckout() {
 
 <template>
   <article
-    class="relative overflow-hidden rounded-2xl border border-neutral-border bg-neutral-card shadow-sm transition-shadow hover:shadow-md"
+    class="relative rounded-2xl border border-neutral-border bg-neutral-card shadow-sm transition-shadow hover:shadow-md"
     style="border-left: 4px solid var(--color-brand-primary);"
   >
     <div class="p-5 sm:p-6">
@@ -480,6 +469,10 @@ async function runAdviceCheckout() {
             />
             {{ adviceLoading ? 'Please wait…' : 'Get resume advice' }}
           </button>
+          <InfoHint
+            v-if="showAdviceButton"
+            tooltip="Get tailored feedback on how well your resume matches this specific role."
+          />
           <button
             v-if="showResumeAdviceButton"
             type="button"
@@ -521,6 +514,10 @@ async function runAdviceCheckout() {
             />
             {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
           </button>
+          <InfoHint
+            v-if="showPremiumInsightsGetButton"
+            tooltip="See hiring activity, sponsorship likelihood, and hiring-manager contacts for this role."
+          />
           <button
             v-if="showPremiumInsightsOrgChoiceHint"
             type="button"
@@ -555,14 +552,6 @@ async function runAdviceCheckout() {
         :remaining-free-credits="freemiumResumeAdviceRemaining"
         @close="closePrecheck"
         @confirm="onConfirmFreeCredit"
-      />
-      <ResumeAdvicePrecheckModal
-        :open="insightsPrecheckOpen"
-        variant="confirm-premium-insights-credit"
-        :max-free-credits="freemiumMaxPremiumInsights"
-        :remaining-free-credits="freemiumPremiumInsightsRemaining"
-        @close="closeInsightsPrecheck"
-        @confirm="onConfirmInsightsCredit"
       />
       <ResumeAdviceModal
         :open="adviceModalOpen"

@@ -8,6 +8,13 @@ export const FREEMIUM_BASE_PLAN_TIER_KEYS = [
 
 export type FreemiumBasePlanTierKey = (typeof FREEMIUM_BASE_PLAN_TIER_KEYS)[number]
 
+/** User-facing labels for career levels (stored on `profiles.career_level`; drives job-matching tier). */
+export const CAREER_LEVEL_OPTIONS: { value: FreemiumBasePlanTierKey; label: string }[] = [
+  { value: 'entry_mid', label: 'Entry & Mid Level' },
+  { value: 'senior_management', label: 'Senior & Management' },
+  { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
+]
+
 export function isFreemiumBasePlanTierKey(value: string): value is FreemiumBasePlanTierKey {
   return (FREEMIUM_BASE_PLAN_TIER_KEYS as readonly string[]).includes(value)
 }

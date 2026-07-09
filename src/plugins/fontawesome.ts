@@ -27,6 +27,7 @@ import {
   faCrosshairs,
   faLock,
   faChevronDown,
+  faClipboardList,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -55,6 +56,7 @@ library.add(
   faCrosshairs,
   faLock,
   faChevronDown,
+  faClipboardList,
 )
 
 export function registerFontAwesome(app: App) {

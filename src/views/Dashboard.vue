@@ -5,6 +5,7 @@ import type { Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
+import ApplicationTrackerCard, { type TrackedApplication } from '@/components/ApplicationTrackerCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
@@ -36,6 +37,13 @@ const {
   trialProducts,
 } = storeToRefs(userStore)
 
+// Users only ever see three plan labels — Free / Core / Premium — never the raw
+// product display_name. Legacy career-level plans all resolve to "Core" via baseTier;
+// career level still drives matching under the hood but is not surfaced here.
+const baseTierLabel = computed(
+  () => baseTier.value.charAt(0).toUpperCase() + baseTier.value.slice(1),
+)
+
 const trialChargeDateLabel = computed(() => {
   if (!trialEndsAt.value) return ''
   return new Date(trialEndsAt.value).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
@@ -65,6 +73,10 @@ const isLoadingMatches = ref(false)
 const matchesError = ref<string | null>(null)
 const freemiumSearchLoading = ref(false)
 const freemiumSearchMessage = ref<string | null>(null)
+
+// Subscriber (Core/Premium) on-demand manual search — distinct from the freemium path.
+const subscriberSearchLoading = ref(false)
+const subscriberSearchMessage = ref<string | null>(null)
 
 const dashboardBanner = ref<DashboardBanner | null>(null)
 const showDashboardBanner = computed(() => isDashboardBannerActive(dashboardBanner.value))
@@ -120,6 +132,16 @@ const premiumInsightsTeaser = {
   ],
 }
 
+// The daily-job-matching edge function always schedules the next run for the
+// following day (randomized time, stored server-side in `scheduled_jobs` and not
+// exposed to the client), so "tomorrow" is the accurate user-facing cadence.
+const nextDigestLabel = 'tomorrow'
+
+// Application Tracker rows. No applications data model exists yet (that lands with
+// the later tracker feature), so this is empty for now and the card shows its
+// empty state; wire real rows here when the backing API is available.
+const trackedApplications = ref<TrackedApplication[]>([])
+
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
   const p = profile.value
@@ -148,7 +170,15 @@ const matchingStats = ref<MatchingStats>({
   avgMatchScore: null,
 })
 
+// Core automated-matching status line: real "matches this week" count from stats.
+const matchesThisWeekLabel = computed(() => {
+  const n = matchingStats.value.thisWeek ?? 0
+  return `${n} new match${n === 1 ? '' : 'es'} this week`
+})
+
 const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
+
+const savedCount = computed(() => matches.value.filter((m) => m.isSaved).length)
 
 const filteredMatches = computed(() => {
   let result = matches.value
@@ -202,6 +232,29 @@ async function runFreemiumJobSearch() {
     await loadMatchesAndStats()
   } finally {
     freemiumSearchLoading.value = false
+  }
+}
+
+async function runSubscriberJobSearch() {
+  if (subscriberSearchLoading.value) return
+  subscriberSearchMessage.value = null
+  matchesError.value = null
+  subscriberSearchLoading.value = true
+  try {
+    const { data, error } = await jobsAPI.runManualJobSearch()
+    if (error) {
+      matchesError.value = error.message
+      return
+    }
+    if (data) {
+      subscriberSearchMessage.value =
+        data.matchesCreated > 0
+          ? `Added ${data.matchesCreated} new match${data.matchesCreated === 1 ? '' : 'es'}.`
+          : 'Search completed; no new matches met the bar this time. Check back after the next digest or refine your profile.'
+    }
+    await loadMatchesAndStats()
+  } finally {
+    subscriberSearchLoading.value = false
   }
 }
 
@@ -318,13 +371,16 @@ onMounted(() => {
           <template v-else>
             <div v-if="basePlan">
               <p class="font-heading font-semibold text-brand-charcoal">
-                {{ basePlan?.display_name }}
+                {{ baseTierLabel }}
               </p>
               <p class="text-sm text-neutral-body mt-1">
                 {{ subscriptionStatusLabel }}
               </p>
               <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
                 Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Next digest: {{ nextDigestLabel }}
               </p>
             </div>
             <div v-else>
@@ -421,19 +477,87 @@ onMounted(() => {
       </template>
 
       <!--
-        TODO(core dashboard — next task): render under v-else-if="baseTier === 'core'".
-        Automated-matching status banner, Application Tracker, and unblurred Resume Advice
-        + Premium Insights cards.
+        Core tier: automated-matching status, Application Tracker, and fully
+        unblurred Resume Advice + Premium Insights. Also serves the 6 legacy trial
+        plans (entry_mid / senior_management / director_vp_c_level), which map to
+        'core' in the store — they differ only by the subscription card's plan name.
       -->
+      <template v-else-if="baseTier === 'core'">
+        <!-- Automated matching status (success-tinted; the only green surface on the page). -->
+        <div class="mb-8 rounded-[12px] border border-green-200 bg-green-50 px-5 py-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2.5">
+                <font-awesome-icon
+                  :icon="['fas', 'circle-check']"
+                  class="text-green-700"
+                  aria-hidden="true"
+                />
+                <p class="font-heading font-semibold text-green-700">Automated matching active</p>
+              </div>
+              <p class="mt-1 pl-7 text-sm text-green-700">
+                Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
+              </p>
+            </div>
+            <!-- On-demand search so a fresh, no-history account isn't stuck waiting for the digest. -->
+            <button
+              type="button"
+              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center gap-2"
+              :disabled="subscriberSearchLoading"
+              @click="runSubscriberJobSearch"
+            >
+              <font-awesome-icon
+                v-if="subscriberSearchLoading"
+                :icon="['fas', 'spinner']"
+                spin
+                aria-hidden="true"
+              />
+              {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
+            </button>
+          </div>
+          <p v-if="subscriberSearchMessage" class="mt-3 pl-7 text-sm text-green-700">
+            {{ subscriberSearchMessage }}
+          </p>
+        </div>
+
+        <!-- Application Tracker (compact). -->
+        <div class="mb-8">
+          <ApplicationTrackerCard :applications="trackedApplications" />
+        </div>
+      </template>
+
       <!--
         TODO(premium dashboard — task after): render under v-else-if="baseTier === 'premium'".
         Everything in Core plus the five Premium Tools concept cards.
       -->
 
       <!-- Recent job matches -->
-      <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-        Recent job matches
-      </h2>
+      <div
+        v-if="matchesError"
+        class="mb-4 rounded-[12px] bg-red-50 text-red-800 px-5 py-4 text-sm"
+        role="alert"
+      >
+        {{ matchesError }}
+      </div>
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
+          Recent job matches
+        </h2>
+        <!-- Saved-jobs view: the full filters panel is disabled (showFiltersPanel),
+             so this standalone toggle is the one way to see saved jobs. -->
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+          :class="showSavedOnly
+            ? 'bg-brand-primary text-white shadow-sm hover:opacity-90'
+            : 'border border-neutral-border bg-neutral-bg text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30'"
+          :aria-pressed="showSavedOnly"
+          @click="showSavedOnly = !showSavedOnly"
+        >
+          <font-awesome-icon :icon="['fas', 'bookmark']" aria-hidden="true" />
+          Saved{{ savedCount > 0 ? ` (${savedCount})` : '' }}
+        </button>
+      </div>
       <div v-if="showFiltersPanel" class="card p-6 mb-8">
         <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">
           Filters
@@ -557,12 +681,22 @@ onMounted(() => {
       <template v-else-if="filteredMatches.length === 0">
         <div class="card p-12 text-center">
           <div class="max-w-md mx-auto">
-            <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
-              No jobs match your filters.
-            </h2>
-            <p class="text-neutral-body mb-6">
-              Try clearing one or more filters to see more of your matches.
-            </p>
+            <template v-if="showSavedOnly && savedCount === 0">
+              <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+                No saved jobs yet.
+              </h2>
+              <p class="text-neutral-body mb-6">
+                Tap the bookmark on any job to keep it here for later.
+              </p>
+            </template>
+            <template v-else>
+              <h2 class="text-2xl font-heading font-semibold text-brand-charcoal mb-2">
+                No jobs match your filters.
+              </h2>
+              <p class="text-neutral-body mb-6">
+                Try clearing one or more filters to see more of your matches.
+              </p>
+            </template>
           </div>
         </div>
       </template>

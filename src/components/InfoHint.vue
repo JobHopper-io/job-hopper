@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * Small info icon that reveals a short tooltip on hover or keyboard focus.
+ * Generic/presentational — used for admin tuning hints and per-job feature
+ * explainers. Keep tooltip copy to one or two short lines.
+ */
 defineProps<{
   tooltip: string
 }>()
@@ -12,7 +17,7 @@ defineProps<{
   >
     <font-awesome-icon
       :icon="['fas', 'circle-info']"
-      class="text-neutral-muted text-xs cursor-default"
+      class="text-neutral-body/60 text-xs cursor-default"
       aria-hidden="true"
     />
     <span

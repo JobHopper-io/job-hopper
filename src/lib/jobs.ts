@@ -488,5 +488,31 @@ export const jobsAPI = {
 
     return { error: null }
   },
+
+  /**
+   * Subscriber (Core/Premium) manual job search. Triggers an on-demand matching pass via
+   * the `run-job-search` edge function so subscribers aren't stuck waiting for the next
+   * automated digest. No per-search cap (unlike the freemium path).
+   */
+  async runManualJobSearch(): Promise<{
+    data: { matchesCreated: number } | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke<{
+      matchesCreated?: number
+      error?: string
+    }>('run-job-search', { body: {} })
+
+    if (error) {
+      return { data: null, error: new Error(error.message) }
+    }
+    if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string') {
+      return { data: null, error: new Error(data.error) }
+    }
+    if (!data || typeof data.matchesCreated !== 'number') {
+      return { data: null, error: new Error('Unexpected response') }
+    }
+    return { data: { matchesCreated: data.matchesCreated }, error: null }
+  },
 }
 

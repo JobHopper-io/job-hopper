@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
-import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
+import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -54,11 +54,7 @@ const startFreePlan = ref(false)
 // is stored on profiles.career_level -- never derived from the plan/product the user picks.
 const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 
-const careerLevelOptions: { value: FreemiumBasePlanTierKey; label: string }[] = [
-  { value: 'entry_mid', label: 'Entry & Mid Level' },
-  { value: 'senior_management', label: 'Senior & Management' },
-  { value: 'director_vp_c_level', label: 'Director, VP & C-Level' },
-]
+const careerLevelOptions = CAREER_LEVEL_OPTIONS
 
 // Show Premium as a locked tier only while it isn't purchasable. When it ships and
 // available_for_purchase flips to true, it drops out of here and getBasePlanProducts()

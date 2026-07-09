@@ -22,7 +22,7 @@ import {
 } from '@/lib/admin-job-matching-algorithm'
 import type { Profile } from '@/types/database'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
-import AdminTuningHintIcon from '@/components/AdminTuningHintIcon.vue'
+import InfoHint from '@/components/InfoHint.vue'
 
 /** Short visible blurbs under section headers (always shown). */
 const MATCH_SECTION_INTROS = {
@@ -656,7 +656,7 @@ onMounted(async () => {
         </h1>
         <p class="text-sm sm:text-base text-neutral-body max-w-3xl">
           Run the same scoring pipeline as production.
-          <AdminTuningHintIcon
+          <InfoHint
             class="inline-block align-middle ml-1"
             :tooltip="MATCH_TUNING_TOOLTIPS.pageOverview"
           />
@@ -686,7 +686,7 @@ onMounted(async () => {
           >
             <span class="inline-flex items-center gap-1">
               <span>Match as subscriber</span>
-              <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.matchSubject" />
+              <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.matchSubject" />
             </span>
           </label>
           <select
@@ -729,7 +729,7 @@ onMounted(async () => {
           <div>
             <h3 class="text-sm font-heading font-semibold text-brand-charcoal inline-flex items-center gap-1">
               <span>Preferences</span>
-              <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionPreferences" />
+              <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.sectionPreferences" />
             </h3>
             <p class="text-xs text-neutral-body mt-1">
               {{ MATCH_SECTION_INTROS.preferences }}
@@ -748,7 +748,7 @@ onMounted(async () => {
                       ({{ basePlanProductKeyOptions.join(', ') }})
                     </span>
                   </span>
-                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.subscriptionTier" />
+                  <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.subscriptionTier" />
                 </span>
               </label>
               <input
@@ -772,7 +772,7 @@ onMounted(async () => {
                     Target role categories (comma-separated; must match
                     <code class="text-[10px]">job_hopper_live.role_category</code> values)
                   </span>
-                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.roles" />
+                  <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.roles" />
                 </span>
               </label>
               <input
@@ -790,7 +790,7 @@ onMounted(async () => {
               >
                 <span class="inline-flex items-center gap-1">
                   <span>Target job title (comma-separated keyword phrases)</span>
-                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.targetJobTitle" />
+                  <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.targetJobTitle" />
                 </span>
               </label>
               <input
@@ -845,7 +845,7 @@ onMounted(async () => {
               >
                 <span class="inline-flex items-center gap-1">
                   <span>Desired salary min (annual)</span>
-                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.payRangeMin" />
+                  <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.payRangeMin" />
                 </span>
               </label>
               <input
@@ -940,7 +940,7 @@ onMounted(async () => {
             <div>
               <h3 class="text-sm font-heading font-semibold text-brand-charcoal inline-flex items-center gap-1">
                 <span>Match config</span>
-                <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionMatchConfig" />
+                <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.sectionMatchConfig" />
               </h3>
               <p class="text-xs text-neutral-body mt-1">
                 {{ MATCH_SECTION_INTROS.matchConfig }}
@@ -980,7 +980,7 @@ onMounted(async () => {
                 <div>
                   <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
                     <span>Category mix (0–100 total)</span>
-                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionCategoryMix" />
+                    <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.sectionCategoryMix" />
                   </p>
                   <p class="text-[11px] text-neutral-body mt-0.5">
                     {{ MATCH_SECTION_INTROS.categoryMix }}
@@ -1004,7 +1004,7 @@ onMounted(async () => {
                     {{ field.label }}
                     {{ Math.round((configForm.categoryWeights?.[field.key] ?? 0) * 100) }}%
                   </span>
-                  <AdminTuningHintIcon :tooltip="field.tooltip" />
+                  <InfoHint :tooltip="field.tooltip" />
                 </span>
                 <input
                   type="range"
@@ -1025,7 +1025,7 @@ onMounted(async () => {
               >
                 <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
                   <span>Minimum score (0–100)</span>
-                  <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.minTotalScore" />
+                  <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.minTotalScore" />
                 </p>
                 <input
                   v-model.number="configForm.thresholds.minTotalScore"
@@ -1043,7 +1043,7 @@ onMounted(async () => {
                 <div>
                   <p class="text-xs font-semibold text-neutral-body inline-flex items-center gap-1">
                     <span>Hard gates</span>
-                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.sectionHardGates" />
+                    <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.sectionHardGates" />
                   </p>
                   <p class="text-[11px] text-neutral-body mt-0.5">
                     {{ MATCH_SECTION_INTROS.hardGates }}
@@ -1061,7 +1061,7 @@ onMounted(async () => {
                   >
                   <span class="inline-flex items-center gap-1">
                     <span>Require primary or industry phrase match</span>
-                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.phraseGate" />
+                    <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.phraseGate" />
                   </span>
                 </label>
                 <label
@@ -1076,7 +1076,7 @@ onMounted(async () => {
                   >
                   <span class="inline-flex items-center gap-1">
                     <span>Exclude pay far below range</span>
-                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.payHardFloorEnabled" />
+                    <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.payHardFloorEnabled" />
                   </span>
                 </label>
                 <div
@@ -1112,7 +1112,7 @@ onMounted(async () => {
                   >
                   <span class="inline-flex items-center gap-1">
                     <span>Exclude far jobs unless remote / relocation</span>
-                    <AdminTuningHintIcon :tooltip="MATCH_TUNING_TOOLTIPS.relocationGate" />
+                    <InfoHint :tooltip="MATCH_TUNING_TOOLTIPS.relocationGate" />
                   </span>
                 </label>
               </div>
@@ -1175,7 +1175,7 @@ onMounted(async () => {
                 </div>
                   </div>
                 </details>
-                <AdminTuningHintIcon
+                <InfoHint
                   class="mt-0.5"
                   :tooltip="MATCH_TUNING_TOOLTIPS.sectionPhrase"
                 />
@@ -1211,7 +1211,7 @@ onMounted(async () => {
                 </label>
                   </div>
                 </details>
-                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionPay" />
+                <InfoHint class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionPay" />
               </div>
             </div>
 
@@ -1290,7 +1290,7 @@ onMounted(async () => {
                 </label>
                   </div>
                 </details>
-                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionLocation" />
+                <InfoHint class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionLocation" />
               </div>
             </div>
 
@@ -1319,7 +1319,7 @@ onMounted(async () => {
                 </div>
                   </div>
                 </details>
-                <AdminTuningHintIcon class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionRecency" />
+                <InfoHint class="mt-0.5" :tooltip="MATCH_TUNING_TOOLTIPS.sectionRecency" />
               </div>
             </div>
 
@@ -1339,7 +1339,7 @@ onMounted(async () => {
                     </p>
                   </div>
                 </details>
-                <AdminTuningHintIcon
+                <InfoHint
                   class="mt-0.5"
                   :tooltip="MATCH_TUNING_TOOLTIPS.sectionFilterMatches"
                 />
