@@ -28,6 +28,7 @@ import {
   faLock,
   faChevronDown,
   faClipboardList,
+  faArrowUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add(
@@ -57,6 +58,7 @@ library.add(
   faLock,
   faChevronDown,
   faClipboardList,
+  faArrowUpRightFromSquare,
 )
 
 export function registerFontAwesome(app: App) {
