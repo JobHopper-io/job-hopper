@@ -9,18 +9,7 @@
 //
 // This file touches NOTHING in the data pipeline. It is display-only.
 //
-// Build-time environment variables (all read from process.env only):
-//   - SUPABASE_URL              — project the n8n workflow writes seo_pages to
-//   - SUPABASE_SERVICE_ROLE_KEY — build-only, read-only use here (query the table)
-//   - SITE_URL                  — public origin for canonicals + sitemap
-//                                 (e.g. https://job-hopper.io). Required; fails loudly.
-//   - SIGNUP_URL                — CTA target (absolute URL or path). Optional;
-//                                 defaults to /register with a warning when unset.
-//
-// Security invariants:
-//   - SUPABASE_SERVICE_ROLE_KEY is read from process.env ONLY. It is used solely
-//     to query the table at build time. It is never logged and never written into
-//     any generated file.
+
 //
 // Resilience invariant:
 //   - This generator runs on EVERY Netlify build, including plain app deploys.
