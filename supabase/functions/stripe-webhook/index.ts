@@ -129,6 +129,31 @@ serve(async (req) => {
       livemode: event.livemode,
     })
 
+    // Log every received event so delivery/coverage is answerable from our own DB.
+    // outcome=handled if a case below processes this type, else ignored. Upsert on the
+    // Stripe event id so redeliveries don't duplicate.
+    const HANDLED_TYPES = new Set([
+      'checkout.session.completed',
+      'customer.subscription.updated',
+      'customer.subscription.deleted',
+    ])
+    const { error: logError } = await supabaseAdmin
+      .from('stripe_webhook_events')
+      .upsert(
+        {
+          id: event.id,
+          type: event.type,
+          outcome: HANDLED_TYPES.has(event.type) ? 'handled' : 'ignored',
+        },
+        { onConflict: 'id' },
+      )
+    if (logError) {
+      console.error(`${LOG_PREFIX} failed to log webhook event`, {
+        id: event.id,
+        message: logError.message,
+      })
+    }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session

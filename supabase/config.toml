@@ -231,6 +231,16 @@ verify_jwt = false
 [functions.resume-advice-callback]
 verify_jwt = false
 
+# Read-only Stripe reconciliation (retrieve only). Invoked by an operator/service, not a
+# logged-in user, so JWT is off; secured with x-cron-secret (CRON_SECRET) or service role bearer.
+[functions.admin-stripe-reconcile]
+verify_jwt = false
+
+# Scheduled subscription drift reconciliation, invoked by run-scheduled-jobs (no user JWT).
+# Secured with x-cron-secret (CRON_SECRET) or service role bearer.
+[functions.reconcile-subscriptions]
+verify_jwt = false
+
 # Premium waitlist capture is called from /pricing for logged-out visitors too, so no
 # JWT is required. When an Authorization header is present the function still resolves
 # the caller's profile_id from it; the client never supplies profile_id directly.
