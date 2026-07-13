@@ -154,7 +154,9 @@ export const resumeProductsAPI = {
     if (existingError) {
       return { data: null, error: existingError }
     }
-    if (existing && existing.status !== 'cancelled') {
+    // A failed row is retryable: redeem_freemium_resume_advice resets it in place
+    // without consuming another credit.
+    if (existing && existing.status !== 'cancelled' && existing.status !== 'failed') {
       return {
         data: null,
         error: new Error('You have already purchased resume advice for this job.'),

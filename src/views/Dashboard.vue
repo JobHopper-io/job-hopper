@@ -710,7 +710,7 @@ onMounted(() => {
             :job="job"
             :advicePurchase="adviceByMatchId[job.matchId] ?? null"
             @toggle-save="handleToggleSave"
-            @refresh-advice="loadMatchesAndStats"
+            @refresh-advice="() => loadMatchesAndStats({ silent: true })"
             @refresh-job-matches="() => loadMatchesAndStats({ silent: true })"
           />
         </div>

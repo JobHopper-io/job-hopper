@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import Stripe from 'npm:stripe@14.21.0'
 import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {

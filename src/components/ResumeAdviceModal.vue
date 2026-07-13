@@ -8,6 +8,8 @@ const props = withDefaults(
     open: boolean
     /** Raw advice text; empty or missing means still generating */
     adviceText: string | null | undefined
+    /** Set when generation reached a terminal failure; suppresses the spinner. */
+    errorMessage?: string | null
     /** Dialog heading (e.g. job-specific vs profile-wide resume advice). */
     modalTitle?: string
   }>(),
@@ -26,6 +28,11 @@ const hasAdvice = computed(() => {
 })
 
 const adviceHtml = computed(() => markdownToSafeHtml(props.adviceText))
+
+const hasError = computed(() => {
+  const m = props.errorMessage
+  return typeof m === 'string' && m.trim().length > 0
+})
 
 function onBackdropClick() {
   emit('close')
@@ -91,6 +98,18 @@ onUnmounted(() => {
             class="prose prose-sm max-w-none break-words text-neutral-body prose-headings:font-heading prose-headings:text-brand-charcoal prose-strong:text-brand-charcoal"
             v-html="adviceHtml"
           ></div>
+          <div
+            v-else-if="hasError"
+            class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm"
+          >
+            <font-awesome-icon
+              :icon="['fas', 'exclamation-triangle']"
+              class="text-2xl text-red-600"
+              aria-hidden="true"
+            />
+            <p class="text-red-600">{{ errorMessage }}</p>
+            <p>Close this dialog and try again.</p>
+          </div>
           <div v-else class="flex flex-col items-center justify-center gap-3 py-8 text-center text-neutral-body text-sm">
             <font-awesome-icon
               :icon="['fas', 'spinner']"

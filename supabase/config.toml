@@ -221,6 +221,16 @@ verify_jwt = false
 [functions.reset-apollo-limits]
 verify_jwt = false
 
+# Invoked by pg_cron every 15 min; pg_net sends no Authorization header, so JWT
+# verification must be off. Secured with x-cron-secret (CRON_SECRET) or service role bearer.
+[functions.run-scheduled-jobs]
+verify_jwt = false
+
+# Called by the n8n resume workflow (not a logged-in user) to deliver generated advice,
+# so JWT verification is off. Secured with x-cron-secret (CRON_SECRET) or service role bearer.
+[functions.resume-advice-callback]
+verify_jwt = false
+
 # Premium waitlist capture is called from /pricing for logged-out visitors too, so no
 # JWT is required. When an Authorization header is present the function still resolves
 # the caller's profile_id from it; the client never supplies profile_id directly.

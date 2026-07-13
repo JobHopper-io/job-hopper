@@ -342,6 +342,57 @@ export type Database = {
           },
         ]
       }
+      job_demand_signal: {
+        Row: {
+          current_count: number | null
+          growth_rate: number | null
+          last_calculated: string | null
+          location_slug: string
+          prior_count: number | null
+          rank: number | null
+          role_slug: string
+        }
+        Insert: {
+          current_count?: number | null
+          growth_rate?: number | null
+          last_calculated?: string | null
+          location_slug: string
+          prior_count?: number | null
+          rank?: number | null
+          role_slug: string
+        }
+        Update: {
+          current_count?: number | null
+          growth_rate?: number | null
+          last_calculated?: string | null
+          location_slug?: string
+          prior_count?: number | null
+          rank?: number | null
+          role_slug?: string
+        }
+        Relationships: []
+      }
+      job_demand_weekly_counts: {
+        Row: {
+          job_count: number | null
+          location_slug: string
+          role_slug: string
+          week_start: string
+        }
+        Insert: {
+          job_count?: number | null
+          location_slug: string
+          role_slug: string
+          week_start: string
+        }
+        Update: {
+          job_count?: number | null
+          location_slug?: string
+          role_slug?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       job_hiring_contacts: {
         Row: {
           company_summary: Json | null
@@ -754,6 +805,35 @@ export type Database = {
           },
         ]
       }
+      premium_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          profile_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          profile_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "premium_waitlist_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           available_for_purchase: boolean
@@ -901,67 +981,11 @@ export type Database = {
         }
         Relationships: []
       }
-      raw_jobs: {
-        Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
-          created_at: string
-          Description: string | null
-          Extras: string | null
-          id: number
-          Industry: string | null
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
-          "Reason for Apollo": string | null
-        }
-        Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-        }
-        Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
-        }
-        Relationships: []
-      }
       resume_products: {
         Row: {
           completed_at: string | null
           created_at: string
+          error_message: string | null
           id: string
           improvements_text: string | null
           job_match_id: string | null
@@ -972,6 +996,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          error_message?: string | null
           id?: string
           improvements_text?: string | null
           job_match_id?: string | null
@@ -982,6 +1007,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          error_message?: string | null
           id?: string
           improvements_text?: string | null
           job_match_id?: string | null
@@ -1172,6 +1198,39 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_pages: {
+        Row: {
+          h1: string | null
+          indexed: boolean | null
+          intro_copy: string | null
+          job_count: number | null
+          last_generated: string | null
+          meta_description: string | null
+          sample_listings: Json | null
+          url_path: string
+        }
+        Insert: {
+          h1?: string | null
+          indexed?: boolean | null
+          intro_copy?: string | null
+          job_count?: number | null
+          last_generated?: string | null
+          meta_description?: string | null
+          sample_listings?: Json | null
+          url_path: string
+        }
+        Update: {
+          h1?: string | null
+          indexed?: boolean | null
+          intro_copy?: string | null
+          job_count?: number | null
+          last_generated?: string | null
+          meta_description?: string | null
+          sample_listings?: Json | null
+          url_path?: string
+        }
+        Relationships: []
+      }
       sic_codes: {
         Row: {
           csv_industry_code: string | null
@@ -1187,6 +1246,30 @@ export type Database = {
           csv_industry_code?: string | null
           ewb_industry_code?: string | null
           industry_title?: string | null
+        }
+        Relationships: []
+      }
+      sponsorship_heuristic_scores: {
+        Row: {
+          company_name: string
+          employee_count: number | null
+          heuristic_label: string | null
+          heuristic_score: number | null
+          last_calculated: string | null
+        }
+        Insert: {
+          company_name: string
+          employee_count?: number | null
+          heuristic_label?: string | null
+          heuristic_score?: number | null
+          last_calculated?: string | null
+        }
+        Update: {
+          company_name?: string
+          employee_count?: number | null
+          heuristic_label?: string | null
+          heuristic_score?: number | null
+          last_calculated?: string | null
         }
         Relationships: []
       }
@@ -1445,7 +1528,7 @@ export type Database = {
         | "one_time_addon"
         | "one_time_item"
       product_type: "subscription" | "payment"
-      resume_product_status: "pending" | "complete" | "cancelled"
+      resume_product_status: "pending" | "complete" | "cancelled" | "failed"
       role_category:
         | "operations"
         | "maintenance"
@@ -1615,7 +1698,7 @@ export const Constants = {
         "one_time_item",
       ],
       product_type: ["subscription", "payment"],
-      resume_product_status: ["pending", "complete", "cancelled"],
+      resume_product_status: ["pending", "complete", "cancelled", "failed"],
       role_category: [
         "operations",
         "maintenance",

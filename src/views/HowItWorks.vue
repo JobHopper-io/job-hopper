@@ -1,275 +1,162 @@
+<script setup lang="ts">
+const steps = [
+  {
+    title: 'Build your profile',
+    aside: '60 seconds',
+    points: [
+      'Your current role and experience level.',
+      'The kinds of jobs you’re targeting.',
+      'Your pay range and preferred locations.',
+      'Your resume, so we understand your background.',
+    ],
+  },
+  {
+    title: 'The Hopper collects and curates',
+    lead: 'We continuously pull new postings from LinkedIn, Indeed, and company career pages, then:',
+    points: [
+      'Filter out stale, low-quality, and resume-collecting posts.',
+      'Enrich each role with company size, industry, and background.',
+      'Map roles to experience levels.',
+      'Analyze posting metadata to estimate sponsorship likelihood.',
+    ],
+  },
+  {
+    title: 'We match and send',
+    lead: 'Every new job is checked against your profile for:',
+    points: [
+      'Role alignment and experience level.',
+      'Location and relocation settings.',
+      'Salary or wage expectation.',
+      'Sponsorship likelihood, when you use that filter.',
+    ],
+    footer:
+      'Good fits land in your feed and — depending on your settings — trigger an email or notification.',
+  },
+  {
+    title: 'You apply and follow up',
+    points: [
+      'A short AI-generated job briefing.',
+      'A direct link to apply on the company’s platform.',
+    ],
+    premium: 'verified hiring contact info',
+  },
+]
+
+const controls = [
+  'Widen or narrow your job types',
+  'Expand or tighten location boundaries',
+  'Add or remove industries',
+  'Pause certain types of roles',
+  'Toggle sponsorship-likelihood filtering',
+]
+
+const privacy = [
+  'We use your profile only to match you with jobs and improve recommendations.',
+  'We never sell your personal data to third-party advertisers.',
+  'You can delete your account at any time.',
+]
+</script>
+
 <template>
   <div class="min-h-screen bg-white py-20 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl mx-auto">
-      <!-- Intro Section -->
-      <section class="mb-16">
-        <h1 class="text-brand-charcoal mb-6 text-center">
+    <div class="max-w-3xl mx-auto">
+      <!-- Intro -->
+      <section class="mb-16 text-center">
+        <h1 class="text-brand-charcoal mb-6">
           How Job-Hopper finds the right jobs for you
         </h1>
-        <div class="prose prose-lg max-w-none text-neutral-body">
-          <p class="text-lg mb-4">
-            Job-Hopper is the AI layer that runs your U.S. job search for you—so you are not stuck refreshing five sites every night.
-          </p>
-          <p class="mb-4">
-            We continuously scan job boards and direct company postings, then actively vet each role for freshness, legitimacy, and real hiring activity. Our system filters out stale listings, passive resume-collecting posts, and low-activity roles before they ever reach you.
-          </p>
-          <p class="mb-4">
-            From there, our team and proprietary matching engine combine your profile, preferences, and career level with enriched company data and behind-the-scenes hiring insights to deliver only the most relevant opportunities, in real time.
-          </p>
-          <p class="mb-4">
-            Job-Hopper shows you company size and background on each posting, so you're not applying blind. On Premium — currently rolling out, <router-link to="/pricing" class="text-brand-primary hover:underline">join the waitlist</router-link> — you'll also get verified hiring contact info, so outreach isn't guesswork.
-          </p>
-          <p class="mb-4">
-            For every role that passes through the Hopper, we also run deep metadata analysis. One outcome of that pipeline is a sponsorship-likelihood signal: when visa sponsorship is part of your situation, you can use it to spend less time on postings that are unlikely to line up—without Job-Hopper becoming a sponsorship-only product. The signal is a practical filter and estimate, not a promise that a given employer will sponsor.
-          </p>
-          <p class="mb-4">
-            The result? Fewer distractions. Better timing. Smarter matches.
-          </p>
-          <p class="font-medium">
-            Job-Hopper turns a chaotic job search into a focused, AI-driven advantage—the kind of upgrade people will expect from job search from here on out.
-          </p>
-        </div>
-      </section>
-
-      <!-- Step Breakdown -->
-      <section class="mb-16">
-        <h2 class="text-brand-charcoal mb-12 text-center">
-          The process, step by step
-        </h2>
-        <div class="space-y-12">
-          <!-- Step 1 -->
-          <div class="flex flex-col md:flex-row gap-8 items-start">
-            <div class="flex-shrink-0">
-              <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center">
-                <span class="text-white text-2xl font-bold">1</span>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-2xl font-heading font-semibold mb-4">Build your profile (60 seconds)</h3>
-              <ul class="space-y-2 text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Share your current role and experience level.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Tell us what kinds of jobs you're targeting.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Set your desired wage or salary range and preferred locations.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Upload your resume so we can better understand your background.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Step 2 -->
-          <div class="flex flex-col md:flex-row gap-8 items-start">
-            <div class="flex-shrink-0">
-              <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center">
-                <span class="text-white text-2xl font-bold">2</span>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-2xl font-heading font-semibold mb-4">Our 'Hopper' collects & curates jobs</h3>
-              <p class="text-neutral-body mb-4">
-                Our system continuously pulls in new postings from sources like LinkedIn, Indeed, and direct company career pages.
-              </p>
-              <p class="text-neutral-body mb-4">From there, we:</p>
-              <ul class="space-y-2 text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Filter out stale or low-quality postings.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Enrich each match with company size, industry, and background.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Map roles to experience levels so you don't see jobs that waste your time.</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Analyze posting metadata so you can optionally filter or sort by sponsorship likelihood when H-1B or other employer sponsorship is relevant to you.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Step 3 -->
-          <div class="flex flex-col md:flex-row gap-8 items-start">
-            <div class="flex-shrink-0">
-              <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center">
-                <span class="text-white text-2xl font-bold">3</span>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-2xl font-heading font-semibold mb-4">We match and send opportunities</h3>
-              <p class="text-neutral-body mb-4">
-                For each new job that hits the Hopper, we check it against your profile:
-              </p>
-              <ul class="space-y-2 text-neutral-body mb-4">
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Role alignment</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Location + relocation settings</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Salary/wage expectation</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Experience level</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Your sponsorship needs and sponsorship-likelihood on each posting (when you use that filter)</span>
-                </li>
-              </ul>
-              <p class="text-neutral-body">
-                If it looks like a good fit, it goes into your personal feed and, depending on your settings, triggers an email and/or notification.
-              </p>
-            </div>
-          </div>
-
-          <!-- Step 4 -->
-          <div class="flex flex-col md:flex-row gap-8 items-start">
-            <div class="flex-shrink-0">
-              <div class="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center">
-                <span class="text-white text-2xl font-bold">4</span>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-2xl font-heading font-semibold mb-4">You apply and follow up</h3>
-              <p class="text-neutral-body mb-4">You get:</p>
-              <ul class="space-y-2 text-neutral-body">
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>A short AI-generated job briefing</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>A direct link to apply on the company's chosen platform</span>
-                </li>
-                <li class="flex items-start">
-                  <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>On Premium (rolling out — <router-link to="/pricing" class="text-brand-primary hover:underline">join the waitlist</router-link>): verified hiring contact info</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Matching Philosophy -->
-      <section class="mb-16 card p-8">
-        <h2 class="text-brand-charcoal mb-6">
-          Not too tight, not too loose
-        </h2>
-        <p class="text-neutral-body mb-4">
-          Good matching is a balance. If filters are too tight, you miss opportunities. Too loose, and you're back in job-board chaos.
+        <p class="text-lg text-neutral-body mb-4">
+          Job-Hopper is the AI layer that runs your U.S. job search — so you're not refreshing five
+          sites every night.
         </p>
+        <p class="text-neutral-body">
+          We scan job boards and company postings, vet each role for freshness and real hiring
+          activity, then match what's left against your profile, preferences, and career level. You
+          see company size and background on every posting, so you're never applying blind.
+        </p>
+      </section>
+
+      <!-- Steps -->
+      <section class="mb-16">
+        <h2 class="text-brand-charcoal mb-12 text-center">The process, step by step</h2>
+        <ol class="space-y-10">
+          <li v-for="(step, i) in steps" :key="step.title" class="flex flex-col md:flex-row gap-6">
+            <div
+              class="w-12 h-12 shrink-0 bg-brand-primary rounded-full flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <span class="text-white text-xl font-bold">{{ i + 1 }}</span>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-xl font-heading font-semibold mb-3">
+                {{ step.title }}
+                <span v-if="step.aside" class="font-normal text-neutral-body">({{ step.aside }})</span>
+              </h3>
+              <p v-if="step.lead" class="text-neutral-body mb-3">{{ step.lead }}</p>
+              <ul class="space-y-2 text-neutral-body">
+                <li v-for="point in step.points" :key="point" class="flex items-start">
+                  <font-awesome-icon
+                    :icon="['fas', 'check']"
+                    class="w-4 h-4 text-brand-success mr-2 mt-1 shrink-0"
+                  />
+                  <span>{{ point }}</span>
+                </li>
+                <li v-if="step.premium" class="flex items-start">
+                  <font-awesome-icon
+                    :icon="['fas', 'check']"
+                    class="w-4 h-4 text-brand-success mr-2 mt-1 shrink-0"
+                  />
+                  <span>
+                    On Premium (rolling out —
+                    <router-link to="/pricing" class="text-brand-primary hover:underline">
+                      join the waitlist</router-link>): {{ step.premium }}.
+                  </span>
+                </li>
+              </ul>
+              <p v-if="step.footer" class="text-neutral-body mt-3">{{ step.footer }}</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Matching philosophy -->
+      <section class="mb-8 card p-8">
+        <h2 class="text-brand-charcoal mb-4">Not too tight, not too loose</h2>
         <p class="text-neutral-body mb-4">
-          We start with a sensible range, then give you control:
+          Too tight and you miss opportunities; too loose and you're back in job-board chaos. We
+          start with a sensible range, then hand you the controls:
         </p>
         <ul class="space-y-2 text-neutral-body">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Adjust how broad or narrow your job types are</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Expand or tighten location boundaries</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Add or remove industries</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Pause certain types of roles</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>Turn sponsorship-likelihood filtering on or off depending on whether visa sponsorship is part of your search right now</span>
+          <li v-for="control in controls" :key="control" class="flex items-start">
+            <font-awesome-icon
+              :icon="['fas', 'check']"
+              class="w-4 h-4 text-brand-success mr-2 mt-1 shrink-0"
+            />
+            <span>{{ control }}</span>
           </li>
         </ul>
       </section>
 
-      <!-- Data & Privacy -->
+      <!-- Sponsorship note -->
+      <section class="mb-8 card p-8">
+        <h2 class="text-brand-charcoal mb-4">About the sponsorship signal</h2>
+        <p class="text-neutral-body">
+          When visa sponsorship is part of your situation, our sponsorship-likelihood signal helps
+          you spend less time on postings that are unlikely to line up. It is a practical filter and
+          estimate — not a promise that a given employer will sponsor.
+        </p>
+      </section>
+
+      <!-- Data & privacy -->
       <section class="card p-8">
-        <h2 class="text-brand-charcoal mb-6">
-          Your data, your control
-        </h2>
-        <ul class="space-y-3 text-neutral-body">
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>We use your profile only to match you with jobs and improve recommendations.</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>We never sell your personal data to third-party advertisers.</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="w-5 h-5 text-brand-success mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>You can delete your account at any time.</span>
+        <h2 class="text-brand-charcoal mb-4">Your data, your control</h2>
+        <ul class="space-y-2 text-neutral-body">
+          <li v-for="item in privacy" :key="item" class="flex items-start">
+            <font-awesome-icon
+              :icon="['fas', 'check']"
+              class="w-4 h-4 text-brand-success mr-2 mt-1 shrink-0"
+            />
+            <span>{{ item }}</span>
           </li>
         </ul>
       </section>
@@ -283,4 +170,3 @@
     </div>
   </div>
 </template>
-

@@ -214,177 +214,186 @@ const handleCreateAccount = async () => {
           You'll be done in under a minute.
         </p>
 
-        <div class="space-y-4">
-          <div>
-            <label for="email" class="block text-sm font-medium text-brand-charcoal mb-2">Email</label>
-            <input
-              id="email"
-              v-model="email"
-              type="email"
-              required
-              class="input"
-              placeholder="your.email@example.com"
-              @input="clearEmailAlreadyUsed"
-            />
-            <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
-              {{ emailValidationError }}
+        <form novalidate @submit.prevent="handleCreateAccount">
+          <div class="space-y-4">
+            <div>
+              <label for="email" class="block text-sm font-medium text-brand-charcoal mb-2">Email</label>
+              <input
+                id="email"
+                v-model="email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                required
+                class="input"
+                placeholder="your.email@example.com"
+                @input="clearEmailAlreadyUsed"
+              />
+              <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
+                {{ emailValidationError }}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label for="phone" class="block text-sm font-medium text-brand-charcoal mb-2">Phone number</label>
-            <div class="flex gap-2" ref="phoneCountryDropdownRef">
-              <div class="relative shrink-0">
+            <div>
+              <label for="phone" class="block text-sm font-medium text-brand-charcoal mb-2">Phone number</label>
+              <div class="flex gap-2" ref="phoneCountryDropdownRef">
+                <div class="relative shrink-0">
+                  <button
+                    type="button"
+                    :aria-label="`Country code: ${selectedCountryCodeDisplay}`"
+                    aria-haspopup="listbox"
+                    :aria-expanded="phoneCountryOpen"
+                    aria-controls="phone-country-listbox"
+                    id="phone-country"
+                    class="input flex items-center gap-1 min-w-[4.5rem] pr-8"
+                    @click="phoneCountryOpen = !phoneCountryOpen"
+                  >
+                    <span>{{ selectedCountryCodeDisplay }}</span>
+                    <svg class="absolute right-2.5 h-4 w-4 text-neutral-body pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <ul
+                    v-show="phoneCountryOpen"
+                    id="phone-country-listbox"
+                    role="listbox"
+                    aria-label="Country"
+                    class="absolute left-0 top-full z-10 mt-1 max-h-60 w-56 overflow-auto rounded-[12px] border border-neutral-border bg-white py-1 shadow-lg"
+                  >
+                    <li
+                      v-for="opt in phoneCountryOptions"
+                      :key="opt.value"
+                      role="option"
+                      :aria-selected="opt.value === phoneCountry"
+                      class="cursor-pointer px-3 py-2 text-sm text-brand-charcoal hover:bg-neutral-100"
+                      :class="{ 'bg-neutral-100': opt.value === phoneCountry }"
+                      @click="phoneCountry = opt.value; phoneCountryOpen = false; clearPhoneAlreadyUsed()"
+                    >
+                      {{ opt.label }}
+                    </li>
+                  </ul>
+                </div>
+                <input
+                  id="phone"
+                  v-model="phone"
+                  name="tel-national"
+                  type="tel"
+                  autocomplete="tel-national"
+                  required
+                  class="input flex-1 min-w-0"
+                  :placeholder="phoneCountry === 'US' ? 'e.g. (555) 123-4567' : 'e.g. 20 7946 0958'"
+                  @input="clearPhoneAlreadyUsed"
+                />
+              </div>
+              <div v-if="phoneValidationError" class="text-red-600 text-sm mt-1">
+                {{ phoneValidationError }}
+              </div>
+            </div>
+
+            <div>
+              <label for="password" class="block text-sm font-medium text-brand-charcoal mb-2">Password</label>
+              <div class="relative">
+                <input
+                  id="password"
+                  v-model="password"
+                  name="new-password"
+                  :type="showPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  required
+                  class="input pr-10"
+                  placeholder="Password (min 8 characters)"
+                />
                 <button
                   type="button"
-                  :aria-label="`Country code: ${selectedCountryCodeDisplay}`"
-                  aria-haspopup="listbox"
-                  :aria-expanded="phoneCountryOpen"
-                  aria-controls="phone-country-listbox"
-                  id="phone-country"
-                  class="input flex items-center gap-1 min-w-[4.5rem] pr-8"
-                  @click="phoneCountryOpen = !phoneCountryOpen"
+                  @click="showPassword = !showPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <span>{{ selectedCountryCodeDisplay }}</span>
-                  <svg class="absolute right-2.5 h-4 w-4 text-neutral-body pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  <svg v-if="showPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                  </svg>
+                  <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                   </svg>
                 </button>
-                <ul
-                  v-show="phoneCountryOpen"
-                  id="phone-country-listbox"
-                  role="listbox"
-                  aria-label="Country"
-                  class="absolute left-0 top-full z-10 mt-1 max-h-60 w-56 overflow-auto rounded-[12px] border border-neutral-border bg-white py-1 shadow-lg"
+              </div>
+            </div>
+
+            <div>
+              <label for="confirmPassword" class="block text-sm font-medium text-brand-charcoal mb-2">Confirm password</label>
+              <div class="relative">
+                <input
+                  id="confirmPassword"
+                  v-model="confirmPassword"
+                  name="confirm-password"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  required
+                  class="input pr-10"
+                  placeholder="Confirm password"
+                />
+                <button
+                  type="button"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <li
-                    v-for="opt in phoneCountryOptions"
-                    :key="opt.value"
-                    role="option"
-                    :aria-selected="opt.value === phoneCountry"
-                    class="cursor-pointer px-3 py-2 text-sm text-brand-charcoal hover:bg-neutral-100"
-                    :class="{ 'bg-neutral-100': opt.value === phoneCountry }"
-                    @click="phoneCountry = opt.value; phoneCountryOpen = false; clearPhoneAlreadyUsed()"
-                  >
-                    {{ opt.label }}
-                  </li>
-                </ul>
+                  <svg v-if="showConfirmPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                  </svg>
+                  <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                  </svg>
+                </button>
               </div>
-              <input
-                id="phone"
-                v-model="phone"
-                type="tel"
-                required
-                class="input flex-1 min-w-0"
-                :placeholder="phoneCountry === 'US' ? 'e.g. (555) 123-4567' : 'e.g. 20 7946 0958'"
-                @input="clearPhoneAlreadyUsed"
-              />
             </div>
-            <div v-if="phoneValidationError" class="text-red-600 text-sm mt-1">
-              {{ phoneValidationError }}
+
+            <div v-if="passwordValidationError" class="text-red-600 text-sm">
+              {{ passwordValidationError }}
+            </div>
+            <div v-else-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
+              Passwords do not match
             </div>
           </div>
 
-          <div>
-            <label for="password" class="block text-sm font-medium text-brand-charcoal mb-2">Password</label>
-            <div class="relative">
-              <input
-                id="password"
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                required
-                class="input pr-10"
-                placeholder="Password (min 8 characters)"
-              />
-              <button
-                type="button"
-                @click="showPassword = !showPassword"
-                class="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <svg v-if="showPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                </svg>
-                <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-              </button>
+          <div class="mt-6">
+            <div class="border border-neutral-border rounded-[12px] p-4 bg-white">
+              <label class="flex items-start gap-3 cursor-pointer" for="email-consent">
+                <input
+                  id="email-consent"
+                  v-model="emailConsent"
+                  type="checkbox"
+                  class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
+                />
+                <div>
+                  <p class="text-sm font-medium text-brand-charcoal">
+                    I agree to receive emails from Job-Hopper about my account and services, including product
+                    updates and general marketing emails.
+                  </p>
+                  <p class="mt-1 text-xs text-neutral-body">
+                    You can change your email preferences or unsubscribe at any time from your settings or
+                    from any email we send.
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
 
-          <div>
-            <label for="confirmPassword" class="block text-sm font-medium text-brand-charcoal mb-2">Confirm password</label>
-            <div class="relative">
-              <input
-                id="confirmPassword"
-                v-model="confirmPassword"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                required
-                class="input pr-10"
-                placeholder="Confirm password"
-              />
-              <button
-                type="button"
-                @click="showConfirmPassword = !showConfirmPassword"
-                class="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <svg v-if="showConfirmPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                </svg>
-                <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-              </button>
-            </div>
+          <div v-if="error" class="mt-6 p-4 bg-red-50 border border-red-200 rounded-[12px]">
+            <p class="text-red-800 text-sm">{{ error }}</p>
           </div>
 
-          <div v-if="passwordValidationError" class="text-red-600 text-sm">
-            {{ passwordValidationError }}
+          <div class="mt-8">
+            <button
+              type="submit"
+              :disabled="!canProceedStep1 || isLoading"
+              class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span v-if="isLoading">Creating account...</span>
+              <span v-else>Continue</span>
+            </button>
           </div>
-          <div v-else-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
-            Passwords do not match
-          </div>
-        </div>
-
-        <div class="mt-6">
-          <div class="border border-neutral-border rounded-[12px] p-4 bg-white">
-            <label class="flex items-start gap-3 cursor-pointer" for="email-consent">
-              <input
-                id="email-consent"
-                v-model="emailConsent"
-                type="checkbox"
-                class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
-              />
-              <div>
-                <p class="text-sm font-medium text-brand-charcoal">
-                  I agree to receive emails from Job-Hopper about my account and services, including product
-                  updates and general marketing emails.
-                </p>
-                <p class="mt-1 text-xs text-neutral-body">
-                  You can change your email preferences or unsubscribe at any time from your settings or
-                  from any email we send.
-                </p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <div v-if="error" class="mt-6 p-4 bg-red-50 border border-red-200 rounded-[12px]">
-          <p class="text-red-800 text-sm">{{ error }}</p>
-        </div>
-
-        <div class="mt-8">
-          <button
-            @click="handleCreateAccount"
-            type="button"
-            :disabled="!canProceedStep1 || isLoading"
-            class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span v-if="isLoading">Creating account...</span>
-            <span v-else>Continue</span>
-          </button>
-        </div>
+        </form>
 
         <p class="mt-6 text-center text-sm text-neutral-body">
           Already have an account?
