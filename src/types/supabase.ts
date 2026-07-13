@@ -282,24 +282,30 @@ export type Database = {
       }
       freemium_settings: {
         Row: {
+          core_daily_resume_advice: number
           id: number
           max_job_searches: number
           max_premium_insights: number
           max_resume_advice: number
+          premium_daily_resume_advice: number
           updated_at: string
         }
         Insert: {
+          core_daily_resume_advice?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_resume_advice?: number
           updated_at?: string
         }
         Update: {
+          core_daily_resume_advice?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_resume_advice?: number
           updated_at?: string
         }
         Relationships: []
@@ -981,10 +987,37 @@ export type Database = {
         }
         Relationships: []
       }
+      resume_advice_daily_usage: {
+        Row: {
+          count: number
+          profile_id: string
+          usage_date: string
+        }
+        Insert: {
+          count?: number
+          profile_id: string
+          usage_date: string
+        }
+        Update: {
+          count?: number
+          profile_id?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resume_advice_daily_usage_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resume_products: {
         Row: {
           completed_at: string | null
           created_at: string
+          daily_usage_date: string | null
           error_message: string | null
           id: string
           improvements_text: string | null
@@ -996,6 +1029,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          daily_usage_date?: string | null
           error_message?: string | null
           id?: string
           improvements_text?: string | null
@@ -1007,6 +1041,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          daily_usage_date?: string | null
           error_message?: string | null
           id?: string
           improvements_text?: string | null
@@ -1273,6 +1308,27 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_webhook_events: {
+        Row: {
+          id: string
+          outcome: string
+          received_at: string
+          type: string
+        }
+        Insert: {
+          id: string
+          outcome: string
+          received_at?: string
+          type: string
+        }
+        Update: {
+          id?: string
+          outcome?: string
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       subscription_product: {
         Row: {
           id: string
@@ -1302,6 +1358,53 @@ export type Database = {
           },
           {
             foreignKeyName: "subscription_product_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_reconciliation_audit: {
+        Row: {
+          id: string
+          new_period_ends_at: string | null
+          new_status: string | null
+          note: string | null
+          old_period_ends_at: string | null
+          old_status: string | null
+          reconciled_at: string
+          source: string
+          stripe_subscription_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          id?: string
+          new_period_ends_at?: string | null
+          new_status?: string | null
+          note?: string | null
+          old_period_ends_at?: string | null
+          old_status?: string | null
+          reconciled_at?: string
+          source: string
+          stripe_subscription_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          id?: string
+          new_period_ends_at?: string | null
+          new_status?: string | null
+          note?: string | null
+          old_period_ends_at?: string | null
+          old_status?: string | null
+          reconciled_at?: string
+          source?: string
+          stripe_subscription_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_reconciliation_audit_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
@@ -1450,6 +1553,21 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      redeem_daily_resume_advice: {
+        Args: {
+          p_daily_limit: number
+          p_job_match_id: string
+          p_product_id: string
+          p_profile_id: string
+        }
+        Returns: {
+          daily_limit: number
+          daily_used: number
+          err: string
+          ok: boolean
+          resume_product_id: string
+        }[]
+      }
       redeem_freemium_premium_insights: {
         Args: { p_job_match_id: string; p_profile_id: string }
         Returns: {
@@ -1476,6 +1594,10 @@ export type Database = {
       }
       refund_apollo_credits: {
         Args: { p_amount: number; p_name: string }
+        Returns: undefined
+      }
+      refund_daily_resume_advice: {
+        Args: { p_resume_product_id: string }
         Returns: undefined
       }
       refund_freemium_premium_insights: {

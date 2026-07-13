@@ -141,6 +141,19 @@ serve(async (req) => {
       count: sweptResumeRows?.length ?? 0,
       staleMinutes: RESUME_STALE_MINUTES,
     })
+    // Reverse the Core/Premium daily credit each swept row held (no-op for free-tier rows).
+    // These rows were EarlyDropped mid-fulfillment, so markResumeProductFailed never ran.
+    for (const swept of sweptResumeRows ?? []) {
+      const { error: refundError } = await supabase.rpc('refund_daily_resume_advice', {
+        p_resume_product_id: swept.id,
+      })
+      if (refundError) {
+        console.error('Failed to refund daily resume credit for swept row', {
+          resumeProductId: swept.id,
+          error: refundError.message,
+        })
+      }
+    }
   }
 
   // 2. Select pending jobs

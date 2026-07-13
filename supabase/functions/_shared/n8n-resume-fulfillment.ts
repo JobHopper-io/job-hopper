@@ -127,7 +127,9 @@ async function markResumeProductFailed(
       ? reason.slice(0, ERROR_MESSAGE_MAX_LENGTH - 3) + '...'
       : reason
 
-  const { error } = await supabaseAdmin
+  // Guard on status='pending' AND return the affected row: if a late callback already
+  // completed it, this matches nothing and we must NOT refund a successful generation.
+  const { data: updated, error } = await supabaseAdmin
     .from('resume_products')
     .update({
       status: 'failed',
@@ -136,6 +138,7 @@ async function markResumeProductFailed(
     })
     .eq('id', resumeProductId)
     .eq('status', 'pending')
+    .select('id')
 
   if (error) {
     console.error(`${LOG} failed to mark resume_products failed`, {
@@ -144,6 +147,23 @@ async function markResumeProductFailed(
     })
     return
   }
+
+  if (!updated || updated.length === 0) {
+    // Row was no longer pending (e.g. completed by the callback) — nothing to fail or refund.
+    console.log(`${LOG} skip mark failed: row not pending`, { resumeProductId })
+    return
+  }
+
+  // Reverse the Core/Premium daily credit this row held. No-op for free-tier rows
+  // (daily_usage_date NULL) and idempotent (clears the stamp), so the sweeper can't
+  // double-refund a row this path already handled.
+  const { error: refundError } = await supabaseAdmin.rpc('refund_daily_resume_advice', {
+    p_resume_product_id: resumeProductId,
+  })
+  if (refundError) {
+    console.error(`${LOG} daily refund failed`, { resumeProductId, message: refundError.message })
+  }
+
   console.log(`${LOG} marked failed`, { resumeProductId, reason: errorMessage })
 }
 

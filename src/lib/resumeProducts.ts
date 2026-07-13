@@ -16,6 +16,26 @@ async function getCurrentProfileId(): Promise<string> {
   return data.id
 }
 
+/**
+ * supabase.functions.invoke throws FunctionsHttpError for non-2xx responses, whose `.message`
+ * is a generic "non-2xx status code". The useful message (e.g. the daily-limit text) is in the
+ * JSON body, reachable via `error.context` (the raw Response). Pull it out when present.
+ */
+async function extractFunctionErrorMessage(err: unknown): Promise<string> {
+  const ctx = (err as { context?: unknown })?.context
+  if (ctx instanceof Response) {
+    try {
+      const body = (await ctx.json()) as { error?: unknown }
+      if (body && typeof body.error === 'string' && body.error.trim()) {
+        return body.error
+      }
+    } catch {
+      // Body unreadable/consumed — fall back to the generic message below.
+    }
+  }
+  return err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+}
+
 async function getPerJobResumeAdviceProductId(): Promise<string | null> {
   const { data } = await supabase
     .from('products')
@@ -201,7 +221,7 @@ export const resumeProductsAPI = {
       }>('freemium-resume-advice', { body: { job_match_id: matchId } })
 
       if (fnError) {
-        return { data: null, error: new Error(fnError.message) }
+        return { data: null, error: new Error(await extractFunctionErrorMessage(fnError)) }
       }
       if (fnData && typeof fnData === 'object' && 'error' in fnData && fnData.error) {
         return { data: null, error: new Error(String(fnData.error)) }
