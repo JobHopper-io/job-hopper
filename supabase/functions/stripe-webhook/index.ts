@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno'
+import Stripe from 'npm:stripe@14.21.0'
 import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
@@ -128,6 +128,31 @@ serve(async (req) => {
       type: event.type,
       livemode: event.livemode,
     })
+
+    // Log every received event so delivery/coverage is answerable from our own DB.
+    // outcome=handled if a case below processes this type, else ignored. Upsert on the
+    // Stripe event id so redeliveries don't duplicate.
+    const HANDLED_TYPES = new Set([
+      'checkout.session.completed',
+      'customer.subscription.updated',
+      'customer.subscription.deleted',
+    ])
+    const { error: logError } = await supabaseAdmin
+      .from('stripe_webhook_events')
+      .upsert(
+        {
+          id: event.id,
+          type: event.type,
+          outcome: HANDLED_TYPES.has(event.type) ? 'handled' : 'ignored',
+        },
+        { onConflict: 'id' },
+      )
+    if (logError) {
+      console.error(`${LOG_PREFIX} failed to log webhook event`, {
+        id: event.id,
+        message: logError.message,
+      })
+    }
 
     switch (event.type) {
       case 'checkout.session.completed': {

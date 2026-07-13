@@ -210,6 +210,29 @@ async function handleChangeBasePlan() {
       selectedBasePlanId.value,
       ...currentSubscriptionAddonIds.value,
     ]
+
+    // With no active base plan this is a brand-new subscription. modify-subscription
+    // requires an existing Stripe subscription and 400s otherwise ("No active
+    // subscription found"), so start Stripe Checkout instead.
+    if (!basePlan.value) {
+      const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
+        productIds,
+        `${window.location.origin}/billing/manage?session_id={CHECKOUT_SESSION_ID}`,
+        `${window.location.origin}/billing/manage`,
+      )
+      if (checkoutError) {
+        console.error('Base plan checkout error:', checkoutError)
+        changePlanError.value = 'Unable to start checkout right now. Please try again.'
+        return
+      }
+      if (data?.url) {
+        window.location.href = data.url
+        return
+      }
+      changePlanError.value = 'Unexpected response from checkout. Please try again.'
+      return
+    }
+
     const { error: changeError } = await subscriptionAPI.modifySubscription(productIds)
 
     if (changeError) {

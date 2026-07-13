@@ -282,24 +282,30 @@ export type Database = {
       }
       freemium_settings: {
         Row: {
+          core_daily_resume_advice: number
           id: number
           max_job_searches: number
           max_premium_insights: number
           max_resume_advice: number
+          premium_daily_resume_advice: number
           updated_at: string
         }
         Insert: {
+          core_daily_resume_advice?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_resume_advice?: number
           updated_at?: string
         }
         Update: {
+          core_daily_resume_advice?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_resume_advice?: number
           updated_at?: string
         }
         Relationships: []
@@ -341,6 +347,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_demand_signal: {
+        Row: {
+          current_count: number | null
+          growth_rate: number | null
+          last_calculated: string | null
+          location_slug: string
+          prior_count: number | null
+          rank: number | null
+          role_slug: string
+        }
+        Insert: {
+          current_count?: number | null
+          growth_rate?: number | null
+          last_calculated?: string | null
+          location_slug: string
+          prior_count?: number | null
+          rank?: number | null
+          role_slug: string
+        }
+        Update: {
+          current_count?: number | null
+          growth_rate?: number | null
+          last_calculated?: string | null
+          location_slug?: string
+          prior_count?: number | null
+          rank?: number | null
+          role_slug?: string
+        }
+        Relationships: []
+      }
+      job_demand_weekly_counts: {
+        Row: {
+          job_count: number | null
+          location_slug: string
+          role_slug: string
+          week_start: string
+        }
+        Insert: {
+          job_count?: number | null
+          location_slug: string
+          role_slug: string
+          week_start: string
+        }
+        Update: {
+          job_count?: number | null
+          location_slug?: string
+          role_slug?: string
+          week_start?: string
+        }
+        Relationships: []
       }
       job_hiring_contacts: {
         Row: {
@@ -754,6 +811,35 @@ export type Database = {
           },
         ]
       }
+      premium_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          profile_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          profile_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "premium_waitlist_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           available_for_purchase: boolean
@@ -901,67 +987,38 @@ export type Database = {
         }
         Relationships: []
       }
-      raw_jobs: {
+      resume_advice_daily_usage: {
         Row: {
-          "Apify Actor": string | null
-          "Apify Employee Count": string | null
-          "apollo data": Json | null
-          "Apollo Employee Count": string | null
-          "Apply Link": string | null
-          "Company Name": string | null
-          created_at: string
-          Description: string | null
-          Extras: string | null
-          id: number
-          Industry: string | null
-          "Job Highlights": string | null
-          "Job Title": string | null
-          Location: string | null
-          "Meta Data": string | null
-          "Reason for Apollo": string | null
+          count: number
+          profile_id: string
+          usage_date: string
         }
         Insert: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
+          count?: number
+          profile_id: string
+          usage_date: string
         }
         Update: {
-          "Apify Actor"?: string | null
-          "Apify Employee Count"?: string | null
-          "apollo data"?: Json | null
-          "Apollo Employee Count"?: string | null
-          "Apply Link"?: string | null
-          "Company Name"?: string | null
-          created_at?: string
-          Description?: string | null
-          Extras?: string | null
-          id?: number
-          Industry?: string | null
-          "Job Highlights"?: string | null
-          "Job Title"?: string | null
-          Location?: string | null
-          "Meta Data"?: string | null
-          "Reason for Apollo"?: string | null
+          count?: number
+          profile_id?: string
+          usage_date?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "resume_advice_daily_usage_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       resume_products: {
         Row: {
           completed_at: string | null
           created_at: string
+          daily_usage_date: string | null
+          error_message: string | null
           id: string
           improvements_text: string | null
           job_match_id: string | null
@@ -972,6 +1029,8 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          daily_usage_date?: string | null
+          error_message?: string | null
           id?: string
           improvements_text?: string | null
           job_match_id?: string | null
@@ -982,6 +1041,8 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          daily_usage_date?: string | null
+          error_message?: string | null
           id?: string
           improvements_text?: string | null
           job_match_id?: string | null
@@ -1172,6 +1233,39 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_pages: {
+        Row: {
+          h1: string | null
+          indexed: boolean | null
+          intro_copy: string | null
+          job_count: number | null
+          last_generated: string | null
+          meta_description: string | null
+          sample_listings: Json | null
+          url_path: string
+        }
+        Insert: {
+          h1?: string | null
+          indexed?: boolean | null
+          intro_copy?: string | null
+          job_count?: number | null
+          last_generated?: string | null
+          meta_description?: string | null
+          sample_listings?: Json | null
+          url_path: string
+        }
+        Update: {
+          h1?: string | null
+          indexed?: boolean | null
+          intro_copy?: string | null
+          job_count?: number | null
+          last_generated?: string | null
+          meta_description?: string | null
+          sample_listings?: Json | null
+          url_path?: string
+        }
+        Relationships: []
+      }
       sic_codes: {
         Row: {
           csv_industry_code: string | null
@@ -1187,6 +1281,51 @@ export type Database = {
           csv_industry_code?: string | null
           ewb_industry_code?: string | null
           industry_title?: string | null
+        }
+        Relationships: []
+      }
+      sponsorship_heuristic_scores: {
+        Row: {
+          company_name: string
+          employee_count: number | null
+          heuristic_label: string | null
+          heuristic_score: number | null
+          last_calculated: string | null
+        }
+        Insert: {
+          company_name: string
+          employee_count?: number | null
+          heuristic_label?: string | null
+          heuristic_score?: number | null
+          last_calculated?: string | null
+        }
+        Update: {
+          company_name?: string
+          employee_count?: number | null
+          heuristic_label?: string | null
+          heuristic_score?: number | null
+          last_calculated?: string | null
+        }
+        Relationships: []
+      }
+      stripe_webhook_events: {
+        Row: {
+          id: string
+          outcome: string
+          received_at: string
+          type: string
+        }
+        Insert: {
+          id: string
+          outcome: string
+          received_at?: string
+          type: string
+        }
+        Update: {
+          id?: string
+          outcome?: string
+          received_at?: string
+          type?: string
         }
         Relationships: []
       }
@@ -1219,6 +1358,53 @@ export type Database = {
           },
           {
             foreignKeyName: "subscription_product_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_reconciliation_audit: {
+        Row: {
+          id: string
+          new_period_ends_at: string | null
+          new_status: string | null
+          note: string | null
+          old_period_ends_at: string | null
+          old_status: string | null
+          reconciled_at: string
+          source: string
+          stripe_subscription_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          id?: string
+          new_period_ends_at?: string | null
+          new_status?: string | null
+          note?: string | null
+          old_period_ends_at?: string | null
+          old_status?: string | null
+          reconciled_at?: string
+          source: string
+          stripe_subscription_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          id?: string
+          new_period_ends_at?: string | null
+          new_status?: string | null
+          note?: string | null
+          old_period_ends_at?: string | null
+          old_status?: string | null
+          reconciled_at?: string
+          source?: string
+          stripe_subscription_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_reconciliation_audit_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
@@ -1367,6 +1553,21 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      redeem_daily_resume_advice: {
+        Args: {
+          p_daily_limit: number
+          p_job_match_id: string
+          p_product_id: string
+          p_profile_id: string
+        }
+        Returns: {
+          daily_limit: number
+          daily_used: number
+          err: string
+          ok: boolean
+          resume_product_id: string
+        }[]
+      }
       redeem_freemium_premium_insights: {
         Args: { p_job_match_id: string; p_profile_id: string }
         Returns: {
@@ -1393,6 +1594,10 @@ export type Database = {
       }
       refund_apollo_credits: {
         Args: { p_amount: number; p_name: string }
+        Returns: undefined
+      }
+      refund_daily_resume_advice: {
+        Args: { p_resume_product_id: string }
         Returns: undefined
       }
       refund_freemium_premium_insights: {
@@ -1445,7 +1650,7 @@ export type Database = {
         | "one_time_addon"
         | "one_time_item"
       product_type: "subscription" | "payment"
-      resume_product_status: "pending" | "complete" | "cancelled"
+      resume_product_status: "pending" | "complete" | "cancelled" | "failed"
       role_category:
         | "operations"
         | "maintenance"
@@ -1615,7 +1820,7 @@ export const Constants = {
         "one_time_item",
       ],
       product_type: ["subscription", "payment"],
-      resume_product_status: ["pending", "complete", "cancelled"],
+      resume_product_status: ["pending", "complete", "cancelled", "failed"],
       role_category: [
         "operations",
         "maintenance",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { jobsAPI } from '@/lib/jobs'
@@ -114,6 +114,45 @@ async function loadTailoringPurchase(matchId: string) {
   advicePurchase.value = data
 }
 
+// Fulfillment is asynchronous: the edge function returns 200 immediately and the row
+// reaches a terminal status later, either from the n8n result or from the stale-row
+// sweeper in run-scheduled-jobs. Poll past the sweeper's 10-minute threshold so a
+// stuck row resolves to 'failed' on screen instead of spinning forever.
+const ADVICE_POLL_INTERVAL_MS = 3000
+const ADVICE_POLL_TIMEOUT_MS = 12 * 60 * 1000
+
+let advicePollActive = false
+let advicePollCancelled = false
+
+function isTerminalAdviceStatus(status: ResumeProduct['status'] | undefined): boolean {
+  return status === 'complete' || status === 'failed' || status === 'cancelled'
+}
+
+async function pollAdviceUntilTerminal(matchId: string) {
+  if (advicePollActive) return
+  advicePollActive = true
+  const deadline = Date.now() + ADVICE_POLL_TIMEOUT_MS
+  try {
+    while (!advicePollCancelled && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, ADVICE_POLL_INTERVAL_MS))
+      if (advicePollCancelled) return
+      await loadTailoringPurchase(matchId)
+      const status = advicePurchase.value?.status
+      if (!status || isTerminalAdviceStatus(status)) return
+    }
+    if (!advicePollCancelled) {
+      tailoringError.value =
+        'Resume advice is taking longer than expected. Refresh the page to check again.'
+    }
+  } finally {
+    advicePollActive = false
+  }
+}
+
+onUnmounted(() => {
+  advicePollCancelled = true
+})
+
 onMounted(async () => {
   try {
     if (!jobIdParam) {
@@ -131,6 +170,10 @@ onMounted(async () => {
     }
     job.value = data
     await loadTailoringPurchase(data.matchId)
+    // A generation started on an earlier visit may still be in flight.
+    if (advicePurchase.value?.status === 'pending') {
+      void pollAdviceUntilTerminal(data.matchId)
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     loadError.value = message
@@ -155,22 +198,42 @@ function handleApplyClick() {
   window.open(job.value.applyLink, '_blank', 'noopener,noreferrer')
 }
 
+// A failed generation is retryable, so it behaves like no purchase at all: offer the
+// button again rather than the (empty) advice modal.
 const canPurchaseAdvice = computed(() => {
   const p = advicePurchase.value
   if (!p) return true
-  return p.status === 'cancelled'
+  return p.status === 'cancelled' || p.status === 'failed'
 })
 
 const showResumeAdviceButton = computed(() => {
   const p = advicePurchase.value
-  if (!p || p.status === 'cancelled') return false
+  if (!p || p.status === 'cancelled' || p.status === 'failed') return false
   return true
 })
+
+const adviceFailed = computed(() => advicePurchase.value?.status === 'failed')
+
+const adviceErrorMessage = computed(() => {
+  const p = advicePurchase.value
+  if (p?.status !== 'failed') return null
+  return p.error_message?.trim() || 'Resume advice could not be generated.'
+})
+
+// A terminal 'complete' always outranks a prior transient error: an earlier poll may
+// have timed out (or briefly seen a failure) before the callback wrote the result.
+watch(
+  () => advicePurchase.value?.status,
+  (status) => {
+    if (status === 'complete') tailoringError.value = null
+  },
+)
 
 const tailoringStatusLabel = computed(() => {
   const p = advicePurchase.value
   if (!p || p.status === 'cancelled') return null
   if (p.status === 'pending') return 'Generating resume advice'
+  if (p.status === 'failed') return 'Resume advice failed'
   return null
 })
 
@@ -489,14 +552,8 @@ async function executeTailoringCheckout() {
   }
   if (data && 'freemium' in data && data.freemium) {
     adviceModalOpen.value = true
-    for (let i = 0; i < 24; i++) {
-      await loadTailoringPurchase(job.value.matchId)
-      if (advicePurchase.value?.improvements_text?.trim()) {
-        break
-      }
-      await new Promise((r) => setTimeout(r, 1500))
-    }
     await loadTailoringPurchase(job.value.matchId)
+    await pollAdviceUntilTerminal(job.value.matchId)
     void userStore.refreshFreemium()
     adviceCheckoutLoading.value = false
     return
@@ -734,6 +791,7 @@ async function executeTailoringCheckout() {
             <ResumeAdviceModal
               :open="adviceModalOpen"
               :advice-text="advicePurchase?.improvements_text"
+              :error-message="adviceErrorMessage"
               @close="adviceModalOpen = false"
             />
             <PremiumInsightsModal
@@ -756,6 +814,17 @@ async function executeTailoringCheckout() {
               <div v-if="tailoringLoading" class="flex items-center gap-2">
                 <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
                 <span>Checking resume advice status…</span>
+              </div>
+              <div
+                v-else-if="adviceFailed"
+                class="flex items-start gap-2 text-red-600"
+              >
+                <font-awesome-icon
+                  :icon="['fas', 'exclamation-triangle']"
+                  class="mt-0.5 shrink-0"
+                  aria-hidden="true"
+                />
+                <span>{{ adviceErrorMessage }} You can try again.</span>
               </div>
               <div
                 v-else-if="tailoringStatusLabel"

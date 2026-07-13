@@ -3,6 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
 import { getFreemiumSettings } from '../_shared/freemium-settings.ts'
+import { resolveBaseTier } from '../_shared/base-tier.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,35 +83,6 @@ serve(async (req) => {
     }
 
     const settings = await getFreemiumSettings(supabaseAdmin)
-    if (settings.max_resume_advice <= 0) {
-      return new Response(JSON.stringify({ error: 'Free resume advice is disabled' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403,
-      })
-    }
-
-    const { data: limitsExists } = await supabaseAdmin
-      .from('freemium_usage')
-      .select('profile_id')
-      .eq('profile_id', profile.id)
-      .maybeSingle()
-
-    if (!limitsExists) {
-      const { error: insertLimErr } = await supabaseAdmin.from('freemium_usage').insert({
-        profile_id: profile.id,
-        selected_tier_key: 'entry_mid',
-        job_searches_used: 0,
-        resume_advice_used: 0,
-        premium_insights_used: 0,
-      })
-      if (insertLimErr) {
-        console.error('freemium-resume-advice: failed to create freemium_usage', insertLimErr)
-        return new Response(JSON.stringify({ error: 'Freemium limits not available' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        })
-      }
-    }
 
     const { data: productRow, error: productError } = await supabaseAdmin
       .from('products')
@@ -125,56 +97,162 @@ serve(async (req) => {
       })
     }
 
-    const { data: redeemRows, error: redeemError } = await supabaseAdmin.rpc(
-      'redeem_freemium_resume_advice',
-      {
-        p_profile_id: profile.id,
-        p_job_match_id: jobMatchId,
-        p_product_id: productRow.id,
-      },
-    )
+    // Tier decides the quota path. Core/Premium use a per-UTC-day counter
+    // (resume_advice_daily_usage); Free uses its lifetime counter (freemium_usage). These are
+    // deliberately separate so subscribed tiers don't share the free lifetime cap.
+    const tier = await resolveBaseTier(supabaseAdmin, profile.id)
 
-    if (redeemError) {
-      console.error('freemium-resume-advice: rpc failed', redeemError)
-      return new Response(JSON.stringify({ error: 'Failed to redeem free resume advice' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      })
-    }
+    let resumeProductId: string
+    let responseBody: Record<string, unknown>
 
-    const row = Array.isArray(redeemRows) ? redeemRows[0] : null
-    if (!row?.ok) {
-      const err = typeof row?.err === 'string' ? row.err : 'unknown'
-      const status = err === 'not_found' ? 404 : err === 'already_purchased' ? 409 : 403
-      return new Response(
-        JSON.stringify({
-          error:
-            err === 'quota_exceeded'
-              ? 'No free resume advice redemptions remaining'
-              : err === 'already_purchased'
-                ? 'Resume advice already exists for this job'
-                : err === 'not_found'
-                  ? 'Job match not found'
-                  : err === 'disabled'
-                    ? 'Free resume advice is disabled'
-                    : 'Cannot redeem free resume advice',
-          code: err,
-          resumeAdviceUsed: row?.resume_advice_used ?? 0,
-          resumeAdviceRemaining: Math.max(
-            0,
-            (row?.max_resume_advice ?? settings.max_resume_advice) - (row?.resume_advice_used ?? 0),
-          ),
-        }),
+    if (tier === 'core' || tier === 'premium') {
+      const dailyLimit =
+        tier === 'premium' ? settings.premium_daily_resume_advice : settings.core_daily_resume_advice
+
+      const { data: redeemRows, error: redeemError } = await supabaseAdmin.rpc(
+        'redeem_daily_resume_advice',
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status,
+          p_profile_id: profile.id,
+          p_job_match_id: jobMatchId,
+          p_product_id: productRow.id,
+          p_daily_limit: dailyLimit,
         },
       )
-    }
 
-    const resumeProductId = row.resume_product_id as string
-    const maxResume = typeof row.max_resume_advice === 'number' ? row.max_resume_advice : settings.max_resume_advice
-    const used = typeof row.resume_advice_used === 'number' ? row.resume_advice_used : 0
+      if (redeemError) {
+        console.error('freemium-resume-advice: daily rpc failed', redeemError)
+        return new Response(JSON.stringify({ error: 'Failed to redeem resume advice' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        })
+      }
+
+      const row = Array.isArray(redeemRows) ? redeemRows[0] : null
+      if (!row?.ok) {
+        const err = typeof row?.err === 'string' ? row.err : 'unknown'
+        const status = err === 'not_found' ? 404 : err === 'already_purchased' ? 409 : 403
+        const limit = typeof row?.daily_limit === 'number' ? row.daily_limit : dailyLimit
+        const usedToday = typeof row?.daily_used === 'number' ? row.daily_used : 0
+        return new Response(
+          JSON.stringify({
+            error:
+              err === 'quota_exceeded'
+                ? `You've reached your daily resume advice limit (${limit}/day). It resets at midnight UTC.`
+                : err === 'already_purchased'
+                  ? 'Resume advice already exists for this job'
+                  : err === 'not_found'
+                    ? 'Job match not found'
+                    : err === 'disabled'
+                      ? 'Resume advice is disabled'
+                      : 'Cannot redeem resume advice',
+            code: err,
+            tier,
+            dailyUsed: usedToday,
+            dailyLimit: limit,
+            dailyRemaining: Math.max(0, limit - usedToday),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status },
+        )
+      }
+
+      resumeProductId = row.resume_product_id as string
+      const usedToday = typeof row.daily_used === 'number' ? row.daily_used : 0
+      responseBody = {
+        resumeProductId,
+        tier,
+        dailyUsed: usedToday,
+        dailyRemaining: Math.max(0, dailyLimit - usedToday),
+        dailyLimit,
+      }
+    } else {
+      // Free tier: lifetime credit path.
+      if (settings.max_resume_advice <= 0) {
+        return new Response(JSON.stringify({ error: 'Free resume advice is disabled' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        })
+      }
+
+      const { data: limitsExists } = await supabaseAdmin
+        .from('freemium_usage')
+        .select('profile_id')
+        .eq('profile_id', profile.id)
+        .maybeSingle()
+
+      if (!limitsExists) {
+        const { error: insertLimErr } = await supabaseAdmin.from('freemium_usage').insert({
+          profile_id: profile.id,
+          selected_tier_key: 'entry_mid',
+          job_searches_used: 0,
+          resume_advice_used: 0,
+          premium_insights_used: 0,
+        })
+        if (insertLimErr) {
+          console.error('freemium-resume-advice: failed to create freemium_usage', insertLimErr)
+          return new Response(JSON.stringify({ error: 'Freemium limits not available' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          })
+        }
+      }
+
+      const { data: redeemRows, error: redeemError } = await supabaseAdmin.rpc(
+        'redeem_freemium_resume_advice',
+        {
+          p_profile_id: profile.id,
+          p_job_match_id: jobMatchId,
+          p_product_id: productRow.id,
+        },
+      )
+
+      if (redeemError) {
+        console.error('freemium-resume-advice: rpc failed', redeemError)
+        return new Response(JSON.stringify({ error: 'Failed to redeem free resume advice' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        })
+      }
+
+      const row = Array.isArray(redeemRows) ? redeemRows[0] : null
+      if (!row?.ok) {
+        const err = typeof row?.err === 'string' ? row.err : 'unknown'
+        const status = err === 'not_found' ? 404 : err === 'already_purchased' ? 409 : 403
+        return new Response(
+          JSON.stringify({
+            error:
+              err === 'quota_exceeded'
+                ? 'No free resume advice redemptions remaining'
+                : err === 'already_purchased'
+                  ? 'Resume advice already exists for this job'
+                  : err === 'not_found'
+                    ? 'Job match not found'
+                    : err === 'disabled'
+                      ? 'Free resume advice is disabled'
+                      : 'Cannot redeem free resume advice',
+            code: err,
+            resumeAdviceUsed: row?.resume_advice_used ?? 0,
+            resumeAdviceRemaining: Math.max(
+              0,
+              (row?.max_resume_advice ?? settings.max_resume_advice) - (row?.resume_advice_used ?? 0),
+            ),
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status,
+          },
+        )
+      }
+
+      resumeProductId = row.resume_product_id as string
+      const maxResume = typeof row.max_resume_advice === 'number' ? row.max_resume_advice : settings.max_resume_advice
+      const used = typeof row.resume_advice_used === 'number' ? row.resume_advice_used : 0
+      responseBody = {
+        resumeProductId,
+        resumeAdviceUsed: used,
+        resumeAdviceRemaining: Math.max(0, maxResume - used),
+        maxResumeAdvice: maxResume,
+      }
+    }
 
     EdgeRuntime.waitUntil(
       fulfillResumeProductViaN8n({
@@ -191,18 +269,10 @@ serve(async (req) => {
       ),
     )
 
-    return new Response(
-      JSON.stringify({
-        resumeProductId,
-        resumeAdviceUsed: used,
-        resumeAdviceRemaining: Math.max(0, maxResume - used),
-        maxResumeAdvice: maxResume,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
+    return new Response(JSON.stringify(responseBody), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     return new Response(JSON.stringify({ error: message }), {

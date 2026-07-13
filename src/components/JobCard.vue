@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
@@ -46,6 +46,36 @@ function goUpgrade() {
 const adviceLoading = ref(false)
 const adviceError = ref<string | null>(null)
 const adviceModalOpen = ref(false)
+
+// Fulfillment is async: the row reaches a terminal status later, via the n8n callback or
+// the stale-row sweeper. Poll past the sweeper's 10-min threshold so a stuck row resolves
+// to 'failed' on screen instead of the old bounded loop giving up mid-generation (~112s).
+// Only emit refresh-advice at terminal, to avoid hammering the dashboard with reloads.
+const ADVICE_POLL_INTERVAL_MS = 3000
+const ADVICE_POLL_TIMEOUT_MS = 12 * 60 * 1000
+let advicePollCancelled = false
+
+function isTerminalAdviceStatus(status: ResumeProduct['status'] | undefined): boolean {
+  return status === 'complete' || status === 'failed' || status === 'cancelled'
+}
+
+async function pollAdviceUntilTerminal(matchId: string) {
+  const deadline = Date.now() + ADVICE_POLL_TIMEOUT_MS
+  while (!advicePollCancelled && Date.now() < deadline) {
+    const { data: row } = await resumeProductsAPI.getTailoringPurchaseForMatch(matchId)
+    if (advicePollCancelled) return
+    if (isTerminalAdviceStatus(row?.status)) {
+      emit('refresh-advice')
+      return
+    }
+    await new Promise((r) => setTimeout(r, ADVICE_POLL_INTERVAL_MS))
+  }
+  if (!advicePollCancelled) emit('refresh-advice')
+}
+
+onUnmounted(() => {
+  advicePollCancelled = true
+})
 
 const precheckOpen = ref(false)
 const precheckVariant = ref<'upload-required' | 'confirm-free-credit'>('upload-required')
@@ -110,16 +140,26 @@ function onConfirmFreeCredit() {
   void runAdviceCheckout()
 }
 
+// A failed row is retryable, so it offers the purchase/generate button again — like no
+// purchase at all. A complete row shows the result (View button), never a re-buy.
 const showAdviceButton = computed(() => {
   const p = props.advicePurchase
   if (!p) return true
-  return p.status === 'cancelled'
+  return p.status === 'cancelled' || p.status === 'failed'
 })
 
 const showResumeAdviceButton = computed(() => {
   const p = props.advicePurchase
-  if (!p || p.status === 'cancelled') return false
+  if (!p || p.status === 'cancelled' || p.status === 'failed') return false
   return true
+})
+
+const adviceFailed = computed(() => props.advicePurchase?.status === 'failed')
+
+const adviceErrorMessage = computed<string | null>(() => {
+  const p = props.advicePurchase
+  if (p?.status !== 'failed') return null
+  return p.error_message?.trim() || 'Resume advice could not be generated.'
 })
 
 const adviceStatusText = computed<string | null>(() => {
@@ -342,15 +382,8 @@ async function runAdviceCheckout() {
     }
     if (data && 'freemium' in data && data.freemium) {
       adviceModalOpen.value = true
-      for (let i = 0; i < 24; i++) {
-        emit('refresh-advice')
-        const { data: row } = await resumeProductsAPI.getTailoringPurchaseForMatch(props.job.matchId)
-        if (row?.improvements_text?.trim()) {
-          break
-        }
-        await new Promise((r) => setTimeout(r, 1500))
-      }
       emit('refresh-advice')
+      await pollAdviceUntilTerminal(props.job.matchId)
       void userStore.refreshFreemium()
       adviceLoading.value = false
       return
@@ -563,6 +596,7 @@ async function runAdviceCheckout() {
       <ResumeAdviceModal
         :open="adviceModalOpen"
         :advice-text="advicePurchase?.improvements_text"
+        :error-message="adviceErrorMessage"
         @close="adviceModalOpen = false"
       />
       <PremiumInsightsModal
@@ -577,7 +611,10 @@ async function runAdviceCheckout() {
         @close="onCloseInsightsModal"
         @confirm-org-choice="onConfirmOrgDisambiguation"
       />
-      <p v-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">
+      <p v-if="adviceFailed" class="mt-2 text-xs text-red-600">
+        {{ adviceErrorMessage }} You can try again.
+      </p>
+      <p v-else-if="adviceStatusText" class="mt-2 text-xs text-neutral-body">
         {{ adviceStatusText }}
       </p>
       <p v-else-if="adviceError" class="mt-2 text-xs text-red-600">

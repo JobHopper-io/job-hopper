@@ -3,13 +3,29 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 }
 
 const PER_RUN_LIMIT = 25
 const INVOCATION_TIMEOUT_MS = 60_000
 const STALE_MINUTES = 20
 const ERROR_MESSAGE_MAX_LENGTH = 1000
+
+// Resume fulfillment runs inside EdgeRuntime.waitUntil, which is best-effort: the
+// isolate can be dropped mid-flight (reason "EarlyDrop") while awaiting n8n, leaving
+// the row 'pending' with no code alive to mark it otherwise. This is the safety net.
+// Keep comfortably above a legitimate LLM round-trip so a live row is never swept.
+const RESUME_STALE_MINUTES = 10
+
+function isAuthorized(req: Request): boolean {
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  const header = req.headers.get('x-cron-secret')
+  if (cronSecret && header === cronSecret) return true
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const auth = req.headers.get('Authorization')
+  if (serviceKey && auth === `Bearer ${serviceKey}`) return true
+  return false
+}
 
 type ScheduledJobRow = {
   id: string
@@ -32,14 +48,20 @@ serve(async (req) => {
     requestedAt: new Date().toISOString(),
   })
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const authHeader = req.headers.get('Authorization') ?? ''
+  if (!isAuthorized(req)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401,
+    })
+  }
 
-  if (!supabaseUrl || !anonKey) {
-    console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY for run-scheduled-jobs', {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for run-scheduled-jobs', {
       hasSupabaseUrl: !!supabaseUrl,
-      hasAnonKey: !!anonKey,
+      hasServiceRoleKey: !!serviceRoleKey,
     })
 
     return new Response(
@@ -51,12 +73,11 @@ serve(async (req) => {
     )
   }
 
-  const supabase = createClient(supabaseUrl, anonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
+  // scheduled_jobs has RLS on with no policies and grants only to service_role, so an
+  // anon client silently reads and writes zero rows. Target functions are likewise
+  // invoked with the service role bearer, since pg_cron sends no Authorization header.
+  const invocationAuthHeader = `Bearer ${serviceRoleKey}`
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   })
 
@@ -88,6 +109,51 @@ serve(async (req) => {
         status: 500,
       },
     )
+  }
+
+  // 1b. Recover stale "pending" resume_products. Aged off created_at because the table
+  // has no started_at; fulfillment begins immediately after the row is created.
+  const resumeStaleThreshold = new Date(
+    Date.now() - RESUME_STALE_MINUTES * 60 * 1000,
+  ).toISOString()
+
+  const { data: sweptResumeRows, error: resumeStaleError } = await supabase
+    .from('resume_products')
+    .update({
+      status: 'failed',
+      error_message: truncate(
+        `Fulfillment did not complete within ${RESUME_STALE_MINUTES} minutes; the worker was likely terminated before n8n responded`,
+        ERROR_MESSAGE_MAX_LENGTH,
+      ),
+      completed_at: now,
+    })
+    .eq('status', 'pending')
+    .lt('created_at', resumeStaleThreshold)
+    .select('id')
+
+  if (resumeStaleError) {
+    // Auxiliary to the scheduler's own work; log and keep going rather than abort the run.
+    console.error('Failed to recover stale resume_products', {
+      error: resumeStaleError.message,
+    })
+  } else if ((sweptResumeRows?.length ?? 0) > 0) {
+    console.log('recovered stale resume_products', {
+      count: sweptResumeRows?.length ?? 0,
+      staleMinutes: RESUME_STALE_MINUTES,
+    })
+    // Reverse the Core/Premium daily credit each swept row held (no-op for free-tier rows).
+    // These rows were EarlyDropped mid-fulfillment, so markResumeProductFailed never ran.
+    for (const swept of sweptResumeRows ?? []) {
+      const { error: refundError } = await supabase.rpc('refund_daily_resume_advice', {
+        p_resume_product_id: swept.id,
+      })
+      if (refundError) {
+        console.error('Failed to refund daily resume credit for swept row', {
+          resumeProductId: swept.id,
+          error: refundError.message,
+        })
+      }
+    }
   }
 
   // 2. Select pending jobs
@@ -154,7 +220,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: authHeader,
+          Authorization: invocationAuthHeader,
         },
         body: JSON.stringify(job.payload ?? {}),
         signal: controller.signal,
