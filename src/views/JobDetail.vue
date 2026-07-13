@@ -212,10 +212,6 @@ const showResumeAdviceButton = computed(() => {
   return true
 })
 
-const adviceComplete = computed(
-  () => advicePurchase.value?.status === 'complete' && !!advicePurchase.value.improvements_text?.trim(),
-)
-
 const adviceFailed = computed(() => advicePurchase.value?.status === 'failed')
 
 const adviceErrorMessage = computed(() => {
