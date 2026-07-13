@@ -9,10 +9,23 @@
 //
 // This file touches NOTHING in the data pipeline. It is display-only.
 //
+// Build-time environment variables (all read from process.env only):
+//   - SUPABASE_URL              — project the n8n workflow writes seo_pages to
+//   - SUPABASE_SERVICE_ROLE_KEY — build-only, read-only use here (query the table)
+//   - SITE_URL                  — public origin for canonicals + sitemap
+//                                 (e.g. https://job-hopper.io). Required; fails loudly.
+//   - SIGNUP_URL                — CTA target (absolute URL or path). Optional;
+//                                 defaults to /register with a warning when unset.
+//
 // Security invariants:
 //   - SUPABASE_SERVICE_ROLE_KEY is read from process.env ONLY. It is used solely
 //     to query the table at build time. It is never logged and never written into
 //     any generated file.
+//
+// Resilience invariant:
+//   - This generator runs on EVERY Netlify build, including plain app deploys.
+//     A single malformed/unsupported row must never fail the build. Such rows are
+//     warned about and skipped; every other page is still generated.
 //
 // The render/helper functions are exported so they can be unit-tested and
 // exercised against fixtures. `main()` only runs when the file is invoked
@@ -131,15 +144,20 @@ export function relatedPages(row, allRows, max = 5) {
 /**
  * Choose the template for a row by page type. `page_type` may not exist yet;
  * read it defensively and default to the listing template.
+ *
+ * Returns `null` for any page type we cannot render yet (including `content`,
+ * whose template is not built). Callers must skip null rows — never fail the
+ * build over one unsupported row.
  */
 export function pickTemplate(row) {
   const type = row.page_type ?? 'listing';
   switch (type) {
-    case 'content':
-      return renderContentPage;
     case 'listing':
-    default:
       return renderListingPage;
+    // 'content' is intentionally unsupported until the content template is
+    // built (see renderContentPage); it falls through to null and is skipped.
+    default:
+      return null;
   }
 }
 
@@ -174,7 +192,7 @@ function listingCard(listing) {
  * an aggregation page risks a domain-wide Google manual action. Everything in
  * the JSON-LD is also rendered visibly on the page.
  */
-export function renderListingPage(row, { siteUrl, related = [] }) {
+export function renderListingPage(row, { siteUrl, related = [], signupUrl = '/register' }) {
   const canonical = absoluteUrl(siteUrl, row.url_path);
   const h1 = row.h1 ?? '';
   const title = `${h1} | ${SITE_SUFFIX}`;
@@ -256,7 +274,7 @@ ${cards}
       </ul>
     </section>
     <section class="cta">
-      <a class="cta-button" href="${escapeHtml(absoluteUrl(siteUrl, '/register'))}">See all ${escapeHtml(String(jobCount))} roles</a>
+      <a class="cta-button" href="${escapeHtml(signupUrl)}">See all ${escapeHtml(String(jobCount))} roles</a>
     </section>
 ${relatedHtml}
   </main>
@@ -330,24 +348,55 @@ async function main() {
     throw new Error(`Failed to query seo_pages: ${error.message}`);
   }
 
+  // SIGNUP_URL decouples the CTA from this origin (the app may live elsewhere).
+  // Optional: fall back to a relative /register, but warn so the fallback is visible.
+  const signupUrl = process.env.SIGNUP_URL;
+  if (!signupUrl) {
+    console.warn('WARNING: SIGNUP_URL is unset; CTA falling back to relative "/register".');
+  }
+  const ctaHref = signupUrl || '/register';
+
   const pages = rows ?? [];
   console.log(`Generating ${pages.length} indexed SEO page(s)...`);
 
-  let written = 0;
+  const generated = [];
+  const skipped = [];
   for (const row of pages) {
     const template = pickTemplate(row);
-    const html = template(row, { siteUrl, related: relatedPages(row, pages) });
-    const outFile = outputFileForUrlPath(DIST_DIR, row.url_path);
-    await mkdir(dirname(outFile), { recursive: true });
-    await writeFile(outFile, html, 'utf8');
-    written += 1;
+    if (!template) {
+      // Unknown/unsupported page_type: skip this row, never fail the build.
+      console.warn(
+        `WARNING: skipping ${row.url_path} — unsupported page_type "${row.page_type ?? 'listing'}".`,
+      );
+      skipped.push(row.url_path);
+      continue;
+    }
+    try {
+      const html = template(row, {
+        siteUrl,
+        signupUrl: ctaHref,
+        related: relatedPages(row, pages),
+      });
+      const outFile = outputFileForUrlPath(DIST_DIR, row.url_path);
+      await mkdir(dirname(outFile), { recursive: true });
+      await writeFile(outFile, html, 'utf8');
+      generated.push(row);
+    } catch (rowErr) {
+      // A malformed row must not take the whole build (and the site) down.
+      console.warn(`WARNING: skipping ${row.url_path} — render failed: ${rowErr.message}`);
+      skipped.push(row.url_path);
+    }
   }
 
-  // Sitemap is written last, after every page exists.
-  const sitemap = buildSitemap(pages, siteUrl);
+  // Sitemap is written last, after every page exists. Only successfully
+  // generated pages are listed (skipped rows have no file to serve).
+  const sitemap = buildSitemap(generated, siteUrl);
   await writeFile(join(DIST_DIR, 'sitemap.xml'), sitemap, 'utf8');
 
-  console.log(`Wrote ${written} page(s) and dist/sitemap.xml`);
+  console.log(
+    `SEO generation complete: ${generated.length} generated, ${skipped.length} skipped.` +
+      (skipped.length ? ` Skipped: ${skipped.join(', ')}` : ''),
+  );
 }
 
 // Only run main() when invoked directly (not when imported for tests/fixtures).

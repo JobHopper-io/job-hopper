@@ -1,7 +1,22 @@
 [build]
   publish = "dist"
-  command = "npm run build"
+  # `npm run build` = type-check + vite build; then pre-render the SEO pages
+  # (scripts/generate-seo-pages.mjs) into dist/ so they ship as static HTML.
+  command = "npm run build && node scripts/generate-seo-pages.mjs"
 
+# Canonicalize away trailing slashes on SEO pages: /jobs/x/y/ -> /jobs/x/y.
+# Our canonical tags have no trailing slash; this prevents the slash variant
+# from resolving as a separate duplicate URL. Forced so it wins over the
+# folder/index.html serving of the same directory. Must precede the SPA catch-all.
+[[redirects]]
+  from = "/jobs/*/"
+  to = "/jobs/:splat"
+  status = 301
+  force = true
+
+# SPA fallback for the Vue app. UNFORCED (no `force`/`!`), so real static files
+# — including the pre-rendered /jobs/**/index.html SEO pages — are served first
+# and only unmatched paths fall through to the app shell.
 [[redirects]]
   from = "/*"
   to = "/index.html"

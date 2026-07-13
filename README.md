@@ -56,3 +56,25 @@ To test in a non‑production environment:
 2. Set the above secrets for your local Supabase Edge Functions.
 3. Trigger an email (e.g. complete checkout to hit `stripe-webhook`, or invoke `match-jobs` / `send-system-announcement` via the Supabase CLI).
 4. Verify delivery in the Mailtrap Email Sending dashboard or logs.
+
+### SEO static pages (Netlify build)
+
+On every Netlify deploy, after `vite build`, `scripts/generate-seo-pages.mjs` reads
+the `seo_pages` table (populated independently by n8n) and pre-renders one static
+HTML file per indexed row into `dist/<url_path>/index.html`, plus `dist/sitemap.xml`.
+This keeps the SEO landing pages crawlable (the Vue SPA is client-rendered).
+
+**Required Netlify build environment variables** (set in Netlify site settings, not the repo):
+
+- `SUPABASE_URL`: project the n8n workflow writes `seo_pages` to.
+- `SUPABASE_SERVICE_ROLE_KEY`: build-only, read-only use — used solely to query
+  `seo_pages` at build time. Never written into generated HTML, never logged.
+- `SITE_URL`: public origin for canonical tags + the sitemap, e.g. `https://job-hopper.io`.
+  Required; the build fails loudly if unset. **Note:** this is a *Netlify build var*
+  and is distinct from the same-named Supabase Edge Function secret used for email links.
+- `SIGNUP_URL` (optional): CTA target on each page (an absolute URL like
+  `https://app.job-hopper.io/register`, or a path like `/register`). Defaults to
+  `/register` with a warning when unset.
+
+A row whose `page_type` is unknown/unsupported is warned about and skipped; it never
+fails the build. The generator prints a summary of pages generated vs. skipped.
