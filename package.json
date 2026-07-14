@@ -14,7 +14,8 @@
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",
     "db:types": "npx supabase gen types typescript --project-id imekpzzvylngpoagcdow --schema public > src/types/supabase.ts",
-    "db:types:local": "npx supabase gen types typescript --local --schema public > src/types/supabase.ts"
+    "db:types:local": "npx supabase gen types typescript --local --schema public > src/types/supabase.ts",
+    "extract-docs": "node scripts/extract-support-docs.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
