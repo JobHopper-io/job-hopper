@@ -348,6 +348,78 @@ export type Database = {
           },
         ]
       }
+      job_applications: {
+        Row: {
+          applied_at: string | null
+          apply_link: string | null
+          company_name: string | null
+          created_at: string
+          id: string
+          job_id: string | null
+          job_title: string | null
+          location: string | null
+          match_id: string
+          notes: string | null
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          profile_id: string
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          apply_link?: string | null
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          job_title?: string | null
+          location?: string | null
+          match_id: string
+          notes?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          profile_id: string
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          apply_link?: string | null
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          job_title?: string | null
+          location?: string | null
+          match_id?: string
+          notes?: string | null
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          profile_id?: string
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_demand_signal: {
         Row: {
           current_count: number | null
@@ -1241,6 +1313,8 @@ export type Database = {
           job_count: number | null
           last_generated: string | null
           meta_description: string | null
+          page_data: Json | null
+          page_type: string
           sample_listings: Json | null
           url_path: string
         }
@@ -1251,6 +1325,8 @@ export type Database = {
           job_count?: number | null
           last_generated?: string | null
           meta_description?: string | null
+          page_data?: Json | null
+          page_type?: string
           sample_listings?: Json | null
           url_path: string
         }
@@ -1261,6 +1337,8 @@ export type Database = {
           job_count?: number | null
           last_generated?: string | null
           meta_description?: string | null
+          page_data?: Json | null
+          page_type?: string
           sample_listings?: Json | null
           url_path?: string
         }
@@ -1444,6 +1522,33 @@ export type Database = {
           },
         ]
       }
+      support_doc_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          embedding: string | null
+          id: string
+          source_doc: string
+          updated_at: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          embedding?: string | null
+          id?: string
+          source_doc: string
+          updated_at?: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          embedding?: string | null
+          id?: string
+          source_doc?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_announcements: {
         Row: {
           created_at: string
@@ -1553,6 +1658,19 @@ export type Database = {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
       }
+      match_support_chunks: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          similarity: number
+          source_doc: string
+        }[]
+      }
       redeem_daily_resume_advice: {
         Args: {
           p_daily_limit: number
@@ -1623,6 +1741,12 @@ export type Database = {
       }
     }
     Enums: {
+      application_status:
+        | "saved"
+        | "applied"
+        | "interviewing"
+        | "rejected"
+        | "ghosted"
       bd_leads_status:
         | "New"
         | "Ready to Process"
@@ -1789,6 +1913,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      application_status: [
+        "saved",
+        "applied",
+        "interviewing",
+        "rejected",
+        "ghosted",
+      ],
       bd_leads_status: [
         "New",
         "Ready to Process",

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
-import type { PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
+import type { JobSnapshot } from '@/lib/applications'
+import type { ApplicationStatus, PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
@@ -17,12 +18,19 @@ import InfoHint from '@/components/InfoHint.vue'
 const props = defineProps<{
   job: MatchedJob
   advicePurchase?: ResumeProduct | null
+  applicationStatus?: ApplicationStatus | null
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle-save', matchId: string, isSaved: boolean): void
   (e: 'refresh-advice'): void
   (e: 'refresh-job-matches'): void
+  (
+    e: 'update-application-status',
+    matchId: string,
+    status: ApplicationStatus | null,
+    job: JobSnapshot,
+  ): void
 }>()
 
 const router = useRouter()
@@ -41,6 +49,58 @@ const isFree = computed(() => baseTier.value === 'free')
 
 function goUpgrade() {
   void router.push({ name: 'billing-purchase' })
+}
+
+// ── Application status tagging ──────────────────────────────────────────
+const statusOptions: { value: ApplicationStatus; label: string; chipClass: string }[] = [
+  { value: 'saved', label: 'Saved', chipClass: 'bg-gray-100 text-gray-600' },
+  { value: 'applied', label: 'Applied', chipClass: 'bg-blue-50 text-blue-700' },
+  { value: 'interviewing', label: 'Interviewing', chipClass: 'bg-purple-50 text-purple-700' },
+  { value: 'rejected', label: 'Rejected', chipClass: 'bg-red-50 text-red-700' },
+  { value: 'ghosted', label: 'Ghosted', chipClass: 'bg-amber-50 text-amber-700' },
+]
+
+const statusDropdownOpen = ref(false)
+const statusDropdownEl = ref<HTMLElement | null>(null)
+
+const currentStatusConfig = computed(() =>
+  props.applicationStatus
+    ? statusOptions.find((o) => o.value === props.applicationStatus) ?? null
+    : null,
+)
+
+function handleClickOutside(e: MouseEvent) {
+  if (statusDropdownEl.value && !statusDropdownEl.value.contains(e.target as Node)) {
+    statusDropdownOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', handleClickOutside))
+onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
+
+function toggleStatusDropdown() {
+  statusDropdownOpen.value = !statusDropdownOpen.value
+}
+
+const jobSnapshot = computed<JobSnapshot>(() => ({
+  jobId: props.job.jobId || null,
+  title: props.job.title,
+  company: props.job.company,
+  applyLink: props.job.applyLink,
+  location: props.job.location,
+  payMin: props.job.payMin,
+  payMax: props.job.payMax,
+  payType: props.job.payType,
+}))
+
+function selectStatus(status: ApplicationStatus | null) {
+  statusDropdownOpen.value = false
+  emit('update-application-status', props.job.matchId, status, jobSnapshot.value)
+}
+
+function clearStatus(e: MouseEvent) {
+  e.stopPropagation()
+  selectStatus(null)
 }
 
 const adviceLoading = ref(false)
@@ -439,6 +499,13 @@ async function runAdviceCheckout() {
               :value="null"
               locked
             />
+            <span
+              v-if="!isFree && currentStatusConfig"
+              class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              :class="currentStatusConfig.chipClass"
+            >
+              {{ currentStatusConfig.label }}
+            </span>
           </div>
         </div>
         <button
@@ -495,6 +562,84 @@ async function runAdviceCheckout() {
           </button>
         </template>
         <template v-else>
+          <!-- Application status tagging -->
+          <div ref="statusDropdownEl" class="relative inline-flex">
+            <button
+              type="button"
+              :class="[
+                actionBtn,
+                currentStatusConfig
+                  ? 'border-brand-primary/40 bg-white text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5'
+                  : 'border border-dashed border-neutral-border bg-neutral-bg text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30',
+              ]"
+              @click="toggleStatusDropdown"
+            >
+              <span v-if="currentStatusConfig" class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-2 w-2 rounded-full"
+                  :class="{
+                    'bg-gray-400': props.applicationStatus === 'saved',
+                    'bg-blue-500': props.applicationStatus === 'applied',
+                    'bg-purple-500': props.applicationStatus === 'interviewing',
+                    'bg-red-500': props.applicationStatus === 'rejected',
+                    'bg-amber-500': props.applicationStatus === 'ghosted',
+                  }"
+                />
+                {{ currentStatusConfig.label }}
+              </span>
+              <span v-else class="flex items-center gap-1.5">
+                <font-awesome-icon :icon="['fas', 'tag']" class="text-xs opacity-70" aria-hidden="true" />
+                Track status
+              </span>
+              <font-awesome-icon :icon="['fas', 'chevron-down']" class="ml-1 text-[10px] opacity-60" aria-hidden="true" />
+            </button>
+            <!-- Dropdown menu -->
+            <div
+              v-if="statusDropdownOpen"
+              class="absolute left-0 top-full z-50 mt-1 min-w-[170px] rounded-[12px] border border-neutral-border bg-white shadow-lg"
+              role="menu"
+            >
+              <div class="py-1.5">
+                <button
+                  v-for="opt in statusOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm transition-colors hover:bg-neutral-bg/80"
+                  :class="props.applicationStatus === opt.value ? 'font-semibold text-brand-charcoal' : 'text-neutral-body'"
+                  role="menuitem"
+                  @click="selectStatus(opt.value)"
+                >
+                  <span
+                    class="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    :class="{
+                      'bg-gray-400': opt.value === 'saved',
+                      'bg-blue-500': opt.value === 'applied',
+                      'bg-purple-500': opt.value === 'interviewing',
+                      'bg-red-500': opt.value === 'rejected',
+                      'bg-amber-500': opt.value === 'ghosted',
+                    }"
+                  />
+                  <span
+                    class="rounded-[8px] px-2 py-0.5 text-xs font-medium"
+                    :class="opt.chipClass"
+                  >
+                    {{ opt.label }}
+                  </span>
+                </button>
+                <div v-if="currentStatusConfig" class="border-t border-neutral-border my-1" />
+                <button
+                  v-if="currentStatusConfig"
+                  type="button"
+                  class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-neutral-body transition-colors hover:bg-neutral-bg/80"
+                  role="menuitem"
+                  @click="clearStatus"
+                >
+                  <font-awesome-icon :icon="['fas', 'xmark']" class="text-xs opacity-70" aria-hidden="true" />
+                  Clear status
+                </button>
+              </div>
+            </div>
+          </div>
           <span v-if="showAdviceButton" class="inline-flex items-center gap-1.5">
             <button
               type="button"

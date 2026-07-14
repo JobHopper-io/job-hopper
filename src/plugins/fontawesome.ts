@@ -29,6 +29,8 @@ import {
   faChevronDown,
   faClipboardList,
   faArrowUpRightFromSquare,
+  faSackDollar,
+  faTag,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -60,6 +62,8 @@ library.add(
   faChevronDown,
   faClipboardList,
   faArrowUpRightFromSquare,
+  faSackDollar,
+  faTag,
   faTiktok,
   faInstagram,
 )

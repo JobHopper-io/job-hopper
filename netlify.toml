@@ -14,6 +14,22 @@
   status = 301
   force = true
 
+# Bare /jobs (no category/location) has no generated SEO page and no Vue route,
+# but dist/jobs/ exists as a directory (holding the generated category/location
+# pages), so it counts as an asset match and would 404 before reaching the SPA
+# catch-all below. Force it straight to the real job search experience.
+[[redirects]]
+  from = "/jobs"
+  to = "/dashboard"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/jobs/"
+  to = "/dashboard"
+  status = 301
+  force = true
+
 # SPA fallback for the Vue app. UNFORCED (no `force`/`!`), so real static files
 # — including the pre-rendered /jobs/**/index.html SEO pages — are served first
 # and only unmatched paths fall through to the app shell.
