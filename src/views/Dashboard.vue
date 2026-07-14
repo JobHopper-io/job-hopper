@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Product, ResumeProduct } from '@/types/database'
+import type { ApplicationStatus, Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
-import ApplicationTrackerCard, { type TrackedApplication } from '@/components/ApplicationTrackerCard.vue'
+import ApplicationTrackerCard from '@/components/ApplicationTrackerCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
+import { applicationsAPI, type TrackedApplicationRow } from '@/lib/applications'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { freemiumAPI } from '@/lib/freemium'
 import { getProductPrice } from '@/lib/subscription'
@@ -137,10 +138,44 @@ const premiumInsightsTeaser = {
 // exposed to the client), so "tomorrow" is the accurate user-facing cadence.
 const nextDigestLabel = 'tomorrow'
 
-// Application Tracker rows. No applications data model exists yet (that lands with
-// the later tracker feature), so this is empty for now and the card shows its
-// empty state; wire real rows here when the backing API is available.
-const trackedApplications = ref<TrackedApplication[]>([])
+// Application Tracker: inline status tagging for job cards (Core+).
+const trackedApplications = ref<TrackedApplicationRow[]>([])
+const applicationsLoading = ref(false)
+
+/** Map of matchId -> application status for quick lookup per JobCard. */
+const applicationStatusByMatchId = computed<Record<string, ApplicationStatus>>(() => {
+  const map: Record<string, ApplicationStatus> = {}
+  for (const app of trackedApplications.value) {
+    map[app.matchId] = app.status
+  }
+  return map
+})
+
+async function loadApplications() {
+  applicationsLoading.value = true
+  try {
+    const { data, error } = await applicationsAPI.getAll()
+    if (!error) trackedApplications.value = data
+  } finally {
+    applicationsLoading.value = false
+  }
+}
+
+async function handleUpdateApplicationStatus(matchId: string, status: ApplicationStatus | null) {
+  if (status) {
+    const { error } = await applicationsAPI.setStatus(matchId, status)
+    if (error) return
+  } else {
+    const { error } = await applicationsAPI.remove(matchId)
+    if (error) return
+  }
+  await loadApplications()
+}
+
+async function handleRemoveApplication(matchId: string) {
+  const { error } = await applicationsAPI.remove(matchId)
+  if (!error) await loadApplications()
+}
 
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
@@ -313,6 +348,7 @@ async function loadDashboardBanner() {
 
 onMounted(() => {
   void loadMatchesAndStats()
+  void loadApplications()
   void loadDashboardBanner()
 })
 </script>
@@ -522,7 +558,10 @@ onMounted(() => {
 
         <!-- Application Tracker (compact). -->
         <div class="mb-8">
-          <ApplicationTrackerCard :applications="trackedApplications" />
+          <ApplicationTrackerCard
+            :applications="trackedApplications"
+            @remove="handleRemoveApplication"
+          />
         </div>
       </template>
 
@@ -709,9 +748,11 @@ onMounted(() => {
             :key="job.matchId"
             :job="job"
             :advicePurchase="adviceByMatchId[job.matchId] ?? null"
+            :applicationStatus="applicationStatusByMatchId[job.matchId] ?? null"
             @toggle-save="handleToggleSave"
             @refresh-advice="() => loadMatchesAndStats({ silent: true })"
             @refresh-job-matches="() => loadMatchesAndStats({ silent: true })"
+            @update-application-status="handleUpdateApplicationStatus"
           />
         </div>
       </template>

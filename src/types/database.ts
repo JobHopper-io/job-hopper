@@ -168,3 +168,9 @@ export type CompanyApolloCacheUpdate = TablesUpdate<'company_apollo_cache'>
 export type CompanyApolloSearchMiss = Tables<'company_apollo_search_miss'>
 export type CompanyApolloSearchMissInsert = TablesInsert<'company_apollo_search_miss'>
 export type CompanyApolloSearchMissUpdate = TablesUpdate<'company_apollo_search_miss'>
+
+// Application tracking (Core+ feature: inline status tagging for job cards).
+export type ApplicationStatus = Enums<'application_status'>
+export type JobApplication = Tables<'job_applications'>
+export type JobApplicationInsert = TablesInsert<'job_applications'>
+export type JobApplicationUpdate = TablesUpdate<'job_applications'>
