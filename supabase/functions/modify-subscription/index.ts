@@ -34,6 +34,12 @@ serve(async (req) => {
       },
     )
 
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } },
+    )
+
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
@@ -42,7 +48,7 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('auth_user_id', user.id)
@@ -58,7 +64,7 @@ serve(async (req) => {
       throw new Error('productIds must be a non-empty array')
     }
 
-    const { data: products, error: productsError } = await supabaseClient
+    const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select(
         'id, category, price_cents, stripe_product_id, display_name, available_for_purchase',
@@ -92,7 +98,7 @@ serve(async (req) => {
       throw new Error('You may not attach more than one base plan')
     }
 
-    const { data: subscriptions, error: subsError } = await supabaseClient
+    const { data: subscriptions, error: subsError } = await supabaseAdmin
       .from('subscriptions')
       .select('id, stripe_subscription_id, status, profile_id')
       .eq('profile_id', profile.id)
@@ -111,7 +117,7 @@ serve(async (req) => {
     if (subscriptions.length > 1) {
       const subIds = subscriptions.map((s) => s.id)
 
-      const { data: subProducts, error: subProdError } = await supabaseClient
+      const { data: subProducts, error: subProdError } = await supabaseAdmin
         .from('subscription_product')
         .select('subscription_id, product_id')
         .in('subscription_id', subIds)
@@ -125,7 +131,7 @@ serve(async (req) => {
       )
 
       const { data: productsForSubs, error: productsForSubsError } =
-        await supabaseClient
+        await supabaseAdmin
           .from('products')
           .select('id, category')
           .in('id', productIdsInSubs)

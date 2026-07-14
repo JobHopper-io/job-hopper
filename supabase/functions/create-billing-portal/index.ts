@@ -35,6 +35,12 @@ serve(async (req) => {
       }
     )
 
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } },
+    )
+
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
@@ -43,7 +49,7 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('stripe_customer_id')
       .eq('auth_user_id', user.id)

@@ -24,10 +24,10 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   const authHeader = req.headers.get("Authorization") ?? ""
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return new Response(
       JSON.stringify({ error: "Server misconfiguration" }),
       {
@@ -37,12 +37,7 @@ serve(async (req) => {
     )
   }
 
-  const supabase = createClient(supabaseUrl, anonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   })
 

@@ -35,10 +35,9 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: 'Server misconfiguration' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
@@ -53,7 +52,10 @@ serve(async (req) => {
     })
   }
 
-  const supabaseUserClient = createClient(supabaseUrl, anonKey, {
+  // apikey uses the service-role key (not anon) so the PostgREST `current_user_has_role`
+  // RPC calls succeed; Authorization still forwards the caller's own JWT, so auth.uid()
+  // inside that function resolves to the caller, not an elevated identity.
+  const supabaseUserClient = createClient(supabaseUrl, serviceRoleKey, {
     global: { headers: { Authorization: authHeader } },
   })
 

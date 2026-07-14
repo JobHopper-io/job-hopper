@@ -242,6 +242,7 @@ ${related
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(metaDescription)}" />
   <link rel="canonical" href="${escapeHtml(canonical)}" />
+  <link rel="stylesheet" href="/seo-pages.css" />
   <script type="application/ld+json">
 ${jsonLdScript(itemListLd)}
   </script>

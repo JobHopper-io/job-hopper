@@ -73,9 +73,12 @@ serve(async (req) => {
       )
     }
 
+    // apikey uses the service-role key (not anon) so the PostgREST `current_user_has_role`
+    // RPC call succeeds; Authorization still forwards the caller's own JWT, so auth.uid()
+    // inside that function resolves to the caller, not an elevated identity.
     const supabaseUserClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         global: {
           headers: { Authorization: authHeader },
