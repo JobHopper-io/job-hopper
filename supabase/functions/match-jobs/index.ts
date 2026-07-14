@@ -71,14 +71,11 @@ serve(async (req) => {
         : 15
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const authHeader = req.headers.get('Authorization') ?? ''
 
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      console.error('match-jobs: SUPABASE_URL or SUPABASE_ANON_KEY missing from environment', {
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('match-jobs: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing from environment', {
         hasSupabaseUrl: !!supabaseUrl,
-        hasAnonKey: !!anonKey,
         hasServiceRoleKey: !!serviceRoleKey,
       })
       return new Response(
@@ -90,21 +87,12 @@ serve(async (req) => {
       )
     }
 
-    const supabase = createClient(supabaseUrl, anonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-      auth: { persistSession: false },
-    })
-
     const supabaseAdminClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     })
 
     // Load profile preferences and email/name for notifications.
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdminClient
       .from('profiles')
       .select(
         `
@@ -195,7 +183,7 @@ serve(async (req) => {
 
     let jobRecords
     try {
-      jobRecords = await fetchJobRecordsForMatching(supabase, preferences, matchConfigOverride)
+      jobRecords = await fetchJobRecordsForMatching(supabaseAdminClient, preferences, matchConfigOverride)
     } catch (jobsError) {
       const message = jobsError instanceof Error ? jobsError.message : String(jobsError)
       console.error('match-jobs: failed to load jobs from job_hopper_live', { error: message })
@@ -213,7 +201,7 @@ serve(async (req) => {
     })
 
     // Load existing matches for this profile so we never duplicate a job match.
-    const { data: existingMatches, error: existingError } = await supabase
+    const { data: existingMatches, error: existingError } = await supabaseAdminClient
       .from('job_matches')
       .select('job_id')
       .eq('profile_id', payload.profile_id)
@@ -258,7 +246,7 @@ serve(async (req) => {
     let inserted = 0
     const newlyMatchedRankedJobs: RankedJob[] = []
     if (rowsToInsert.length > 0) {
-      const { error: insertError, count } = await supabase
+      const { error: insertError, count } = await supabaseAdminClient
         .from('job_matches')
         .insert(rowsToInsert, { count: 'exact' })
 
@@ -288,7 +276,7 @@ serve(async (req) => {
     let emailSent = false
     if (inserted > 0 && profile.email && newlyMatchedRankedJobs.length > 0) {
       try {
-        const { data: settings } = await supabase
+        const { data: settings } = await supabaseAdminClient
           .from('notification_settings')
           .select('job_match_email_enabled, job_match_email_frequency, email_unsubscribed_at, last_job_match_email_sent_at')
           .eq('profile_id', payload.profile_id)
@@ -296,7 +284,7 @@ serve(async (req) => {
 
         let settingsRow = settings
         if (!settingsRow) {
-          const { data: insertedSettings } = await supabase
+          const { data: insertedSettings } = await supabaseAdminClient
             .from('notification_settings')
             .insert({ profile_id: payload.profile_id })
             .select('job_match_email_enabled, job_match_email_frequency, email_unsubscribed_at, last_job_match_email_sent_at')
@@ -345,11 +333,11 @@ serve(async (req) => {
             templateKey: 'job_match_digest_default',
             profileId: payload.profile_id,
             payload: { job_count: jobSummaries.length },
-            supabase,
+            supabase: supabaseAdminClient,
           })
           if (result.success) {
             emailSent = true
-            await supabase
+            await supabaseAdminClient
               .from('notification_settings')
               .update({
                 last_job_match_email_sent_at: new Date().toISOString(),

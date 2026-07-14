@@ -36,6 +36,12 @@ serve(async (req) => {
       }
     )
 
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } },
+    )
+
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
@@ -44,7 +50,7 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, email, first_name, last_name, stripe_customer_id')
       .eq('auth_user_id', user.id)
@@ -67,7 +73,7 @@ serve(async (req) => {
       })
       customerId = customer.id
 
-      const { error: updateError } = await supabaseClient
+      const { error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({ stripe_customer_id: customerId })
         .eq('id', profile.id)
@@ -83,7 +89,7 @@ serve(async (req) => {
       throw new Error('productIds must be a non-empty array')
     }
 
-    const { data: products, error: productsError } = await supabaseClient
+    const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
       .select(
         'id, key, display_name, category, price_cents, stripe_product_id, available_for_purchase',
@@ -108,7 +114,7 @@ serve(async (req) => {
       jobMatchId &&
       resumeAdviceProduct
     ) {
-      const { data: existingPerJob } = await supabaseClient
+      const { data: existingPerJob } = await supabaseAdmin
         .from('resume_products')
         .select('id')
         .eq('profile_id', profile.id)
