@@ -1,10 +1,39 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
-import type { ApplicationStatus, JobApplication } from '@/types/database'
+import type { ApplicationStatus, JobApplication, PayType } from '@/types/database'
 
-type AppRow = Pick<JobApplication, 'id' | 'match_id' | 'status' | 'applied_at' | 'updated_at'>
-type JobMatchRow = { id: string; job_id: string | null }
-type JobHopperRow = { id: string; job_title: string | null; company_name: string | null }
+const APP_COLUMNS =
+  'id, match_id, status, applied_at, updated_at, job_id, job_title, company_name, apply_link, location, pay_min, pay_max, pay_type'
+
+type AppRow = Pick<
+  JobApplication,
+  | 'id'
+  | 'match_id'
+  | 'status'
+  | 'applied_at'
+  | 'updated_at'
+  | 'job_id'
+  | 'job_title'
+  | 'company_name'
+  | 'apply_link'
+  | 'location'
+  | 'pay_min'
+  | 'pay_max'
+  | 'pay_type'
+>
+
+/** A point-in-time snapshot of the job details captured when tracking starts/updates,
+ * so the tracker stays accurate even if the listing is later pruned from job_hopper_live. */
+export interface JobSnapshot {
+  jobId: string | null
+  title: string | null
+  company: string | null
+  applyLink: string | null
+  location: string | null
+  payMin: number | null
+  payMax: number | null
+  payType: PayType | null
+}
 
 async function getCurrentProfileId(): Promise<string> {
   const { data, error } = await profileAPI.getCurrentUserProfile()
@@ -14,26 +43,51 @@ async function getCurrentProfileId(): Promise<string> {
   return data.id
 }
 
-/** Joined row returned by the tracker list query. */
+/** Row returned by the tracker list query, sourced entirely from the job_applications snapshot. */
 export interface TrackedApplicationRow {
   id: string
   matchId: string
-  jobId: string
+  jobId: string | null
   title: string | null
   company: string | null
+  applyLink: string | null
+  location: string | null
+  payMin: number | null
+  payMax: number | null
+  payType: PayType | null
   status: ApplicationStatus
   appliedAt: string | null
   updatedAt: string
 }
 
+function toTrackedApplicationRow(a: AppRow): TrackedApplicationRow {
+  return {
+    id: a.id,
+    matchId: a.match_id,
+    jobId: a.job_id,
+    title: a.job_title,
+    company: a.company_name,
+    applyLink: a.apply_link,
+    location: a.location,
+    payMin: a.pay_min,
+    payMax: a.pay_max,
+    payType: a.pay_type,
+    status: a.status,
+    appliedAt: a.applied_at,
+    updatedAt: a.updated_at,
+  }
+}
+
 export const applicationsAPI = {
   /**
-   * Upsert application status for a match. Creates a row if none exists,
-   * updates the status + updated_at if it does. Core/Premium only.
+   * Upsert application status for a match, snapshotting the job's display details
+   * (title, company, apply link, location, pay) at the same time. Creates a row if
+   * none exists, updates status + snapshot + updated_at if it does. Core/Premium only.
    */
   async setStatus(
     matchId: string,
     status: ApplicationStatus,
+    job: JobSnapshot,
   ): Promise<{ error: Error | null }> {
     const profileId = await getCurrentProfileId()
 
@@ -42,6 +96,14 @@ export const applicationsAPI = {
         profile_id: profileId,
         match_id: matchId,
         status,
+        job_id: job.jobId,
+        job_title: job.title,
+        company_name: job.company,
+        apply_link: job.applyLink,
+        location: job.location,
+        pay_min: job.payMin,
+        pay_max: job.payMax,
+        pay_type: job.payType,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'profile_id, match_id' },
@@ -51,60 +113,18 @@ export const applicationsAPI = {
     return { error: null }
   },
 
-  /** Get all application rows for the current user, joined with job details. */
+  /** Get all application rows for the current user, from the job_applications snapshot. */
   async getAll(): Promise<{ data: TrackedApplicationRow[]; error: Error | null }> {
     const { data: apps, error } = await supabase
       .from('job_applications')
-      .select('id, match_id, status, applied_at, updated_at')
+      .select(APP_COLUMNS)
       .order('updated_at', { ascending: false })
 
     if (error) return { data: [], error }
     if (!apps?.length) return { data: [], error: null }
 
     const appRows = apps as unknown as AppRow[]
-    const matchIds = appRows.map((r) => r.match_id)
-
-    const { data: matches, error: matchError } = await supabase
-      .from('job_matches')
-      .select('id, job_id')
-      .in('id', matchIds)
-
-    if (matchError) return { data: [], error: matchError }
-
-    const jobIds = Array.from(
-      new Set((matches ?? []).map((m) => m.job_id).filter(Boolean)),
-    ) as string[]
-
-    const { data: jobs, error: jobsError } = jobIds.length
-      ? await supabase
-          .from('job_hopper_live')
-          .select('id, job_title, company_name')
-          .in('id', jobIds)
-      : { data: [], error: null }
-
-    if (jobsError) return { data: [], error: jobsError }
-
-    const jobById = new Map((jobs ?? []).map((j) => [j.id, j]))
-    const matchById = new Map((matches ?? []).map((m) => [m.id, m]))
-
-    const result: TrackedApplicationRow[] = appRows.map((a) => {
-      const match = matchById.get(a.match_id) as JobMatchRow | undefined
-      const job = match?.job_id
-        ? (jobById.get(match.job_id) as JobHopperRow | undefined)
-        : null
-      return {
-        id: a.id,
-        matchId: a.match_id,
-        jobId: match?.job_id ?? '',
-        title: job?.job_title ?? null,
-        company: job?.company_name ?? null,
-        status: a.status,
-        appliedAt: a.applied_at,
-        updatedAt: a.updated_at,
-      }
-    })
-
-    return { data: result, error: null }
+    return { data: appRows.map(toTrackedApplicationRow), error: null }
   },
 
   /** Remove the application tracking row (reset to untracked). */
@@ -124,11 +144,11 @@ export const applicationsAPI = {
   ): Promise<{ data: AppRow | null; error: Error | null }> {
     const { data, error } = await supabase
       .from('job_applications')
-      .select('*')
+      .select(APP_COLUMNS)
       .eq('match_id', matchId)
       .maybeSingle()
 
     if (error) return { data: null, error }
-    return { data: data as AppRow | null, error: null }
+    return { data: data as unknown as AppRow | null, error: null }
   },
 }

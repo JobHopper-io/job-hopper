@@ -9,7 +9,7 @@ import ApplicationTrackerCard from '@/components/ApplicationTrackerCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
-import { applicationsAPI, type TrackedApplicationRow } from '@/lib/applications'
+import { applicationsAPI, type TrackedApplicationRow, type JobSnapshot } from '@/lib/applications'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { freemiumAPI } from '@/lib/freemium'
 import { getProductPrice } from '@/lib/subscription'
@@ -161,9 +161,13 @@ async function loadApplications() {
   }
 }
 
-async function handleUpdateApplicationStatus(matchId: string, status: ApplicationStatus | null) {
+async function handleUpdateApplicationStatus(
+  matchId: string,
+  status: ApplicationStatus | null,
+  job: JobSnapshot,
+) {
   if (status) {
-    const { error } = await applicationsAPI.setStatus(matchId, status)
+    const { error } = await applicationsAPI.setStatus(matchId, status, job)
     if (error) return
   } else {
     const { error } = await applicationsAPI.remove(matchId)

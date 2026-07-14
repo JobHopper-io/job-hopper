@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob } from '@/lib/jobs'
+import type { JobSnapshot } from '@/lib/applications'
 import type { ApplicationStatus, PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
@@ -24,7 +25,12 @@ const emit = defineEmits<{
   (e: 'toggle-save', matchId: string, isSaved: boolean): void
   (e: 'refresh-advice'): void
   (e: 'refresh-job-matches'): void
-  (e: 'update-application-status', matchId: string, status: ApplicationStatus | null): void
+  (
+    e: 'update-application-status',
+    matchId: string,
+    status: ApplicationStatus | null,
+    job: JobSnapshot,
+  ): void
 }>()
 
 const router = useRouter()
@@ -76,9 +82,20 @@ function toggleStatusDropdown() {
   statusDropdownOpen.value = !statusDropdownOpen.value
 }
 
+const jobSnapshot = computed<JobSnapshot>(() => ({
+  jobId: props.job.jobId || null,
+  title: props.job.title,
+  company: props.job.company,
+  applyLink: props.job.applyLink,
+  location: props.job.location,
+  payMin: props.job.payMin,
+  payMax: props.job.payMax,
+  payType: props.job.payType,
+}))
+
 function selectStatus(status: ApplicationStatus | null) {
   statusDropdownOpen.value = false
-  emit('update-application-status', props.job.matchId, status)
+  emit('update-application-status', props.job.matchId, status, jobSnapshot.value)
 }
 
 function clearStatus(e: MouseEvent) {
