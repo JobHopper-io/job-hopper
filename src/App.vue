@@ -380,8 +380,8 @@ const handleSignOutAndCloseMenu = async () => {
         </div>
       </footer>
 
-      <!-- RAG support chat widget: authenticated users only -->
-      <ChatWidget v-if="isAuthenticated" />
+      <!-- RAG support chat widget: available to everyone, including logged-out visitors -->
+      <ChatWidget />
   </div>
 </template>
 
