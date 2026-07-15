@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 import { useUserStore } from '@/stores/user'
+import ChatWidget from '@/components/ChatWidget.vue'
 import jobHopperFullLogo from '@/assets/job-hopper-logo.png'
 import jobHopperWordsLogo from '@/assets/job-hopper-words.png'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
@@ -378,6 +379,9 @@ const handleSignOutAndCloseMenu = async () => {
           </div>
         </div>
       </footer>
+
+      <!-- RAG support chat widget: authenticated users only -->
+      <ChatWidget v-if="isAuthenticated" />
   </div>
 </template>
 
