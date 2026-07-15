@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Extracts user-facing documentation copy (FAQ, pricing FAQ, methodology,
-// terms, privacy) from the Vue views into public/support-docs.json.
+// terms, privacy, chatbot KB) into public/support-docs.json.
 //
-// Tailored to the exact structure of the five source files below rather
-// than a general Vue/HTML parser — see CLAUDE.md docs/architecture notes
-// on data-access layering for why these are plain view components with
-// no API-backed copy (aside from the two resume add-on fields we skip).
+// Tailored to the exact structure of the source files below rather than a
+// general Vue/HTML/TS parser — see CLAUDE.md docs/architecture notes on
+// data-access layering for why these are plain view components with no
+// API-backed copy (aside from the two resume add-on fields we skip).
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -13,8 +13,10 @@ import path from 'node:path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
-const src = (p) => path.join(root, 'src', 'views', p)
-const read = (p) => readFileSync(src(p), 'utf8')
+const viewsPath = (p) => path.join(root, 'src', 'views', p)
+const dataPath = (p) => path.join(root, 'src', 'data', p)
+const read = (p) => readFileSync(viewsPath(p), 'utf8')
+const readData = (p) => readFileSync(dataPath(p), 'utf8')
 
 // ---------- generic helpers ----------
 
@@ -273,6 +275,13 @@ function extractLegalDoc(fileName, sourceDocTag) {
   return entries
 }
 
+// RAG-chatbot-only knowledge base — plain TS data module, not a Vue view.
+function extractChatbotKb() {
+  const source = readData('chatbotKnowledge.ts')
+  const chatbotKnowledge = extractArrayLiteral(source, 'chatbotKnowledge')
+  return chatbotKnowledge.map((f) => ({ source_doc: 'chatbot_kb', title: f.q, content: f.a }))
+}
+
 // ---------- run ----------
 
 const entries = [
@@ -281,6 +290,7 @@ const entries = [
   ...extractMethodology(),
   ...extractLegalDoc('Terms.vue', 'terms'),
   ...extractLegalDoc('Privacy.vue', 'privacy'),
+  ...extractChatbotKb(),
 ]
 
 const outPath = path.join(root, 'public', 'support-docs.json')
