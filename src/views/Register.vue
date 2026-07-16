@@ -124,7 +124,7 @@ const handleCreateAccount = async () => {
       return
     }
 
-    const redirectTo = `${window.location.origin}/onboarding`
+    const redirectTo = `${window.location.origin}/email-verified`
     const { data: signUpData, error: signUpError } = await authAPI.signUp(
       email.value,
       password.value,

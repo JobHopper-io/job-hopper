@@ -246,20 +246,66 @@ function titleMatchScore(personTitle: string, phrases: string[]): number {
   return s
 }
 
+/**
+ * Decision-maker seniority — used to surface actual hiring managers/leaders for Premium,
+ * where the "important people" matter more than a recruiter/HR title match.
+ */
+function seniorityScore(title: string): number {
+  const t = title.toLowerCase()
+  let s = 0
+  if (/\b(ceo|cto|coo|cfo|cpo|cmo|cio|ciso|chro)\b/.test(t) || t.includes('chief')) s += 50
+  if (t.includes('vice president') || /\bvp\b/.test(t)) s += 40
+  if (t.includes('head of')) s += 35
+  if (t.includes('director')) s += 30
+  if (t.includes('hiring manager')) s += 28
+  if (t.includes('manager')) s += 20
+  if (t.includes('principal') || t.includes('lead')) s += 10
+  return s
+}
+
+/**
+ * Rank people and return up to `count` distinct candidates (deduped by id).
+ * Email-reachable contacts always sort first (they're actionable). With
+ * `prioritizeSeniority` (Premium), decision-maker rank is the primary tiebreaker
+ * so the hiring manager/leader surfaces ahead of a recruiter; otherwise (Core)
+ * we keep the recruiter/HR-oriented title match.
+ */
+export function pickTopPeople(
+  people: ApolloPersonSearchHit[],
+  phrases: string[],
+  count: number,
+  opts?: { prioritizeSeniority?: boolean },
+): ApolloPersonSearchHit[] {
+  if (count <= 0) return []
+  const ranked = [...people].sort((a, b) => {
+    const ae = a.has_email === true ? 1 : 0
+    const be = b.has_email === true ? 1 : 0
+    if (be !== ae) return be - ae
+    if (opts?.prioritizeSeniority) {
+      const asn = seniorityScore(a.title ?? '')
+      const bsn = seniorityScore(b.title ?? '')
+      if (bsn !== asn) return bsn - asn
+    }
+    const at = titleMatchScore(a.title ?? '', phrases)
+    const bt = titleMatchScore(b.title ?? '', phrases)
+    return bt - at
+  })
+  const out: ApolloPersonSearchHit[] = []
+  const seen = new Set<string>()
+  for (const p of ranked) {
+    if (!p.id || seen.has(p.id)) continue
+    seen.add(p.id)
+    out.push(p)
+    if (out.length >= count) break
+  }
+  return out
+}
+
 export function pickBestPerson(
   people: ApolloPersonSearchHit[],
   phrases: string[],
 ): ApolloPersonSearchHit | null {
-  if (!people.length) return null
-  const withEmailFirst = [...people].sort((a, b) => {
-    const ae = a.has_email === true ? 1 : 0
-    const be = b.has_email === true ? 1 : 0
-    if (be !== ae) return be - ae
-    const as = titleMatchScore(a.title ?? '', phrases)
-    const bs = titleMatchScore(b.title ?? '', phrases)
-    return bs - as
-  })
-  return withEmailFirst[0] ?? null
+  return pickTopPeople(people, phrases, 1)[0] ?? null
 }
 
 function apolloHeaders(apiKey: string): Record<string, string> {

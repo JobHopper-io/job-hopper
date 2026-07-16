@@ -1,22 +1,59 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI } from '@/lib/auth'
+import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 
 const router = useRouter()
+const hasNavigated = ref(false)
+const isCheckingNow = ref(false)
 
-onMounted(async () => {
+async function goToDestination() {
+  if (hasNavigated.value) return
+  hasNavigated.value = true
+  const { data: profile } = await profileAPI.getCurrentUserProfile()
+  if (profile?.onboarding_completed) {
+    router.push('/dashboard')
+  } else {
+    router.push('/onboarding')
+  }
+}
+
+async function checkIfVerified() {
   const { user } = await authAPI.getCurrentUser()
   if (user) {
-    const { data: profile } = await profileAPI.getCurrentUserProfile()
-    if (profile?.onboarding_completed) {
-      router.push('/dashboard')
-    } else {
-      router.push('/onboarding')
-    }
+    await goToDestination()
+  }
+}
+
+async function handleManualCheck() {
+  isCheckingNow.value = true
+  await checkIfVerified()
+  isCheckingNow.value = false
+}
+
+// Verification happens in a different tab (the email link). Supabase syncs the new
+// session to this tab via a cross-tab broadcast, so listen for it here instead of only
+// checking once on mount.
+const {
+  data: { subscription: authListener },
+} = onAuthStateChange(async (_event, session) => {
+  if (session?.user) {
+    await goToDestination()
   }
 })
+
+// Belt-and-suspenders fallback: the broadcast above doesn't fire in every browser
+// (e.g. Safari private browsing blocks BroadcastChannel outright), so also poll
+// periodically in case this tab misses the event.
+const pollId = window.setInterval(checkIfVerified, 3000)
+
+onUnmounted(() => {
+  authListener.unsubscribe()
+  window.clearInterval(pollId)
+})
+
+onMounted(checkIfVerified)
 </script>
 
 <template>
@@ -45,13 +82,21 @@ onMounted(async () => {
           </li>
           <li class="flex items-start gap-2">
             <span class="text-brand-primary mt-0.5">•</span>
-            <span>You'll be taken to finish your profile and choose your plan.</span>
+            <span>Once it confirms you're verified, come back to this tab — it'll continue automatically into setting up your profile.</span>
           </li>
         </ul>
+        <button
+          type="button"
+          class="btn-primary w-full mb-3"
+          :disabled="isCheckingNow"
+          @click="handleManualCheck"
+        >
+          {{ isCheckingNow ? 'Checking…' : "I've verified — continue" }}
+        </button>
         <p class="text-sm text-neutral-body mb-6">
           Didn't get the email? Wait a few minutes and check again, or contact support if the problem continues.
         </p>
-        <router-link to="/login" class="btn-primary w-full inline-block text-center">
+        <router-link to="/login" class="btn-secondary w-full inline-block text-center">
           Back to sign in
         </router-link>
       </div>

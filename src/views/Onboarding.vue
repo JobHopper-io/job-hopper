@@ -15,21 +15,22 @@ const router = useRouter()
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
 
-// Steps: 1=About, 2=Targets, 3=Resume, 4=Plan
+// Steps: 1=About, 2=Role & Level, 3=Compensation & Location, 4=Resume, 5=Plan
 const currentStep = ref(1)
-const totalSteps = 4
+const totalSteps = 5
 
 // Step 1: About You
 const firstName = ref('')
 const lastName = ref('')
 const currentJobTitle = ref('')
-const yearsOfExperience = ref<number | null>(null)
 const currentIndustry = ref('')
 const requiresUsSponsorship = ref<boolean | null>(null)
 
-// Step 2: Targets
+// Step 2: Role & Level
 const targetJobTitle = ref('')
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
+
+// Step 3: Compensation & Location
 const desiredSalaryMin = ref<number | null>(null)
 const desiredSalaryMax = ref<number | null>(null)
 const preferredLocations = ref<string[]>([])
@@ -37,10 +38,10 @@ const locationRadius = ref(25)
 const openToRelocation = ref(false)
 const openToRemote = ref(false)
 
-// Step 3: Resume Upload
+// Step 4: Resume Upload
 const resumeFile = ref<File | null>(null)
 
-// Step 4: Plan Selection (product ids from DB) or free tier
+// Step 5: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
 const addonProducts = ref<Product[]>([])
 // Premium is not sellable yet: shown as a locked "coming soon" tier with a waitlist CTA.
@@ -69,44 +70,55 @@ const isLoading = ref(false)
 const error = ref('')
 
 const canProceedStep1 = computed(() => {
-  const hasYears = yearsOfExperience.value !== null && yearsOfExperience.value >= 0
   return (
     firstName.value.trim() &&
     lastName.value.trim() &&
     currentJobTitle.value &&
-    hasYears &&
     currentIndustry.value
   )
 })
 
 const canProceedStep2 = computed(() => {
-  return (
-    targetJobTitle.value.trim().length > 0 &&
-    targetRoleCategories.value.length > 0 &&
-    preferredLocations.value.length > 0
-  )
-})
-
-const canProceedStep4 = computed(() => {
   const hasCareerLevel = FREEMIUM_BASE_PLAN_TIER_KEYS.includes(
     careerLevel.value as FreemiumBasePlanTierKey,
   )
-  if (!hasCareerLevel) return false
+  return (
+    targetJobTitle.value.trim().length > 0 &&
+    targetRoleCategories.value.length > 0 &&
+    hasCareerLevel
+  )
+})
+
+const salaryRangeError = computed(() => {
+  if (desiredSalaryMin.value == null || desiredSalaryMax.value == null) return null
+  if (desiredSalaryMax.value < desiredSalaryMin.value) {
+    return 'Max must be greater than or equal to min'
+  }
+  return null
+})
+
+const canProceedStep3 = computed(() => {
+  return preferredLocations.value.length > 0 && !salaryRangeError.value
+})
+
+const canProceedStep5 = computed(() => {
   return startFreePlan.value || selectedBasePlanId.value !== null
 })
 
 const canProceedCurrentStep = computed(() => {
   if (currentStep.value === 1) return canProceedStep1.value
   if (currentStep.value === 2) return canProceedStep2.value
-  if (currentStep.value === 3) return true
+  if (currentStep.value === 3) return canProceedStep3.value
+  if (currentStep.value === 4) return true
   return true
 })
 
 function getFirstIncompleteStep(): number {
   if (!canProceedStep1.value) return 1
   if (!canProceedStep2.value) return 2
-  if (!userStore.profile?.resume_bucket_key) return 3
-  return 4
+  if (!canProceedStep3.value) return 3
+  if (!userStore.profile?.resume_bucket_key) return 4
+  return 5
 }
 
 function populateFromProfile() {
@@ -117,7 +129,6 @@ function populateFromProfile() {
   firstName.value = p.first_name ?? ''
   lastName.value = p.last_name ?? ''
   currentJobTitle.value = p.current_job_title ?? ''
-  yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry ?? ''
   careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
 
@@ -160,24 +171,6 @@ watch(
   },
   { immediate: true }
 )
-
-const YEARS_MIN = 0
-const YEARS_MAX = 50
-const YEARS_MAX_DIGITS = 2
-
-function handleYearsInput(e: Event) {
-  const input = e.target as HTMLInputElement
-  const digits = input.value.replace(/\D/g, '').slice(0, YEARS_MAX_DIGITS)
-  if (!digits) {
-    yearsOfExperience.value = null
-    input.value = ''
-    return
-  }
-  const num = parseInt(digits, 10)
-  const clamped = Math.min(YEARS_MAX, Math.max(YEARS_MIN, num))
-  yearsOfExperience.value = clamped
-  input.value = String(clamped)
-}
 
 const handleResumeFileSelected = (file: File) => {
   resumeFile.value = file
@@ -248,7 +241,6 @@ async function persistProfileAndResume(): Promise<boolean> {
     current_job_title: currentJobTitle.value,
     career_level: careerLevel.value || undefined,
     target_job_title: targetJobTitle.value.trim(),
-    years_of_experience: yearsOfExperience.value ?? undefined,
     current_industry: currentIndustry.value,
     target_role_categories: targetRoleCategories.value,
     desired_salary_min: desiredSalaryMin.value ?? undefined,
@@ -351,7 +343,7 @@ const handleProceedToCheckout = async () => {
 
 <template>
   <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-7xl mx-auto">
+    <div :class="currentStep === 5 ? 'max-w-7xl' : 'max-w-2xl'" class="mx-auto">
       <div class="mb-8">
         <div class="flex justify-between mb-2">
           <span class="text-sm font-medium text-neutral-body">Step {{ currentStep }} of {{ totalSteps }}</span>
@@ -368,14 +360,11 @@ const handleProceedToCheckout = async () => {
       <div class="card p-8">
         <!-- Step 1: About You -->
         <div v-if="currentStep === 1">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-6">
-            Welcome — we're glad you're here.
-          </h2>
-          <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-2">
+          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
             Tell us about your current role
-          </h3>
+          </h2>
           <p class="text-neutral-body mb-6">
-            This helps us understand where you're starting from so we can match you more accurately.
+            This helps us match you more accurately.
           </p>
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
@@ -411,22 +400,6 @@ const handleProceedToCheckout = async () => {
                 required
                 class="input"
                 placeholder="e.g., Maintenance Technician"
-              />
-            </div>
-
-            <div>
-              <label for="yearsOfExperience" class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>
-              <input
-                id="yearsOfExperience"
-                :value="yearsOfExperience ?? ''"
-                type="text"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                maxlength="2"
-                required
-                class="input"
-                placeholder="0"
-                @input="handleYearsInput"
               />
             </div>
 
@@ -473,13 +446,13 @@ const handleProceedToCheckout = async () => {
           </div>
         </div>
 
-        <!-- Step 2: Targets -->
+        <!-- Step 2: Role & Level -->
         <div v-if="currentStep === 2">
           <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
             What kind of roles are you targeting?
           </h2>
           <p class="text-neutral-body mb-6">
-            You can fine-tune these later. For now, a rough target is enough to get started.
+            A rough target is enough to get started — you can fine-tune it later.
           </p>
 
           <div class="space-y-6">
@@ -495,7 +468,8 @@ const handleProceedToCheckout = async () => {
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories (select all that apply)</label>
+              <label class="block text-sm font-medium text-brand-charcoal mb-1">Role categories (select all that apply)</label>
+              <p class="text-sm text-neutral-body mb-3">The specific kinds of roles you're open to.</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   v-for="opt in ROLE_CATEGORIES"
@@ -514,6 +488,37 @@ const handleProceedToCheckout = async () => {
               </div>
             </div>
 
+            <div>
+              <label for="career-level" class="block text-sm font-medium text-brand-charcoal mb-1">
+                Which level best describes the roles you want? <span class="text-red-600">*</span>
+              </label>
+              <p class="text-sm text-neutral-body mb-2">
+                The overall seniority band we'll match you within, on any plan.
+              </p>
+              <select id="career-level" v-model="careerLevel" class="input w-full">
+                <option disabled value="">Select a level</option>
+                <option
+                  v-for="opt in careerLevelOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Compensation & Location -->
+        <div v-if="currentStep === 3">
+          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
+            What are you looking for in pay and location?
+          </h2>
+          <p class="text-neutral-body mb-6">
+            You can fine-tune these later.
+          </p>
+
+          <div class="space-y-6">
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Desired wage or salary range</label>
               <div class="grid grid-cols-2 gap-4">
@@ -535,6 +540,9 @@ const handleProceedToCheckout = async () => {
                     placeholder="Max ($)"
                   />
                 </div>
+              </div>
+              <div v-if="salaryRangeError" class="text-red-600 text-sm mt-1">
+                {{ salaryRangeError }}
               </div>
             </div>
 
@@ -568,8 +576,8 @@ const handleProceedToCheckout = async () => {
           </div>
         </div>
 
-        <!-- Step 3: Resume Upload -->
-        <div v-if="currentStep === 3">
+        <!-- Step 4: Resume Upload -->
+        <div v-if="currentStep === 4">
           <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
             Upload your resume (optional, but recommended)
           </h2>
@@ -588,35 +596,16 @@ const handleProceedToCheckout = async () => {
           />
         </div>
 
-        <!-- Step 4: Plan Selection -->
-        <div v-if="currentStep === 4">
+        <!-- Step 5: Plan Selection -->
+        <div v-if="currentStep === 5">
           <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
             Choose how you want to start
           </h2>
           <p class="text-neutral-body mb-6">
-            Subscribe with a 7-day free trial for automated matching and email digests, or start on the free plan and run job searches yourself when you are ready. You can upgrade anytime from billing.
+            Start free, or subscribe with a 7-day trial for automated matching and email digests. Upgrade anytime from billing.
           </p>
 
           <div class="space-y-6">
-            <div class="max-w-md">
-              <label for="career-level" class="block text-sm font-medium text-brand-charcoal mb-1">
-                Which level best describes the roles you want? <span class="text-red-600">*</span>
-              </label>
-              <p class="text-sm text-neutral-body mb-2">
-                This determines which jobs we match you with, on any plan.
-              </p>
-              <select id="career-level" v-model="careerLevel" class="input w-full">
-                <option disabled value="">Select a level</option>
-                <option
-                  v-for="opt in careerLevelOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div
                 :class="[
@@ -736,13 +725,13 @@ const handleProceedToCheckout = async () => {
             :disabled="!canProceedCurrentStep"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {{ currentStep === 3 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
+            {{ currentStep === 4 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
           </button>
           <button
             v-else-if="startFreePlan"
             @click="handleContinueForFree"
             type="button"
-            :disabled="!canProceedStep4 || isLoading"
+            :disabled="!canProceedStep5 || isLoading"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="isLoading">Saving…</span>
@@ -752,7 +741,7 @@ const handleProceedToCheckout = async () => {
             v-else
             @click="handleProceedToCheckout"
             type="button"
-            :disabled="!canProceedStep4 || isLoading"
+            :disabled="!canProceedStep5 || isLoading"
             class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="isLoading">Redirecting to checkout...</span>
