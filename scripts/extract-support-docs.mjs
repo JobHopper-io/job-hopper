@@ -284,10 +284,17 @@ function extractChatbotKb() {
 
 // ---------- run ----------
 
+// faq / pricing_faq / methodology are intentionally not emitted. They were
+// retired because their content OVERLAPS kb_master (see extract-kb-master.mjs),
+// not because it was wrong:
+//   - methodology -> KB-0007 (How Job-Hopper Works), KB-0017 (How Jobs Are Collected)
+//   - pricing_faq -> KB-0008 (Plans and Pricing Overview), KB-0036/0037/0038
+//                    (Free / Core / Premium plans)
+//   - faq         -> the rest overlaps kb_master's account/product articles
+// Duplicate sources give the retrieval layer conflicting answers, so only one
+// should win. Their extractors are deliberately kept below: reinstating any
+// source just means adding it back to the `entries` output list in this file.
 const entries = [
-  ...extractFaq(),
-  ...extractPricingFaq(),
-  ...extractMethodology(),
   ...extractLegalDoc('Terms.vue', 'terms'),
   ...extractLegalDoc('Privacy.vue', 'privacy'),
   ...extractChatbotKb(),

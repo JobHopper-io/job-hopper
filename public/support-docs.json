@@ -1,260 +1,5 @@
 [
   {
-    "source_doc": "faq",
-    "title": "What is Job-Hopper?",
-    "content": "Job-Hopper is a subscription-based job matching service and web app built for job seekers—not employers. Think of it as the AI tool that does your job search for you: we continuously scan and curate roles from across the web, then use your profile, preferences, and career level to deliver only the opportunities that make sense for you."
-  },
-  {
-    "source_doc": "faq",
-    "title": "How is this different from job boards like Indeed or LinkedIn?",
-    "content": "Most job boards are funded by and built to serve the interests of employers. Companies pay to post or promote roles, and candidates do the heavy lifting—searching, applying, and hoping something sticks. Job-Hopper flips that model. Because our service is paid for by subscribers, we work exclusively on your behalf: we filter and enrich roles, screen out obvious 'ghost' or low-activity postings, and match only the best fits to your profile so you're not stuck sorting through endless noise."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Who pays for Job-Hopper—and whose side are you on?",
-    "content": "Job-Hopper is paid for by job seekers through subscriptions, not by employers. That means our incentives are aligned with you. Our job is to save you time, cut down on wasted effort, and surface quality roles that are actually worth your attention—not to drive more clicks or applicants to paid job ads."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do you apply to jobs for me?",
-    "content": "No. You stay in control of your applications. Job-Hopper surfaces opportunities and context for each role, and you decide where, how, and when to apply."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Can you guarantee I'll get a job?",
-    "content": "We can't guarantee a specific outcome—no honest service can. What we can do is save you time, reduce frustration, and dramatically improve the quality, timing, and relevance of the roles you pursue."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Where do the jobs come from?",
-    "content": "We pull from public job boards, direct company career pages, and other online sources. Our automation engine continuously scans for new postings, then our rules and team review them for freshness, legitimacy, and signs of real hiring activity before they ever reach your feed."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Is Job-Hopper only for certain industries?",
-    "content": "No. Job-Hopper is built for anyone in the United States who is serious about their next move. Our automation engine searches and matches across industries from your profile and preferences. We add extra human vetting where we see the densest, noisiest markets—today that includes manufacturing and tech, especially analytics and engineering-heavy roles—so matches stay sharp. For other fields (healthcare, retail leadership, logistics, professional services, and more) the same engine still works effectively; niche or highly unusual titles may see fewer postings simply because the market is thinner, but we keep searching on your behalf."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Which industries do you cover today?",
-    "content": "Today the product spans the economy—from desk jobs to the plant floor and everything in between. We are seeing standout results for people in tech and manufacturing, particularly analytics and engineering paths such as Data Analyst, Systems Analyst, Full Stack Developer, Mechanical Engineer, Process Engineer, Supply Chain Analyst, Manufacturing Systems Analyst, and IT Support Specialist. In those busy segments we pair AI matching with extra human review to keep signal high. Healthcare, logistics, retail leadership, professional services, and other sectors already run on the same engine, and we keep deepening coverage as we grow."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Which locations do you support?",
-    "content": "Currently, Job-Hopper focuses on roles based in the United States. In your profile, you can set preferred locations, indicate whether you're open to relocation, include or exclude remote options, and adjust those settings anytime."
-  },
-  {
-    "source_doc": "faq",
-    "title": "How often will I get new matches?",
-    "content": "It depends on your profile, preferences, and the current market. Many users see new matches weekly. Our priority is quality over volume, so you may receive a smaller number of strong, well-matched opportunities rather than a constant stream of random postings."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Can I change my preferences later?",
-    "content": "Yes. You can update your target roles, salary expectations, locations, industries of interest, and other settings at any time from your Job-Hopper dashboard. Your future matches will automatically adjust as you refine your profile."
-  },
-  {
-    "source_doc": "faq",
-    "title": "What is the sponsorship badge, and how accurate is it?",
-    "content": "It's a fast, heuristic estimate—built from employer size, industry, and role signals—that helps you quickly prioritize roles where sponsorship is more plausible, without digging through each posting. On Free you see a teaser; Core unlocks the full badge on every match. It's a smart filter, not a guarantee—no badge can tell you for certain whether a specific employer will sponsor. If you want something backed by real government filing data instead of a heuristic, that's what our upcoming Real Sponsorship Score (Premium) is built for—join the waitlist to get early access."
-  },
-  {
-    "source_doc": "faq",
-    "title": "How does the free trial work?",
-    "content": "Core starts with a free trial, so you can see the quality of your matches before being charged—cancel anytime before it ends and you won't pay. Free requires no card and has no trial period since it's free to use indefinitely. Premium isn't purchasable yet, so there's no trial for it—join the waitlist to get access when it launches."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Is Resume Advice included, or is it a paid add-on?",
-    "content": "Full Resume Advice is included in Core—not a separate purchase. Free gets a teaser version. The one-time resume upgrade and per-job resume tailoring are separate paid add-ons on top of whichever plan you're on."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Why are there different plans?",
-    "content": "Plans differ in how much Job-Hopper automates for you—not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, daily email digests, full insights, full resume advice, and an application tracker. Premium (coming soon) layers on a deeper sponsorship intelligence set."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do higher-priced tiers come with different features?",
-    "content": "Yes—that's the main difference between plans. Core unlocks unlimited automated daily search, full sponsorship insights, full resume advice, and the application tracker, all of which are limited or teaser-only on Free. Premium will add deeper sponsorship intelligence—Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contacts, and the Ghost Listing Detector—on top of everything in Core."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Can I change plans later?",
-    "content": "Yes. You can upgrade or downgrade between Free, Core, and Premium (once Premium is available) from your account settings at any time. Changes typically apply to your next billing cycle."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do I have to upgrade to Core to get value?",
-    "content": "No—Free gets you manual search with capped access and a preview of what Core unlocks. But Core is where the automation actually runs for you: unlimited daily matching, full insights, and the application tracker. Most people upgrade once they've seen a few matches and want it running automatically."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do I need a credit card to sign up?",
-    "content": "No. Free requires no card at all—you can start using Job-Hopper immediately. A card is only needed when you choose to upgrade to Core."
-  },
-  {
-    "source_doc": "faq",
-    "title": "What happens when I hit my search limit on Free?",
-    "content": "Free gives you 3 manual job searches. Once you use them, you'll see the option to upgrade to Core, which removes the cap entirely and switches you to unlimited automated daily search—no more manually re-running searches."
-  },
-  {
-    "source_doc": "faq",
-    "title": "What's the real difference between Free and Core?",
-    "content": "Free lets you look around: manual search with a cap, a teaser of the sponsorship badge, a few visible Premium Insights fields, and a preview of Resume Advice. Core removes the ceiling—unlimited automated daily search with an email digest, the full sponsorship badge on every match, full Premium Insights, full Resume Advice, and the application tracker to keep track of where you've applied. If you're serious about your search, Core is where Job-Hopper actually starts working for you instead of you working it."
-  },
-  {
-    "source_doc": "faq",
-    "title": "How do I upgrade from Free to Core?",
-    "content": "From your dashboard, go to your account settings and select Upgrade to Core. You'll get unlimited automated search and full access to every feature immediately—no waiting for the next billing cycle to start using it."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Can I cancel anytime?",
-    "content": "Yes. Cancel from your account settings whenever you want—no minimum commitment. If you cancel Core, you'll keep access through the end of your current billing period, then drop back to Free rather than losing your account entirely."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Will I lose my matches or saved jobs if I switch plans?",
-    "content": "No. Your account, profile, and saved job history stay in place whether you're on Free or Core. If you downgrade from Core to Free, your tracked applications aren't deleted—the application tracker view just isn't part of the Free plan, so you won't see it in your dashboard until you upgrade again, at which point everything reappears."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Is Premium worth waiting for?",
-    "content": "If sponsorship likelihood matters a lot to your search, yes—Premium is built specifically for that. It layers a Real Sponsorship Score backed by actual filing data on top of everything Core already gives you, plus Sponsor Watch (alerts on employer filing activity), Apply Intelligence, hiring manager contacts, and the Ghost Listing Detector. It's not purchasable yet—join the waitlist from the Pricing page to get early access the moment it launches."
-  },
-  {
-    "source_doc": "faq",
-    "title": "I'm not sure Core is worth it yet—what should I do?",
-    "content": "Start on Free and see the quality of your matches firsthand—there's no card required and no time pressure. When you're ready to stop manually re-running searches and want the full sponsorship badge, insights, and tracker running automatically, upgrading to Core takes one click and applies immediately."
-  },
-  {
-    "source_doc": "faq",
-    "title": "What happens if I find a job?",
-    "content": "First—congratulations. You can cancel your subscription in a couple of clicks or keep it active if you want to stay aware of future opportunities or quietly monitor the market. Many users pause, then come back when they're ready for their next move."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do employers see my profile?",
-    "content": "No. Job-Hopper is not a public candidate database, and we do not give employers access to browse or search your profile. We use your information internally to power matching and recommendations. If we ever introduce features that allow selective visibility to employers, they will be strictly opt-in and under your control."
-  },
-  {
-    "source_doc": "faq",
-    "title": "Do you share my data with employers or third parties?",
-    "content": "No. We do not share your personal profile data with employers or sell it to third-party advertisers. Any information an employer receives about you comes directly from you—through the applications you choose to submit and any outreach you decide to send. Our role is to help you find and prioritize opportunities, not to trade on your data."
-  },
-  {
-    "source_doc": "faq",
-    "title": "How do you protect my data?",
-    "content": "We use industry-standard security practices to safeguard your information and we never sell your personal data to advertisers. Your profile exists to help us match you with better jobs—nothing else. For full details on how we handle and protect your information, see our Privacy Policy."
-  },
-  {
-    "source_doc": "faq",
-    "title": "I still have questions—how do I contact you?",
-    "content": "You can reach us anytime at support@job-hopper.io or by using the contact form on our Support page. We typically respond within 1–2 business days."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Why are there different prices?",
-    "content": "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium (coming soon) layers on a deeper sponsorship intelligence set."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Do higher tiers come with different features?",
-    "content": "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Premium Insights, full Resume Advice, and the application tracker. Premium (coming soon) adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Can I change tiers later?",
-    "content": "Yes. You can upgrade or downgrade your plan from your dashboard at any time as your needs change."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Do I have to buy add-ons to get value?",
-    "content": "No. Core stands on its own. The resume add-ons — a one-time resume upgrade and per-job resume tailoring — are there only if you want extra help, and they're unaffected by your plan tier."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Is there a free trial?",
-    "content": "Yes — Core starts with a free trial, so you can see the quality and relevance of your matches before you commit. Premium isn't purchasable yet, so there's no trial for it; join the waitlist and we'll notify you the moment it launches."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "How do billing and cancellation work?",
-    "content": "Core is billed monthly and you can cancel at any time in a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Simple plans, priced by depth — not seniority.",
-    "content": "Job-Hopper gives every user the same core service: curated, high-quality job matches delivered to your inbox and dashboard, powered by AI and human vetting.\n\nPick the tier that matches how much you want automated for you."
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Free plan",
-    "content": "$0/month. No card required\n\n✓ Manual job search (capped)\n✓ Sponsorship badge — teaser view only\n✓ Premium Insights — a few fields visible, rest blurred\n✓ Resume Advice — teaser\n✗ Application tracker\n✗ Automated matching & email digest"
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Core plan",
-    "content": "$29/month. Billed monthly\n\n✓ Unlimited, automated daily job search + email digest\n✓ Full sponsorship badge (heuristic)\n✓ Full Premium Insights\n✓ Full Resume Advice\n✓ Application tracker included"
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Premium",
-    "content": "$49/mo at launch\n\nNot purchasable yet — join the waitlist for early access.\n\nEverything in Core, plus:\n\nThese features are in active development. Join the waitlist to get early access and be notified the moment they launch.\n\nJoin the waitlist\n\nEverything in Core, plus:\n- Real Sponsorship Score\n- Sponsor Watch\n- Apply Intelligence\n- Hiring manager contact\n- Ghost Listing Detector"
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Feature comparison (Free / Core / Premium)",
-    "content": "Manual job search: Capped / Unlimited / Unlimited\nAutomated matching + email digest: No / Yes / Yes\nSponsorship badge: Teaser / Full (heuristic) / Full\nPremium Insights: Limited / Full / Full\nResume Advice: Teaser / Full / Full\nApplication tracker: No / Yes / Yes\nReal Sponsorship Score: No / No / Coming soon\nSponsor Watch: No / No / Coming soon\nApply Intelligence: No / No / Coming soon\nHiring manager contact: No / No / Coming soon\nGhost Listing Detector: No / No / Coming soon"
-  },
-  {
-    "source_doc": "pricing_faq",
-    "title": "Every plan starts with the same core advantage.",
-    "content": "No matter which tier you choose, Job-Hopper gives you:\n\nThe same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood signals when they are relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship-only service.\n\nCurated, vetted job matches instead of endless scrolling\n\nMatching powered by automation engine plus human review\n\nA personal job feed in your dashboard\n\nEmail delivery of new opportunities"
-  },
-  {
-    "source_doc": "methodology",
-    "title": "How Job-Hopper finds the right jobs for you",
-    "content": "Job-Hopper is the AI layer that runs your U.S. job search — so you're not refreshing five\n\nsites every night.\n\nWe scan job boards and company postings, vet each role for freshness and real hiring\n\nactivity, then match what's left against your profile, preferences, and career level. You\n\nsee company size and background on every posting, so you're never applying blind."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "Build your profile (60 seconds)",
-    "content": "- Your current role and experience level.\n- The kinds of jobs you’re targeting.\n- Your pay range and preferred locations.\n- Your resume, so we understand your background."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "The Hopper collects and curates",
-    "content": "We continuously pull new postings from LinkedIn, Indeed, and company career pages, then:\n\n- Filter out stale, low-quality, and resume-collecting posts.\n- Enrich each role with company size, industry, and background.\n- Map roles to experience levels.\n- Analyze posting metadata to estimate sponsorship likelihood."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "We match and send",
-    "content": "Every new job is checked against your profile for:\n\n- Role alignment and experience level.\n- Location and relocation settings.\n- Salary or wage expectation.\n- Sponsorship likelihood, when you use that filter.\n\nGood fits land in your feed and — depending on your settings — trigger an email or notification."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "You apply and follow up",
-    "content": "- A short AI-generated job briefing.\n- A direct link to apply on the company’s platform.\n\nOn Premium (rolling out): verified hiring contact info."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "Not too tight, not too loose",
-    "content": "Too tight and you miss opportunities; too loose and you're back in job-board chaos. We\n\nstart with a sensible range, then hand you the controls:\n\n- Widen or narrow your job types\n- Expand or tighten location boundaries\n- Add or remove industries\n- Pause certain types of roles\n- Toggle sponsorship-likelihood filtering"
-  },
-  {
-    "source_doc": "methodology",
-    "title": "About the sponsorship signal",
-    "content": "When visa sponsorship is part of your situation, our sponsorship-likelihood signal helps\n\nyou spend less time on postings that are unlikely to line up. It is a practical filter and\n\nestimate — not a promise that a given employer will sponsor."
-  },
-  {
-    "source_doc": "methodology",
-    "title": "Your data, your control",
-    "content": "- We use your profile only to match you with jobs and improve recommendations.\n- We never sell your personal data to third-party advertisers.\n- You can delete your account at any time."
-  },
-  {
     "source_doc": "terms",
     "title": "Terms of Service",
     "content": "Welcome to Job-Hopper. These Terms of Service (\"Terms\") govern your use of the\n\nJob-Hopper website, web application, and related services (collectively, the \"Service\")\n\noperated by Job-Hopper, a product of Schepmont Group LLC (\"Company\", \"we\", \"our\", or\n\n\"us\"). By accessing or using Job-Hopper, you agree to be bound by these Terms. If you\n\ndo not agree, do not use the Service."
@@ -523,5 +268,390 @@
     "source_doc": "chatbot_kb",
     "title": "How do I delete my account entirely?",
     "content": "You can request full account deletion by contacting support@job-hopper.io. Per our privacy policy, you're entitled to request removal of your data at any time."
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0001 What Is Job-Hopper?",
+    "content": "Job-Hopper is an AI job-search platform for U.S. professionals. It helps you find and review curated roles based on your background, pay expectations, and location, so you spend less time filtering irrelevant listings.\n\nJob-Hopper is an AI job-search tool for U.S. professionals that finds, vets, and matches relevant roles based on the user’s profile and preferences.\n\nJob-Hopper reduces the time, noise, and uncertainty involved in searching for work. Users create a profile, upload a resume, and define preferences such as target role, compensation, and location. Job-Hopper then monitors job sources, filters obvious low-quality or stale opportunities, and presents curated matches with available context. Job-Hopper is not an employer, recruiting agency, immigration sponsor, law firm, or guarantee of employment. Employers make all interview, hiring, compensation, and sponsorship decisions.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0002 Job-Hopper Mission",
+    "content": "Our mission is to make job searching more focused and less wasteful by helping people discover fewer, better opportunities and make more informed decisions.\n\nJob-Hopper’s mission is to make job searching more focused, transparent, and efficient by helping people discover fewer, better opportunities.\n\nTraditional job search forces candidates to scan repetitive listings, guess which roles are active, and apply without useful context. Job-Hopper exists to replace that process with structured intelligence. The mission is not to maximize application volume. It is to improve the quality of decisions: which roles deserve attention, which employers appear relevant, and where a candidate’s time is best spent.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0003 Job-Hopper Vision",
+    "content": "Our vision is to become the trusted intelligence layer for job seekers - helping people understand which opportunities fit, why they fit, and what action to take next.\n\nJob-Hopper’s vision is to become the trusted intelligence layer between job seekers and the U.S. employment market.\n\nThe long-term vision is a job-search operating system that understands the user’s goals, interprets changing job-market data, and supports decisions from discovery through application and career growth. The vision includes richer match intelligence, sponsorship context, application organization, career guidance, and connected experiences for universities and employers. Future-state language must always be separated from live-product claims.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0004 Why Job-Hopper Exists",
+    "content": "Job-Hopper exists because job seekers should not have to spend hours separating useful opportunities from noise. It adds curation, matching, and structure to the search.\n\nJob-Hopper exists because modern job search is crowded with stale postings, weak filters, repetitive work, and too little context.\n\nJob boards make it easy to see many listings but difficult to know which ones are current, relevant, or worth the effort. Candidates repeat searches across multiple sites and often lack context about fit or sponsorship. Job-Hopper shifts the experience from volume to curation. The current site says the platform monitors job boards and company career pages, filters stale, low-quality, and obviously resume-collecting roles, and matches opportunities based on experience and preferences.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0005 Who Job-Hopper Helps",
+    "content": "Job-Hopper is for serious U.S.-focused job seekers across career stages and industries, including users who need sponsorship context.\n\nJob-Hopper helps U.S.-focused job seekers from entry level through executive leadership across role families represented by current job sources.\n\nThe platform is designed for people actively exploring employment in the United States who want a more structured search. It can support early-career candidates, experienced professionals, managers, directors, vice presidents, and executives. Users who require visa sponsorship are an important audience, but not the only audience. Sponsorship intelligence is a specialized layer, not the entire identity of Job-Hopper.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0006 Why Choose Job-Hopper",
+    "content": "Choose Job-Hopper when you want a more curated, organized search instead of manually filtering large volumes of listings.\n\nJob-Hopper combines curated matching, active-posting filtering, match context, dashboard delivery, and job-search organization in one experience.\n\nThe strongest reason to choose Job-Hopper is not a claim that it has the largest number of listings. The differentiation is focus. Job-Hopper uses profile information and preferences to curate opportunities, filters obvious low-quality or stale roles, and gives users a more usable review workflow. For users who need immigration sponsorship, deeper sponsorship-likelihood context can help prioritize research. This capability must be described according to current plan availability.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0007 How Job-Hopper Works",
+    "content": "Create your profile, upload your resume, set the role, pay, and location you want, and Job-Hopper will curate relevant opportunities for review.\n\nUsers create a profile, upload a resume, set preferences, receive curated matches, review available insights, and decide which jobs to pursue.\n\nThe standard flow is: create an account; upload a current resume; define role, pay, and location preferences; allow Job-Hopper to collect and filter postings from approved sources; review matches in the dashboard or email; verify the original employer posting; decide whether to apply; and organize progress with available tracking tools. The user remains responsible for reviewing requirements and submitting accurate information.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0008 Plans and Pricing Overview",
+    "content": "Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month at launch, waitlist only) adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of Core.\n\nJob-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be verified on the official pricing page or live checkout before quoting.\n\nFree is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Premium is $49/month at launch, not yet purchasable - join the waitlist for early access - and adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of everything in Core. Plans differ by depth of automation, not by seniority or job type. Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0009 H-1B Jobs and Sponsorship Intelligence",
+    "content": "Job-Hopper can show sponsorship-likelihood signals that help you prioritize roles, but a signal is not a guarantee that an employer will sponsor you. Confirm the role with the employer and use qualified legal counsel for immigration advice.\n\nJob-Hopper can add sponsorship-likelihood context to relevant job opportunities so users can prioritize research and applications more intelligently.\n\nA sponsorship signal is contextual information suggesting whether an employer or role may be more or less relevant to someone who needs work-authorization support. The current site says posting metadata can be analyzed so users can filter or sort by sponsorship likelihood when H-1B or other employer sponsorship is relevant. A signal is not a promise. Employer policy, role needs, candidate qualifications, and immigration rules can change. Job-Hopper is not a law firm and does not provide immigration legal advice.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0010 Resume Upload",
+    "content": "Upload your current resume so Job-Hopper can understand your background and improve the relevance of your matches.\n\nUsers upload a current resume so Job-Hopper can understand their background and improve match relevance.\n\nThe resume provides evidence of experience, skills, education, seniority, industries, and career history. Job-Hopper uses that information with stated preferences to evaluate potential fit. Users should upload an accurate, readable, current resume. Job-Hopper does not verify every claim, and the user remains responsible for the truthfulness of application materials. File types, size limits, and parsing behavior must follow the live interface.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0011 Creating a Job-Hopper Account",
+    "content": "Create your account with an email you can access, use a secure password, and complete any verification step shown on screen.\n\nUsers can create a Job-Hopper account through the registration page and then continue to profile setup.\n\nRegistration requires the account information and credentials shown in the live interface. Users should register with an email they can access, use a strong unique password, and complete any verification step. If registration fails, check the email spelling, determine whether an account already exists, retry in a supported browser, and contact support if the issue continues. Job-Hopper staff and the chatbot must never ask for a password or one-time code.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0012 Completing Your Profile",
+    "content": "Complete your profile with accurate background information and clear job preferences. Current information produces more useful matching than outdated or overly broad inputs.\n\nA complete profile combines the resume with current role information and clear preferences.\n\nProfile quality directly affects match quality. Users should review imported resume information, correct outdated details, and provide realistic preferences. They should update the profile after a promotion, career change, relocation, major resume revision, or material change in job-search goals. A profile is an input to matching, not a promise of eligibility. Missing or inaccurate information can produce broad or weak matches.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0013 Setting Job Preferences",
+    "content": "Set preferences around the roles, compensation, and locations you would genuinely consider, then refine them based on the relevance of your matches.\n\nPreferences tell Job-Hopper which roles, compensation levels, and locations to prioritize.\n\nThe preference set should reflect jobs the user would seriously consider. Overly broad preferences create noise, while extremely narrow preferences can reduce opportunities. Begin with one primary role family and realistic compensation and location criteria, then refine based on match quality. Preferences are signals, not employer commitments. Source postings may contain incomplete or changing data.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0014 Role and Title Preferences",
+    "content": "Choose one primary target and a small set of closely related titles. Focused role families usually produce better results than a long list of unrelated jobs.\n\nUsers should choose a primary target role and a small set of closely related titles that reflect experience and the intended next step.\n\nTitles vary by employer. Customer Success Manager may overlap with Account Manager or Client Success Lead. Job-Hopper can evaluate semantic relevance, but users should still define a clear role family. Career changers should use titles supported by transferable skills and should not assume that adding a title establishes qualification.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0015 Pay Range Preferences",
+    "content": "Set a realistic pay preference, but remember that employers do not always publish complete compensation details. Confirm unknown or ambiguous pay directly with the employer.\n\nA pay preference helps prioritize roles aligned with the user’s expectations when reliable compensation data is available.\n\nUsers should set realistic expectations based on experience, location, industry, and role level. Employers may publish base salary, total compensation, hourly pay, a broad range, or no amount. Job-Hopper must distinguish employer-published figures from estimates and unknown data. A role without published pay should not be presented as confirmed below or above the user’s preference.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0016 Location and Remote-Work Preferences",
+    "content": "Set your preferred location, then review every posting for state, time-zone, hybrid, and work-authorization restrictions.\n\nUsers can set location and remote-work preferences, but must review each employer’s geographic and work-authorization restrictions.\n\nRemote does not always mean work from anywhere. A role may be remote only in certain states, time zones, tax jurisdictions, or commuting areas. Hybrid roles may require regular office attendance. Job-Hopper should preserve source language and avoid converting remote eligible into fully remote without evidence.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0017 How Jobs Are Collected",
+    "content": "Job-Hopper monitors postings from job boards and company career pages, then filters and matches them before showing them to users.\n\nJob-Hopper monitors new postings across job boards and direct company career pages.\n\nThe collection system continuously brings in postings from approved public sources. The platform normalizes and evaluates data before presenting matches. The current site specifically references sources such as LinkedIn, Indeed, and direct employer career pages. The chatbot must not disclose private collection methods, credentials, anti-bot techniques, vendor contracts, security architecture, or source-specific operational controls.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0018 Job Vetting and Quality Filtering",
+    "content": "Job-Hopper filters obvious low-quality and stale roles, but you should still verify the original employer posting and report anything suspicious.\n\nJob-Hopper filters obvious stale, low-quality, duplicate, and resume-collecting roles using approved automated and human-informed checks.\n\nVetting is quality control, not a legal certification. It can reduce obvious noise but cannot guarantee that every employer or role remains legitimate and unchanged after publication. Users should still review the employer domain, original posting, role details, and application destination before sharing sensitive information.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0019 Active Posting Standard",
+    "content": "Job-Hopper prioritizes active roles, but employers can close or change a posting at any time. Confirm availability on the employer’s current application page.\n\nJob-Hopper prioritizes active postings, but job availability can change between collection, review, and application.\n\nAn active signal means the role appeared open at the latest approved check. Employers can pause, close, edit, or remove roles at any time. Third-party pages can update later than the employer’s career site. The original employer application page should be treated as the final operational source when the user applies.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0020 Match Score",
+    "content": "The match score helps you prioritize roles based on available profile and job data. It is not a prediction of interview or hiring success.\n\nA match score is a decision-support signal showing how closely a role appears to align with the user’s profile and preferences.\n\nThe score may consider resume experience, skills, title relevance, seniority, location, compensation, and other available job data. Missing or ambiguous source information can affect the result. A high score does not prove eligibility or predict an interview. A lower score does not mean the user must avoid a role. Users should read the reasons and apply judgment.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0021 Job-Hopper Dashboard",
+    "content": "Your dashboard is the main place to review curated matches and available insights. Features may vary by plan and rollout.\n\nThe dashboard is where users review curated matches, insights, and available tracking information.\n\nThe dashboard helps users identify new matches, review key role details, and decide what to do next. Exact modules can vary by plan and rollout. The chatbot must avoid inventing buttons or tabs. Navigation instructions should use current approved UI labels or labels the user reports seeing.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0022 Email Delivery of Job Matches",
+    "content": "Job-Hopper can send curated matches to your inbox. Check spam and notification settings if messages are missing, and use the dashboard for the latest match information.\n\nCurated job matches may be delivered to the user’s email inbox as well as the dashboard.\n\nUsers should register with an email they monitor and add Job-Hopper to safe senders if messages are filtered. Delivery frequency and controls must be described only according to live settings. Email is a notification channel. The dashboard and original employer page should be used for the latest information.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0023 Job Tracker",
+    "content": "Use the Job Tracker to organize the roles you are considering and record your progress. It is not an employer’s internal status system.\n\nThe Job Tracker helps users organize opportunities and record application progress.\n\nThe tracker may include stages such as saved, preparing, applied, interviewing, offer, or closed, depending on the live product. Status generally reflects user-entered information unless an approved integration says otherwise. Job-Hopper does not automatically know an employer’s internal decision merely because a role is in the tracker.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0024 Saving and Organizing Jobs",
+    "content": "Save roles you want to review, then confirm the current employer posting before applying. Saving a job does not reserve it or keep it open.\n\nSaving a role allows the user to return to it, compare it with other opportunities, and decide on the next action.\n\nUsers should save roles they genuinely intend to review rather than using the saved list as an unlimited archive. They should re-check the employer posting before applying because details and availability can change. If folders, notes, labels, or prioritization controls exist, the chatbot should describe only the live controls. The underlying principle is to maintain a manageable shortlist.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0025 Applying to a Job Found on Job-Hopper",
+    "content": "Review the original posting and apply through the available employer or source process. Confirm that you receive the employer’s submission confirmation.\n\nUsers should open the role, review the original employer or source posting, and follow the available application process.\n\nBefore applying, confirm title, location, compensation, qualifications, work-authorization language, and application destination. The employer or source may require a separate account and may ask the user to re-enter resume information. Unless a separate live-feature article explicitly confirms application submission, the chatbot must not claim that Job-Hopper applies automatically or submits forms on the user’s behalf.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0026 Application Accuracy and User Responsibility",
+    "content": "Review every application carefully and submit only accurate information. Job-Hopper can support your search, but you remain responsible for employer-facing answers.\n\nUsers are responsible for reviewing and submitting accurate, complete, and truthful application information.\n\nJob-Hopper may organize or display information derived from a user profile and job sources, but the user must confirm every employer-facing answer. This includes dates, titles, skills, education, work authorization, sponsorship needs, salary expectations, disclosures, and required certifications. The chatbot must never advise a user to conceal, falsify, or materially misrepresent information.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0027 Application Status and Employer Decisions",
+    "content": "The employer controls your application status. Job-Hopper can help you organize progress, but it normally cannot see the employer’s internal review or decision.\n\nEmployers control review, interview, rejection, offer, and hiring decisions; Job-Hopper usually cannot see their internal status.\n\nA tracker status may reflect the user’s own record, not the employer’s applicant-tracking system. No response does not necessarily indicate rejection, and a role remaining open does not prove the application is still under review. The chatbot should not invent reasons for silence or claim inside knowledge of a hiring decision.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0028 Understanding Match Explanations",
+    "content": "Use the explanation to understand why a role was matched, then verify the details in the original posting. Pay attention to both strengths and unknowns.\n\nMatch explanations summarize the strongest available reasons a role appears relevant and the important limitations or gaps.\n\nA useful explanation can mention aligned skills, similar titles, seniority, location, compensation, industry, and sponsorship context. It should also surface important unknowns and mismatches rather than presenting only positive language. Explanations are generated from available data and can be incomplete. Users should compare the explanation with the original posting and their actual experience.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0029 Job Data Sources and Attribution",
+    "content": "Job-Hopper uses employer and approved job-source information. When details conflict, verify the current direct employer posting.\n\nJob-Hopper displays information derived from employer postings and approved job sources; the original current employer page is the final operational reference.\n\nJob records may combine normalized fields from more than one public source. Source URLs and timestamps should be preserved internally so the system can explain where data came from and troubleshoot discrepancies. When sources conflict, the current direct employer page generally has priority over third-party copies. The chatbot should say when information is unknown or conflicting rather than silently choosing a convenient value.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0030 AI Limitations and Confidence",
+    "content": "Job-Hopper AI can help you interpret available information, but it can be incomplete. Verify important details with the employer, and use qualified professionals for legal or immigration advice.\n\nJob-Hopper AI supports discovery and explanation, but can be incomplete or wrong when source data is missing, stale, ambiguous, or incorrectly parsed.\n\nThe AI uses three response modes: answer directly when supported; qualify when facts are incomplete, variable, or inferential; and escalate when the issue is account-specific, high-stakes, legally sensitive, safety-related, or unsupported. The AI must never fabricate a feature, price, employer decision, sponsorship promise, legal conclusion, or support action. It should distinguish facts from inferences and say what the user should verify.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0031 How Resume Matching Works",
+    "content": "Job-Hopper compares your resume and preferences with available job information. It can recognize related language, but you should review the match and correct any parsing errors.\n\nResume matching compares the user’s documented background with available job requirements and preferences.\n\nThe process can consider skills, roles, seniority, experience patterns, education, certifications, industries, and other relevant text. It can also compare job preferences such as location and compensation. A resume may use different terms from a job posting. Semantic matching can identify related concepts, but it cannot prove that the user has a skill that is absent or unclear. Users should review and correct resume parsing errors.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0032 Improving Match Quality",
+    "content": "Update your resume and preferences, keep your target role focused, and report repeated clearly irrelevant matches with examples. Never add experience or skills you do not have.\n\nUsers can improve match quality by updating the resume, narrowing role preferences, setting realistic location and pay criteria, and reporting clearly irrelevant results.\n\nRecommended sequence: confirm the latest resume is uploaded; check current and target roles; use a focused role family; review location and remote restrictions; set realistic compensation expectations; remove obsolete preferences; review several matches; and report persistent mismatches with examples. The AI should not recommend adding false keywords or qualifications.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0033 Understanding Sponsorship-Likelihood Signals",
+    "content": "Use the signal to prioritize research, not as a promise. Confirm sponsorship directly with the employer and get legal advice for your personal eligibility.\n\nA sponsorship-likelihood signal summarizes available evidence that may help a user prioritize an employer or role.\n\nToday's signal is a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data. A future Premium feature (Real Sponsorship Score) will be built on real DOL/USCIS filing data; until that ships, describe the current signal strictly as a heuristic, never as filing-history-backed. Positive, neutral, or low signals are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0034 Employer Sponsorship History vs. Current Sponsorship",
+    "content": "Past sponsorship is useful context, not a current commitment. Review the specific posting and confirm the policy with the employer.\n\nPast sponsorship activity can be useful context, but it does not prove that an employer or specific role will sponsor now.\n\nAn employer’s historical petitions or sponsorship activity may show familiarity with immigration processes. However, budgets, policies, legal strategies, business needs, and role eligibility change. The strongest current evidence is explicit language in the current role or a direct employer confirmation. Even explicit language remains subject to candidate eligibility and employer discretion.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0035 Immigration and Legal Advice Boundary",
+    "content": "I can explain Job-Hopper’s sponsorship information and the wording in a job posting, but I can’t determine immigration eligibility or provide legal advice. A qualified immigration attorney can evaluate your situation.\n\nJob-Hopper provides job-search information and sponsorship context, not immigration legal advice.\n\nThe AI may explain product features, summarize the language of a posting, and describe what a sponsorship signal means. It must not determine visa eligibility, recommend a filing strategy, interpret a user’s status, predict petition approval, calculate legal deadlines, or tell a user how to answer legal questions when facts are uncertain. For legal questions, provide a brief boundary, recommend a qualified immigration attorney or authorized legal resource, and continue helping with non-legal job-search tasks.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0036 Free Plan",
+    "content": "Free is $0 with no card required. It includes 3 manual job searches, a teaser of the sponsorship badge, a few visible Premium Insights fields, and a teaser of Resume Advice.\n\nThe current pricing page describes Free as $0 with no card required, capped searches, and teaser insights.\n\nFree is designed for users who want to experience Job-Hopper before paying. It includes 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Once the 3 searches are used, upgrading to Core removes the cap entirely and switches to unlimited automated daily search. If this number ever changes on the live product, the current interface is the source of truth over this article.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0037 Core Plan",
+    "content": "Core is $29/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.\n\nThe current pricing page lists Core at $29 per month with automated daily job search or matching, the Job Tracker, and full insights.\n\nCore is $29/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Premium Insights, full Resume Advice, and the Job Tracker. Core is designed for users who want Job-Hopper to work continuously rather than relying on Free's capped manual searches. Verify the current price and billing interval before a definitive quote; recommend Core based on stated needs, not urgency.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0038 Premium Plan and Waitlist",
+    "content": "[NOT YET LIVE - do not present as available]\n\nPremium is $49/month at launch (not yet purchasable - waitlist only) and includes everything in Core plus Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector.\n\nPremium is positioned around deeper sponsorship intelligence and has been publicly shown at $49 per month at launch; availability may be staged or waitlist-based.\n\nPremium is $49/month at launch and includes everything in Core, plus: Real Sponsorship Score (built on actual government filing data instead of today's heuristic), Sponsor Watch (alerts on employer filing activity), Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector. Premium should be recommended only to users for whom sponsorship intelligence materially affects the search. It is not yet purchasable - do not promise a launch date, first-month promotion, waitlist reward, or guaranteed access unless an approved campaign record is active. Direct the user to the official waitlist.",
+    "ai_approved": "Conditional",
+    "live_state": "Planned"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0039 Upgrading, Downgrading, and Cancelling a Subscription",
+    "content": "Use the subscription controls in your account if available. Because timing and credits depend on the current billing policy, contact support if the option is missing or you need confirmation.\n\nUsers should manage plan changes through the current account or billing interface; billing effects depend on the live checkout and subscription policy.\n\nThe chatbot may direct a user to visible subscription or billing controls, but it must not promise proration, immediate credits, refunds, retained access, or a specific cancellation effective date unless the current billing policy confirms it. Cancellation should be handled clearly and without retention pressure. Users should receive the practical next step and a support path when self-service controls are unavailable.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0040 Billing, Charges, Receipts, and Refund Requests",
+    "content": "I can help route this to Billing. Please do not send your full card number, CVV, password, or one-time code. Share the charge date, amount, receipt or invoice ID, and the email on the account through the approved support channel.\n\nBilling questions require account-specific verification. The chatbot can explain general plan information but must not confirm a refund or expose payment details.\n\nFor an unfamiliar charge, review the account plan, billing email, amount, date, and merchant descriptor. Support should verify the account securely and route the issue to Billing. The chatbot must never request a full card number, CVV, bank password, one-time code, or complete sensitive payment data. Refund eligibility depends on current Terms and billing policy.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0041 Installing Job-Hopper as an App",
+    "content": "Job-Hopper is a progressive web app. Open it in a supported browser and use the browser’s Install App or Add to Home Screen option. No app store is required.\n\nJob-Hopper is a progressive web app that can be added to a home screen or installed like an app without an app store.\n\nThe installation option depends on device and browser. On supported desktop browsers, users may see an install icon in the address bar or browser menu. On iPhone or iPad, users typically use the Share menu and Add to Home Screen. On Android, users may see Install App or Add to Home Screen. Exact labels vary by operating system and browser. If the install option does not appear, the user can continue using Job-Hopper in the browser.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0042 Supported Devices and Browsers",
+    "content": "Use the latest version of a mainstream browser such as Chrome, Safari, Edge, or Firefox. If the issue continues, share your device, operating system, and browser version with support.\n\nJob-Hopper is web-based and should be used in a current mainstream browser; exact supported versions require Engineering validation.\n\nThe chatbot can recommend updating Chrome, Safari, Edge, or Firefox and trying a private window after clearing site-specific cache. It must not publish a formal compatibility matrix until Engineering approves it. Mobile and desktop experiences may differ. Browser extensions, strict privacy settings, network filters, and old operating systems can affect login, uploads, notifications, and installation.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0043 Notification Preferences",
+    "content": "Use the notification settings or the control in the email you received. If the preference does not take effect, contact support with the message type and date.\n\nUsers should use available notification or account settings to control match emails and other communications.\n\nExact notification categories, frequencies, and unsubscribe behavior depend on the live product. Transactional messages such as security or billing notices may be handled differently from marketing messages. The chatbot should honor opt-out requests, direct the user to visible settings or unsubscribe controls, and escalate when the preference does not take effect.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0044 Login, Password, and Account Access",
+    "content": "Use the official Forgot Password process and never share your password or one-time code. If the reset email does not arrive, check spam and contact support.\n\nUsers should use the official login and password-reset process; support and the chatbot must never request passwords or one-time codes.\n\nBasic steps are to confirm the correct email, check keyboard or password-manager issues, use Forgot Password, check spam for reset mail, and retry in a current browser. A user who suspects unauthorized access should reset the password, secure the email account, and contact support. Account ownership must be verified through approved procedures rather than personal questions in open chat.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0045 Reporting Incorrect, Duplicate, or Closed Jobs",
+    "content": "Please send the Job-Hopper job link, the employer’s current page, what is incorrect, and a screenshot if available. The team will verify the listing.\n\nUsers should report inaccurate, duplicate, or closed listings with enough information for the data team to investigate.\n\nA useful report includes the Job-Hopper job URL or ID, original source URL, employer, title, what appears wrong, date and time observed, and a screenshot when possible. Support should acknowledge the report without promising immediate removal. The data team should verify the source, update or suppress the record, and track repeat issues by source.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0046 Reporting Suspicious or Fraudulent Jobs",
+    "content": "Stop contact, do not send money or more personal information, save screenshots and URLs, and report the listing immediately. If you sent money or financial details, contact your bank or payment provider now.\n\nUsers should stop interacting with a suspicious listing, avoid sharing money or sensitive data, preserve evidence, and report it to Job-Hopper and the original platform.\n\nWarning signs include requests for payment, gift cards, cryptocurrency, banking credentials, identity documents before a legitimate process, interviews only through unusual messaging channels, impersonated domains, unrealistic compensation, and pressure to act immediately. Job-Hopper cannot guarantee that every listing is safe. Reports should be prioritized and the affected record may be temporarily suppressed while investigated.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0047 Privacy and Personal Data",
+    "content": "Job-Hopper uses information such as your profile, resume, and preferences to provide matching and account services. For formal details about use, sharing, retention, and rights, review the current Privacy Policy or contact support.\n\nJob-Hopper uses account, profile, resume, preference, and usage information to provide the service; the current Privacy Policy is the legal source of truth.\n\nThe chatbot may explain why common information is needed - for example, a resume supports matching and an email supports account access and notifications. It must not make unsupported promises about encryption, data sale, retention periods, subprocessors, model training, or deletion timelines. Users should be directed to the current Privacy Policy for legal terms and to support for access, correction, deletion, consent, or complaint requests.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0048 Account Deletion and Data Requests",
+    "content": "I can route your account or data request to the privacy team. Please use the approved support channel so your identity can be verified securely. Timing and retained records are governed by the current Privacy Policy and legal requirements.\n\nUsers can request account deletion or other data actions through the approved account or support process; exact scope and timing depend on the current Privacy Policy and legal obligations.\n\nThe chatbot should identify the requested action - delete account, access data, correct data, export data, restrict processing, or withdraw consent - and route it securely. It should not promise immediate or complete deletion because billing, security, fraud prevention, or legal records may be retained when permitted or required. Identity must be verified using an approved process. The chatbot must not collect sensitive identity documents in open chat unless a secure authorized workflow explicitly requires them.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0049 Contacting Job-Hopper Support",
+    "content": "Email support@job-hopper.io with your account email, a clear description, the page and approximate time, and a screenshot if useful. Do not include passwords, one-time codes, or full payment details. Support typically responds within 1 - 2 business days.\n\nUsers can contact Job-Hopper at support@job-hopper.io; the current support page states a typical response time of 1 - 2 business days.\n\nA complete support request should include the account email, issue category, exact error or question, approximate time, page URL, device and browser for technical problems, and screenshots without passwords, full payment details, or unnecessary sensitive data. Urgent safety, security, fraud, or payment issues should be labeled and routed according to the escalation matrix. The chatbot must not claim that a ticket was created unless the integration confirms creation.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0050 Job-Hopper AI Chatbot Operating Policy",
+    "content": "I’ll answer from Job-Hopper’s approved product knowledge. When information can change or depends on your account, I’ll say what needs verification. I won’t guess about prices, employer decisions, sponsorship, legal matters, billing outcomes, or support actions.\n\nThe chatbot must be accurate, useful, transparent, privacy-aware, commercially intelligent, and willing to escalate instead of guessing.\n\nThe chatbot follows this order: identify the intent; retrieve only Approved or permitted Conditional articles; prefer live account and checkout state, then current official pages, then approved KB content; answer directly; state material limitations; recommend a plan only when the need maps clearly to a current plan; and escalate when a human decision, account lookup, investigation, or legal judgment is required. Hard rules: never invent a capability, price, promotion, launch date, job fact, employer decision, sponsorship promise, legal answer, refund, ticket, or completed action; never request passwords, one-time codes, full card details, or unnecessary sensitive information; never provide immigration legal advice; never use fear, rejection, billing problems, cancellation, privacy concerns, or safety incidents as sales leverage; and never present AI scores or sponsorship signals as guarantees.\nDefault answer shape: direct answer; important limitation; next action; relevant plan recommendation only when appropriate; human handoff when required.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0051 University Campus Partnership Overview",
+    "content": "[NOT YET LIVE - do not present as available]\n\nJob-Hopper has a draft concept for university partnerships that would give career-services teams bulk student access and coaching, but it isn't a live program yet. I can connect you with our partnerships team for a discovery conversation.\n\nJob-Hopper has drafted a Campus Partnership Program concept that would give university career-services teams bulk student access, recurring coaching, and engagement/outcome analytics. The program is a proposed commercial concept, not a live offering, and has no confirmed pricing, launch date, or signed institution.\n\nThe concept positions Job-Hopper as a student-success and graduate-employability platform rather than a bulk software purchase, combining campus access, career technology, live coaching, and a future analytics/employer-connectivity layer. Proposed components include a campus license for defined student cohorts, monthly or quarterly coaching sessions, an institution-branded landing page, a career-services dashboard, and a longer-term employer-partnership layer. None of these components are built, priced, or contractually available today. Any inbound interest must go through discovery with the partnerships/product owner before any commitment is made.",
+    "ai_approved": "No",
+    "live_state": "Planned"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0052 Campus Pilot Program",
+    "content": "[NOT YET LIVE - do not present as available]\n\nA campus pilot is proposed as roughly 100 students over 30 to 60 days with agreed success metrics, but nothing is scheduled yet. I can connect you with our partnerships team to scope one.\n\nA campus pilot would run for roughly 100 students over 30 to 60 days with mutually agreed success metrics. Nothing is scheduled, contracted, or currently running.\n\nThe draft pilot concept proposes a defined cohort size and time window so an institution can evaluate fit before any larger commitment. Proposed metrics include activation rate, profile completion, monthly active users, jobs viewed/saved, applications (definition still required — manual vs system-tracked), resume-workflow completion, workshop attendance, and student satisfaction. Placement outcomes may only ever be reported where verified and directly attributable — never estimated or implied.",
+    "ai_approved": "No",
+    "live_state": "Planned"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0053 Career Coaching Sessions (University)",
+    "content": "[NOT YET LIVE - do not present as available]\n\nCareer coaching is part of the proposed university partnership concept, covering things like resume, LinkedIn, interview prep, and international job search — but cadence and delivery aren't finalized yet.\n\nThe draft partnership concept includes monthly or quarterly coaching sessions covering resume, LinkedIn, networking, interviews, salary, and international/sponsorship-aware search. This is proposed, not a confirmed deliverable.\n\nCoaching is envisioned as a recurring, structured complement to the core product rather than a one-off session. Cadence, facilitator model (internal staff vs. contracted coaches), and exact topic list are not yet finalized. Any institution asking about coaching should be told the concept exists but specifics are pending product-owner approval.",
+    "ai_approved": "No",
+    "live_state": "Planned"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0054 University Career Services Dashboard",
+    "content": "[NOT YET LIVE - do not present as available]\n\nA university dashboard is planned to give career-services staff visibility into student engagement and outcomes, but it isn't built yet, and the data-privacy framework around it is still being defined.\n\nA planned/proposed dashboard would give career-services staff visibility into activation, engagement, applications, workshop attendance, and outcomes for their student cohort. It is not built, and the data governance around it (education-data roles, permissions, exports, retention) is not yet defined.\n\nBefore any dashboard work begins, Job-Hopper must define whether it is a school official/service provider for education-data purposes, what data the institution actually shares, data controller/processor roles, breach-notification duties, and export/retention rules. No FERPA, SOC 2, GDPR, CCPA, or similar compliance status may be claimed unless formally established and documented.",
+    "ai_approved": "No",
+    "live_state": "Planned"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0055 Job-Hopper Product Status and Release Process",
+    "content": "(Internal use only — not customer-facing.) Before confirming any feature is live, check its status in the Product Truth Register. Only Confirmed Public or Confirmed Internal statuses may be presented as available to users.\n\nEvery Job-Hopper capability carries a status label — Confirmed Public, Confirmed Internal, In Development, Planned, Proposed, To Confirm, or Deprecated — tracked in the Product Truth Register. No team may present a feature as available until the product owner has approved and released it. Marketing drafts, social posts, and planning documents never override product-owner approval.\n\nOnly \"Confirmed Public\" and \"Confirmed Internal\" statuses may be described to users as available. \"In Development\" may be marketed only as coming soon or waitlist. \"Planned\" and \"Proposed\" are roadmap-only and must not be presented as available. \"To Confirm\" means evidence is conflicting or insufficient and must be escalated to the product owner before any implementation or communication. \"Deprecated\" capabilities must be removed from product, marketing, and chatbot responses. Every release additionally passes a checklist covering product, content, data, security, privacy, accessibility, operations, commercial, and marketing before launch.",
+    "ai_approved": "Conditional",
+    "live_state": "Live"
   }
 ]
