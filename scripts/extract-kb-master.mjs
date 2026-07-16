@@ -218,6 +218,33 @@ for (const article of articles) {
   })
 }
 
+// ---------- synthetic routing chunk ----------
+
+// Not sourced from knowledgeBaseMaster.md — deliberately hand-written.
+//
+// Short, fact-light chunks embed poorly against vague short queries even when
+// they are topically correct. Direct similarity testing put KB-0008's full
+// article at only 0.42 against "tell me about your plans", even after a generic
+// topic sentence was added to it: one sentence barely shifts the embedding of an
+// otherwise long, dense chunk. This chunk exists purely to catch vague
+// plan-related queries and hand off to the detailed KB-0008/0036/0037/0038
+// articles, which carry the real per-plan detail.
+//
+// CAUTION: the prices below are hardcoded and do NOT track knowledgeBaseMaster.md.
+// If a plan's price or availability changes, edit this string too — and note it is
+// tuned to win vague plan queries, so if it goes stale it is the answer users get.
+entries.push({
+  source_doc: SOURCE_DOC,
+  title: 'Plans Overview (short)',
+  content:
+    'Job-Hopper has three plans: Free, Core, and Premium. Free is $0 with no card ' +
+    'required. Core is $29 per month. Premium is $49 per month at launch and is ' +
+    "currently waitlist-only. Ask about any specific plan for full details on what's " +
+    'included.',
+  ai_approved: 'Yes',
+  live_state: 'Live',
+})
+
 // ---------- merge ----------
 
 let existing = []
@@ -249,7 +276,10 @@ const tally = (key) =>
     .map(([k, n]) => `${k}=${n}`)
     .join('  ')
 
-console.log(`Parsed ${entries.length} articles from ${path.relative(root, kbPath)}`)
+console.log(
+  `Parsed ${articles.length} articles from ${path.relative(root, kbPath)} ` +
+    `(+1 synthetic routing chunk = ${entries.length} entries)`,
+)
 console.log(`  ai_approved: ${tally('ai_approved')}`)
 console.log(`  live_state:  ${tally('live_state')}`)
 console.log(`  flagged NOT YET LIVE: ${flagged.length} (${flagged.map((e) => e.title.split(' ')[0]).join(', ')})`)
