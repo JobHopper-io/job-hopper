@@ -233,6 +233,31 @@ class SupabaseRest:
             prefer="return=minimal",
         )
 
+    async def upsert_rows(
+        self,
+        table: str,
+        rows: list[dict[str, Any]],
+        *,
+        on_conflict: str,
+        dry_run: bool,
+        chunk_size: int = 500,
+    ) -> int:
+        """Batch upsert (POST + Prefer: resolution=merge-duplicates), chunked. Returns rows sent."""
+        if dry_run or not rows:
+            return 0
+        sent = 0
+        for i in range(0, len(rows), chunk_size):
+            chunk = rows[i : i + chunk_size]
+            await self._request(
+                "POST",
+                f"/{table}",
+                params=[("on_conflict", on_conflict)],
+                json_body=chunk,
+                prefer="resolution=merge-duplicates,return=minimal",
+            )
+            sent += len(chunk)
+        return sent
+
     async def insert_bd_lead(self, company_name: str, status: str, *, dry_run: bool) -> None:
         if dry_run:
             return

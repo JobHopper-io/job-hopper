@@ -18,6 +18,9 @@ dependencies = [
   "uvicorn[standard]>=0.32.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
 [project.scripts]
 job-processor-api = "job_processor.main:run_api"
 job-processor = "job_processor.cli:main"

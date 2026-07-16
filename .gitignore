@@ -52,6 +52,9 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Sponsorship data engine: large raw government source files, not committed
+job-processor-service/data/raw/
+
 # Claude Code project instructions (local only)
 CLAUDE.md
 
