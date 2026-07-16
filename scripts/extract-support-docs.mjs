@@ -70,22 +70,6 @@ function extractHeadingAndBody(html, headingTag) {
   return { title, body }
 }
 
-function sectionBetween(source, startMarker, endMarker) {
-  const startIdx = source.indexOf(startMarker)
-  if (startIdx === -1) throw new Error(`marker not found: ${startMarker}`)
-  const contentStart = startIdx + startMarker.length
-  const endIdx = endMarker ? source.indexOf(endMarker, contentStart) : source.length
-  if (endMarker && endIdx === -1) throw new Error(`marker not found: ${endMarker}`)
-  return source.slice(contentStart, endIdx)
-}
-
-// Removes elements carrying a v-for attribute (their content duplicates a
-// JS array already extracted separately). Only safe for non-nested tags,
-// which holds for every block this is used on here.
-function removeVForBlocks(html) {
-  return html.replace(/<(\w[\w-]*)[^>]*\sv-for=[^>]*>[\s\S]*?<\/\1>\s*/g, '')
-}
-
 // Extracts a top-level `const NAME = [...]` (or `const NAME: T = [...]`)
 // array literal as real JS values, tolerant of a TS type annotation before
 // the `=`. Only works for literals containing plain data (no functions),
@@ -122,119 +106,6 @@ function extractArrayLiteral(source, varName) {
 }
 
 // ---------- per-file extractors ----------
-
-function extractFaq() {
-  const source = read('FAQ.vue')
-  const faqs = extractArrayLiteral(source, 'faqs')
-  return faqs.map((f) => ({ source_doc: 'faq', title: f.q, content: f.a }))
-}
-
-function extractPricingFaq() {
-  const source = read('Pricing.vue')
-  const entries = []
-
-  const pricingFaq = extractArrayLiteral(source, 'pricingFaq')
-  for (const f of pricingFaq) {
-    entries.push({ source_doc: 'pricing_faq', title: f.q, content: f.a })
-  }
-
-  // Intro copy (static, above the tier cards).
-  const introHtml = sectionBetween(source, '<!-- Intro -->', '<!-- Tiers -->')
-  const intro = extractHeadingAndBody(introHtml, 'h1')
-  entries.push({ source_doc: 'pricing_faq', title: intro.title, content: intro.body })
-
-  // Free / Core tiers — static data, no live product lookups.
-  const sellableTiers = extractArrayLiteral(source, 'sellableTiers')
-  for (const tier of sellableTiers) {
-    const featureLines = tier.features
-      .map((f) => `${f.included ? '✓' : '✗'} ${f.label}`)
-      .join('\n')
-    entries.push({
-      source_doc: 'pricing_faq',
-      title: `${tier.name} plan`,
-      content: `${tier.price}/month. ${tier.note}\n\n${featureLines}`,
-    })
-  }
-
-  // Premium tier card — price/description text is hardcoded in the
-  // template (not purchasable yet); feature list comes from the JS array.
-  const premiumFeatures = extractArrayLiteral(source, 'premiumFeatures')
-  const premiumHtml = sectionBetween(
-    source,
-    '<!-- Premium (locked / not yet buyable) -->',
-    '<!-- Feature comparison -->',
-  )
-  const premium = extractHeadingAndBody(removeVForBlocks(premiumHtml), 'h3')
-  const premiumFeatureLines = premiumFeatures.map((f) => `- ${f}`).join('\n')
-  entries.push({
-    source_doc: 'pricing_faq',
-    title: premium.title ?? 'Premium plan',
-    content: `${premium.body}\n\nEverything in Core, plus:\n${premiumFeatureLines}`,
-  })
-
-  // Feature comparison table.
-  const comparisonRows = extractArrayLiteral(source, 'comparisonRows')
-  const comparisonColumns = extractArrayLiteral(source, 'comparisonColumns')
-  const comparisonLines = comparisonRows.map(
-    (row) => `${row.feature}: ${row.cells.map((c) => (c === true ? 'Yes' : c === false ? 'No' : c)).join(' / ')}`,
-  )
-  entries.push({
-    source_doc: 'pricing_faq',
-    title: `Feature comparison (${comparisonColumns.join(' / ')})`,
-    content: comparisonLines.join('\n'),
-  })
-
-  // Reassurance strip (static prose + hardcoded checklist, no v-for).
-  const reassuranceHtml = sectionBetween(source, '<!-- Reassurance Strip -->', '<!-- Pricing FAQ -->')
-  const reassurance = extractHeadingAndBody(reassuranceHtml, 'h2')
-  entries.push({ source_doc: 'pricing_faq', title: reassurance.title, content: reassurance.body })
-
-  return entries
-}
-
-function extractMethodology() {
-  const source = read('HowItWorks.vue')
-  const entries = []
-
-  const introHtml = sectionBetween(source, '<!-- Intro -->', '<!-- Steps -->')
-  const intro = extractHeadingAndBody(introHtml, 'h1')
-  entries.push({ source_doc: 'methodology', title: intro.title, content: intro.body })
-
-  const steps = extractArrayLiteral(source, 'steps')
-  for (const step of steps) {
-    const parts = []
-    if (step.lead) parts.push(step.lead)
-    if (step.points) parts.push(step.points.map((p) => `- ${p}`).join('\n'))
-    if (step.premium) parts.push(`On Premium (rolling out): ${step.premium}.`)
-    if (step.footer) parts.push(step.footer)
-    const title = step.aside ? `${step.title} (${step.aside})` : step.title
-    entries.push({ source_doc: 'methodology', title, content: parts.join('\n\n') })
-  }
-
-  const controls = extractArrayLiteral(source, 'controls')
-  const philoHtml = sectionBetween(source, '<!-- Matching philosophy -->', '<!-- Sponsorship note -->')
-  const philo = extractHeadingAndBody(removeVForBlocks(philoHtml), 'h2')
-  entries.push({
-    source_doc: 'methodology',
-    title: philo.title,
-    content: `${philo.body}\n\n${controls.map((c) => `- ${c}`).join('\n')}`,
-  })
-
-  const sponsorHtml = sectionBetween(source, '<!-- Sponsorship note -->', '<!-- Data & privacy -->')
-  const sponsor = extractHeadingAndBody(sponsorHtml, 'h2')
-  entries.push({ source_doc: 'methodology', title: sponsor.title, content: sponsor.body })
-
-  const privacy = extractArrayLiteral(source, 'privacy')
-  const dataHtml = sectionBetween(source, '<!-- Data & privacy -->', '<!-- CTA -->')
-  const data = extractHeadingAndBody(removeVForBlocks(dataHtml), 'h2')
-  entries.push({
-    source_doc: 'methodology',
-    title: data.title,
-    content: privacy.map((p) => `- ${p}`).join('\n'),
-  })
-
-  return entries
-}
 
 // Shared shape for Terms.vue / Privacy.vue: an intro <p>, a run of
 // `<section class="space-y-3">` blocks each starting with an <h2>, and a
@@ -292,8 +163,11 @@ function extractChatbotKb() {
 //                    (Free / Core / Premium plans)
 //   - faq         -> the rest overlaps kb_master's account/product articles
 // Duplicate sources give the retrieval layer conflicting answers, so only one
-// should win. Their extractors are deliberately kept below: reinstating any
-// source just means adding it back to the `entries` output list in this file.
+// should win. Their extractors (extractFaq / extractPricingFaq /
+// extractMethodology, plus the sectionBetween + removeVForBlocks helpers only
+// they used) were deleted rather than left dormant, because no-unused-vars
+// fails CI on them. To reinstate a source, recover its extractor from git
+// history and add it back to this list.
 const entries = [
   ...extractLegalDoc('Terms.vue', 'terms'),
   ...extractLegalDoc('Privacy.vue', 'privacy'),
