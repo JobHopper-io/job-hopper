@@ -2446,7 +2446,9 @@ Related Articles
 KB-0008; KB-0037; KB-0039
 
 Training AI
+
 Canonical Response
+This article explains the Free plan.
 Free is $0 with no card required. It includes 3 manual job searches, a teaser of the sponsorship badge, a few visible Premium Insights fields, and a teaser of Resume Advice.
 
 Related Intents
@@ -2511,6 +2513,8 @@ KB-0008; KB-0036; KB-0039
 
 Training AI
 Canonical Response
+This article explains the Core plan.
+
 Core is $29/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.
 
 Related Intents
@@ -2577,6 +2581,8 @@ KB-0008; KB-0009; KB-0033
 
 Training AI
 Canonical Response
+This article explains the Premium plan and waitlist.
+
 Premium is $49/month at launch (not yet purchasable - waitlist only) and includes everything in Core plus Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector.
 
 Related Intents
