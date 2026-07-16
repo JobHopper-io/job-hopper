@@ -21,8 +21,14 @@ resolution) is next.**
 >
 > Decisions made while building, worth reading before D36–40: **§3 decision 3** (USCIS loaded
 > unscoped, on purpose), **§3 decision 4** (`&`-vs-`and` name-matching trap, measured), and
-> **🔴 §3 decision 5** (brand ≠ legal filer — **needs a product call from Nick/Syed**, blocks
-> resolution *and* UI).
+> **§3 decision 5** (brand ≠ legal filer — **decided 2026-07-17: merge to brand**; `employers` is
+> brand-level, filer identity moves to `employer_name_aliases`, raw filings stay entity-level).
+>
+> **⛔ One migration is owed before D36–40 resolution code** (§3 decision 5 / §4): `employers`
+> still carries `employer_fein` **UNIQUE** + `tax_id_last4` from `20260716200000`, which encode
+> an entity-level model and cannot represent Goldman's 3 FEINs under one brand. Move both to
+> `employer_name_aliases`, drop from `employers`. Both tables are 0 rows — free today, a data
+> migration once resolution has run.
 
 > **Positioning.** Today's sponsorship signal is a **heuristic** badge
 > (`sponsorship_likelihood` = Low/Medium/High, inferred from posting metadata). The Premium
@@ -65,11 +71,15 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
   doc asserted "no FEIN/EIN, name + address only" as a settled fact. That was wrong. Verified by
   parsing the real FY2026 Q2 file directly (not a description of it): `EMPLOYER_FEIN` is a real
   column, 0/20,000 blank in a sample, real EINs (`22-3524303` for LTIMindtree, `95-3630868` for
-  Leidos). **FEIN is now the primary employer-resolution key** (`employers.employer_fein` /
-  `lca_filings.employer_fein`, §4); normalized name + address + domain + fuzzy/vector matching is
-  the **fallback**, used only where FEIN is genuinely missing. Coverage in older FYs hasn't been
-  checked — don't assume FEIN is universal across every fiscal year without re-verifying on that
-  year's actual file.
+  Leidos). **FEIN is now the primary employer-resolution key**; normalized name + address + domain
+  + fuzzy/vector matching is the **fallback**, used only where FEIN is genuinely missing. Coverage
+  in older FYs hasn't been checked — don't assume FEIN is universal across every fiscal year
+  without re-verifying on that year's actual file.
+  **Refined 2026-07-17 by §3 decision 5:** FEIN identifies a **filer**, not a brand, so it keys
+  the **alias** layer — `employer_name_aliases.employer_fein`, *not* `employers.employer_fein`
+  (that column is being dropped; Goldman has 3 FEINs and one brand row can't hold them).
+  `lca_filings.employer_fein` stays as the raw captured value. Resolution: `filing → FEIN → alias
+  → employer_id (brand)`.
 
 ### 1b. USCIS — H-1B Employer Data Hub (the "outcome" signal)
 
@@ -184,39 +194,56 @@ scheduled-jobs/email plumbing.
    normalized-name equality.** Also note `sponsorship_scope.normalize_employer_name` is a
    deliberately crude helper for *grouping LCA rows by FEIN-or-name*, not a resolution primitive —
    don't promote it into one.
-5. **🔴 PRODUCT DECISION NEEDED (not an engineering bug) — a brand and a legal filer are not
-   1:1, in both directions. → Nick / Syed.** Found in the real FY2026 data while building the
-   scope list. This is *correct* data, not dirty data; there is no cleaning step that resolves
-   it, only a product choice:
+5. **✅ DECIDED 2026-07-17 (Nick/Syed) — `employers` is a BRAND-level identity. Merge to brand.**
+   **The finding:** a brand and a legal filer are not 1:1, in *either* direction. This is correct
+   data, not dirty data — no cleaning step resolves it, it needed a product call:
    - **One name → many FEINs.** `Regeneron Pharmaceuticals, Inc.` appears **twice**, spelled
-     byte-identically, under two different tax IDs (`46-4073600`, 586 positions; `13-3444607`,
-     251 positions) — two legally separate companies filing under one trade name. This is why
-     the 400-row scope list has only 399 distinct names.
-   - **One brand → many names+FEINs.** `GOLDMAN SACHS & CO. LLC` / `GOLDMAN SACHS BANK USA` /
-     `GOLDMAN SACHS SERVICES LLC` — three names, three FEINs, three separate top-10 scope
-     entries (14,585 / 14,178 / 14,090 positions), one brand everyone calls "Goldman Sachs."
+     byte-identically, under two tax IDs (`46-4073600`, 586 positions; `13-3444607`, 251) — two
+     legally separate companies, one trade name. This is why the 400-row scope list has 399
+     distinct names.
+   - **One brand → many names+FEINs.** `GOLDMAN SACHS & CO. LLC` (`13-5108880`) / `GOLDMAN SACHS
+     BANK USA` (`13-3571598`) / `GOLDMAN SACHS SERVICES LLC` (`13-3937419`) — three names, three
+     FEINs, three separate top-10 scope entries (14,585 / 14,178 / 14,090), one brand everyone
+     calls "Goldman Sachs."
 
-   So the mapping between *"a company as a job seeker thinks of it"* and *"a filer in government
-   data"* is **many-to-many**. Any resolution that assumes either direction is 1:1 is wrong.
+   **The decision:** a job seeker seeing "Goldman Sachs" or "Regeneron" on a posting gets **one
+   combined score**, not per-legal-entity scores.
+   - `employers` = **canonical brand identity** (one row for Goldman Sachs).
+   - `employer_name_aliases` = **every legal name + FEIN variant → one `employer_id`** (all three
+     Goldman entities, both Regeneron FEINs).
+   - **`lca_filings` / `uscis_h1b_hub` stay entity-level, unchanged** — raw filing records keep
+     their true filer identity for audit accuracy. Only the `employers` rollup is brand-level.
+     Nothing is destroyed or collapsed; the brand view is a layer *on top of* faithful records.
 
-   **The questions D36–40 cannot answer alone — they're product, and they change what the UI can
-   show, not just how resolution works:**
-   - Someone searches **"Regeneron"** — one company or two? If we keep the entities separate,
-     which score do we show? If we merge, we're asserting a corporate relationship the filing
-     data doesn't state.
-   - A posting says **"Goldman Sachs"** — do we sum all three entities' filings into one
-     brand-level score (the number a job seeker probably means), or score only the specific
-     legal entity that would sponsor them (the number that's literally true)? Summing inflates;
-     not summing shows "Goldman Sachs" three times with three different scores.
-   - Does **`sponsor_watch_subscriptions.employer_id`** point at a brand or a filer? Watching
-     "Goldman Sachs" and only getting alerts for one of three entities is a broken feature; the
-     schema currently has no brand concept at all (§4).
+   **Why:** matches the existing single-badge UX (`JobSponsorshipBadge.vue` shows one badge per
+   posting, not three); avoids showing "Goldman Sachs" three times with three different scores;
+   and it's **reversible** — because raw filings keep entity identity, entity-level detail can be
+   exposed later as an expansion without re-ingesting anything. Resolves the
+   `sponsor_watch_subscriptions.employer_id` ambiguity too: it points at a **brand**, so watching
+   "Goldman Sachs" covers all three filers.
 
-   **Decide the model before writing resolution code** — merging to brand-level needs a
-   parent/brand layer in §4 (`employers` has no such column today) and is far cheaper to add now
-   than to retrofit after scores exist. Note this cuts against §3 decision 2's "FEIN is
-   near-deterministic": FEIN reliably identifies a *filer*, which is only the answer if a filer
-   is what we mean to show.
+   **⚠️ This DOES require a schema change — the "no schema change needed" assumption was wrong.**
+   `employer_name_aliases` already supports many-aliases→one-employer, but the §4 schema as built
+   (migration `20260716200000`) bakes in *entity*-level assumptions that actively block
+   brand-level:
+   1. **`employers.employer_fein` is UNIQUE** (`employers_employer_fein_key`, partial where not
+      null). A brand-level Goldman row can hold only **one** of its three FEINs — and the unique
+      index asserts "one FEIN ⇒ one `employers` row", which is the entity-level model itself.
+   2. **`employer_name_aliases` has no FEIN column** — only `raw_name` / `normalized_name`. There
+      is nowhere to record "FEIN `13-5108880` belongs to the Goldman brand."
+   3. **`employers.tax_id_last4`** has the same one-value-per-brand problem.
+
+   **Required shape** (see §4): move FEIN identity **down to the alias layer** —
+   `employer_name_aliases.employer_fein` (unique where not null: one FEIN = one filer = belongs to
+   exactly one brand), and **drop `employer_fein` + `tax_id_last4` from `employers`** (a brand has
+   no single FEIN; keeping a "representative" one invites exactly the entity/brand confusion this
+   decision resolves). **Do this before writing resolution code** — `employers` and
+   `employer_name_aliases` are both **empty (0 rows)** right now, so it's a free drop/add today
+   and a data migration later.
+
+   Note this refines §3 decision 2: FEIN is still near-deterministic, but it deterministically
+   identifies a **filer**, which is now the *alias* key, not the `employers` key. Resolution is
+   two hops: `filing → FEIN → alias → employer_id (brand)`.
 6. **The Real Score blends filings with the existing heuristic** — real filing-based score where
    an employer has filings; fall back to `inferSponsorshipLikelihood` where it doesn't; and
    **confidence reflects data coverage.** This is the honest UX for "top 300–500 employers first."
@@ -242,25 +269,36 @@ scheduled-jobs/email plumbing.
 New tables (service-role-written; read paths gated by tier for the Premium surface):
 
 ```
-employers                      -- canonical employer identities
+employers                      -- canonical BRAND identity, one row per brand (§3 decision 5).
+                                -- "Goldman Sachs" = 1 row, not 3. NOT a legal filer.
   id                uuid pk
-  canonical_name    text
+  canonical_name    text        -- the brand as a job seeker knows it, e.g. "Goldman Sachs"
   normalized_name   text        -- for matching (lowercased, legal suffixes stripped)
-  employer_fein     text null    -- PRIMARY resolution key when present (2026-07-16 correction,
-                                  -- see §1a); unique where not null
-  domain            text null    -- reuse domain_resolution.py / company_apollo_cache
+  domain            text null   -- reuse domain_resolution.py / company_apollo_cache
   primary_naics     text null
   hq_city, hq_state text null
-  tax_id_last4      text null    -- from USCIS Hub, secondary disambiguator (used with/without FEIN)
   created_at, updated_at
+  -- ⚠️ MIGRATION PENDING (§3 decision 5, decided 2026-07-17): as built in 20260716200000 this
+  -- table still has `employer_fein` (UNIQUE where not null) + `tax_id_last4`, both of which
+  -- encode a one-FEIN-per-employer = ENTITY-level model and block brand-level. Goldman has 3
+  -- FEINs and can hold only 1. Both columns must MOVE DOWN to employer_name_aliases and be
+  -- dropped here. Free to do now: employers + employer_name_aliases are both 0 rows.
 
-employer_name_aliases          -- every raw spelling we've seen -> employer
+employer_name_aliases          -- every legal name + FEIN variant we've seen -> ONE brand.
+                                -- This is where FILER identity lives (§3 decision 5).
+                                -- All 3 Goldman entities + both Regeneron FEINs -> 1 employer_id.
   id                uuid pk
-  employer_id       uuid fk -> employers
+  employer_id       uuid fk -> employers      -- the BRAND this filer rolls up to
   raw_name          text
   normalized_name   text
+  employer_fein     text null   -- ⚠️ TO ADD: one FEIN = one filer = exactly one brand.
+                                -- unique where not null. THE deterministic resolution key.
+  tax_id_last4      text null   -- ⚠️ TO ADD: USCIS-side disambiguator (no full FEIN there)
   source            text        -- dol_lca | uscis_hub | apollo | posting
   source_fiscal_year int null
+  -- Resolution is two hops: filing -> FEIN -> alias -> employer_id (brand). Many aliases per
+  -- employer is already supported (plain FK, no unique on employer_id) - that part needs no
+  -- change; only the FEIN/tax_id_last4 columns are missing.
 
 lca_filings                    -- DOL OFLC LCA disclosure rows (H-1B/H-1B1/E-3)
   id                uuid pk
@@ -316,13 +354,22 @@ employer_sponsorship_scores    -- computed Real Sponsorship Score (Days 41–45)
 
 sponsor_watch_subscriptions    -- Sponsor Watch (Days 51–55)
   id, profile_id fk, employer_id fk, created_at
+                                -- employer_id = BRAND (§3 decision 5): watching "Goldman Sachs"
+                                -- covers all 3 of its filers. No schema change needed for this.
 sponsor_watch_events
   id, employer_id fk, event_type, delta, fiscal_period, detected_at, notified bool
 ```
 
 Notes:
+- **Raw filing tables stay ENTITY-level, deliberately (§3 decision 5).** `lca_filings` and
+  `uscis_h1b_hub` keep each row's true filer identity — `employer_name_raw` / `employer_fein` are
+  never rewritten or merged. Brand-level is *only* the `employers` rollup, reached via
+  `employer_id`. This is what makes the decision reversible: entity-level detail can be exposed
+  later without re-ingesting. **Never collapse raw filing records to brand.**
 - `lca_filings.employer_id` / `uscis_h1b_hub.employer_id` start **null** and are populated by the
-  entity-resolution pass — decouples ingestion from resolution.
+  entity-resolution pass — decouples ingestion from resolution. Post-D36–40 they point at a
+  **brand**, while `employer_fein` on the same row still identifies the **filer**. Both are true
+  at once, on purpose.
 - Score is per **employer**, then surfaced on a job by resolving the posting's company → employer
   (reusing existing Apollo/domain resolution), degrading to the heuristic on a miss.
 
@@ -335,16 +382,31 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
 - **D31–35 — Ingest & clean.** *Stick.* Download DOL LCA `.xlsx` (per-FY) + USCIS Hub CSV; build
   a per-fiscal-year column-normalizer (handles schema drift); load into `lca_filings` /
   `uscis_h1b_hub` with `employer_id` null. True net-new; the real blocker.
-- **D36–40 — Entity resolution.** **[CHANGED, then CORRECTED 2026-07-16]** *Next up — the data is
-  loaded and waiting (`employer_id` is null on all 102,821 `lca_filings` + 36,624 `uscis_h1b_hub`
-  rows).* LCA rows carry a real, populated `EMPLOYER_FEIN` (see §1a) — resolution keys on FEIN
-  first (near-deterministic for the scoped top 300–500); normalize name + city/state + domain +
-  USCIS last-4 tax ID to narrow candidates only where FEIN is missing; fuzzy/vector for whatever's
-  left. **⚠️ The LCA↔USCIS join is the hard part and it has no FEIN to lean on** — USCIS gives
-  only last-4 tax ID, and matching on normalized name is measurably broken (§3 decision 4: misses
-  15% of employers incl. Goldman Sachs/JPMorgan/McKinsey). Budget real effort here; this is where
-  fuzzy/vector actually earns its place, not in the long tail. pgvector likely still unnecessary
-  for FEIN-side resolution.
+- **D36–40 — Entity resolution.** **[CHANGED; CORRECTED 2026-07-16; re-planned 2026-07-17 after
+  §3 decision 5]** *Next up — data is loaded and waiting (`employer_id` null on all 102,821
+  `lca_filings` + 36,624 `uscis_h1b_hub` rows).* Target: **brand-level `employers`**, with filer
+  identity in `employer_name_aliases`. Resolution is **two hops**: `filing → FEIN → alias →
+  employer_id (brand)`. Merging happens **at the alias layer only** — raw filings are never
+  collapsed. Revised day-by-day:
+  - **D36 — schema + the deterministic 80%.** Land the owed migration first (move
+    `employer_fein`/`tax_id_last4` to `employer_name_aliases`, drop from `employers`; free — both
+    tables are empty). Then seed `employers` + aliases from the 400 distinct LCA FEINs. This part
+    is genuinely near-deterministic and should land in a day.
+  - **D37 — brand grouping (the new work decision 5 created).** Decide which FEINs share a brand.
+    ~Most brands are 1 FEIN and trivial; the tail is Goldman (3) / Regeneron (2) / Amazon (several
+    entities). **Not inferable from filing data** — needs domain (reuse `domain_resolution.py`) or
+    Apollo (`company_apollo_cache`), plus a human pass over the top 400. Budget a **manual review
+    step** and an override table/file; don't pretend an algorithm settles it.
+  - **D38–39 — the LCA↔USCIS join. The actual hard part, and where the schedule risk is.** No FEIN
+    on the USCIS side (last-4 only), and name matching is measurably broken (§3 decision 4: 61/399
+    missed; naive `&`→`and` recovers just 24). Plan: block on last-4 + state/city, then fuzzy
+    within block (rapidfuzz/trigram), then LLM adjudication for survivors — the
+    `domain_resolution.py` bounded-fan-out + single-LLM-call pattern fits. **Measure recall
+    against the 400 scope brands and report it** — do not ship this on vibes.
+  - **D40 — backfill + verify.** Populate `employer_id` across both tables, verify coverage,
+    report unresolved counts. Filings whose FEIN isn't in the top 400 stay null (expected).
+  - **pgvector: still likely unnecessary.** Blocking + fuzzy + LLM on ≤400 brands is small;
+    revisit only for the long-tail expansion past the scope list.
 - **D41–45 — Scoring/confidence.** **[CHANGED]** *Reframe.* Formula blends LCA volume/recency +
   USCIS approval ratios **with the existing `inferSponsorshipLikelihood` heuristic as fallback**;
   `confidence` = f(data coverage); emit plain-text `rationale`. Reuses live code.
@@ -378,8 +440,12 @@ Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorsh
    `employer_id` is null on every row, by design.
 5. **← STILL OPEN. Resolve §6 decision 1 before any UI work** (D46–50 is blocked on it).
 
-**Next:** D36–40 entity resolution. Read §3 decisions 2 and 4 first — FEIN makes the LCA side
-near-trivial, but the **LCA↔USCIS join has no FEIN** and name matching is measurably broken.
+**Next:** D36–40 entity resolution — **start with the owed migration** (§3 decision 5: move
+`employer_fein`/`tax_id_last4` off `employers` onto `employer_name_aliases`; free while both are
+0 rows). Read §3 decisions 2, 4 and 5 first: FEIN makes the LCA side near-trivial, but the
+**LCA↔USCIS join has no FEIN** and name matching is measurably broken, and **brand grouping
+(which FEINs are one brand) is not inferable from filing data** — it needs domain/Apollo plus a
+human pass.
 
 **Reproducing the ingest** (raw files are gitignored; `dol.gov` blocks automated download —
 Akamai 403 — so the LCA `.xlsx` must be fetched by hand from the Disclosure Data tab):
