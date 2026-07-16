@@ -206,6 +206,27 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
 
 ---
 
+## 5a. Status — GO (decided 2026-07-16)
+
+Phase 5 is approved to build, targeting Premium features **1 (Real Sponsorship Score)** and
+**2 (Sponsor Watch)**. Nothing in the engine exists yet — Days 31–35 (ingest) is the blocker and
+the first real work. Everything below in §4/§5 stands.
+
+**Immediate next actions, in order:**
+1. **Pick the employer scope** — pull the top 300–500 sponsors by LCA volume from the most recent
+   FY file. Everything downstream is easier once this list exists.
+2. **Build the per-fiscal-year column normalizer** for the DOL LCA `.xlsx` (schema drifts across
+   FYs; this is unavoidable and gates all ingestion).
+3. **Land the migration** for the §4 data model (`employers`, `employer_name_aliases`,
+   `lca_filings`, `uscis_h1b_hub`, `employer_sponsorship_scores`, `sponsor_watch_*`).
+4. **Ingest** LCA + USCIS Hub with `employer_id` null; resolve entities as a separate pass.
+5. **Resolve decision #1 below before any UI work** (D46–50 is blocked on it).
+
+**Where the code should live:** ingestion is a batch/ETL job over large files — the FastAPI
+`job-processor-service/` is the natural host (it already does Apollo/web/LLM batch work and has
+`domain_resolution.py`), not a Deno edge function. Scoring reads can be exposed to the frontend
+via an edge function or a plain table read through `src/lib/`.
+
 ## 6. Open decisions to resolve before building
 
 1. **Score presentation (#6 above):** replace the heuristic badge, or show a separate Premium
