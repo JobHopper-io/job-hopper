@@ -233,6 +233,97 @@ class SupabaseRest:
             prefer="return=minimal",
         )
 
+    async def select(
+        self,
+        table: str,
+        *,
+        select: str = "*",
+        params: list[tuple[str, str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Single-page read. Callers paginate; PostgREST caps responses at 1000 rows regardless
+        of a larger `limit`, so pass limit<=1000 and page with offset (see fetch_all_table)."""
+        query = [("select", select)] + list(params or [])
+        rows = await self._request("GET", f"/{table}", params=query, prefer=None)
+        if not rows:
+            return []
+        return rows if isinstance(rows, list) else [rows]
+
+    async def insert_rows(
+        self,
+        table: str,
+        rows: list[dict[str, Any]],
+        *,
+        dry_run: bool,
+        chunk_size: int = 500,
+    ) -> int:
+        """Plain batch insert, chunked. Returns rows sent. Use upsert_rows when the table has a
+        conflict target; this is for tables with no natural key (e.g. employers)."""
+        if dry_run or not rows:
+            return 0
+        sent = 0
+        for i in range(0, len(rows), chunk_size):
+            chunk = rows[i : i + chunk_size]
+            await self._request("POST", f"/{table}", json_body=chunk, prefer="return=minimal")
+            sent += len(chunk)
+        return sent
+
+    async def patch_rows(
+        self,
+        table: str,
+        patch: dict[str, Any],
+        *,
+        params: list[tuple[str, str]],
+        dry_run: bool,
+    ) -> int:
+        """PATCH matching rows. Returns the number actually updated (via Prefer: count=exact),
+        not the number requested - so callers can verify coverage rather than assume it."""
+        if dry_run:
+            return 0
+        url = f"{self._rest}/{table}"
+        r = await self._client.request(
+            "PATCH",
+            url,
+            headers=self._headers(prefer="return=minimal,count=exact"),
+            params=params,
+            json=patch,
+        )
+        if r.status_code >= 400:
+            raise SupabaseRestError(f"PATCH /{table} {r.status_code}: {r.text}")
+        content_range = r.headers.get("content-range", "")
+        if "/" in content_range:
+            total = content_range.rsplit("/", 1)[-1]
+            if total.isdigit():
+                return int(total)
+        return 0
+
+    async def delete_rows(
+        self,
+        table: str,
+        *,
+        params: list[tuple[str, str]],
+        dry_run: bool,
+    ) -> int:
+        """DELETE matching rows. Returns the number deleted. `params` is required - PostgREST
+        would happily delete the whole table without a filter."""
+        if dry_run:
+            return 0
+        if not params:
+            raise ValueError("delete_rows requires a filter")
+        r = await self._client.request(
+            "DELETE",
+            f"{self._rest}/{table}",
+            headers=self._headers(prefer="return=minimal,count=exact"),
+            params=params,
+        )
+        if r.status_code >= 400:
+            raise SupabaseRestError(f"DELETE /{table} {r.status_code}: {r.text}")
+        content_range = r.headers.get("content-range", "")
+        if "/" in content_range:
+            total = content_range.rsplit("/", 1)[-1]
+            if total.isdigit():
+                return int(total)
+        return 0
+
     async def upsert_rows(
         self,
         table: str,
@@ -242,7 +333,12 @@ class SupabaseRest:
         dry_run: bool,
         chunk_size: int = 500,
     ) -> int:
-        """Batch upsert (POST + Prefer: resolution=merge-duplicates), chunked. Returns rows sent."""
+        """Batch upsert (POST + Prefer: resolution=merge-duplicates), chunked. Returns rows sent.
+
+        Note: `on_conflict` cannot target a PARTIAL unique index (PostgreSQL needs the index's
+        WHERE predicate in the statement and PostgREST does not emit it). For tables whose only
+        unique index is partial, use insert_rows and handle idempotency in the caller.
+        """
         if dry_run or not rows:
             return 0
         sent = 0

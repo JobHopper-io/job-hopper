@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import typer
 
-from job_processor import sponsorship_ingest, sponsorship_scope
+from job_processor import sponsorship_ingest, sponsorship_resolution, sponsorship_scope
 from job_processor.settings import get_settings
 from job_processor.supabase_client import SupabaseRest
 
@@ -144,6 +144,41 @@ def sponsorship_ingest_uscis(
             return await sponsorship_ingest.ingest_uscis_hub(db, input_path, dry_run=dry_run)
 
     typer.echo(json.dumps(asyncio.run(run()), indent=2))
+
+
+@sponsorship_app.command("seed-employers")
+def sponsorship_seed_employers(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    show_divergent: int = typer.Option(
+        10, "--show-divergent", help="How many FEINs-with-divergent-names to print (0 = none)"
+    ),
+) -> None:
+    """D36: seed employers + employer_name_aliases from the FEINs in lca_filings, then backfill
+    lca_filings.employer_id. FEIN is a direct key - no fuzzy matching. Does NOT do brand grouping
+    (D37), so Goldman stays 3 rows and Regeneron 2. Re-runnable: FEINs already seeded are skipped.
+    """
+
+    async def run() -> sponsorship_resolution.SeedPlan:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            return await sponsorship_resolution.seed_employers_from_lca(db, dry_run=dry_run)
+
+    plan = asyncio.run(run())
+    typer.echo(json.dumps(plan["counts"], indent=2))
+
+    divergent = plan["divergent"]
+    if divergent and show_divergent:
+        typer.echo(
+            f"\n⚠️  {len(divergent)} FEINs cover MULTIPLE DISTINCT ORG NAMES (not spelling variants)."
+            "\n   One employers row per FEIN means each of these gets ONE canonical_name that"
+            "\n   mislabels the others. Not a merge problem (D37) - the inverse. Top offenders:"
+        )
+        for fein, modal, norms in sorted(divergent, key=lambda d: -len(d[2]))[:show_divergent]:
+            typer.echo(f"\n   {fein}  ->  labelled {modal!r}")
+            typer.echo(f"      but covers {len(norms)} distinct orgs, e.g.:")
+            for n in norms[:4]:
+                typer.echo(f"        - {n}")
 
 
 def main() -> None:

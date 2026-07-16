@@ -2,10 +2,11 @@
 
 Working document for the Premium "Real Sponsorship Score" and Sponsor Watch features.
 Covers: data sources, current-state audit, the scoring approach, a proposed data model,
-and the revised day-by-day plan. Last updated 2026-07-16.
+and the revised day-by-day plan. Last updated 2026-07-17.
 
-**Status: D31–35 (ingest) is DONE and loaded to the live project — see §5a. D36–40 (entity
-resolution) is next.**
+**Status: D31–35 (ingest) DONE. D36 (seed employers+aliases from FEIN) DONE — 400 employers,
+642 aliases, 102,821 filings backfilled 100%. D37 (brand grouping: merge AND split) is next.
+See §5a.**
 
 > **⚠️ Read this before trusting anything below.** Three of this doc's original claims turned out
 > to be false when checked against the real files. They're struck in place, not deleted, so the
@@ -16,19 +17,19 @@ resolution) is next.**
 > |---|---|---|
 > | **Correction #1** | `EMPLOYER_FEIN` **is** present + populated in LCA (doc said "no FEIN"). FEIN is now the primary resolution key. | §1a |
 > | **Correction #2** | USCIS export is **`.xlsx` with 6 category pairs / 12 count columns** (doc said 4-column CSV). Also NAICS is a descriptive string, not a bare code. | §1b, §4 |
-> | **Correction #3** | ~~"for well-known big sponsors, name matching is near-trivial"~~ — **false, and backwards.** Big names are the *hardest* (`&`, multi-entity, cross-agency spelling). | §3 decision 7 |
+> | **Correction #3** | ~~"for well-known big sponsors, name matching is near-trivial"~~ — **false, and backwards.** Big names are the *hardest* (`&`, multi-entity, cross-agency spelling). | §3 decision 8 |
 > | **Known future risk #1** | `uscis_h1b_hub.naics_code` format is unnormalized **and part of the natural key** → a second FY in the other format = silent duplicate rows. Deliberately not fixed. | §1c |
 >
-> Decisions made while building, worth reading before D36–40: **§3 decision 3** (USCIS loaded
-> unscoped, on purpose), **§3 decision 4** (`&`-vs-`and` name-matching trap, measured), and
-> **§3 decision 5** (brand ≠ legal filer — **decided 2026-07-17: merge to brand**; `employers` is
-> brand-level, filer identity moves to `employer_name_aliases`, raw filings stay entity-level).
+> Decisions made while building, worth reading before D37: **§3 decision 3** (USCIS loaded
+> unscoped, on purpose), **§3 decision 4** (`&`-vs-`and` name-matching trap, measured),
+> **§3 decision 5** (brand ≠ legal filer — **decided: merge to brand**; `employers` is
+> brand-level, filer identity lives on `employer_name_aliases`, raw filings stay entity-level),
+> and **§3 decision 6** (**umbrella FEINs** — 52 of 400 tax IDs cover *many* distinct orgs, e.g.
+> one FEIN = New York State + 21 SUNY campuses; **D37 must split as well as merge**).
 >
-> **⛔ One migration is owed before D36–40 resolution code** (§3 decision 5 / §4): `employers`
-> still carries `employer_fein` **UNIQUE** + `tax_id_last4` from `20260716200000`, which encode
-> an entity-level model and cannot represent Goldman's 3 FEINs under one brand. Move both to
-> `employer_name_aliases`, drop from `employers`. Both tables are 0 rows — free today, a data
-> migration once resolution has run.
+> **✅ The brand-level migration is applied** (`20260717120000`, plus `…130000`/`…140000` fixing
+> the alias uniqueness constraint — see §3 decision 5, which is worth reading as a cautionary
+> tale: the constraint was reasoned about twice and wrong twice before being *measured*).
 
 > **Positioning.** Today's sponsorship signal is a **heuristic** badge
 > (`sponsorship_likelihood` = Low/Medium/High, inferred from posting metadata). The Premium
@@ -77,7 +78,7 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
   without re-verifying on that year's actual file.
   **Refined 2026-07-17 by §3 decision 5:** FEIN identifies a **filer**, not a brand, so it keys
   the **alias** layer — `employer_name_aliases.employer_fein`, *not* `employers.employer_fein`
-  (that column is being dropped; Goldman has 3 FEINs and one brand row can't hold them).
+  (that column was dropped in `20260717120000`; Goldman has 3 FEINs, one brand row can't hold them).
   `lca_filings.employer_fein` stays as the raw captured value. Resolution: `filing → FEIN → alias
   → employer_id (brand)`.
 
@@ -234,20 +235,74 @@ scheduled-jobs/email plumbing.
    3. **`employers.tax_id_last4`** has the same one-value-per-brand problem.
 
    **Required shape** (see §4): move FEIN identity **down to the alias layer** —
-   `employer_name_aliases.employer_fein` (unique where not null: one FEIN = one filer = belongs to
-   exactly one brand), and **drop `employer_fein` + `tax_id_last4` from `employers`** (a brand has
-   no single FEIN; keeping a "representative" one invites exactly the entity/brand confusion this
-   decision resolves). **Do this before writing resolution code** — `employers` and
-   `employer_name_aliases` are both **empty (0 rows)** right now, so it's a free drop/add today
-   and a data migration later.
+   `employer_name_aliases.employer_fein` — and **drop `employer_fein` + `tax_id_last4` from
+   `employers`** (a brand has no single FEIN; keeping a "representative" one invites exactly the
+   entity/brand confusion this decision resolves). Done in migration `20260717120000`, while both
+   tables were still empty.
+
+   **⚠️ Uniqueness on the alias table: `(employer_fein, raw_name)`, and getting there took three
+   migrations.** `20260717120000` first shipped `unique (employer_fein)` — reasoning "one FEIN =
+   one filer = one brand" straight into a constraint. That is wrong: it enforces *one FEIN = one
+   **row***, which contradicts the alias table's purpose (record every spelling a filer uses).
+   `20260717130000` tried `(employer_fein, normalized_name)` — also wrong. Only measuring against
+   the real 642 (FEIN, raw_name) pairs settled it (`20260717140000`):
+   | candidate | max rows | needed | verdict |
+   |---|---|---|---|
+   | `(employer_fein)` | 400 | 642 | ❌ discards 242 spellings |
+   | `(employer_fein, normalized_name)` | 517 | 642 | ❌ discards 125 spellings (`Charter Communications, Inc` vs `Inc.` collapse) |
+   | `(employer_fein, raw_name)` | 642 | 642 | ✅ |
+   Both wrong versions would have **silently dropped** real spellings. **The invariant "all aliases
+   for one FEIN share one `employer_id`" is NOT expressible as a unique index** and is enforced in
+   code (`sponsorship_resolution.build_seed_plan`) — verified holding across all 400 after seeding.
+   DB-level enforcement would need a separate `employer_feins (employer_fein pk → employer_id)`
+   table; deliberately deferred.
 
    Note this refines §3 decision 2: FEIN is still near-deterministic, but it deterministically
    identifies a **filer**, which is now the *alias* key, not the `employers` key. Resolution is
    two hops: `filing → FEIN → alias → employer_id (brand)`.
-6. **The Real Score blends filings with the existing heuristic** — real filing-based score where
+6. **✅ DECIDED 2026-07-17 — D37 covers BOTH directions: merge *and* split. Umbrella FEINs are
+   real.** Scope change, not an open question. Found during the D36 seed (measured on the real
+   400 FEINs now in `lca_filings`, not theorised).
+
+   Decision 5 established that brand↔filer is many-to-many, but its evidence and its fix only
+   covered **one direction** — many FEINs → one brand (Goldman, Regeneron), i.e. *merging*. The
+   D36 seed surfaced the **inverse**: **one FEIN → many genuinely distinct organisations**, i.e.
+   *splitting*. **52 of 400 FEINs (13%)** carry names that normalise to more than one distinct
+   org. These are state/city **umbrella tax IDs**, not spelling noise:
+   - **`14-6013200` → 22 distinct orgs.** Modal spelling is `State University of New York at
+     Stony Brook`, so that becomes the `canonical_name` — but the same row also covers
+     **`New York State`**, `New York State Office of Mental Health`, and SUNY **Albany /
+     Buffalo / Binghamton**. A University at Albany posting currently resolves to a badge
+     reading "Stony Brook."
+   - **`13-6400434` → 7 orgs.** Labelled `New York City Department of Education`; also covers
+     the **Department of Correction**, **Health & Mental Hygiene**, the **Chief Medical
+     Examiner**, and City Planning.
+   - **`04-6002284` → 7 orgs.** Labelled `University of Massachusetts Chan Medical School`; also
+     covers **Bridgewater State**, **Framingham State**, UMass Amherst/Boston, and
+     **`Commonwealth of Massachusetts/Office of the Governor`**.
+
+   **What's wrong, precisely.** The *score* is defensible — New York State really is one legal
+   filer, and sponsorship is decided at filer level, so SUNY-wide filing history is a real signal
+   for any SUNY campus. The **label is not**: one `canonical_name` per FEIN mislabels the other
+   21. For `13-6400434` even score-sharing is doubtful — Education, Correction and the Medical
+   Examiner are not one employer to a job seeker.
+
+   **Nothing is lost today.** All 642 raw spellings are alias rows pointing at the correct
+   `employer_id`, so the evidence needed to split is already in the DB and re-seeding is cheap.
+   This is deliberately left as-is from D36 (one `employers` row per FEIN) rather than
+   half-fixed.
+
+   **D37 scope, as decided:** handle merge **and** split. **The split side reuses the same
+   manual-review/override mechanism already planned for merging — do not build a second bespoke
+   process.** Both are the same shape of problem: an algorithm proposes a grouping, a human
+   confirms or overrides it, the override is recorded durably. One review pass over the top 400,
+   one override store, two directions. Like merging, the split boundary is **not inferable from
+   the filing data** (nothing in either file says Stony Brook and Albany are different employers
+   but Goldman's three entities are one) — it needs domain/Apollo signals plus human judgement.
+7. **The Real Score blends filings with the existing heuristic** — real filing-based score where
    an employer has filings; fall back to `inferSponsorshipLikelihood` where it doesn't; and
    **confidence reflects data coverage.** This is the honest UX for "top 300–500 employers first."
-7. **Scope to the top 300–500 high-volume sponsors FIRST** — and move that scoping *earlier*, not
+8. **Scope to the top 300–500 high-volume sponsors FIRST** — and move that scoping *earlier*, not
    just as the launch gate, so we get a real live score without solving long-tail entity
    resolution up front. ~~for well-known big sponsors, name matching is near-trivial~~ —
    **✅ CORRECTION #3 (2026-07-16): struck, this premise was false.** Being well-known is exactly what makes an
@@ -256,9 +311,9 @@ scheduled-jobs/email plumbing.
    Sachs, JPMorgan, McKinsey, EY). Scoping still holds, but it's justified by **file
    tractability + FEIN being exact**, *not* by names being easy. Done: FY2026 LCA scoped via
    FEIN, 102,821 filings across the top 400.
-8. **Sponsor Watch = quarterly diff alerts** on existing cron + `sendEmail`, not net-new
+9. **Sponsor Watch = quarterly diff alerts** on existing cron + `sendEmail`, not net-new
    real-time workers. Set expectations in copy.
-9. **OPEN:** Is the Real Score a **replacement** of the heuristic badge, or a **separate
+10. **OPEN:** Is the Real Score a **replacement** of the heuristic badge, or a **separate
    Premium-only score shown alongside** it? Drives whether D46–50 is "swap the badge's data
    source" or "add a second badge." **← needs a product decision before D46.**
 
@@ -278,11 +333,13 @@ employers                      -- canonical BRAND identity, one row per brand (�
   primary_naics     text null
   hq_city, hq_state text null
   created_at, updated_at
-  -- ⚠️ MIGRATION PENDING (§3 decision 5, decided 2026-07-17): as built in 20260716200000 this
-  -- table still has `employer_fein` (UNIQUE where not null) + `tax_id_last4`, both of which
-  -- encode a one-FEIN-per-employer = ENTITY-level model and block brand-level. Goldman has 3
-  -- FEINs and can hold only 1. Both columns must MOVE DOWN to employer_name_aliases and be
-  -- dropped here. Free to do now: employers + employer_name_aliases are both 0 rows.
+  -- ✅ Brand-level as of 20260717120000: employer_fein + tax_id_last4 were dropped from here and
+  -- moved to employer_name_aliases (§3 decision 5). A brand has no single FEIN.
+  -- ⚠️ AS SEEDED (D36, 2026-07-17) this is NOT yet brand-level in practice: one row per FEIN, so
+  -- Goldman is 3 rows and Regeneron 2. D37 merges those. D37 must ALSO split the 52 umbrella
+  -- FEINs where one row wrongly covers many orgs (§3 decision 6). Current canonical_name = the
+  -- modal raw spelling for that FEIN, which mislabels those 52 (e.g. 14-6013200 is titled
+  -- "SUNY Stony Brook" but also covers New York State + 21 other orgs).
 
 employer_name_aliases          -- every legal name + FEIN variant we've seen -> ONE brand.
                                 -- This is where FILER identity lives (§3 decision 5).
@@ -291,14 +348,20 @@ employer_name_aliases          -- every legal name + FEIN variant we've seen -> 
   employer_id       uuid fk -> employers      -- the BRAND this filer rolls up to
   raw_name          text
   normalized_name   text
-  employer_fein     text null   -- ⚠️ TO ADD: one FEIN = one filer = exactly one brand.
-                                -- unique where not null. THE deterministic resolution key.
-  tax_id_last4      text null   -- ⚠️ TO ADD: USCIS-side disambiguator (no full FEIN there)
+  employer_fein     text null   -- ✅ added 20260717120000. THE deterministic resolution key.
+  tax_id_last4      text null   -- ✅ added. USCIS-side disambiguator (no full FEIN there)
   source            text        -- dol_lca | uscis_hub | apollo | posting
   source_fiscal_year int null
-  -- Resolution is two hops: filing -> FEIN -> alias -> employer_id (brand). Many aliases per
-  -- employer is already supported (plain FK, no unique on employer_id) - that part needs no
-  -- change; only the FEIN/tax_id_last4 columns are missing.
+  -- UNIQUE (employer_fein, raw_name) where employer_fein is not null  [20260717140000]
+  --   NOT unique(employer_fein): one filer files under many names (642 rows / 400 FEINs).
+  --   NOT unique(employer_fein, normalized_name): distinct raw spellings collapse when
+  --   normalized ("Charter Communications, Inc" vs "Inc."), which would discard 125 real
+  --   spellings. Both were tried and were wrong - see §3 decision 5.
+  -- ⚠️ INVARIANT NOT ENFORCED BY THE DB: "all aliases sharing a FEIN share one employer_id".
+  --   No unique index can express it; sponsorship_resolution.build_seed_plan enforces it in
+  --   code (verified holding across all 400 post-seed). DB enforcement would need a separate
+  --   employer_feins (employer_fein pk -> employer_id) table - deferred, revisit in D37.
+  -- Resolution is two hops: filing -> FEIN -> alias -> employer_id (brand).
 
 lca_filings                    -- DOL OFLC LCA disclosure rows (H-1B/H-1B1/E-3)
   id                uuid pk
@@ -388,15 +451,26 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
   identity in `employer_name_aliases`. Resolution is **two hops**: `filing → FEIN → alias →
   employer_id (brand)`. Merging happens **at the alias layer only** — raw filings are never
   collapsed. Revised day-by-day:
-  - **D36 — schema + the deterministic 80%.** Land the owed migration first (move
-    `employer_fein`/`tax_id_last4` to `employer_name_aliases`, drop from `employers`; free — both
-    tables are empty). Then seed `employers` + aliases from the 400 distinct LCA FEINs. This part
-    is genuinely near-deterministic and should land in a day.
-  - **D37 — brand grouping (the new work decision 5 created).** Decide which FEINs share a brand.
-    ~Most brands are 1 FEIN and trivial; the tail is Goldman (3) / Regeneron (2) / Amazon (several
-    entities). **Not inferable from filing data** — needs domain (reuse `domain_resolution.py`) or
-    Apollo (`company_apollo_cache`), plus a human pass over the top 400. Budget a **manual review
-    step** and an override table/file; don't pretend an algorithm settles it.
+  - **D36 — schema + the deterministic 80%. ✅ DONE 2026-07-17.** Brand-level migration landed
+    (`20260717120000`, + `…130000`/`…140000` fixing alias uniqueness — see §3 decision 5).
+    Seeded from the 400 distinct LCA FEINs: **400 `employers`, 642 `employer_name_aliases`
+    (every raw spelling, none discarded), 102,821 `lca_filings` backfilled — 100%, 0 orphans.**
+    The FEIN key was exactly as deterministic as predicted; no fuzzy matching needed.
+    `job_processor/sponsorship_resolution.py`, CLI `job-processor sponsorship seed-employers`
+    (re-runnable: already-seeded FEINs are skipped; rolls back its own employers rows on a
+    mid-run failure).
+  - **D37 — grouping: MERGE *and* SPLIT (§3 decisions 5 + 6). Both directions, one mechanism.**
+    - **Merge** (one brand → many FEINs): Goldman (3) / Regeneron (2) / Amazon (several). Most
+      brands are 1 FEIN and trivial; this is a tail problem.
+    - **Split** (one FEIN → many orgs): **52 of 400** umbrella FEINs, e.g. `14-6013200` = New
+      York State + 21 SUNY campuses; `13-6400434` = NYC Education + Correction + Health + Medical
+      Examiner. Larger than the merge tail, and currently mislabelling live rows.
+    - **Neither is inferable from filing data** — needs domain (reuse `domain_resolution.py`) or
+      Apollo (`company_apollo_cache`), plus a human pass over the top 400. Budget a **manual
+      review step** and a durable **override store**; don't pretend an algorithm settles it.
+      **One review pass, one override mechanism, both directions — not two bespoke processes.**
+    - Evidence is already in the DB: all 642 spellings are aliases on the right `employer_id`, so
+      re-seeding after a grouping decision is cheap.
   - **D38–39 — the LCA↔USCIS join. The actual hard part, and where the schedule risk is.** No FEIN
     on the USCIS side (last-4 only), and name matching is measurably broken (§3 decision 4: 61/399
     missed; naive `&`→`and` recovers just 24). Plan: block on last-4 + state/city, then fuzzy
@@ -412,7 +486,7 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
   `confidence` = f(data coverage); emit plain-text `rationale`. Reuses live code.
 - **D46–50 — Sponsorship UI.** **[CHANGED]** *Reduce.* Extend `JobSponsorshipBadge.vue` +
   `sponsorship_likelihood` surface rather than rebuild: numeric score, rationale tooltip, filters
-  (`requires_us_sponsorship` already exists). **Blocked on §3 decision 9** (replace vs. add badge).
+  (`requires_us_sponsorship` already exists). **Blocked on §3 decision 10** (replace vs. add badge).
 - **D51–55 — Sponsor Watch.** **[CHANGED]** *Reframe.* Quarterly diff-alert worker on
   `scheduled_jobs` + pg_cron; alerts via `sendEmail`. Not real-time.
 - **D56–60 — Validation + launch, Score v1.** *Stick.* Validate on the 300–500 set; spot-check
@@ -420,7 +494,7 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
 
 ---
 
-## 5a. Status — D31–35 (ingest) DONE 2026-07-16; D36–40 (resolution) is next
+## 5a. Status — D31–35 (ingest) DONE 2026-07-16; D36 (seed) DONE 2026-07-17; D37 is next
 
 Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorship Score)** and
 **2 (Sponsor Watch)**. ~~Nothing in the engine exists yet — Days 31–35 (ingest) is the blocker~~ —
@@ -440,12 +514,31 @@ Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorsh
    `employer_id` is null on every row, by design.
 5. **← STILL OPEN. Resolve §6 decision 1 before any UI work** (D46–50 is blocked on it).
 
-**Next:** D36–40 entity resolution — **start with the owed migration** (§3 decision 5: move
-`employer_fein`/`tax_id_last4` off `employers` onto `employer_name_aliases`; free while both are
-0 rows). Read §3 decisions 2, 4 and 5 first: FEIN makes the LCA side near-trivial, but the
-**LCA↔USCIS join has no FEIN** and name matching is measurably broken, and **brand grouping
-(which FEINs are one brand) is not inferable from filing data** — it needs domain/Apollo plus a
-human pass.
+### D36 — seed employers + aliases (DONE 2026-07-17)
+
+Brand-level migration applied, then seeded from the FEINs in `lca_filings`. FEIN was exactly as
+deterministic as §3 decision 2 predicted — no fuzzy matching involved.
+
+| | |
+|---|---|
+| `employers` | **400** (one per distinct FEIN; **not yet brand-grouped** — Goldman is 3 rows, Regeneron 2) |
+| `employer_name_aliases` | **642** (every distinct raw spelling; none discarded) |
+| `lca_filings` backfilled | **102,821 / 102,821 = 100%**, 0 orphans |
+| scope FEINs with no filings | **0** — the scope CSV's 400 FEINs match the seeded 400 exactly |
+| `uscis_h1b_hub` | untouched (D38–39) |
+
+Verified beyond the run's own report: counts re-queried from the DB, and the code-enforced
+invariant *"all aliases for one FEIN share one `employer_id`"* confirmed holding across all 400.
+
+Run it with `job-processor sponsorship seed-employers [--dry-run]`. Re-runnable (already-seeded
+FEINs are skipped) and it rolls back its own `employers` rows if the alias insert fails.
+
+**Next: D37 — grouping, both directions (§3 decisions 5 + 6).** Read decisions 2, 4, 5 and 6
+first. FEIN made the LCA side near-trivial, but: **merging** (which FEINs are one brand) and
+**splitting** (52 umbrella FEINs covering many orgs) are **both un-inferable from filing data** —
+they need domain/Apollo plus a human pass, sharing **one** review/override mechanism. The
+**LCA↔USCIS join (D38–39) has no FEIN at all** and name matching is measurably broken — still the
+biggest schedule risk.
 
 **Reproducing the ingest** (raw files are gitignored; `dol.gov` blocks automated download —
 Akamai 403 — so the LCA `.xlsx` must be fetched by hand from the Disclosure Data tab):
@@ -466,7 +559,7 @@ function or a plain table read through `src/lib/`.
 
 ## 6. Open decisions to resolve before building
 
-1. **Score presentation (§3 decision 9):** replace the heuristic badge, or show a separate Premium
+1. **Score presentation (§3 decision 10):** replace the heuristic badge, or show a separate Premium
    Real Score alongside it?
 2. **Score shape:** 0–100 numeric vs. A–F grade vs. High/Med/Low + confidence.
 3. **Prototype vs. primary data:** use a third-party aggregator to validate scoring math fast,
