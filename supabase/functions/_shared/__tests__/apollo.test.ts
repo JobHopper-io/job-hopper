@@ -6,6 +6,7 @@ import {
   locationRegionToken,
   normalizeCompanyName,
   pickBestPerson,
+  pickTopPeople,
   scoreOrganizationCandidates,
 } from '../apollo.ts'
 
@@ -85,6 +86,32 @@ Deno.test('pickBestPerson prefers has_email and title match', () => {
   ]
   const best = pickBestPerson(people, phrases)
   assertEquals(best?.id, 'b')
+})
+
+Deno.test('pickTopPeople returns up to count, email-reachable first, deduped', () => {
+  const phrases = hiringTitlePhrases('engineering', 'Software Engineer')
+  const people = [
+    { id: 'a', title: 'Recruiter', has_email: false },
+    { id: 'b', title: 'Engineering Manager', has_email: true },
+    { id: 'b', title: 'Engineering Manager', has_email: true }, // duplicate id
+    { id: 'c', title: 'Talent Acquisition', has_email: true },
+  ]
+  const top = pickTopPeople(people, phrases, 2)
+  assertEquals(top.map((p) => p.id), ['b', 'c']) // has_email first, dupe dropped
+  assertEquals(pickTopPeople(people, phrases, 0).length, 0)
+})
+
+Deno.test('pickTopPeople prioritizes seniority for Premium (hiring manager over recruiter)', () => {
+  const phrases = hiringTitlePhrases('engineering', 'Software Engineer')
+  const people = [
+    { id: 'rec', title: 'Technical Recruiter', has_email: true },
+    { id: 'vp', title: 'VP of Engineering', has_email: true },
+    { id: 'dir', title: 'Director of Engineering', has_email: true },
+  ]
+  const premium = pickTopPeople(people, phrases, 1, { prioritizeSeniority: true })
+  assertEquals(premium[0]?.id, 'vp') // most senior decision-maker surfaces first
+  const ordered = pickTopPeople(people, phrases, 3, { prioritizeSeniority: true })
+  assertEquals(ordered.map((p) => p.id), ['vp', 'dir', 'rec'])
 })
 
 Deno.test('employerNamePlausible uses fuzzy name', () => {

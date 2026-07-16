@@ -37,6 +37,8 @@ To avoid charging for a `people/match` when org resolution never succeeded:
 1. `try_consume_apollo_credits('premium_insights', 1)` → org search → on failure, `refund_apollo_credits('premium_insights', 1)`.
 2. `try_consume_apollo_credits('premium_insights', 1)` → `people/match` → on failure, `refund_apollo_credits('premium_insights', 1)`.
 
+**Contact depth is tier-driven** (`resolveBaseTier`): **free → 1** contact, **core → up to 2**, **premium → up to 3** (seniority-ranked so the hiring manager/decision-maker surfaces first). The step-2 credit covers the **first** `people/match`; each **additional** contact consumes **one more** credit, refunded if that specific reveal returns no usable person or a credit error. So a single lookup costs up to `1 (org, cold only) + 1×N` credits, where `N` is the tier's contact count. If the budget runs out mid-loop, whatever contacts already resolved are returned as `complete`.
+
 `mixed_companies/search` is called **by organization name only** (job posting location is not passed as Apollo’s HQ `organization_locations` filter, which would otherwise exclude valid subsidiaries and brands).
 
 Before redeeming freemium or consuming credits, the function may short-circuit on **`company_apollo_search_miss`** (same `cache_key` as `company_apollo_cache`, TTL on the order of a week) when that company/region recently hit a definitive org/contact resolution failure, avoiding repeat spend.

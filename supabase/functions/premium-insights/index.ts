@@ -8,12 +8,13 @@ import {
   matchPersonById,
   normalizeCompanyName,
   personToMatchedContact,
-  pickBestPerson,
+  pickTopPeople,
   scoreOrganizationCandidates,
   searchOrganizationsByName,
   searchPeopleAtOrganization,
 } from '../_shared/apollo.ts'
 import { refundApolloCredits, tryConsumeApolloCredits } from '../_shared/apollo-limits.ts'
+import { resolveBaseTier } from '../_shared/base-tier.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -784,8 +785,15 @@ serve(async (req) => {
       employerNamePlausible(companyName, p.organization?.name ?? null),
     )
     const pool = filtered.length ? filtered : people
-    const best = pickBestPerson(pool, phrases)
-    if (!best) {
+
+    // Tier-driven contact depth: free → 1 (teaser), core → up to 2, premium → up to 3
+    // seniority-ranked so the actual hiring manager/decision-maker surfaces first.
+    const baseTier = await resolveBaseTier(admin, profileId)
+    const targetContacts = baseTier === 'premium' ? 3 : baseTier === 'core' ? 2 : 1
+    const candidates = pickTopPeople(pool, phrases, targetContacts, {
+      prioritizeSeniority: baseTier === 'premium',
+    })
+    if (!candidates.length) {
       console.log(
         JSON.stringify({
           fn: 'premium-insights',
@@ -802,35 +810,58 @@ serve(async (req) => {
       return await respondFailure('no_contacts', 422, { recordMiss: true })
     }
 
-    const { person, creditError } = await matchPersonById(apolloKey, best.id)
-    if (creditError || !person) {
+    // The people-search credit (c2) also covers the first reveal; each additional
+    // contact costs one more Apollo people/match credit, refunded if it doesn't land.
+    const contacts: Array<{
+      name: string
+      title: string | null
+      email: string | null
+      location: string | null
+      note: string | null
+    }> = []
+    let creditErrorHit = false
+    for (let i = 0; i < candidates.length; i++) {
+      if (i > 0) {
+        const cx = await tryConsumeApolloCredits(admin, PROCESS, 1)
+        if (!cx.ok) break // out of Apollo budget — return the contacts we already have
+      }
+      const { person, creditError } = await matchPersonById(apolloKey, candidates[i].id)
+      if (creditError) {
+        if (i > 0) await refundApolloCredits(admin, PROCESS, 1)
+        creditErrorHit = true
+        break
+      }
+      if (!person) {
+        if (i > 0) await refundApolloCredits(admin, PROCESS, 1)
+        continue
+      }
+      const c = personToMatchedContact(person)
+      contacts.push({
+        name: c.name,
+        title: c.title,
+        email: c.email,
+        location: c.location,
+        note: c.note,
+      })
+    }
+
+    if (!contacts.length) {
       console.log(
         JSON.stringify({
           fn: 'premium-insights',
           phase: 'failure',
           job_match_id: jobMatchId,
           profile_id: profileId,
-          code: creditError ? 'apollo_credit_error' : 'match_failed',
-          person_id: best.id,
+          code: creditErrorHit ? 'apollo_credit_error' : 'match_failed',
+          organization_id: organizationId,
+          candidate_count: candidates.length,
         }),
       )
       await refundApolloCredits(admin, PROCESS, 1)
-      const failCode = creditError ? 'apollo_credit_error' : 'match_failed'
-      return await respondFailure(failCode, creditError ? 403 : 422, {
-        recordMiss: !creditError,
+      return await respondFailure(creditErrorHit ? 'apollo_credit_error' : 'match_failed', creditErrorHit ? 403 : 422, {
+        recordMiss: !creditErrorHit,
       })
     }
-
-    const contact = personToMatchedContact(person)
-    const contacts = [
-      {
-        name: contact.name,
-        title: contact.title,
-        email: contact.email,
-        location: contact.location,
-        note: contact.note,
-      },
-    ]
 
     const company_summary = {
       name: resolvedOrgName,
@@ -856,6 +887,7 @@ serve(async (req) => {
         job_match_id: jobMatchId,
         profile_id: profileId,
         apollo_organization_id: organizationId,
+        base_tier: baseTier,
         contact_count: contacts.length,
       }),
     )

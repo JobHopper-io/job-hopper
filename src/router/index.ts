@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/Login.vue'
 import RegisterView from '../views/Register.vue'
 import ConfirmEmailView from '../views/ConfirmEmail.vue'
+import EmailVerifiedView from '../views/EmailVerified.vue'
 import OnboardingView from '../views/Onboarding.vue'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
@@ -24,6 +25,7 @@ export const publicPaths = [
   '/forgot-password',
   '/reset-password',
   '/confirm-email',
+  '/email-verified',
   '/unsubscribe-success',
 ]
 
@@ -116,6 +118,11 @@ const router = createRouter({
       path: '/confirm-email',
       name: 'confirm-email',
       component: ConfirmEmailView,
+    },
+    {
+      path: '/email-verified',
+      name: 'email-verified',
+      component: EmailVerifiedView,
     },
     {
       path: '/unsubscribe-success',

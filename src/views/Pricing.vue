@@ -9,25 +9,33 @@ const faqOpen = ref<number | null>(null)
 const resumeUpgradeProduct = ref<Product | null>(null)
 const resumeTailoringProduct = ref<Product | null>(null)
 
-// Premium is not sellable yet. Backend wiring for the waitlist is a separate follow-up
-// task, so for now this modal just captures intent (email + user id if signed in) and
-// confirms locally — it does not hit Stripe or any endpoint.
+// Premium is not sellable yet. This modal captures interest (email + profile id if
+// signed in, resolved server-side) via the premium-waitlist edge function.
 const waitlistOpen = ref(false)
 const waitlistEmail = ref('')
 const waitlistSubmitted = ref(false)
+const waitlistLoading = ref(false)
+const waitlistError = ref('')
 const currentUserId = ref<string | null>(null)
 
 const openWaitlist = () => {
   waitlistSubmitted.value = false
+  waitlistError.value = ''
   waitlistOpen.value = true
 }
 const closeWaitlist = () => {
   waitlistOpen.value = false
 }
-const submitWaitlist = () => {
+const submitWaitlist = async () => {
   if (!waitlistEmail.value.trim()) return
-  // TODO(waitlist-backend): persist { email: waitlistEmail, userId: currentUserId } once
-  // the waitlist table/endpoint exists. Captured here so the copy/UX task isn't blocked.
+  waitlistLoading.value = true
+  waitlistError.value = ''
+  const { error } = await subscriptionAPI.joinPremiumWaitlist(waitlistEmail.value.trim())
+  waitlistLoading.value = false
+  if (error) {
+    waitlistError.value = 'Could not join the waitlist. Please try again.'
+    return
+  }
   waitlistSubmitted.value = true
 }
 
@@ -376,7 +384,7 @@ const pricingFaq = [
       </section>
     </div>
 
-    <!-- Premium waitlist modal (stub — captures intent locally; backend wiring is a follow-up) -->
+    <!-- Premium waitlist modal -->
     <div
       v-if="waitlistOpen"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
@@ -404,7 +412,10 @@ const pricingFaq = [
               placeholder="you@example.com"
               class="input mb-4"
             >
-            <button type="submit" class="btn-primary w-full">Notify me</button>
+            <p v-if="waitlistError" class="text-sm text-red-600 mb-4">{{ waitlistError }}</p>
+            <button type="submit" class="btn-primary w-full" :disabled="waitlistLoading">
+              {{ waitlistLoading ? 'Joining…' : 'Notify me' }}
+            </button>
           </form>
         </template>
         <template v-else>

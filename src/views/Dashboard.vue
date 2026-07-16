@@ -184,7 +184,7 @@ async function handleRemoveApplication(matchId: string) {
 // Profile completion: key fields that improve matching
 const profileCompletion = computed(() => {
   const p = profile.value
-  if (!p) return { filled: 0, total: 8, percent: 0 }
+  if (!p) return { filled: 0, total: 7, percent: 0 }
   const fields = [
     !!p.first_name?.trim(),
     !!p.last_name?.trim(),
@@ -192,7 +192,6 @@ const profileCompletion = computed(() => {
     !!p.target_job_title?.trim(),
     (p.target_role_categories?.length ?? 0) > 0,
     (p.desired_salary_min != null || p.desired_salary_max != null) || (p.preferred_locations?.length ?? 0) > 0,
-    p.years_of_experience != null,
     !!p.resume_bucket_key
   ]
   const filled = fields.filter(Boolean).length
