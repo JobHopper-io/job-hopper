@@ -26,4 +26,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+          # Cache DENO_DIR (keyed on deno.lock by default). Without this every run re-fetches
+          # ~70 modules from deno.land + esm.sh, so any CDN blip fails CI on correct code —
+          # e.g. esm.sh returned a Cloudflare 522 on the zipcodes import in
+          # _shared/location-normalization.ts and took the whole suite down before a single
+          # test ran. deno.lock pins integrity hashes but does not prevent the fetch.
+          cache: true
       - run: deno test supabase/functions/_shared/__tests__/
