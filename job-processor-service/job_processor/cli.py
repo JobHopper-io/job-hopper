@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import typer
 
-from job_processor import sponsorship_ingest, sponsorship_resolution, sponsorship_scope
+from job_processor import sponsorship_ingest, sponsorship_resolution, sponsorship_scope, sponsorship_scoring
 from job_processor.settings import get_settings
 from job_processor.supabase_client import SupabaseRest
 
@@ -220,6 +220,25 @@ def sponsorship_apply_d37_decisions(
 
     typer.echo("\n=== scoring exclusions ===")
     typer.echo(json.dumps(excl_counts, indent=2))
+
+
+@sponsorship_app.command("compute-scores")
+def sponsorship_compute_scores(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D41-45 (§3 decision 7): scores every non-excluded employer Low/Medium/High from
+    lca_filings alone (volume + recency) - no USCIS input. excluded_from_scoring=true employers
+    get no row (fall back to the heuristic badge). Re-runnable: upserts on employer_id.
+    """
+
+    async def run() -> sponsorship_scoring.ScoreComputeCounts:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            return await sponsorship_scoring.compute_and_write_scores(db, dry_run=dry_run)
+
+    counts = asyncio.run(run())
+    typer.echo(json.dumps(counts, indent=2))
 
 
 def main() -> None:

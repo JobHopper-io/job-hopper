@@ -4,8 +4,10 @@ Working document for the Premium "Real Sponsorship Score" and Sponsor Watch feat
 Covers: data sources, current-state audit, the scoring approach, a proposed data model,
 and the revised day-by-day plan. Last updated 2026-07-17.
 
-**Status: D31–35 (ingest) DONE. D36 (seed employers+aliases from FEIN) DONE — 400 employers,
-642 aliases, 102,821 filings backfilled 100%. D37 (reduced) is next. See §5a.**
+**Status: D31–35 (ingest) DONE. D36 (seed) DONE — 400 employers → 374 post-merge. D37 (reduced)
+DONE — 16 brands merged, 6 umbrella FEINs flagged `excluded_from_scoring`. D41–45 (scoring) DONE
+— 368 employers scored Low/Medium/High, live in `employer_sponsorship_scores`. Next: §3 decision
+11 (badge replace-vs-alongside) blocks D46–50 (UI). See §5a.**
 
 **🔻 SCOPE: Phase 5 v1 is LCA-ONLY (decided 2026-07-17, §3 decision 7).** D38–40 — the LCA↔USCIS
 join and its verification — are **cut from v1 and deferred to a v2 enrichment**. v1 ships a
@@ -177,8 +179,8 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
 | Phase 5 workstream | Status | Evidence in repo |
 |---|---|---|
 | **DOL/USCIS ingestion** (D31–35) | ✅ **Built + loaded 2026-07-16** | Schema: migrations `20260716200000` + `20260716210000` (both pushed). Code: `job-processor-service/job_processor/{lca_normalizer,sponsorship_scope,sponsorship_ingest}.py`, CLI `job-processor sponsorship {scope-list,ingest-lca,ingest-uscis}`. Data loaded to the live project: `lca_filings` (FY2026 Q1+Q2, scoped to top 400) + `uscis_h1b_hub` (FY2026, **full file**, 36,624 rows). `employer_id` null throughout — resolution is D36–40. Scope artifact: `job-processor-service/data/scope_top_sponsors.csv` (committed); raw source files are gitignored (`data/raw/`, 138MB). |
-| **Entity resolution** (D36–40) | 🟡 Partial, wrong shape | `scoreOrganizationCandidates` / `normalizeCompanyName` / `stripLegalSuffixes` (`_shared/apollo.ts`), `company_apollo_cache`, LLM+Brave `domain_resolution.py`. Resolves *posting → Apollo org*, not *filing → canonical employer*. **No canonical employer table, no pgvector.** |
-| **Scoring/confidence** (D41–45) | 🟡 Heuristic already live; **v1 = LCA-only** (§3 decision 7) | `_shared/infer-sponsorship-likelihood.ts` → Low/Med/High, stored in `job_hopper_live.sponsorship_likelihood`, resolved via `getEffectiveSponsorshipLikelihood`. No numeric score, no confidence, no rationale. |
+| **Entity resolution** (D36–40) | ✅ **D36–37 done 2026-07-17 (LCA-only, reduced scope)** | `employers` (374, brand-level) + `employer_name_aliases` (642) live. `job_processor/sponsorship_resolution.py`, CLI `job-processor sponsorship {seed-employers,apply-d37-decisions}`. Systematic merge/split + `uscis_h1b_hub` join still D38–40, deferred to v2. |
+| **Scoring/confidence** (D41–45) | ✅ **DONE 2026-07-17, LCA-only** (§3 decision 7) | `employer_sponsorship_scores` populated for 368/374 employers (Low/Medium/High score **and** confidence, same scale as the heuristic — no numeric score). `job_processor/sponsorship_scoring.py`, CLI `job-processor sponsorship compute-scores`. Old heuristic (`_shared/infer-sponsorship-likelihood.ts`) untouched — still the fallback for the 6 `excluded_from_scoring` employers and for any company outside this 374-employer scope. |
 | **Sponsorship UI** (D46–50) | 🟡 Badge + teaser done | `JobSponsorshipBadge.vue` (Low/Med/High + `locked` free-tier teaser). `profiles.requires_us_sponsorship` already feeds matching/filters. No numeric score, rationale tooltip, or Sponsor-Watch surface. |
 | **Sponsor Watch** (D51–55) | ❌ None (infra exists) | No worker/route/page. But `scheduled_jobs` + pg_cron + `run-scheduled-jobs` and provider-agnostic `sendEmail` (`_shared/email.ts`) are ready to host it. |
 | **Validation + launch** (D56–60) | ❌ N/A | — |
@@ -482,20 +484,30 @@ uscis_h1b_hub                  -- USCIS approvals/denials, employer-aggregated
   -- ~0.5% share an identical key with different counts (dupe rows in USCIS's own export) — those
   -- get summed, not overwritten, before upsert (see job_processor/sponsorship_ingest.py).
 
-employer_sponsorship_scores    -- computed Real Sponsorship Score (Days 41–45)
-                                -- ⚠️ v1 IS LCA-ONLY (§3 decision 7): score = filing volume +
-                                -- recency. NO USCIS input (the join is deferred to v2), so this
-                                -- is an INTENT signal, not an APPROVAL-OUTCOME signal.
-                                -- confidence must say so explicitly. data_coverage must record
-                                -- v1=LCA-only so v2 can tell v1 rows apart without guessing.
+employer_sponsorship_scores    -- computed Real Sponsorship Score (Days 41–45) ✅ DONE 2026-07-17
+                                -- v1 IS LCA-ONLY (§3 decision 7): score = filing volume + recency
+                                -- from Certified/Certified-Withdrawn lca_filings only. NO USCIS
+                                -- input, so this is an INTENT signal, not an APPROVAL-OUTCOME
+                                -- signal - rationale states that explicitly on every row.
+                                -- ✅ `score` was `int` in the original migration (20260716200000);
+                                -- altered to text + check (Low/Medium/High) by 20260717160000 to
+                                -- match the decided scale (same as the heuristic badge, no new
+                                -- 0-100/A-F system - see §6 item 2, now resolved).
   employer_id       uuid fk pk
-  score             int          -- 0–100 (or A–F); TBD in scoring spec
-  confidence        text         -- Low/Medium/High, from data coverage
-  rationale         text         -- plain-text "why", for transparency
-  data_coverage     jsonb        -- which sources/years contributed
-  fiscal_years_used int[]
-  algorithm_version text
+  score             text         -- Low/Medium/High, tertile-bucketed on summed positions
+  confidence        text         -- Low/Medium/High, from received_date recency share (0.5/0.8
+                                  -- cutoffs measured against the real distribution, not guessed)
+  rationale         text         -- plain-text "why", real numbers not vague language
+  data_coverage     jsonb        -- v1_scope, counted_statuses, filing counts, recency_share
+  fiscal_years_used int[]        -- currently always [2026] - single-FY scope
+  algorithm_version text         -- "lca_volume_recency_v1"
   computed_at       timestamptz
+                                -- 368/374 employers scored; the 6 excluded_from_scoring get NO
+                                -- row (not a degraded score) and fall back to the heuristic badge.
+                                -- Code: job_processor/sponsorship_scoring.py, CLI
+                                -- `job-processor sponsorship compute-scores` (re-runnable: upserts
+                                -- on employer_id, deletes any stale row for a since-excluded
+                                -- employer). Tests: tests/test_sponsorship_scoring.py.
 
 sponsor_watch_subscriptions    -- Sponsor Watch (Days 51–55)
   id, profile_id fk, employer_id fk, created_at
@@ -575,7 +587,26 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
     D38–39 join). LCA-side backfill is already done and verified — D36 hit 100% (102,821/102,821).
   - **pgvector: still unnecessary**, now more so — the fuzzy/vector work lived in the deferred
     D38–39.
-- **D41–45 — Scoring/confidence.** **[CHANGED; SCOPE CUT 2026-07-17 → LCA-only, §3 decision 7]**
+- **D41–45 — Scoring/confidence. ✅ DONE 2026-07-17.** LCA-only per §3 decision 7. Score/confidence
+  shape decided as **Low/Medium/High** (matching the heuristic scale, not 0–100/A–F — see §6 item
+  2), which required altering `employer_sponsorship_scores.score` from its original `int` type to
+  `text` (migration `20260717160000`; table had 0 rows, no backfill needed). Thresholds were
+  measured against the real 368-employer distribution before being hardcoded, not guessed:
+  - **Score** (tertiles of summed `total_worker_positions`, Certified + Certified-Withdrawn filings
+    only): Low 0–99, Medium 100–192, High 193+. Roughly even thirds (122/123/123) by construction.
+  - **Confidence** (share of an employer's filings, any status, with `received_date` in the file's
+    most recent 150 days — `fiscal_year` turned out to be uniformly 2026 across the whole scope, so
+    it couldn't carry a recency signal the way the original plan assumed; `received_date` could):
+    Low <0.5, Medium 0.5–0.8, High ≥0.8. Distribution is heavily right-skewed (median share ≈0.93,
+    only ~3% of employers below 0.5) — 0.5/0.8 sit at real gaps in the data, not round numbers.
+  - Result: 368/374 employers scored (High 123 / Medium 123 / Low 122; confidence High 286 /
+    Medium 71 / Low 11). Spot-checked against known cases before writing anything for real:
+    Qualcomm/Amazon/Goldman → High/High; Honeywell/Perficient → Low score but High confidence
+    (real sponsors, just smaller relative volume within this top-400 scope — "Low" here means
+    "low relative to other major sponsors," not "barely sponsors anyone," and the rationale text
+    says so); one employer found with 0% recent filings despite qualifying volume → Low/Low
+    correctly. Verified post-write against the live DB, not just the run's own report: exactly 368
+    rows, 0 rows leaked onto `excluded_from_scoring=true` employers, 0 nulls.
   - **Score from `lca_filings` only: volume + recency. No USCIS input**, because there is no join
     (D38–39 deferred). This is a **filing-intent** signal, not an approval-outcome signal.
   - **`confidence` must say so explicitly.** It reflects *filing activity only, not approval
@@ -599,7 +630,7 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
 
 ---
 
-## 5a. Status — D31–35 (ingest) DONE 2026-07-16; D36 (seed) DONE 2026-07-17; D37 is next
+## 5a. Status — D31–35, D36, D37, D41–45 all DONE; next is §3 decision 11 (blocks D46–50)
 
 Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorship Score)** and
 **2 (Sponsor Watch)**. ~~Nothing in the engine exists yet — Days 31–35 (ingest) is the blocker~~ —
@@ -617,7 +648,8 @@ Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorsh
    (scoped, FEIN-matched; independently verified — equals `sum(filing_count)` in the scope CSV
    exactly). `uscis_h1b_hub` = 36,624 rows (**full file, unscoped** — §3 decision 3).
    `employer_id` is null on every row, by design.
-5. **← STILL OPEN. Resolve §6 decision 1 before any UI work** (D46–50 is blocked on it).
+5. **← STILL OPEN. Resolve §6 decision 1 (= §3 decision 11) before any UI work** (D46–50 is
+   blocked on it). D36, D37, and D41–45 are otherwise all done — see below.
 
 ### D36 — seed employers + aliases (DONE 2026-07-17)
 
@@ -638,18 +670,28 @@ invariant *"all aliases for one FEIN share one `employer_id`"* confirmed holding
 Run it with `job-processor sponsorship seed-employers [--dry-run]`. Re-runnable (already-seeded
 FEINs are skipped) and it rolls back its own `employers` rows if the alias insert fails.
 
-**Next: D37 (reduced) — §3 decision 7.** Read decisions 5, 6 and 7 first. v1 is **LCA-only**;
-the LCA↔USCIS join is deferred, which removed the biggest schedule risk from this pass. D37 now
-means only:
-1. Apply the **confirmed merges** (Goldman 3→1, Regeneron 2→1, + any equivalents from the review
-   list) — *not* a systematic sweep of all 400.
-2. **Flag** the 52 umbrella FEINs with `employers.excluded_from_scoring = true` — *not* split them.
-3. Still **review-then-apply**: the merge-candidate list and the 52-FEIN list get confirmed
-   **before** anything is written.
+### D37 — grouping (DONE 2026-07-17, reduced scope)
 
-Systematic merge/split detection, the durable override store, and the domain/Apollo grouping pass
-all defer to v2 with D38–40. Their design (§3 decision 6, §5 D38–39) is kept verbatim — start
-there, don't re-derive.
+16 brands merged (42 FEINs → 16 rows: Qualcomm, Amazon, Goldman Sachs, CGI, Oracle, Deloitte, STV,
+Samsung, Morgan Stanley, Regeneron, HCL, Mastech Digital, Capital One, Visa, CVS Health, Deutsche
+Bank), 61 other candidates reviewed and rejected. 6 employers flagged `excluded_from_scoring=true`
+(SUNY Stony Brook, UMass Chan, NYC DOE, UW System, UMD College Park, U Oklahoma) — fewer than the
+52 originally estimated once the review CSVs were actually built and generic-token false positives
+were filtered out. `employers` went 400 → 374. Decision CSVs committed as an audit trail:
+`data/review_merge_candidates.csv`, `data/review_umbrella_feins.csv`. Run via
+`job-processor sponsorship apply-d37-decisions`.
+
+### D41–45 — scoring (DONE 2026-07-17, LCA-only)
+
+368/374 employers scored Low/Medium/High (score + confidence), thresholds measured against the
+real distribution rather than guessed — see §5 D41–45 for the full writeup (exact cutoffs, why
+`fiscal_year` couldn't carry the recency signal and `received_date` did instead, spot-check
+results). Run via `job-processor sponsorship compute-scores`.
+
+**Next: §3 decision 11** (does the Real Score replace the heuristic badge or show alongside it?)
+— blocks D46–50 (UI). Systematic merge/split detection, the durable override store, the
+domain/Apollo grouping pass, and the LCA↔USCIS join all still defer to v2 with D38–40. Their
+design (§3 decision 6, §5 D38–39) is kept verbatim — start there, don't re-derive.
 
 **Reproducing the ingest** (raw files are gitignored; `dol.gov` blocks automated download —
 Akamai 403 — so the LCA `.xlsx` must be fetched by hand from the Disclosure Data tab):
@@ -672,7 +714,9 @@ function or a plain table read through `src/lib/`.
 
 1. **Score presentation (§3 decision 11):** replace the heuristic badge, or show a separate Premium
    Real Score alongside it?
-2. **Score shape:** 0–100 numeric vs. A–F grade vs. High/Med/Low + confidence.
+2. ~~**Score shape:** 0–100 numeric vs. A–F grade vs. High/Med/Low + confidence.~~ **✅ RESOLVED
+   2026-07-17 — Low/Medium/High + confidence**, same scale as the existing heuristic badge. See
+   §5 D41–45.
 3. **Prototype vs. primary data:** use a third-party aggregator to validate scoring math fast,
    then swap to primary DOL/USCIS files for launch? (Recommended, with the ToS caveat.)
 4. **pgvector:** commit to standing up embeddings now, or defer until the long-tail expansion
