@@ -5,8 +5,13 @@ Covers: data sources, current-state audit, the scoring approach, a proposed data
 and the revised day-by-day plan. Last updated 2026-07-17.
 
 **Status: D31–35 (ingest) DONE. D36 (seed employers+aliases from FEIN) DONE — 400 employers,
-642 aliases, 102,821 filings backfilled 100%. D37 (brand grouping: merge AND split) is next.
-See §5a.**
+642 aliases, 102,821 filings backfilled 100%. D37 (reduced) is next. See §5a.**
+
+**🔻 SCOPE: Phase 5 v1 is LCA-ONLY (decided 2026-07-17, §3 decision 7).** D38–40 — the LCA↔USCIS
+join and its verification — are **cut from v1 and deferred to a v2 enrichment**. v1 ships a
+**filing-intent** score (volume + recency), **not** an approval-outcome score. `uscis_h1b_hub`
+keeps its 36,624 ingested rows untouched and ready: **a scope cut, not a rollback.** D38–39's
+design is kept verbatim in §5 — **v2 should start from it, not re-derive it.**
 
 > **⚠️ Read this before trusting anything below.** Three of this doc's original claims turned out
 > to be false when checked against the real files. They're struck in place, not deleted, so the
@@ -17,19 +22,51 @@ See §5a.**
 > |---|---|---|
 > | **Correction #1** | `EMPLOYER_FEIN` **is** present + populated in LCA (doc said "no FEIN"). FEIN is now the primary resolution key. | §1a |
 > | **Correction #2** | USCIS export is **`.xlsx` with 6 category pairs / 12 count columns** (doc said 4-column CSV). Also NAICS is a descriptive string, not a bare code. | §1b, §4 |
-> | **Correction #3** | ~~"for well-known big sponsors, name matching is near-trivial"~~ — **false, and backwards.** Big names are the *hardest* (`&`, multi-entity, cross-agency spelling). | §3 decision 8 |
+> | **Correction #3** | ~~"for well-known big sponsors, name matching is near-trivial"~~ — **false, and backwards.** Big names are the *hardest* (`&`, multi-entity, cross-agency spelling). | §3 decision 9 |
 > | **Known future risk #1** | `uscis_h1b_hub.naics_code` format is unnormalized **and part of the natural key** → a second FY in the other format = silent duplicate rows. Deliberately not fixed. | §1c |
 >
 > Decisions made while building, worth reading before D37: **§3 decision 3** (USCIS loaded
 > unscoped, on purpose), **§3 decision 4** (`&`-vs-`and` name-matching trap, measured),
 > **§3 decision 5** (brand ≠ legal filer — **decided: merge to brand**; `employers` is
 > brand-level, filer identity lives on `employer_name_aliases`, raw filings stay entity-level),
-> and **§3 decision 6** (**umbrella FEINs** — 52 of 400 tax IDs cover *many* distinct orgs, e.g.
-> one FEIN = New York State + 21 SUNY campuses; **D37 must split as well as merge**).
+> **§3 decision 6** (**umbrella FEINs** — 52 of 400 tax IDs cover *many* distinct orgs, e.g. one
+> FEIN = New York State + 21 SUNY campuses), and **§3 decision 7** (**v1 is LCA-only** — D38–40
+> cut/deferred; D37 reduced to confirmed merges + flagging the 52 via `excluded_from_scoring`
+> rather than splitting them).
 >
 > **✅ The brand-level migration is applied** (`20260717120000`, plus `…130000`/`…140000` fixing
 > the alias uniqueness constraint — see §3 decision 5, which is worth reading as a cautionary
 > tale: the constraint was reasoned about twice and wrong twice before being *measured*).
+
+---
+
+### 🔬 Working principle: spot-check every detection pass against known-obvious cases
+
+**Applies to every automated detection/matching/clustering step in this pipeline — name
+normalization, prefix clustering, fuzzy matching, whatever comes next. Not tied to one finding.**
+
+Before trusting any such pass, **run it against a handful of cases whose answer you already
+know** and check it gets them right. Then look at what it *didn't* return, not just what it did.
+
+**Why this is a rule and not a nicety: every one of these bugs was found this way, and none of
+them threw an error.** They returned plausible numbers and exit code 0:
+
+| Bug | What it looked like | How it was actually caught |
+|---|---|---|
+| `&` vs `and` normalization | `rows_matched_scope: 742` — a perfectly reasonable number | Asking *how many of the 400 scope employers appeared?* → 61 missing, incl. Goldman, JPMorgan, McKinsey, EY |
+| `.com` breaks prefix clustering | An "amazon" cluster of 4 FEINs / 14,238 positions | Knowing Amazon.com Services (the **#2 employer**, 33,464) *must* be in it — `amazoncom` ≠ `amazon` |
+| One name → many FEINs (Regeneron) / one brand → many names (Goldman) | A 400-row scope list | Noticing it held only **399 distinct names** |
+| Alias uniqueness constraint | Inserts "worked" for two wrong index designs | Counting rows the constraint *permits* (400, then 517) vs. rows actually needed (642) |
+| `max()` similarity mislabelling umbrellas | Sensible-looking a/b/c label distribution | Checking SUNY/NYC/UMass specifically → all three mislabelled as "typos". With 22 names there are 231 pairs, so *some* pair is always ≥0.75 similar and `max()` always fires |
+
+**The pattern is identical every time: the failure is silent and the output is plausible.** A
+number that looks about right is the characteristic *symptom*, not evidence of correctness. Green
+tests and a zero exit code prove nothing about a matcher.
+
+**So:** pick cases you can verify independently (a known-big employer, a known-duplicate, a known
+count), assert against them, and report the number rather than asserting it's fine. Prefer
+measuring the real data over reasoning about what it probably contains — **reasoning has lost
+every time it was checked** in this project.
 
 > **Positioning.** Today's sponsorship signal is a **heuristic** badge
 > (`sponsorship_likelihood` = Low/Medium/High, inferred from posting metadata). The Premium
@@ -141,10 +178,11 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
 |---|---|---|
 | **DOL/USCIS ingestion** (D31–35) | ✅ **Built + loaded 2026-07-16** | Schema: migrations `20260716200000` + `20260716210000` (both pushed). Code: `job-processor-service/job_processor/{lca_normalizer,sponsorship_scope,sponsorship_ingest}.py`, CLI `job-processor sponsorship {scope-list,ingest-lca,ingest-uscis}`. Data loaded to the live project: `lca_filings` (FY2026 Q1+Q2, scoped to top 400) + `uscis_h1b_hub` (FY2026, **full file**, 36,624 rows). `employer_id` null throughout — resolution is D36–40. Scope artifact: `job-processor-service/data/scope_top_sponsors.csv` (committed); raw source files are gitignored (`data/raw/`, 138MB). |
 | **Entity resolution** (D36–40) | 🟡 Partial, wrong shape | `scoreOrganizationCandidates` / `normalizeCompanyName` / `stripLegalSuffixes` (`_shared/apollo.ts`), `company_apollo_cache`, LLM+Brave `domain_resolution.py`. Resolves *posting → Apollo org*, not *filing → canonical employer*. **No canonical employer table, no pgvector.** |
-| **Scoring/confidence** (D41–45) | 🟡 Heuristic already live | `_shared/infer-sponsorship-likelihood.ts` → Low/Med/High, stored in `job_hopper_live.sponsorship_likelihood`, resolved via `getEffectiveSponsorshipLikelihood`. No numeric score, no confidence, no rationale. |
+| **Scoring/confidence** (D41–45) | 🟡 Heuristic already live; **v1 = LCA-only** (§3 decision 7) | `_shared/infer-sponsorship-likelihood.ts` → Low/Med/High, stored in `job_hopper_live.sponsorship_likelihood`, resolved via `getEffectiveSponsorshipLikelihood`. No numeric score, no confidence, no rationale. |
 | **Sponsorship UI** (D46–50) | 🟡 Badge + teaser done | `JobSponsorshipBadge.vue` (Low/Med/High + `locked` free-tier teaser). `profiles.requires_us_sponsorship` already feeds matching/filters. No numeric score, rationale tooltip, or Sponsor-Watch surface. |
 | **Sponsor Watch** (D51–55) | ❌ None (infra exists) | No worker/route/page. But `scheduled_jobs` + pg_cron + `run-scheduled-jobs` and provider-agnostic `sendEmail` (`_shared/email.ts`) are ready to host it. |
 | **Validation + launch** (D56–60) | ❌ N/A | — |
+| **LCA↔USCIS join** (D38–40) | ⛔ **CUT from v1 → v2** | `uscis_h1b_hub` stays ingested (36,624 rows, `employer_id` null), untouched and ready. Design kept in §5. **Scope cut, not rollback** (§3 decision 7). |
 
 **Reusable today:** the `sponsorship_likelihood` column + enum, the heuristic scorer, the badge
 component + `locked` teaser, the sponsorship user-preference, name-normalization helpers, the
@@ -299,10 +337,44 @@ scheduled-jobs/email plumbing.
    one override store, two directions. Like merging, the split boundary is **not inferable from
    the filing data** (nothing in either file says Stony Brook and Albany are different employers
    but Goldman's three entities are one) — it needs domain/Apollo signals plus human judgement.
-7. **The Real Score blends filings with the existing heuristic** — real filing-based score where
+7. **✅ DECIDED 2026-07-17 — Phase 5 v1 is LCA-ONLY. D38–40 cut and deferred to a v2 enrichment.**
+   Approved scope change. **A cut, not a rollback:** `uscis_h1b_hub` keeps its 36,624 ingested
+   rows, untouched, `employer_id` null — available the moment the join gets built.
+
+   **What v1 ships:** a score from **LCA filings only — volume + recency**. That is a
+   **filing-intent** signal ("does this employer file a lot of LCAs, recently?"). It is **not** an
+   **approval-outcome** signal ("do their petitions actually get approved?"). Both were in the
+   original pitch; only the first survives v1, and the copy must not blur them.
+
+   **Why:** D38–39 (the LCA↔USCIS join) was **the single highest-risk, least-proven step in the
+   plan** — the only one with **no deterministic key** to lean on. Everywhere else FEIN carries
+   us (§3 decision 2; D36 hit 100% on it). Across agencies there is no FEIN bridge at all: USCIS
+   publishes last-4 only, and name matching is *measured* broken (§3 decision 4 — 61/399 missed,
+   naive fix recovers 24). Its success rate was unknowable until built. **Cutting it trades the
+   biggest schedule risk for a real-but-partial v1.**
+
+   **Knock-on scope cuts:**
+   - **D37 reduced** to applying the *already-confirmed* merges (Goldman 3→1, Regeneron 2→1) and
+     **flagging** the 52 umbrella FEINs via a new `employers.excluded_from_scoring` boolean —
+     rather than splitting them properly. Systematic merge/split detection across all 400, and the
+     durable override store, defer to v2 with D38–40. §3 decision 6's design stands; it just isn't
+     v1. Still review-then-apply, just smaller.
+   - **D40 cut** — it existed only to verify the D38–39 join. LCA-side backfill is already done
+     and verified (D36: 102,821/102,821).
+   - **D41–45 reduced** — no USCIS input; `confidence` must **explicitly** state the score
+     reflects filing activity only, not approval outcomes.
+   - **`excluded_from_scoring = true` ⇒ no score at all.** Not degraded, not low-confidence, not a
+     guess — nothing, falling back to the existing heuristic badge (which already works and
+     doesn't need this feature). A confidently-wrong score on "SUNY Stony Brook" — really New York
+     State plus 21 campuses — is worse than no score.
+
+   **For whoever picks up v2:** D38–39's design in §5 is **kept verbatim, not deleted**. Start
+   there; don't re-derive it. The hard-won facts (no FEIN bridge, `&`-vs-`and`, 61/399 baseline)
+   are still true and still the starting point.
+8. **The Real Score blends filings with the existing heuristic** — real filing-based score where
    an employer has filings; fall back to `inferSponsorshipLikelihood` where it doesn't; and
    **confidence reflects data coverage.** This is the honest UX for "top 300–500 employers first."
-8. **Scope to the top 300–500 high-volume sponsors FIRST** — and move that scoping *earlier*, not
+9. **Scope to the top 300–500 high-volume sponsors FIRST** — and move that scoping *earlier*, not
    just as the launch gate, so we get a real live score without solving long-tail entity
    resolution up front. ~~for well-known big sponsors, name matching is near-trivial~~ —
    **✅ CORRECTION #3 (2026-07-16): struck, this premise was false.** Being well-known is exactly what makes an
@@ -311,9 +383,9 @@ scheduled-jobs/email plumbing.
    Sachs, JPMorgan, McKinsey, EY). Scoping still holds, but it's justified by **file
    tractability + FEIN being exact**, *not* by names being easy. Done: FY2026 LCA scoped via
    FEIN, 102,821 filings across the top 400.
-9. **Sponsor Watch = quarterly diff alerts** on existing cron + `sendEmail`, not net-new
+10. **Sponsor Watch = quarterly diff alerts** on existing cron + `sendEmail`, not net-new
    real-time workers. Set expectations in copy.
-10. **OPEN:** Is the Real Score a **replacement** of the heuristic badge, or a **separate
+11. **OPEN:** Is the Real Score a **replacement** of the heuristic badge, or a **separate
    Premium-only score shown alongside** it? Drives whether D46–50 is "swap the badge's data
    source" or "add a second badge." **← needs a product decision before D46.**
 
@@ -333,6 +405,11 @@ employers                      -- canonical BRAND identity, one row per brand (�
   primary_naics     text null
   hq_city, hq_state text null
   created_at, updated_at
+  excluded_from_scoring boolean  -- ⚠️ TO ADD (D37, §3 decision 7). true => show NO score at all,
+                                 -- fall back to the inferSponsorshipLikelihood heuristic badge.
+                                 -- Set on the 52 umbrella FEINs (§3 decision 6) whose one row
+                                 -- wrongly covers many orgs. NOT a degraded/low-confidence score
+                                 -- - nothing. A confident wrong score is worse than no score.
   -- ✅ Brand-level as of 20260717120000: employer_fein + tax_id_last4 were dropped from here and
   -- moved to employer_name_aliases (§3 decision 5). A brand has no single FEIN.
   -- ⚠️ AS SEEDED (D36, 2026-07-17) this is NOT yet brand-level in practice: one row per FEIN, so
@@ -406,6 +483,11 @@ uscis_h1b_hub                  -- USCIS approvals/denials, employer-aggregated
   -- get summed, not overwritten, before upsert (see job_processor/sponsorship_ingest.py).
 
 employer_sponsorship_scores    -- computed Real Sponsorship Score (Days 41–45)
+                                -- ⚠️ v1 IS LCA-ONLY (§3 decision 7): score = filing volume +
+                                -- recency. NO USCIS input (the join is deferred to v2), so this
+                                -- is an INTENT signal, not an APPROVAL-OUTCOME signal.
+                                -- confidence must say so explicitly. data_coverage must record
+                                -- v1=LCA-only so v2 can tell v1 rows apart without guessing.
   employer_id       uuid fk pk
   score             int          -- 0–100 (or A–F); TBD in scoring spec
   confidence        text         -- Low/Medium/High, from data coverage
@@ -459,34 +541,57 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
     `job_processor/sponsorship_resolution.py`, CLI `job-processor sponsorship seed-employers`
     (re-runnable: already-seeded FEINs are skipped; rolls back its own employers rows on a
     mid-run failure).
-  - **D37 — grouping: MERGE *and* SPLIT (§3 decisions 5 + 6). Both directions, one mechanism.**
-    - **Merge** (one brand → many FEINs): Goldman (3) / Regeneron (2) / Amazon (several). Most
-      brands are 1 FEIN and trivial; this is a tail problem.
-    - **Split** (one FEIN → many orgs): **52 of 400** umbrella FEINs, e.g. `14-6013200` = New
-      York State + 21 SUNY campuses; `13-6400434` = NYC Education + Correction + Health + Medical
-      Examiner. Larger than the merge tail, and currently mislabelling live rows.
-    - **Neither is inferable from filing data** — needs domain (reuse `domain_resolution.py`) or
-      Apollo (`company_apollo_cache`), plus a human pass over the top 400. Budget a **manual
-      review step** and a durable **override store**; don't pretend an algorithm settles it.
-      **One review pass, one override mechanism, both directions — not two bespoke processes.**
-    - Evidence is already in the DB: all 642 spellings are aliases on the right `employer_id`, so
-      re-seeding after a grouping decision is cheap.
-  - **D38–39 — the LCA↔USCIS join. The actual hard part, and where the schedule risk is.** No FEIN
-    on the USCIS side (last-4 only), and name matching is measurably broken (§3 decision 4: 61/399
-    missed; naive `&`→`and` recovers just 24). Plan: block on last-4 + state/city, then fuzzy
-    within block (rapidfuzz/trigram), then LLM adjudication for survivors — the
-    `domain_resolution.py` bounded-fan-out + single-LLM-call pattern fits. **Measure recall
-    against the 400 scope brands and report it** — do not ship this on vibes.
-  - **D40 — backfill + verify.** Populate `employer_id` across both tables, verify coverage,
-    report unresolved counts. Filings whose FEIN isn't in the top 400 stay null (expected).
-  - **pgvector: still likely unnecessary.** Blocking + fuzzy + LLM on ≤400 brands is small;
-    revisit only for the long-tail expansion past the scope list.
-- **D41–45 — Scoring/confidence.** **[CHANGED]** *Reframe.* Formula blends LCA volume/recency +
-  USCIS approval ratios **with the existing `inferSponsorshipLikelihood` heuristic as fallback**;
-  `confidence` = f(data coverage); emit plain-text `rationale`. Reuses live code.
+  - **D37 — grouping. [SCOPE CUT 2026-07-17 → see §3 decision 7]** *Reduced to the confirmed
+    cases only; systematic detection deferred to v2 alongside D38–40.*
+    - **Apply the already-confirmed merges only:** Goldman (3 FEINs → 1 brand), Regeneron (2 → 1),
+      plus any equivalents surfaced in the review list. **Not** a systematic merge sweep of all
+      400.
+    - **Flag, don't split:** the **52 umbrella FEINs** (§3 decision 6) get
+      `employers.excluded_from_scoring = true` (new column). We do **not** attempt to split
+      `14-6013200` into New York State + 21 SUNY campuses. Splitting needs the full review
+      mechanism; flagging needs a boolean.
+    - **Still review-then-apply**, just smaller: produce the merge-candidate list + confirm the
+      52-FEIN list is stable **before** any merge or flag is written.
+    - **DEFERRED TO v2:** systematic merge/split detection across all 400, the durable override
+      store, and the domain/Apollo-assisted grouping pass. Still the right design (§3 decision 6)
+      — just not v1.
+  - **D38–39 — LCA↔USCIS join. ⛔ CUT FROM v1, DEFERRED TO v2 (2026-07-17, §3 decision 7).**
+    **Not cancelled, not obsolete — deliberately deferred. Do not rebuild this from scratch
+    thinking it was never planned.** The design below stands and should be the starting point
+    when v2 picks it up:
+    > No FEIN on the USCIS side (last-4 only), and name matching is measurably broken (§3
+    > decision 4: 61/399 missed; naive `&`→`and` recovers just 24). Plan: block on last-4 +
+    > state/city, then fuzzy within block (rapidfuzz/trigram), then LLM adjudication for
+    > survivors — the `domain_resolution.py` bounded-fan-out + single-LLM-call pattern fits.
+    > **Measure recall against the 400 scope brands and report it** — do not ship this on vibes.
+
+    **Why cut:** this was the single highest-risk, least-proven part of the plan — the one step
+    with **no deterministic key to lean on** (the two agencies share no FEIN bridge), and the
+    only one whose success rate was unknown until built. Cutting it removes the biggest schedule
+    risk in exchange for a **real-but-partial v1**. **`uscis_h1b_hub` stays ingested and
+    untouched** (36,624 rows, `employer_id` null) — the data is already there whenever the join
+    gets built. **This is a scope cut, not a rollback.**
+  - **D40 — backfill + verify. ⛔ CUT FROM v1, DEFERRED TO v2** (it only existed to verify the
+    D38–39 join). LCA-side backfill is already done and verified — D36 hit 100% (102,821/102,821).
+  - **pgvector: still unnecessary**, now more so — the fuzzy/vector work lived in the deferred
+    D38–39.
+- **D41–45 — Scoring/confidence.** **[CHANGED; SCOPE CUT 2026-07-17 → LCA-only, §3 decision 7]**
+  - **Score from `lca_filings` only: volume + recency. No USCIS input**, because there is no join
+    (D38–39 deferred). This is a **filing-intent** signal, not an approval-outcome signal.
+  - **`confidence` must say so explicitly.** It reflects *filing activity only, not approval
+    outcomes* — that sentence, or its meaning, has to reach the user. The v1 score answers "does
+    this employer file a lot of LCAs, recently?" It does **not** answer "do their petitions get
+    approved?" Do not let `confidence` imply otherwise.
+  - **`excluded_from_scoring = true` ⇒ show NO score.** Not a degraded score, not a low-confidence
+    score, not a guess — **nothing**. Fall back to the existing `inferSponsorshipLikelihood`
+    heuristic badge, which already works and does not depend on this feature. A wrong score on
+    "SUNY Stony Brook" (actually New York State + 21 campuses) is worse than no score.
+  - Keeps: `inferSponsorshipLikelihood` as the fallback everywhere there's no real score; plain-text
+    `rationale`. **`employer_sponsorship_scores.data_coverage`** should record that v1 = LCA-only,
+    so v2 can tell v1 rows apart without guessing.
 - **D46–50 — Sponsorship UI.** **[CHANGED]** *Reduce.* Extend `JobSponsorshipBadge.vue` +
   `sponsorship_likelihood` surface rather than rebuild: numeric score, rationale tooltip, filters
-  (`requires_us_sponsorship` already exists). **Blocked on §3 decision 10** (replace vs. add badge).
+  (`requires_us_sponsorship` already exists). **Blocked on §3 decision 11** (replace vs. add badge).
 - **D51–55 — Sponsor Watch.** **[CHANGED]** *Reframe.* Quarterly diff-alert worker on
   `scheduled_jobs` + pg_cron; alerts via `sendEmail`. Not real-time.
 - **D56–60 — Validation + launch, Score v1.** *Stick.* Validate on the 300–500 set; spot-check
@@ -533,12 +638,18 @@ invariant *"all aliases for one FEIN share one `employer_id`"* confirmed holding
 Run it with `job-processor sponsorship seed-employers [--dry-run]`. Re-runnable (already-seeded
 FEINs are skipped) and it rolls back its own `employers` rows if the alias insert fails.
 
-**Next: D37 — grouping, both directions (§3 decisions 5 + 6).** Read decisions 2, 4, 5 and 6
-first. FEIN made the LCA side near-trivial, but: **merging** (which FEINs are one brand) and
-**splitting** (52 umbrella FEINs covering many orgs) are **both un-inferable from filing data** —
-they need domain/Apollo plus a human pass, sharing **one** review/override mechanism. The
-**LCA↔USCIS join (D38–39) has no FEIN at all** and name matching is measurably broken — still the
-biggest schedule risk.
+**Next: D37 (reduced) — §3 decision 7.** Read decisions 5, 6 and 7 first. v1 is **LCA-only**;
+the LCA↔USCIS join is deferred, which removed the biggest schedule risk from this pass. D37 now
+means only:
+1. Apply the **confirmed merges** (Goldman 3→1, Regeneron 2→1, + any equivalents from the review
+   list) — *not* a systematic sweep of all 400.
+2. **Flag** the 52 umbrella FEINs with `employers.excluded_from_scoring = true` — *not* split them.
+3. Still **review-then-apply**: the merge-candidate list and the 52-FEIN list get confirmed
+   **before** anything is written.
+
+Systematic merge/split detection, the durable override store, and the domain/Apollo grouping pass
+all defer to v2 with D38–40. Their design (§3 decision 6, §5 D38–39) is kept verbatim — start
+there, don't re-derive.
 
 **Reproducing the ingest** (raw files are gitignored; `dol.gov` blocks automated download —
 Akamai 403 — so the LCA `.xlsx` must be fetched by hand from the Disclosure Data tab):
@@ -559,7 +670,7 @@ function or a plain table read through `src/lib/`.
 
 ## 6. Open decisions to resolve before building
 
-1. **Score presentation (§3 decision 10):** replace the heuristic badge, or show a separate Premium
+1. **Score presentation (§3 decision 11):** replace the heuristic badge, or show a separate Premium
    Real Score alongside it?
 2. **Score shape:** 0–100 numeric vs. A–F grade vs. High/Med/Low + confidence.
 3. **Prototype vs. primary data:** use a third-party aggregator to validate scoring math fast,
