@@ -251,6 +251,18 @@ const showSponsorshipTeaser = computed(
   () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
 )
 
+/** §3 decision 11: the Real Score replaces the badge's value for Premium only - Free/Core keep
+ * the heuristic (inferSponsorshipLikelihood), unchanged, same as before this feature existed. */
+const isPremium = computed(() => baseTier.value === 'premium')
+const sponsorshipBadgeValue = computed(() =>
+  isPremium.value && job.value?.sponsorshipRealScore
+    ? job.value.sponsorshipRealScore
+    : (job.value?.sponsorshipLikelihood ?? null),
+)
+const sponsorshipBadgeRationale = computed(() =>
+  isPremium.value && job.value?.sponsorshipRealScore ? job.value.sponsorshipRealRationale : null,
+)
+
 const tierTagLabel = computed(() => {
   return job.value?.subscriptionTierDisplayName ?? null
 })
@@ -626,7 +638,8 @@ async function executeTailoringCheckout() {
                   </span>
                   <JobSponsorshipBadge
                     v-if="showSponsorshipBadge"
-                    :value="job.sponsorshipLikelihood"
+                    :value="sponsorshipBadgeValue"
+                    :rationale="sponsorshipBadgeRationale"
                   />
                   <JobSponsorshipBadge
                     v-else-if="showSponsorshipTeaser"

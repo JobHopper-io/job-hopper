@@ -7,7 +7,14 @@ from pathlib import Path
 import httpx
 import typer
 
-from job_processor import sponsorship_ingest, sponsorship_resolution, sponsorship_scope, sponsorship_scoring
+from job_processor import (
+    sponsorship_domain_backfill,
+    sponsorship_ingest,
+    sponsorship_resolution,
+    sponsorship_scope,
+    sponsorship_scoring,
+)
+from job_processor.llm_ops import openai_client
 from job_processor.settings import get_settings
 from job_processor.supabase_client import SupabaseRest
 
@@ -236,6 +243,34 @@ def sponsorship_compute_scores(
         async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
             db = SupabaseRest(settings, client)
             return await sponsorship_scoring.compute_and_write_scores(db, dry_run=dry_run)
+
+    counts = asyncio.run(run())
+    typer.echo(json.dumps(counts, indent=2))
+
+
+@sponsorship_app.command("backfill-employer-domains")
+def sponsorship_backfill_employer_domains(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D46-50 (§3 decision 11): resolves employers.domain for scored employers via the same
+    resolve_company_domain used for job postings in pipeline.py (Brave + LLM, no Apollo credits),
+    so job<->employer matching can go through domain equality instead of lossy name matching.
+    Skips excluded_from_scoring=true and already-resolved employers. Re-runnable.
+    """
+
+    async def run() -> sponsorship_domain_backfill.DomainBackfillCounts:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            oai = openai_client(settings)
+            return await sponsorship_domain_backfill.backfill_employer_domains(
+                db,
+                settings=settings,
+                http_client=client,
+                oai=oai,
+                model=settings.llm_model_domain,
+                dry_run=dry_run,
+            )
 
     counts = asyncio.run(run())
     typer.echo(json.dumps(counts, indent=2))

@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SponsorshipLikelihood } from '@/types/database'
+import InfoHint from '@/components/InfoHint.vue'
 
 const props = defineProps<{
   value: SponsorshipLikelihood | null
   /** Free tier: obscure the real likelihood behind a blurred, locked teaser. */
   locked?: boolean
+  /** Premium only (§3 decision 11): plain-text rationale for a real-score-backed badge, e.g.
+   * "138 certified LCA filings in FY2026, covering 140 sponsored positions...". Presence of this
+   * prop is what shows the info hint - callers must not pass it for Free/Core. */
+  rationale?: string | null
 }>()
 
 const label = computed(() => props.value ?? 'N/A')
@@ -42,6 +47,7 @@ const toneClass = computed(() => {
   >
     <font-awesome-icon :icon="['fas', 'globe-americas']" class="shrink-0" aria-hidden="true" />
     <span>Chance to provide sponsorship: {{ label }}</span>
+    <InfoHint v-if="rationale" :tooltip="rationale" />
   </span>
 </template>
 

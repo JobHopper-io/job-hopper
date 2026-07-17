@@ -12,7 +12,52 @@ import type {
   JobContact,
   JobHiringContactsStatus,
   PremiumInsightsOrgChoice,
+  RealSponsorshipTier,
 } from '@/types/database'
+
+/** Narrows the DB's `text` + check-constraint columns to the app's Low/Medium/High type. */
+function asRealSponsorshipTier(value: string | null | undefined): RealSponsorshipTier | null {
+  return value === 'Low' || value === 'Medium' || value === 'High' ? value : null
+}
+
+/** Real Sponsorship Score, keyed by employer domain (§3 decision 11). Looked up via
+ * job_hopper_live.company_domain = employers.domain - see docs/sponsorship-data-engine.md D46-50
+ * for why domain, not company name. Excludes employers.excluded_from_scoring=true (no row
+ * fetched for them at all - not a degraded score) and employers with no score row yet. */
+type RealScoreByDomain = Map<
+  string,
+  { score: RealSponsorshipTier; confidence: RealSponsorshipTier | null; rationale: string | null }
+>
+
+async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDomain> {
+  const map: RealScoreByDomain = new Map()
+  if (domains.length === 0) return map
+
+  const { data, error } = await supabase
+    .from('employers')
+    .select('domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
+    .in('domain', domains)
+    .eq('excluded_from_scoring', false)
+
+  if (error || !data) return map
+
+  for (const row of data as unknown as {
+    domain: string | null
+    employer_sponsorship_scores: { score: string | null; confidence: string | null; rationale: string | null } | null
+  }[]) {
+    const domain = row.domain
+    const scoreRow = row.employer_sponsorship_scores
+    const score = asRealSponsorshipTier(scoreRow?.score)
+    if (!domain || !score) continue
+    map.set(domain, {
+      score,
+      confidence: asRealSponsorshipTier(scoreRow?.confidence),
+      rationale: scoreRow?.rationale ?? null,
+    })
+  }
+
+  return map
+}
 
 function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
@@ -63,7 +108,8 @@ const JOB_HOPPER_LIVE_SELECT = `
   employee_count,
   posted_date,
   is_remote,
-  sponsorship_likelihood
+  sponsorship_likelihood,
+  company_domain
 ` as const
 
 function parseJobContactsFromJson(raw: unknown): JobContact[] | undefined {
@@ -88,8 +134,10 @@ function toMatchedJob(
   match: JobMatch,
   job: JobHopperLive | null,
   isSaved: boolean,
+  realScoresByDomain: RealScoreByDomain,
 ): MatchedJob {
   const storedSponsorship = job?.sponsorship_likelihood ?? null
+  const realScore = job?.company_domain ? realScoresByDomain.get(job.company_domain) ?? null : null
   const jobData = job
     ? {
         title: job.job_title ?? null,
@@ -130,6 +178,9 @@ function toMatchedJob(
     postedDate: job?.posted_date ?? null,
     isRemote: job?.is_remote ?? null,
     sponsorshipLikelihood: effectiveSponsorship ?? storedSponsorship,
+    sponsorshipRealScore: realScore?.score ?? null,
+    sponsorshipRealConfidence: realScore?.confidence ?? null,
+    sponsorshipRealRationale: realScore?.rationale ?? null,
   }
 }
 
@@ -201,6 +252,15 @@ export const jobsAPI = {
     const jobs = (jobsRaw ?? []) as JobHopperLive[]
     const savedRows = (savedRowsRaw ?? []) as SavedJob[]
 
+    const domains = Array.from(
+      new Set(
+        jobs
+          .map((j) => j.company_domain)
+          .filter((d): d is string => typeof d === 'string' && d.length > 0),
+      ),
+    )
+    const realScoresByDomain = await fetchRealScoresByDomain(domains)
+
     const hiringByMatchId = new Map<
       string,
       {
@@ -263,7 +323,7 @@ export const jobsAPI = {
 
     const result: MatchedJob[] = matches.map((match) => {
       const job = match.job_id ? jobById.get(match.job_id) ?? null : null
-      const base = toMatchedJob(match, job, savedMatchIds.has(match.id))
+      const base = toMatchedJob(match, job, savedMatchIds.has(match.id), realScoresByDomain)
       const tierName =
         base.subscriptionTier != null
           ? tierNameByKey.get(base.subscriptionTier) ?? null
@@ -378,7 +438,9 @@ export const jobsAPI = {
         (product as { display_name?: string } | null)?.display_name ?? null
     }
 
-    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow)
+    const jobDomain = (job as JobHopperLive).company_domain
+    const realScoresByDomain = jobDomain ? await fetchRealScoresByDomain([jobDomain]) : new Map()
+    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow, realScoresByDomain)
 
     const hiringStatus = hiringRow?.status as JobHiringContactsStatus | undefined
     const contacts =

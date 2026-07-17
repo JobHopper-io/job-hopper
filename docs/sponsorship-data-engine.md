@@ -2,12 +2,15 @@
 
 Working document for the Premium "Real Sponsorship Score" and Sponsor Watch features.
 Covers: data sources, current-state audit, the scoring approach, a proposed data model,
-and the revised day-by-day plan. Last updated 2026-07-17.
+and the revised day-by-day plan. Last updated 2026-07-18.
 
 **Status: D31–35 (ingest) DONE. D36 (seed) DONE — 400 employers → 374 post-merge. D37 (reduced)
 DONE — 16 brands merged, 6 umbrella FEINs flagged `excluded_from_scoring`. D41–45 (scoring) DONE
-— 368 employers scored Low/Medium/High, live in `employer_sponsorship_scores`. Next: §3 decision
-11 (badge replace-vs-alongside) blocks D46–50 (UI). See §5a.**
+— 368 employers scored Low/Medium/High, live in `employer_sponsorship_scores`. §3 decision 11
+(Real Score replaces the badge's value; tier-gated tooltip reveals detail) DECIDED 2026-07-17.
+D46–50 (UI wiring) DONE 2026-07-18, browser-verified against an isolated local stack — see §5a.
+Real-world coverage still depends on the `employers.domain` backfill, **not yet run** (needs a
+real `BRAVE_SEARCH_API_KEY`; blocked on that, not on code).
 
 **🔻 SCOPE: Phase 5 v1 is LCA-ONLY (decided 2026-07-17, §3 decision 7).** D38–40 — the LCA↔USCIS
 join and its verification — are **cut from v1 and deferred to a v2 enrichment**. v1 ships a
@@ -60,6 +63,7 @@ them threw an error.** They returned plausible numbers and exit code 0:
 | One name → many FEINs (Regeneron) / one brand → many names (Goldman) | A 400-row scope list | Noticing it held only **399 distinct names** |
 | Alias uniqueness constraint | Inserts "worked" for two wrong index designs | Counting rows the constraint *permits* (400, then 517) vs. rows actually needed (642) |
 | `max()` similarity mislabelling umbrellas | Sensible-looking a/b/c label distribution | Checking SUNY/NYC/UMass specifically → all three mislabelled as "typos". With 22 names there are 231 pairs, so *some* pair is always ≥0.75 similar and `max()` always fires |
+| RLS policy with no underlying `GRANT` (D46–50) | `npm run build` green, page rendered fine, badge showed a value — looked like the ordinary "no match, fell back to heuristic" path | Only caught by an actual authenticated browser request: PostgREST 403'd the query outright. `create policy ... using (true)` was live and correct, but Postgres requires the base `GRANT SELECT` before a policy is even evaluated — RLS filters rows an *already-permitted* operation returns, it doesn't itself grant the permission. `employers`/`employer_sponsorship_scores` were readable by literally nobody (service role only) from `20260717180000` until this was caught and fixed in `20260718120000`, in production. Neither `npm run build` nor `npm run type-check` can catch this class of bug — nothing about it is a type error. |
 
 **The pattern is identical every time: the failure is silent and the output is plausible.** A
 number that looks about right is the characteristic *symptom*, not evidence of correctness. Green
@@ -181,7 +185,7 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
 | **DOL/USCIS ingestion** (D31–35) | ✅ **Built + loaded 2026-07-16** | Schema: migrations `20260716200000` + `20260716210000` (both pushed). Code: `job-processor-service/job_processor/{lca_normalizer,sponsorship_scope,sponsorship_ingest}.py`, CLI `job-processor sponsorship {scope-list,ingest-lca,ingest-uscis}`. Data loaded to the live project: `lca_filings` (FY2026 Q1+Q2, scoped to top 400) + `uscis_h1b_hub` (FY2026, **full file**, 36,624 rows). `employer_id` null throughout — resolution is D36–40. Scope artifact: `job-processor-service/data/scope_top_sponsors.csv` (committed); raw source files are gitignored (`data/raw/`, 138MB). |
 | **Entity resolution** (D36–40) | ✅ **D36–37 done 2026-07-17 (LCA-only, reduced scope)** | `employers` (374, brand-level) + `employer_name_aliases` (642) live. `job_processor/sponsorship_resolution.py`, CLI `job-processor sponsorship {seed-employers,apply-d37-decisions}`. Systematic merge/split + `uscis_h1b_hub` join still D38–40, deferred to v2. |
 | **Scoring/confidence** (D41–45) | ✅ **DONE 2026-07-17, LCA-only** (§3 decision 7) | `employer_sponsorship_scores` populated for 368/374 employers (Low/Medium/High score **and** confidence, same scale as the heuristic — no numeric score). `job_processor/sponsorship_scoring.py`, CLI `job-processor sponsorship compute-scores`. Old heuristic (`_shared/infer-sponsorship-likelihood.ts`) untouched — still the fallback for the 6 `excluded_from_scoring` employers and for any company outside this 374-employer scope. |
-| **Sponsorship UI** (D46–50) | 🟡 Badge + teaser done | `JobSponsorshipBadge.vue` (Low/Med/High + `locked` free-tier teaser). `profiles.requires_us_sponsorship` already feeds matching/filters. No numeric score, rationale tooltip, or Sponsor-Watch surface. |
+| **Sponsorship UI** (D46–50) | ✅ **Wiring DONE 2026-07-18**, 0% live coverage until domain backfill runs | `JobSponsorshipBadge.vue` Premium-only data-source swap + rationale tooltip, domain-based job↔employer matching (`job_hopper_live.company_domain` ↔ `employers.domain`), browser-verified. See §5a D46–50. Still needed: run the domain backfill against prod, Sponsor-Watch surface. |
 | **Sponsor Watch** (D51–55) | ❌ None (infra exists) | No worker/route/page. But `scheduled_jobs` + pg_cron + `run-scheduled-jobs` and provider-agnostic `sendEmail` (`_shared/email.ts`) are ready to host it. |
 | **Validation + launch** (D56–60) | ❌ N/A | — |
 | **LCA↔USCIS join** (D38–40) | ⛔ **CUT from v1 → v2** | `uscis_h1b_hub` stays ingested (36,624 rows, `employer_id` null), untouched and ready. Design kept in §5. **Scope cut, not rollback** (§3 decision 7). |
@@ -387,9 +391,78 @@ scheduled-jobs/email plumbing.
    FEIN, 102,821 filings across the top 400.
 10. **Sponsor Watch = quarterly diff alerts** on existing cron + `sendEmail`, not net-new
    real-time workers. Set expectations in copy.
-11. **OPEN:** Is the Real Score a **replacement** of the heuristic badge, or a **separate
-   Premium-only score shown alongside** it? Drives whether D46–50 is "swap the badge's data
-   source" or "add a second badge." **← needs a product decision before D46.**
+11. **✅ DECIDED 2026-07-17 — Real Score replaces the badge's underlying value; it is not a second
+   badge.** Unblocks D46–50.
+
+   **The tension.** Decision 5 already committed to one badge per posting, not one per legal
+   entity. Decision 8 said the Real Score should blend with the heuristic where filing data is
+   thin. Left open was the UI shape of that blend: does Premium get a visually distinct *second*
+   badge next to the existing one, or does the existing badge itself become tier-aware?
+
+   **The decision:**
+   - **Free/Core** see exactly today's badge — Low/Medium/High, sourced from
+     `inferSponsorshipLikelihood` — pixel-for-pixel unchanged.
+   - **Premium**, for the 368 scored employers, sees the **same badge component and the same
+     Low/Medium/High value** — just sourced from `employer_sponsorship_scores.score` instead of
+     the heuristic — and tapping/hovering reveals the real backing data: confidence + a plain-text
+     rationale, e.g. *"High confidence, 127 filings, 586 positions, FY2026"* vs. *"Low confidence,
+     thin filing history."*
+   - **`excluded_from_scoring = true` employers** (the 6 umbrella FEINs) always show the existing
+     heuristic badge, **silently** — no visual marker, no "estimated" label, nothing that signals
+     this posting is on the fallback path.
+
+   **Why replace, not add:**
+   - **Consistent with decision 5's single-badge UX.** A second Premium-only badge next to the
+     existing one reintroduces the exact "three Goldman badges" problem decision 5 eliminated —
+     just at the free/premium seam instead of the entity seam — and invites the same "which one do
+     I trust" confusion.
+   - **Matches the tier-depth precedent already shipped** (decision 1, Premium Insights: same UI,
+     `baseTier`-gated depth — free 1 contact / core 2 / premium 3, not a separate premium-only
+     panel). The Real Score follows the same shape: same surface, deeper detail behind the gate.
+   - **The rationale/confidence tooltip *is* the Premium value**, not the badge itself. That's what
+     makes "upgrade to see the real backing data" a legible pitch instead of a second signal
+     competing with the first.
+   - **Silence on the fallback path is deliberate, not an oversight.** The 6 excluded employers are
+     excluded for an *identity* reason (one FEIN, many distinct orgs — decision 6), not a
+     *data-quality* reason a user could act on ("try again later," "we don't have enough data
+     yet"). There is no actionable difference from the user's side, so no UI difference is
+     warranted — this mirrors decision 7's framing: the badge shown for these six is not degraded,
+     it's the same heuristic that already works and needs no caveat.
+
+   **What D46–50 now means, concretely:**
+   1. **The data-source switch is Premium-only**, not tied to `!isFree`/Core-and-up like the rest of
+      the badge's visibility gating. Free and Core keep the exact `inferSponsorshipLikelihood`
+      value they see today — *unchanged*, not just "no tooltip." Only for `baseTier === 'premium'`
+      does `JobSponsorshipBadge.vue` swap to `employer_sponsorship_scores.score` (when a row exists
+      and `excluded_from_scoring` is false, else it falls back to the heuristic same as Free/Core).
+      Same Low/Medium/High enum either way, so the swap is invisible at the value level — but the
+      *gate* on whether the swap happens at all is `baseTier`, not data availability.
+   2. A tooltip/popover, Premium only, surfacing `rationale` + `confidence` whenever the badge is
+      real-score-backed. Free/Core get no tooltip (same as today - the badge is presentational
+      only for them).
+   3. No new visual state for `excluded_from_scoring` postings — that code path is identical to a
+      company with no LCA data at all.
+   3a. **⚠️ Discovered during implementation, not anticipated by this doc: there is no existing
+      link from a job posting to `employers`.** `job_hopper_live.company_name` is freeform scraped
+      text; naive normalized-name matching against it is measurably lossy the same way §3 decision
+      4 found across DOL/USCIS — tested against the live 16,415-row table and it missed real top-374
+      sponsors (`'McKinsey & Company'` didn't match `employers.canonical_name` = `"McKinsey &
+      Company, Inc. United States"`; `'JPMorgan Chase Bank, N.A.'` didn't match `"JPMorgan Chase &
+      Co."`). **Fix: domain-based matching, not name matching.**
+      `job_processor/pipeline.py::process_one_job` already resolves a company domain for every
+      ingested job via `resolve_company_domain` (Brave + LLM, no Apollo credits) but silently
+      discarded it before the `job_hopper_live` insert (`_normalize_fields` computed
+      `company_domain`, `insert_row` never included it). Fixed to persist it. `employers.domain`
+      (null since D36 seeding) is backfilled for the 374 scored employers the same way. Matching is
+      then exact `job_hopper_live.company_domain = employers.domain` — sidesteps the whole
+      freeform-name trap entirely. **Deliberately NOT backfilling domains for the existing
+      16,415/8,366-distinct-name job postings** — real Brave+LLM cost across thousands of lookups
+      for postings that may already be stale. Coverage grows organically as the scraper pipeline
+      re-ingests with the fix in place; until then, unmatched postings fall back to the heuristic
+      exactly as `excluded_from_scoring` ones do (3a is a data-coverage gap, not a defect - no UI
+      difference, no user-facing signal that a match wasn't found).
+   4. `requires_us_sponsorship` filtering is unaffected — still boolean, independent of the
+      score/badge value.
 
 ---
 
@@ -620,9 +693,16 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
   - Keeps: `inferSponsorshipLikelihood` as the fallback everywhere there's no real score; plain-text
     `rationale`. **`employer_sponsorship_scores.data_coverage`** should record that v1 = LCA-only,
     so v2 can tell v1 rows apart without guessing.
-- **D46–50 — Sponsorship UI.** **[CHANGED]** *Reduce.* Extend `JobSponsorshipBadge.vue` +
-  `sponsorship_likelihood` surface rather than rebuild: numeric score, rationale tooltip, filters
-  (`requires_us_sponsorship` already exists). **Blocked on §3 decision 11** (replace vs. add badge).
+- **D46–50 — Sponsorship UI. [CHANGED] ✅ DONE 2026-07-18.** *Reduce.* Extended
+  `JobSponsorshipBadge.vue` + `sponsorship_likelihood` surface rather than rebuilding:
+  **Premium-only** swap of the badge's data source (real score when available and not excluded,
+  else the existing heuristic — Free/Core stay on the heuristic unconditionally, unchanged from
+  today), a Premium-only rationale tooltip (confidence is stated in the rationale text, no
+  separate prop), filters (`requires_us_sponsorship` already exists, untouched). No numeric score,
+  no second badge, no visual marker on the `excluded_from_scoring` fallback path — see decision 11
+  for why. Grew to include domain-based job↔employer matching (not scoped originally — see §5a
+  D46–50 for the full discovery + build writeup). Browser-verified; production coverage is 0%
+  until the `employers.domain` backfill runs (blocked on a real Brave key, not on code).
 - **D51–55 — Sponsor Watch.** **[CHANGED]** *Reframe.* Quarterly diff-alert worker on
   `scheduled_jobs` + pg_cron; alerts via `sendEmail`. Not real-time.
 - **D56–60 — Validation + launch, Score v1.** *Stick.* Validate on the 300–500 set; spot-check
@@ -630,7 +710,7 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
 
 ---
 
-## 5a. Status — D31–35, D36, D37, D41–45 all DONE; next is §3 decision 11 (blocks D46–50)
+## 5a. Status — D31–35, D36, D37, D41–45 all DONE; §3 decision 11 DECIDED 2026-07-17; D46–50 next
 
 Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorship Score)** and
 **2 (Sponsor Watch)**. ~~Nothing in the engine exists yet — Days 31–35 (ingest) is the blocker~~ —
@@ -648,8 +728,9 @@ Phase 5 is approved and building, targeting Premium features **1 (Real Sponsorsh
    (scoped, FEIN-matched; independently verified — equals `sum(filing_count)` in the scope CSV
    exactly). `uscis_h1b_hub` = 36,624 rows (**full file, unscoped** — §3 decision 3).
    `employer_id` is null on every row, by design.
-5. **← STILL OPEN. Resolve §6 decision 1 (= §3 decision 11) before any UI work** (D46–50 is
-   blocked on it). D36, D37, and D41–45 are otherwise all done — see below.
+5. ~~STILL OPEN. Resolve §6 decision 1 (= §3 decision 11) before any UI work~~ **✅ RESOLVED
+   2026-07-17** — see §3 decision 11. D46–50 is unblocked. All five original next-actions are
+   now done.
 
 ### D36 — seed employers + aliases (DONE 2026-07-17)
 
@@ -688,10 +769,77 @@ real distribution rather than guessed — see §5 D41–45 for the full writeup 
 `fiscal_year` couldn't carry the recency signal and `received_date` did instead, spot-check
 results). Run via `job-processor sponsorship compute-scores`.
 
-**Next: §3 decision 11** (does the Real Score replace the heuristic badge or show alongside it?)
-— blocks D46–50 (UI). Systematic merge/split detection, the durable override store, the
-domain/Apollo grouping pass, and the LCA↔USCIS join all still defer to v2 with D38–40. Their
-design (§3 decision 6, §5 D38–39) is kept verbatim — start there, don't re-derive.
+**§3 decision 11 is DECIDED (2026-07-17): Real Score replaces the badge's value, tier-gated
+tooltip reveals detail.**
+
+### D46–50 — badge wiring (DONE 2026-07-18)
+
+**Scope grew mid-implementation** — the original D46–50 estimate ("swap the badge's data source")
+assumed a job posting could already be linked to `employers`. It couldn't (§3 decision 11's "what
+D46–50 means, concretely" item 3a has the full discovery writeup). What actually shipped:
+
+1. **Domain-based job↔employer matching**, not name matching. `job_hopper_live.company_domain`
+   (new column, `20260717170000`) + `employers.domain` join on exact equality.
+   `job_processor/pipeline.py::process_one_job` already resolved a domain per job via
+   `resolve_company_domain` (Brave + LLM) but discarded it before the insert — one-line fix.
+   `job_processor/sponsorship_domain_backfill.py` (CLI: `job-processor sponsorship
+   backfill-employer-domains`) resolves `employers.domain` for the 368 scored employers the same
+   way, so both sides of the join go through identical resolution logic.
+2. **RLS.** `employers` and `employer_sponsorship_scores` had RLS enabled with zero policies since
+   `20260716200000` — completely unreadable by the frontend (service role bypasses RLS, which is
+   why D36/D37/D41–45's writes never surfaced this). Added `for select to authenticated using
+   (true)` policies (`20260717180000`), same precedent as `sponsorship_likelihood` — tier-gating
+   is a UI concern, not an RLS concern, and neither table holds sensitive data.
+3. **`src/lib/jobs.ts`**: batches distinct `company_domain` values per page of matches, one query
+   (`employers` embedding `employer_sponsorship_scores` via the FK) resolves all of them, mapped
+   onto `MatchedJob.sponsorshipRealScore/RealConfidence/RealRationale` — `null` for everyone
+   including Premium when there's no match, `excluded_from_scoring`, or no score row yet.
+4. **Premium-only gating lives in the Vue layer, not `jobs.ts`.** `jobsAPI` returns the real-score
+   fields for every tier alike (matches the existing pattern: `sponsorshipLikelihood` isn't tier-
+   filtered by the API either). `JobCard.vue`/`JobDetail.vue` each get an `isPremium` computed
+   (`baseTier === 'premium'`) that decides whether to *use* `sponsorshipRealScore` over
+   `sponsorshipLikelihood`, and whether to pass `rationale` into the badge at all.
+5. **`JobSponsorshipBadge.vue`** gained one prop, `rationale?: string | null` — its presence (not
+   a separate boolean) is what shows an `InfoHint` (reused, not rebuilt) inside the badge. No
+   `confidence` prop: the stored `rationale` string already states confidence in plain language
+   ("...(High confidence)"), so a second prop would just be a second way to say the same thing.
+
+**⚠️ Bug caught only by an actual authenticated browser request, not by `npm run build`:**
+`20260717180000`'s RLS policies were live and correct, but nobody could read either table anyway —
+Postgres requires the base `GRANT SELECT` *before* a policy is even evaluated, and that migration
+never granted it. Compare `dashboard_banner` (`20260422140000`), which does both together and was
+the tell. The symptom looked exactly like the designed fallback path (badge rendered, showed the
+heuristic value) — nothing about it looked like an error unless you were watching network
+requests. Fixed in `20260718120000`, pushed to remote. See the spot-check table above — this is
+the same "silent failure, plausible symptom, only caught by testing known cases" pattern as every
+entity-resolution bug this session, just in a different layer (infra permissions, not matching
+logic).
+
+**Browser-verified end-to-end** against an isolated local Supabase stack (Docker), not the
+production project — a temporary Premium test user + Core test user + one seeded employer/score/
+job posting, both `JobCard.vue` (dashboard) and `JobDetail.vue`. Confirmed: Premium sees the real
+score value with a working tooltip showing the exact stored `rationale`; Core sees the heuristic
+value with no tooltip at all (not a degraded tooltip — literally absent, matching decision 11);
+zero console/network errors in either case. Local stack torn down after — no test data touches
+production, which currently has 0 rows in `employer_sponsorship_scores` matched to any live
+posting (the domain backfill hasn't run yet, see below).
+
+**Still open:**
+- **`employers.domain` backfill has not been run against production.** The CLI command exists and
+  was dry-run verified (`attempted: 368, resolved: 0` — correctly resolves nothing without a real
+  key), but this session's `BRAVE_SEARCH_API_KEY` is an unfilled placeholder. Until it runs, no
+  production job posting can match a scored employer by domain, and everyone — Premium included —
+  sees the heuristic badge. This is the designed fallback path working correctly, not a bug; it
+  just means the feature has shipped with 0% real coverage until the backfill runs.
+- Existing job postings (16,415 rows / 8,366 distinct company names) were deliberately **not**
+  backfilled with `company_domain` — real Brave+LLM cost across thousands of lookups for postings
+  that may already be stale. Coverage grows organically as the scraper pipeline re-ingests with
+  the `pipeline.py` fix in place.
+- D51–55 (Sponsor Watch) not started.
+
+Systematic merge/split detection, the durable override store, the domain/Apollo grouping pass, and
+the LCA↔USCIS join all still defer to v2 with D38–40. Their design (§3 decision 6, §5 D38–39) is
+kept verbatim — start there, don't re-derive.
 
 **Reproducing the ingest** (raw files are gitignored; `dol.gov` blocks automated download —
 Akamai 403 — so the LCA `.xlsx` must be fetched by hand from the Disclosure Data tab):
@@ -712,8 +860,11 @@ function or a plain table read through `src/lib/`.
 
 ## 6. Open decisions to resolve before building
 
-1. **Score presentation (§3 decision 11):** replace the heuristic badge, or show a separate Premium
-   Real Score alongside it?
+1. ~~**Score presentation (§3 decision 11):** replace the heuristic badge, or show a separate
+   Premium Real Score alongside it?~~ **✅ RESOLVED 2026-07-17 — replaces the badge's value; no
+   second badge.** Free/Core see today's badge unchanged; Premium sees the same badge sourced from
+   the real score with a tooltip revealing rationale/confidence; `excluded_from_scoring` employers
+   fall back to the heuristic silently. See §3 decision 11.
 2. ~~**Score shape:** 0–100 numeric vs. A–F grade vs. High/Med/Low + confidence.~~ **✅ RESOLVED
    2026-07-17 — Low/Medium/High + confidence**, same scale as the existing heuristic badge. See
    §5 D41–45.

@@ -60,6 +60,14 @@ export type PayType = Enums<'pay_type'>
 export type RoleCategory = Enums<'role_category'>
 export type SponsorshipLikelihood = Enums<'sponsorship_likelihood'>
 
+// Real Sponsorship Score (Premium, §3 decision 11): employers is the brand-level identity table,
+// employer_sponsorship_scores holds the LCA-only v1 score. `score`/`confidence` are DB `text` +
+// check constraint (Low/Medium/High), not a Postgres enum, so RealSponsorshipTier narrows them
+// for app code the same way the check constraint narrows them in the DB.
+export type Employer = Tables<'employers'>
+export type EmployerSponsorshipScore = Tables<'employer_sponsorship_scores'>
+export type RealSponsorshipTier = 'Low' | 'Medium' | 'High'
+
 /** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
 export interface JobContact {
   name: string
@@ -104,6 +112,13 @@ export interface MatchedJob {
   postedDate: string | null
   isRemote: boolean | null
   sponsorshipLikelihood: SponsorshipLikelihood | null
+  /** Real Sponsorship Score fields (§3 decision 11) - populated only when the job's resolved
+   * employer has a live employer_sponsorship_scores row (domain-matched, not excluded_from_scoring).
+   * Null for everyone else, including free/core users regardless of match - the Premium-only gate
+   * on whether to USE these instead of sponsorshipLikelihood lives in the UI layer, not here. */
+  sponsorshipRealScore: RealSponsorshipTier | null
+  sponsorshipRealConfidence: RealSponsorshipTier | null
+  sponsorshipRealRationale: string | null
   contacts?: JobContact[]
   /** Premium Insights pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null

@@ -184,6 +184,130 @@ export type Database = {
           },
         ]
       }
+      employer_name_aliases: {
+        Row: {
+          created_at: string
+          employer_fein: string | null
+          employer_id: string
+          id: string
+          normalized_name: string
+          raw_name: string
+          source: string
+          source_fiscal_year: number | null
+          tax_id_last4: string | null
+        }
+        Insert: {
+          created_at?: string
+          employer_fein?: string | null
+          employer_id: string
+          id?: string
+          normalized_name: string
+          raw_name: string
+          source: string
+          source_fiscal_year?: number | null
+          tax_id_last4?: string | null
+        }
+        Update: {
+          created_at?: string
+          employer_fein?: string | null
+          employer_id?: string
+          id?: string
+          normalized_name?: string
+          raw_name?: string
+          source?: string
+          source_fiscal_year?: number | null
+          tax_id_last4?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_name_aliases_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employer_sponsorship_scores: {
+        Row: {
+          algorithm_version: string | null
+          computed_at: string | null
+          confidence: string | null
+          data_coverage: Json
+          employer_id: string
+          fiscal_years_used: number[]
+          rationale: string | null
+          score: string | null
+        }
+        Insert: {
+          algorithm_version?: string | null
+          computed_at?: string | null
+          confidence?: string | null
+          data_coverage?: Json
+          employer_id: string
+          fiscal_years_used?: number[]
+          rationale?: string | null
+          score?: string | null
+        }
+        Update: {
+          algorithm_version?: string | null
+          computed_at?: string | null
+          confidence?: string | null
+          data_coverage?: Json
+          employer_id?: string
+          fiscal_years_used?: number[]
+          rationale?: string | null
+          score?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_sponsorship_scores_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: true
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employers: {
+        Row: {
+          canonical_name: string
+          created_at: string
+          domain: string | null
+          excluded_from_scoring: boolean
+          hq_city: string | null
+          hq_state: string | null
+          id: string
+          normalized_name: string
+          primary_naics: string | null
+          updated_at: string
+        }
+        Insert: {
+          canonical_name: string
+          created_at?: string
+          domain?: string | null
+          excluded_from_scoring?: boolean
+          hq_city?: string | null
+          hq_state?: string | null
+          id?: string
+          normalized_name: string
+          primary_naics?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canonical_name?: string
+          created_at?: string
+          domain?: string | null
+          excluded_from_scoring?: boolean
+          hq_city?: string | null
+          hq_state?: string | null
+          id?: string
+          normalized_name?: string
+          primary_naics?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       enriched_lead: {
         Row: {
           address: string | null
@@ -532,6 +656,7 @@ export type Database = {
         Row: {
           ai_job_briefing: string
           apply_link: string | null
+          company_domain: string | null
           company_name: string
           created_at: string | null
           description: string | null
@@ -553,6 +678,7 @@ export type Database = {
         Insert: {
           ai_job_briefing: string
           apply_link?: string | null
+          company_domain?: string | null
           company_name: string
           created_at?: string | null
           description?: string | null
@@ -574,6 +700,7 @@ export type Database = {
         Update: {
           ai_job_briefing?: string
           apply_link?: string | null
+          company_domain?: string | null
           company_name?: string
           created_at?: string | null
           description?: string | null
@@ -694,6 +821,92 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      lca_filings: {
+        Row: {
+          case_number: string
+          case_status: string | null
+          created_at: string
+          decision_date: string | null
+          employer_fein: string | null
+          employer_id: string | null
+          employer_name_raw: string
+          fiscal_year: number
+          id: string
+          job_title: string | null
+          prevailing_wage: number | null
+          received_date: string | null
+          soc_code: string | null
+          soc_title: string | null
+          source_file: string
+          total_worker_positions: number | null
+          visa_class: string | null
+          wage_from: number | null
+          wage_to: number | null
+          wage_unit: string | null
+          worksite_city: string | null
+          worksite_postal_code: string | null
+          worksite_state: string | null
+        }
+        Insert: {
+          case_number: string
+          case_status?: string | null
+          created_at?: string
+          decision_date?: string | null
+          employer_fein?: string | null
+          employer_id?: string | null
+          employer_name_raw: string
+          fiscal_year: number
+          id?: string
+          job_title?: string | null
+          prevailing_wage?: number | null
+          received_date?: string | null
+          soc_code?: string | null
+          soc_title?: string | null
+          source_file: string
+          total_worker_positions?: number | null
+          visa_class?: string | null
+          wage_from?: number | null
+          wage_to?: number | null
+          wage_unit?: string | null
+          worksite_city?: string | null
+          worksite_postal_code?: string | null
+          worksite_state?: string | null
+        }
+        Update: {
+          case_number?: string
+          case_status?: string | null
+          created_at?: string
+          decision_date?: string | null
+          employer_fein?: string | null
+          employer_id?: string | null
+          employer_name_raw?: string
+          fiscal_year?: number
+          id?: string
+          job_title?: string | null
+          prevailing_wage?: number | null
+          received_date?: string | null
+          soc_code?: string | null
+          soc_title?: string | null
+          source_file?: string
+          total_worker_positions?: number | null
+          visa_class?: string | null
+          wage_from?: number | null
+          wage_to?: number | null
+          wage_unit?: string | null
+          worksite_city?: string | null
+          worksite_postal_code?: string | null
+          worksite_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lca_filings_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       match_synonyms: {
         Row: {
@@ -1362,6 +1575,80 @@ export type Database = {
         }
         Relationships: []
       }
+      sponsor_watch_events: {
+        Row: {
+          delta: Json
+          detected_at: string
+          employer_id: string
+          event_type: string
+          fiscal_period: string
+          id: string
+          notified: boolean
+        }
+        Insert: {
+          delta?: Json
+          detected_at?: string
+          employer_id: string
+          event_type: string
+          fiscal_period: string
+          id?: string
+          notified?: boolean
+        }
+        Update: {
+          delta?: Json
+          detected_at?: string
+          employer_id?: string
+          event_type?: string
+          fiscal_period?: string
+          id?: string
+          notified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_watch_events_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_watch_subscriptions: {
+        Row: {
+          created_at: string
+          employer_id: string
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          employer_id: string
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          employer_id?: string
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_watch_subscriptions_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_watch_subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sponsorship_heuristic_scores: {
         Row: {
           company_name: string
@@ -1586,6 +1873,89 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uscis_h1b_hub: {
+        Row: {
+          amended_approvals: number | null
+          amended_denials: number | null
+          change_employer_approvals: number | null
+          change_employer_denials: number | null
+          change_same_employer_approvals: number | null
+          change_same_employer_denials: number | null
+          city: string | null
+          continuation_approvals: number | null
+          continuation_denials: number | null
+          created_at: string
+          employer_id: string | null
+          employer_name_raw: string
+          fiscal_year: number
+          id: string
+          naics_code: string | null
+          new_concurrent_approvals: number | null
+          new_concurrent_denials: number | null
+          new_employment_approvals: number | null
+          new_employment_denials: number | null
+          state: string | null
+          tax_id_last4: string | null
+          zip: string | null
+        }
+        Insert: {
+          amended_approvals?: number | null
+          amended_denials?: number | null
+          change_employer_approvals?: number | null
+          change_employer_denials?: number | null
+          change_same_employer_approvals?: number | null
+          change_same_employer_denials?: number | null
+          city?: string | null
+          continuation_approvals?: number | null
+          continuation_denials?: number | null
+          created_at?: string
+          employer_id?: string | null
+          employer_name_raw: string
+          fiscal_year: number
+          id?: string
+          naics_code?: string | null
+          new_concurrent_approvals?: number | null
+          new_concurrent_denials?: number | null
+          new_employment_approvals?: number | null
+          new_employment_denials?: number | null
+          state?: string | null
+          tax_id_last4?: string | null
+          zip?: string | null
+        }
+        Update: {
+          amended_approvals?: number | null
+          amended_denials?: number | null
+          change_employer_approvals?: number | null
+          change_employer_denials?: number | null
+          change_same_employer_approvals?: number | null
+          change_same_employer_denials?: number | null
+          city?: string | null
+          continuation_approvals?: number | null
+          continuation_denials?: number | null
+          created_at?: string
+          employer_id?: string | null
+          employer_name_raw?: string
+          fiscal_year?: number
+          id?: string
+          naics_code?: string | null
+          new_concurrent_approvals?: number | null
+          new_concurrent_denials?: number | null
+          new_employment_approvals?: number | null
+          new_employment_denials?: number | null
+          state?: string | null
+          tax_id_last4?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uscis_h1b_hub_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
             referencedColumns: ["id"]
           },
         ]

@@ -402,6 +402,18 @@ const showSponsorshipTeaser = computed(
   () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
 )
 
+/** §3 decision 11: the Real Score replaces the badge's value for Premium only - Free/Core keep
+ * the heuristic (inferSponsorshipLikelihood), unchanged, same as before this feature existed. */
+const isPremium = computed(() => baseTier.value === 'premium')
+const sponsorshipBadgeValue = computed(() =>
+  isPremium.value && props.job.sponsorshipRealScore
+    ? props.job.sponsorshipRealScore
+    : props.job.sponsorshipLikelihood,
+)
+const sponsorshipBadgeRationale = computed(() =>
+  isPremium.value && props.job.sponsorshipRealScore ? props.job.sponsorshipRealRationale : null,
+)
+
 /* Compact action-row buttons: one shared size so the footer reads as a single
  * balanced toolbar (the global btn-primary/btn-secondary are heavier and sized
  * for standalone CTAs). */
@@ -492,7 +504,8 @@ async function runAdviceCheckout() {
             </span>
             <JobSponsorshipBadge
               v-if="showSponsorshipBadge"
-              :value="job.sponsorshipLikelihood"
+              :value="sponsorshipBadgeValue"
+              :rationale="sponsorshipBadgeRationale"
             />
             <JobSponsorshipBadge
               v-else-if="showSponsorshipTeaser"
