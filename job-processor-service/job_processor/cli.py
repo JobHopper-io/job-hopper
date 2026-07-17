@@ -181,6 +181,47 @@ def sponsorship_seed_employers(
                 typer.echo(f"        - {n}")
 
 
+@sponsorship_app.command("apply-d37-decisions")
+def sponsorship_apply_d37_decisions(
+    merge_csv: Path = typer.Option(
+        Path("data/review_merge_candidates.csv"), "--merge-csv", exists=True, dir_okay=False
+    ),
+    umbrella_csv: Path = typer.Option(
+        Path("data/review_umbrella_feins.csv"), "--umbrella-csv", exists=True, dir_okay=False
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D37 (reduced scope, §3 decision 7): applies the human-reviewed decisions in the two CSVs.
+    Merges confirmed multi-FEIN brands (Goldman, Amazon, ...) into one employers row each, and
+    flags genuine umbrella FEINs (SUNY, NYC, ...) with excluded_from_scoring=true. Reads decisions
+    from the CSVs - does not detect anything itself. Merges run before exclusions, since a FEIN's
+    employer_id can change during a merge and the exclusion must land on the current row.
+    """
+
+    async def run() -> tuple[sponsorship_resolution.MergeApplyCounts, list[sponsorship_resolution.MergeGroupResult], sponsorship_resolution.ExclusionApplyCounts]:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            merge_counts, merge_results = await sponsorship_resolution.apply_merge_decisions(db, merge_csv, dry_run=dry_run)
+            excl_counts = await sponsorship_resolution.apply_scoring_exclusions(db, umbrella_csv, dry_run=dry_run)
+            return merge_counts, merge_results, excl_counts
+
+    merge_counts, merge_results, excl_counts = asyncio.run(run())
+
+    typer.echo("=== merge ===")
+    typer.echo(json.dumps(merge_counts, indent=2))
+    typer.echo("\nper-brand:")
+    for r in merge_results:
+        status = "already merged" if r["already_merged"] else f"merging {len(r['other_employer_ids'])} into primary"
+        typer.echo(
+            f"  {r['brand']:<16} {len(r['feins'])} FEINs, primary={r['primary_fein']}"
+            f"  [{status}]  aliases={r['aliases_repointed']:>4}  filings={r['filings_repointed']:>6}"
+        )
+
+    typer.echo("\n=== scoring exclusions ===")
+    typer.echo(json.dumps(excl_counts, indent=2))
+
+
 def main() -> None:
     app()
 
