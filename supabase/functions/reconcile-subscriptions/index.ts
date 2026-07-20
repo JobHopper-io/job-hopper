@@ -32,9 +32,10 @@ function isAuthorized(req: Request): boolean {
 }
 
 // Mirror of mapStripeStatus in stripe-webhook/index.ts — keep in sync.
-function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' {
+function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'past_due' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
-  if (stripeStatus === 'active' || stripeStatus === 'past_due') return 'active'
+  if (stripeStatus === 'active') return 'active'
+  if (stripeStatus === 'past_due') return 'past_due'
   return 'canceled'
 }
 
@@ -68,7 +69,7 @@ serve(async (req) => {
   const { data: rows, error: selError } = await supabaseAdmin
     .from('subscriptions')
     .select('id, stripe_subscription_id, status, current_period_ends_at')
-    .in('status', ['trial', 'active'])
+    .in('status', ['trial', 'active', 'past_due'])
     .like('stripe_subscription_id', 'sub_%')
 
   if (selError) {

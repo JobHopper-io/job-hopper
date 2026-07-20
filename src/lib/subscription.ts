@@ -11,9 +11,14 @@ import type {
 } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 
-const STATUS_LABELS: Record<SubscriptionStatus, string> = {
+// Keyed by string (not Record<SubscriptionStatus>) so the `past_due` label is
+// present before the generated enum in src/types/supabase.ts is regenerated to
+// include it. getStatusLabel falls back to DEFAULT_STATUS_LABEL for anything
+// unknown, so this stays safe either way.
+const STATUS_LABELS: Record<string, string> = {
   trial: 'Free trial',
   active: 'Active',
+  past_due: 'Payment failed',
   canceled: 'Cancelled',
 }
 

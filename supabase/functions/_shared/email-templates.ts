@@ -176,6 +176,42 @@ export function renderSubscriptionUpdated(params: {
 }
 
 /**
+ * Payment failed email. Sent when a subscription enters `past_due` (e.g. a trial
+ * ends and the card is declined). The customer has NOT been granted paid access;
+ * this prompts them to update their payment method before Stripe stops retrying.
+ */
+export function renderSubscriptionPaymentFailed(params: {
+  recipientName: string
+  footer?: Partial<TemplateFooterOptions>
+}): { html: string; text: string } {
+  const { recipientName, footer } = params
+  const prefsUrl = footer?.preferencesUrl ?? DEFAULT_FOOTER_OPTIONS.preferencesUrl
+  const unsubUrl = footer?.unsubscribeUrl ?? DEFAULT_FOOTER_OPTIONS.unsubscribeUrl
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Your payment failed</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 1rem;">
+  <h1 style="font-size: 1.5rem;">Hi ${escapeHtml(recipientName)},</h1>
+  <p>We weren't able to process your payment for Job-Hopper, so your subscription hasn't been activated.</p>
+  <p>Please update your payment method in your billing settings to keep (or start) your subscription. We'll retry the charge automatically for a few days before the subscription is canceled.</p>
+  ${footerHtml({ preferencesUrl: prefsUrl, unsubscribeUrl: unsubUrl })}
+</body>
+</html>`
+
+  const text = [
+    `Hi ${recipientName},`,
+    "We weren't able to process your payment for Job-Hopper, so your subscription hasn't been activated.",
+    "Please update your payment method in your billing settings to keep (or start) your subscription. We'll retry the charge automatically for a few days before the subscription is canceled.",
+    "Manage preferences: " + prefsUrl,
+    "Unsubscribe: " + unsubUrl,
+  ].join("\n")
+
+  return { html, text }
+}
+
+/**
  * Subscription cancellation scheduled email.
  */
 export function renderSubscriptionCancelScheduled(params: {
