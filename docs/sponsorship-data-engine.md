@@ -119,7 +119,7 @@ that copy is still accurate regardless of individual feature status).
 | 2 | Sponsor Watch | 🟡 Built, not deployed to production (see D51–55 below) |
 | 3 | Apply Intelligence | ⛔ Not started |
 | 4 | Hiring Manager Contact | ✅ **Done and verified 2026-07-20** |
-| 5 | Ghost Listing Detector | ⛔ Not started |
+| 5 | Ghost Listing Detector | ❌ **Investigated 2026-07-20, not viable as scoped** — closed, not shelved (see below) |
 
 **Hiring Manager Contact was substantially pre-existing, not net-new** — built via
 `premium-insights` (`supabase/functions/premium-insights/index.ts`) + `job_hiring_contacts`,
@@ -134,8 +134,28 @@ Goleta Sanitary District (Peter Regis, Laura Romano, Robert Hidalgo), matching w
 undeployed code). Still open: overall `job_hiring_contacts` data quality/reliability at scale
 beyond this one spot-check.
 
-**Net: 3 of 5 Premium features done** (Real Sponsorship Score, Sponsor Watch, Hiring Manager
-Contact); Apply Intelligence and Ghost Listing Detector remain unstarted.
+**Ghost Listing Detector is closed, not shelved for later.** The schema cannot distinguish a
+genuine refill from a ghost repost — both produce an identical row signature (same
+`company_name`+`job_title`, new `apply_link`, roughly periodic recurrence in `job_hopper_live`,
+which is append-only with no status/expiry column). The one thing that actually differs between
+them — whether anyone was ever hired — isn't tracked anywhere in this pipeline (no ATS
+integration, no hire/outcome feedback). Confirmed empirically against the live table, not
+assumed: the top 30 real `company_name`+`job_title` recurrence pairs (up to 36 postings each)
+were **30/30 legitimate high-turnover retail/warehouse/hospitality roles** — Foot Locker, ALDI,
+Marriott, Costco, FedEx, Walmart, etc. — not ghost-job candidates. A naive recurrence-count
+signal would flag exactly the wrong postings first, and even role-category-based noise reduction
+only narrows false positives, it can't produce a real positive signal, since the underlying
+real-world behavior (a role gets re-advertised) looks the same either way. **Reopening this
+requires a real outcome signal that doesn't exist today** — ATS integration or equivalent hire
+feedback — not a smarter heuristic on existing data.
+
+**Net: 2 of 5 Premium features remain to build** (Apply Intelligence not started; Ghost Listing
+Detector closed as not viable with current data — see above). 3 of 5 done: Real Sponsorship
+Score, Sponsor Watch, Hiring Manager Contact.
+
+*(A related but separate finding surfaced during this investigation — matched jobs going stale
+in a user's own feed/saved list with no re-check — is a data-hygiene/UX gap affecting all users,
+not a Premium feature. Documented in `docs/architecture.md` instead of here.)*
 
 ---
 

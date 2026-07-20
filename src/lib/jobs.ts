@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
 import { getEffectiveSponsorshipLikelihood } from '@shared/infer-sponsorship-likelihood'
+import { jobExceedsMaxAge, defaultConfig, type JobRecord } from '@shared/job-matching-algorithm'
 import type {
   JobMatch,
   SavedJob,
@@ -165,6 +166,14 @@ function parseJobContactsFromJson(raw: unknown): JobContact[] | undefined {
   return out.length ? out : undefined
 }
 
+/** Whole days between an ISO timestamp and now. Null on an unparseable/missing input. */
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const ms = Date.parse(iso)
+  if (Number.isNaN(ms)) return null
+  return Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000))
+}
+
 function toMatchedJob(
   match: JobMatch,
   job: JobHopperLive | null,
@@ -189,6 +198,15 @@ function toMatchedJob(
     jobData != null
       ? getEffectiveSponsorshipLikelihood(storedSponsorship ?? 'N/A', jobData)
       : null
+
+  // Same posted_date-else-created_at source match-jobs uses at creation time
+  // (docs/job-matching-rules.md gate #2) - re-checked here at read time only to surface a
+  // note, not to re-gate or hide anything already matched.
+  const ageSourceIso = job?.posted_date ?? job?.created_at ?? null
+  const isStale = ageSourceIso
+    ? jobExceedsMaxAge({ postedDate: ageSourceIso, createdAt: ageSourceIso } as JobRecord, defaultConfig)
+    : false
+  const daysSincePosted = daysSince(ageSourceIso)
 
   return {
     matchId: match.id,
@@ -219,6 +237,8 @@ function toMatchedJob(
     sponsorshipRealRationale: realScore?.rationale ?? null,
     sponsorshipEmployerId: realScore?.employerId ?? null,
     sponsorshipWatched: realScore?.employerId ? watchedEmployerIds.has(realScore.employerId) : false,
+    isStale,
+    daysSincePosted,
   }
 }
 

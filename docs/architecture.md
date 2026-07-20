@@ -9,6 +9,79 @@ A table-driven scheduler runs edge functions at approximately a given time. Use 
 - **Cron**: The scheduler must be manually created. It should POST to 'match-jobs' edge function every 15 minutes. Be sure to add the suth header with secret key.
 - **How to use**: From backend-only code (e.g. an edge function with service_role), insert into `scheduled_jobs` with `function_name` (target edge function name), `payload`, and `run_at`. Only schedule functions that accept service-role calls (no user context). Do not expose insert to the client unless you add a restricted RLS policy.
 
+### Incident: run-scheduled-jobs cron silently dead for 6 days (2026-07-14 to 2026-07-20)
+
+**Root cause:** the pg_cron job driving `run-scheduled-jobs` (`cron.job` jobid 5) had its
+`Authorization: Bearer <token>` header hardcoded as a **literal legacy-format service-role JWT**
+directly in the job's `command` SQL, set once at creation time instead of looked up dynamically.
+That literal went stale against a platform-side service-role key rotation/reformat — same class
+of key-format drift already seen with `sponsor-watch-check` (D51–55). Every 15-minute invocation
+got a clean `401` from `isAuthorized()` and returned **before ever touching `scheduled_jobs`**,
+so nothing was ever written to `error_message` anywhere — a stale credential compared as false
+and the caller silently gave up, producing no error trail at all. This is the same pattern
+`docs/sponsorship-data-engine.md`'s working-principle section documents repeatedly (silent
+failure, plausible-looking exit code 0); see that section rather than re-deriving it here.
+pg_cron itself never stopped — `cron.job_run_details` showed an unbroken record of the HTTP call
+being dispatched successfully every single time; only the receiving end was rejecting it.
+
+**Blast radius:** ~6 days. Both `daily-job-matching` and `reconcile-subscriptions` (unrelated
+consumers of the same `scheduled_jobs` table) froze simultaneously at their `2026-07-14` pending
+rows and never advanced — confirming the fault was in the shared poller, not either function's
+own logic.
+
+**Real impact found:** of 6 real (non-test) Stripe-backed subscriptions checked, exactly one had
+genuinely drifted — `subaina@binarynext.io`'s subscription was `past_due` in Stripe but still
+read `active` in our DB for the outage window. Corrected the moment the backlogged
+`reconcile-subscriptions` run finally executed. Verified end-to-end, not just the DB write:
+`subscriptionAPI.getProfileSubscriptionData()` (`src/lib/subscription.ts:217`) filters
+`.in('status', ['trial', 'active'])` at query time, so the now-`past_due` row simply isn't
+returned — `hasActiveSubscription` → `false` → `baseTier` → `'free'`. No entitlement leaked.
+The other 5 real subscriptions checked out unchanged; no other drift found.
+
+**Fix:** repointed jobid 5 to the same dynamic-secret pattern `reset-apollo-limits-monthly`
+(jobid 15) already used successfully — `(select decrypted_secret from vault.decrypted_secrets
+where name = 'cron_secret')` looked up fresh at execution time, sent as `x-cron-secret`, instead
+of a hardcoded literal — via `cron.alter_job`. Verified: the manual drain call succeeded, both
+backlogged rows completed, and both self-rescheduled their next run normally.
+
+**Cron job inventory (checked while investigating, not just this one):** this project has
+exactly two pg_cron jobs (`select * from cron.job`, unfiltered — exhaustive as of 2026-07-20):
+jobid 5 (`run-scheduled-jobs`, just fixed above) and jobid 15 (`reset-apollo-limits-monthly`,
+already used the vault lookup, was never affected). **As of this fix, neither remaining cron job
+hardcodes a literal secret.** Worth re-checking this specifically whenever a new cron job is
+added — the vault-lookup pattern isn't enforced anywhere, it's just now the case that both
+existing jobs happen to follow it.
+
+**Open question, not building now:** there is currently **zero alerting** on these
+self-perpetuating `scheduled_jobs` chains going silent. This one sat completely dead for 6 days
+with no error trail and was only caught incidentally while investigating an unrelated dashboard
+staleness question — it could just as easily still be broken today otherwise. Worth a
+monitoring/alerting layer (e.g. paging if `daily-job-matching` or `reconcile-subscriptions`
+haven't completed within some expected window) — flagging for Nick/Syed to prioritize, out of
+scope for today.
+
+### Job match staleness (known gap, unfixed)
+
+The 45-day recency gate (`recency.maxAgeDays` in `_shared/job-matching-algorithm.ts`,
+`jobExceedsMaxAge`) only runs at **match-creation time**, inside `match-jobs`. Once a
+`job_matches` row exists, nothing ever re-checks or removes it — `match-jobs` only selects
+existing matches (to avoid re-inserting duplicates) and inserts new ones; it never deletes.
+
+Both frontend read paths apply **zero age filter at read time**:
+- `jobsAPI.getJobMatches()` (`src/lib/jobs.ts:235`, backs the Dashboard "Recent job matches"
+  feed) — orders by `created_at desc`, no date condition.
+- `jobsAPI.getJobMatchByJobId()` (`src/lib/jobs.ts:388`, backs `/job/:id`, saved jobs, and the
+  application tracker) — pulls `job_hopper_live` by id, no date condition.
+
+Net effect: a job matched when 5 days old can sit in a user's dashboard, saved jobs, or tracker
+indefinitely, rendering identically to a fresh match regardless of how old the underlying
+posting actually is now. This is a general data-hygiene/UX gap affecting all users on every
+tier — not tied to any Premium feature. (Surfaced while investigating Ghost Listing Detector;
+see `docs/sponsorship-data-engine.md` §0 for that separate, closed investigation.) Fix proposed,
+not yet built as of 2026-07-20 — pending a decision on what to do with a match found stale at
+read time (silent hide vs. a "may no longer be active" note vs. something else) before writing
+code.
+
 ### Supabase client
 
 - `supabase` (from `src/lib/supabase.ts`) is **only** used in API helpers under `src/lib/`
