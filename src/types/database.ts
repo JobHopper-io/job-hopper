@@ -60,6 +60,20 @@ export type PayType = Enums<'pay_type'>
 export type RoleCategory = Enums<'role_category'>
 export type SponsorshipLikelihood = Enums<'sponsorship_likelihood'>
 
+// Real Sponsorship Score (Premium, §3 decision 11): employers is the brand-level identity table,
+// employer_sponsorship_scores holds the LCA-only v1 score. `score`/`confidence` are DB `text` +
+// check constraint (Low/Medium/High), not a Postgres enum, so RealSponsorshipTier narrows them
+// for app code the same way the check constraint narrows them in the DB.
+export type Employer = Tables<'employers'>
+export type EmployerSponsorshipScore = Tables<'employer_sponsorship_scores'>
+export type RealSponsorshipTier = 'Low' | 'Medium' | 'High'
+
+// Sponsor Watch (Premium, D51-55): quarterly diff-alert subscription on a brand-level employer.
+// Users manage their own rows directly (subscribe/unsubscribe), no update - a subscription is
+// either present or absent, nothing on the row itself is user-editable.
+export type SponsorWatchSubscription = Tables<'sponsor_watch_subscriptions'>
+export type SponsorWatchSubscriptionInsert = TablesInsert<'sponsor_watch_subscriptions'>
+
 /** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
 export interface JobContact {
   name: string
@@ -104,6 +118,30 @@ export interface MatchedJob {
   postedDate: string | null
   isRemote: boolean | null
   sponsorshipLikelihood: SponsorshipLikelihood | null
+  /** Real Sponsorship Score fields (§3 decision 11) - populated only when the job's resolved
+   * employer has a live employer_sponsorship_scores row (domain-matched, not excluded_from_scoring).
+   * Null for everyone else, including free/core users regardless of match - the Premium-only gate
+   * on whether to USE these instead of sponsorshipLikelihood lives in the UI layer, not here. */
+  sponsorshipRealScore: RealSponsorshipTier | null
+  sponsorshipRealConfidence: RealSponsorshipTier | null
+  sponsorshipRealRationale: string | null
+  /** employers.id for the job's resolved employer, when real-score-backed (§3 decision 11 gate -
+   * same condition as sponsorshipRealScore). Needed to subscribe/unsubscribe Sponsor Watch. */
+  sponsorshipEmployerId: string | null
+  /** Whether the current profile has an active Sponsor Watch subscription for this employer. */
+  sponsorshipWatched: boolean
+  /** True when the underlying posting is older than the matching algorithm's recency cutoff
+   * (same jobExceedsMaxAge check match-jobs uses at creation time, re-applied at read time).
+   * Purely informational - this match already exists, so nothing here re-runs the
+   * creation-time gate or hides the job; it only tells the UI whether to show a staleness note. */
+  isStale: boolean
+  /** Days since the job's posted_date (falling back to job_hopper_live.created_at), for the
+   * staleness note's copy. Null when neither date is available. */
+  daysSincePosted: number | null
+  /** True within the first 7 days of a posting (Apply Intelligence A). Mutually exclusive with
+   * isStale by construction (7 vs. >45 day thresholds never overlap) - advice-only, no claim
+   * this app's data proves early applications do better. */
+  isRecentlyPosted: boolean
   contacts?: JobContact[]
   /** Premium Insights pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null

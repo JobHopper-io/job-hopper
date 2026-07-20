@@ -242,6 +242,7 @@ async def process_one_job(
             "apply_link": norm["apply_link"],
             "posted_date": norm["posted_date"],
             "employee_count": norm["employee_count"] or None,
+            "company_domain": norm["company_domain"],
             "ai_job_briefing": briefing,
             "role_category": role_cat,
             "subscription_tier": tier,

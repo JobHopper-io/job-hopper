@@ -1,0 +1,104 @@
+brand_cluster,cluster_fein_count,cluster_total_positions,employer_fein,canonical_name,positions,filings,suggested_action,your_decision__keep_reject,your_merge_target_brand
+qualcomm,4,73890,45-3157787,"Qualcomm Technologies, Inc.",59679,672,MERGE?,MERGE,Qualcomm
+qualcomm,4,73890,77-0485570,"Qualcomm Atheros, Inc.",6805,73,MERGE?,MERGE,Qualcomm
+qualcomm,4,73890,26-4049231,"Qualcomm Innovation Center, Inc.",4104,45,MERGE?,MERGE,Qualcomm
+qualcomm,4,73890,95-3685934,Qualcomm Incorporated,3302,35,MERGE?,MERGE,Qualcomm
+amazon,5,47702,82-0544687,Amazon.com Services LLC,33464,5346,MERGE?,MERGE,Amazon
+amazon,5,47702,20-4938068,"Amazon Web Services, Inc.",7724,1256,MERGE?,MERGE,Amazon
+amazon,5,47702,20-8424306,"Amazon Development Center U.S., Inc.",3715,747,MERGE?,MERGE,Amazon
+amazon,5,47702,91-1986543,"Amazon Data Services, Inc",2445,420,MERGE?,MERGE,Amazon
+amazon,5,47702,42-1749823,Amazon Advertising LLC,354,57,MERGE?,MERGE,Amazon
+goldman,3,42853,13-5108880,GOLDMAN SACHS & CO. LLC,14585,527,MERGE?,MERGE,Goldman Sachs
+goldman,3,42853,13-3571598,GOLDMAN SACHS BANK USA,14178,219,MERGE?,MERGE,Goldman Sachs
+goldman,3,42853,13-3937419,GOLDMAN SACHS SERVICES LLC,14090,329,MERGE?,MERGE,Goldman Sachs
+cgi,2,9306,54-0856778,CGI Technologies and Solutions Inc.,9201,283,MERGE?,MERGE,CGI
+cgi,2,9306,27-0087176,CGI Federal Inc.,105,7,MERGE?,MERGE,CGI
+oracle,2,5563,94-2805249,"Oracle America, Inc.",5448,465,MERGE?,MERGE,Oracle
+oracle,2,5563,13-4200183,"Oracle Financial Services Software, Inc.",115,11,MERGE?,MERGE,Oracle
+deloitte,4,4735,06-1454513,Deloitte Consulting LLP,3666,1794,MERGE?,MERGE,Deloitte
+deloitte,4,4735,13-3891517,Deloitte & Touche LLP,536,270,MERGE?,MERGE,Deloitte
+deloitte,4,4735,86-1065772,Deloitte Tax LLP,403,201,MERGE?,MERGE,Deloitte
+deloitte,4,4735,13-4147118,Deloitte Services LP,130,64,MERGE?,MERGE,Deloitte
+university,18,2859,38-6006309,University of Michigan,433,433,REJECT_generic_token,REJECT,
+university,18,2859,52-6002033,University of Maryland College Park,242,242,REJECT_generic_token,REJECT,
+university,18,2859,39-6006492,University of Wisconsin System,227,227,REJECT_generic_token,REJECT,
+university,18,2859,37-6000511,University of Illinois,190,190,REJECT_generic_token,REJECT,
+university,18,2859,59-6002052,UNIVERSITY OF FLORIDA,183,183,REJECT_generic_token,REJECT,
+university,18,2859,94-6036493,"University of California, San Francisco",178,178,REJECT_generic_token,REJECT,
+university,18,2859,84-6000555,University of Colorado,170,170,REJECT_generic_token,REJECT,
+university,18,2859,95-6006144,"UNIVERSITY OF CALIFORNIA, SAN DIEGO",152,152,REJECT_generic_token,REJECT,
+university,18,2859,41-6007513,University of Minnesota,148,148,REJECT_generic_token,REJECT,
+university,18,2859,25-0965591,University of Pittsburgh,139,139,REJECT_generic_token,REJECT,
+university,18,2859,73-6017987,University of Oklahoma,114,114,REJECT_generic_token,REJECT,
+university,18,2859,94-6036494,"University of California, Davis",107,107,REJECT_generic_token,REJECT,
+university,18,2859,04-6002284,University of Massachusetts Chan Medical School,104,104,REJECT_generic_token,REJECT,
+university,18,2859,94-6002123,"University of California, Berkeley",102,102,REJECT_generic_token,REJECT,
+university,18,2859,95-6006143,"University of California, Los Angeles",100,100,REJECT_generic_token,REJECT,
+university,18,2859,91-6001537,University of Washington,96,96,REJECT_generic_token,REJECT,
+university,18,2859,87-6000525,University of Utah,95,95,REJECT_generic_token,REJECT,
+university,18,2859,59-0624458,UNIVERSITY OF MIAMI,79,79,REJECT_generic_token,REJECT,
+intel,2,2323,94-1672743,Intel Corporation,2202,1173,MERGE?,REJECT,
+intel,2,2323,83-0675925,Intellectt Inc,121,121,MERGE?,REJECT,
+the,18,2206,94-2960235,"The MathWorks, Inc.",209,209,REJECT_generic_token,REJECT,
+the,18,2206,94-1156365,"The Leland Stanford, Jr University",184,184,REJECT_generic_token,REJECT,
+the,18,2206,42-6004813,The University of Iowa,164,164,REJECT_generic_token,REJECT,
+the,18,2206,36-2177139,The University of Chicago,163,163,REJECT_generic_token,REJECT,
+the,18,2206,31-6025986,The Ohio State University,152,152,REJECT_generic_token,REJECT,
+the,18,2206,74-6000203,The University of Texas at Austin,137,137,REJECT_generic_token,REJECT,
+the,18,2206,43-6003859,The Curators of the University of Missouri,132,132,REJECT_generic_token,REJECT,
+the,18,2206,63-6005396,The University of Alabama at Birmingham,118,118,REJECT_generic_token,REJECT,
+the,18,2206,74-6001118,The University of Texas M.D. Anderson Cancer Center,113,113,REJECT_generic_token,REJECT,
+the,18,2206,24-6000376,The Pennsylvania State University,107,107,REJECT_generic_token,REJECT,
+the,18,2206,21-0634501,The Trustees of Princeton University,106,106,REJECT_generic_token,REJECT,
+the,18,2206,54-6001796,The University of Virginia,103,103,REJECT_generic_token,REJECT,
+the,18,2206,23-1390618,The Devereux Foundation,98,60,REJECT_generic_token,REJECT,
+the,18,2206,62-6001636,THE UNIVERSITY OF TENNESSEE,89,89,REJECT_generic_token,REJECT,
+the,18,2206,95-1642394,The University of Southern California,86,86,REJECT_generic_token,REJECT,
+the,18,2206,74-2652689,The University of Arizona,84,84,REJECT_generic_token,REJECT,
+the,18,2206,13-5160382,The Bank of New York Mellon,81,81,REJECT_generic_token,REJECT,
+the,18,2206,23-1945930,"The Vanguard Group, Inc.",80,80,REJECT_generic_token,REJECT,
+stv,2,2191,13-1986759,STV Incorporated,1784,69,MERGE?,MERGE,STV
+stv,2,2191,23-2933918,STV Construction Inc.,407,15,MERGE?,MERGE,STV
+samsung,2,1910,94-2905596,"Samsung Semiconductor, Inc.",1825,96,MERGE?,MERGE,Samsung
+samsung,2,1910,74-2772066,"Samsung Austin Semiconductor, LLC.",85,85,MERGE?,MERGE,Samsung
+western,2,1298,95-2647125,"Western Digital Technologies, Inc.",1222,94,REJECT_generic_token,REJECT,
+western,2,1298,20-4561550,"Western Union, LLC",76,76,REJECT_generic_token,REJECT,
+intuit,2,1271,77-0034661,Intuit Inc.,1169,387,MERGE?,REJECT,
+intuit,2,1271,27-1094206,"Intuitive Surgical Operations, Inc.",102,102,MERGE?,REJECT,
+morgan,3,1263,26-0116361,Morgan Stanley Services Group Inc.,808,352,MERGE?,MERGE,Morgan Stanley
+morgan,3,1263,13-2655998,"Morgan Stanley & Co., LLC",356,90,MERGE?,MERGE,Morgan Stanley
+morgan,3,1263,26-4310844,Morgan Stanley Smith Barney LLC,99,23,MERGE?,MERGE,Morgan Stanley
+regeneron,2,837,46-4073600,"Regeneron Pharmaceuticals, Inc.",586,59,MERGE?,MERGE,Regeneron
+regeneron,2,837,13-3444607,"Regeneron Pharmaceuticals, Inc.",251,232,MERGE?,MERGE,Regeneron
+hcl,2,813,77-0205035,HCL AMERICA INC,697,697,MERGE?,MERGE,HCL
+hcl,2,813,13-4309337,HCL GLOBAL SYSTEMS INC,116,116,MERGE?,MERGE,HCL
+mastech,2,774,25-1873382,"Mastech Digital Technologies, Inc.",540,90,MERGE?,MERGE,Mastech Digital
+mastech,2,774,47-2372385,"Mastech Digital Resourcing, Inc.",234,39,MERGE?,MERGE,Mastech Digital
+federal,2,645,52-0904874,Federal Home Loan Mortgage Corporation,464,58,REJECT_generic_token,REJECT,
+federal,2,645,71-0427007,Federal Express Corporation,181,181,REJECT_generic_token,REJECT,
+capital,2,642,54-1780389,"Capital One Services, LLC",446,446,MERGE?,MERGE,Capital One
+capital,2,642,72-0210640,"Capital One, National Association",196,196,MERGE?,MERGE,Capital One
+visa,2,480,74-3070018,Visa Technology & Operations LLC,251,251,MERGE?,MERGE,Visa
+visa,2,480,94-1721694,Visa U.S.A. Inc.,229,229,MERGE?,MERGE,Visa
+general,2,466,27-0383222,General Motors,352,352,REJECT_generic_token,REJECT,
+general,2,466,04-2697983,General Hospital Corporation,114,114,REJECT_generic_token,REJECT,
+cvs,3,421,99-2848079,CVS Shared Services Resources LLC,215,215,MERGE?,MERGE,CVS Health
+cvs,3,421,05-0340626,CVS Pharmacy Inc.,126,126,MERGE?,MERGE,CVS Health
+cvs,3,421,05-0501917,CVS Rx Services Inc.,80,80,MERGE?,MERGE,CVS Health
+american,2,407,13-3133497,"American Express Travel Related Services Company, Inc.",236,182,REJECT_generic_token,REJECT,
+american,2,407,13-1502798,"American Airlines, Inc.",171,171,REJECT_generic_token,REJECT,
+rivian,2,389,47-3556480,"Rivian Automotive, LLC",320,320,MERGE?,REJECT,
+rivian,2,389,99-4796906,"Rivian and Volkswagen Group Technologies, LLC",69,69,MERGE?,REJECT,
+trustees,2,337,23-1352685,TRUSTEES OF THE UNIVERSITY OF PENNSYLVANIA,261,261,REJECT_generic_token,REJECT,
+trustees,2,337,04-2103547,TRUSTEES OF BOSTON UNIVERSITY,76,76,REJECT_generic_token,REJECT,
+texas,3,335,74-6000531,Texas A&M University,145,145,REJECT_generic_token,REJECT,
+texas,3,335,75-0289970,Texas Instruments Incorporated,110,110,REJECT_generic_token,REJECT,
+texas,3,335,75-6002622,Texas Tech University,80,80,REJECT_generic_token,REJECT,
+atlas,2,323,84-1207329,"Atlas Air, Inc.",186,12,MERGE?,REJECT,
+atlas,2,323,59-3797948,"Atlassian US, Inc.",137,137,MERGE?,REJECT,
+state,2,245,14-6013200,State University of New York at Stony Brook,126,125,REJECT_generic_token,REJECT,
+state,2,245,04-1867445,State Street Bank and Trust Company,119,119,REJECT_generic_token,REJECT,
+tiktok,2,234,88-4076938,TikTok USDS Joint Venture LLC,119,107,MERGE?,REJECT,
+tiktok,2,234,47-3892853,TikTok Inc.,115,115,MERGE?,REJECT,
+db,2,184,27-0509518,"DB Global Technology, Inc.",113,113,MERGE?,MERGE,Deutsche Bank
+db,2,184,13-3184273,DB USA Core Corporation,71,71,MERGE?,MERGE,Deutsche Bank

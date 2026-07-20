@@ -9,6 +9,7 @@ import {
   faExclamationTriangle,
   faBookmark,
   faChevronLeft,
+  faChevronRight,
   faLocationDot,
   faBuilding,
   faXmark,
@@ -31,6 +32,9 @@ import {
   faArrowUpRightFromSquare,
   faSackDollar,
   faTag,
+  faBell,
+  faBellSlash,
+  faCrown,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -42,6 +46,7 @@ library.add(
   faExclamationTriangle,
   faBookmark,
   faChevronLeft,
+  faChevronRight,
   faLocationDot,
   faBuilding,
   faXmark,
@@ -64,6 +69,9 @@ library.add(
   faArrowUpRightFromSquare,
   faSackDollar,
   faTag,
+  faBell,
+  faBellSlash,
+  faCrown,
   faTiktok,
   faInstagram,
 )

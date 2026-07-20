@@ -9,6 +9,7 @@ import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import SponsorWatchToggle from '@/components/SponsorWatchToggle.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
@@ -249,6 +250,18 @@ const showSponsorshipBadge = computed(() => {
 /** Free tier sees a blurred, locked sponsorship badge when they require sponsorship. */
 const showSponsorshipTeaser = computed(
   () => isFree.value && userStore.profile?.requires_us_sponsorship === true,
+)
+
+/** §3 decision 11: the Real Score replaces the badge's value for Premium only - Free/Core keep
+ * the heuristic (inferSponsorshipLikelihood), unchanged, same as before this feature existed. */
+const isPremium = computed(() => baseTier.value === 'premium')
+const sponsorshipBadgeValue = computed(() =>
+  isPremium.value && job.value?.sponsorshipRealScore
+    ? job.value.sponsorshipRealScore
+    : (job.value?.sponsorshipLikelihood ?? null),
+)
+const sponsorshipBadgeRationale = computed(() =>
+  isPremium.value && job.value?.sponsorshipRealScore ? job.value.sponsorshipRealRationale : null,
 )
 
 const tierTagLabel = computed(() => {
@@ -624,14 +637,34 @@ async function executeTailoringCheckout() {
                     <font-awesome-icon :icon="['fas', 'location-dot']" class="shrink-0 opacity-70" aria-hidden="true" />
                     {{ job.location }}
                   </span>
+                  <span
+                    v-if="job.isRecentlyPosted"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-2.5 py-0.5 text-xs font-medium text-brand-primary"
+                  >
+                    <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
+                    Recently posted — early applicants tend to get noticed first
+                  </span>
+                  <span
+                    v-if="job.isStale"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800"
+                  >
+                    <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
+                    Posted {{ job.daysSincePosted }} days ago — may no longer be accepting applications
+                  </span>
                   <JobSponsorshipBadge
                     v-if="showSponsorshipBadge"
-                    :value="job.sponsorshipLikelihood"
+                    :value="sponsorshipBadgeValue"
+                    :rationale="sponsorshipBadgeRationale"
                   />
                   <JobSponsorshipBadge
                     v-else-if="showSponsorshipTeaser"
                     :value="null"
                     locked
+                  />
+                  <SponsorWatchToggle
+                    v-if="isPremium && job.sponsorshipRealScore && job.sponsorshipEmployerId"
+                    :employer-id="job.sponsorshipEmployerId"
+                    :watched="job.sponsorshipWatched"
                   />
                 </div>
               </div>

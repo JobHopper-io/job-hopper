@@ -238,6 +238,54 @@ const filteredMatches = computed(() => {
   return result
 })
 
+// --- Pagination for the job feed -------------------------------------------
+// Keeps the "Recent job matches" list a fixed height instead of growing the page
+// as more matches accumulate. Numbered pages below the grid.
+const PAGE_SIZE = 9
+const currentPage = ref(1)
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredMatches.value.length / PAGE_SIZE)),
+)
+
+const pagedMatches = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return filteredMatches.value.slice(start, start + PAGE_SIZE)
+})
+
+// Compact page-number list with gaps (…) for large counts, e.g. [1,'…',4,5,6,'…',12].
+const pageItems = computed<(number | 'gap')[]>(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  const items: (number | 'gap')[] = [1]
+  const from = Math.max(2, current - 1)
+  const to = Math.min(total - 1, current + 1)
+  if (from > 2) items.push('gap')
+  for (let p = from; p <= to; p++) items.push(p)
+  if (to < total - 1) items.push('gap')
+  items.push(total)
+  return items
+})
+
+function goToPage(page: number) {
+  currentPage.value = Math.min(Math.max(1, page), totalPages.value)
+}
+
+// Reset to the first page whenever the filtered result set changes (filters
+// toggled, new matches loaded), and clamp if the current page no longer exists.
+watch(
+  () => filteredMatches.value.length,
+  () => {
+    if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+  },
+)
+watch([showSavedOnly, selectedLocation], () => {
+  currentPage.value = 1
+})
+
 const showFreemiumExhaustedUpgrade = computed(
   () =>
     !hasActiveSubscription.value &&
@@ -516,12 +564,12 @@ onMounted(() => {
       </template>
 
       <!--
-        Core tier: automated-matching status, Application Tracker, and fully
-        unblurred Resume Advice + Premium Insights. Also serves the 6 legacy trial
-        plans (entry_mid / senior_management / director_vp_c_level), which map to
-        'core' in the store — they differ only by the subscription card's plan name.
+        Core and Premium share this branch: automated-matching status, Application Tracker, and
+        fully unblurred Resume Advice + Premium Insights (also serves the 6 legacy trial plans,
+        which map to 'core'). Premium gets an extra banner below linking out to /premium-tools
+        (Sponsor Watch management + future tools) rather than duplicating that content inline.
       -->
-      <template v-else-if="baseTier === 'core'">
+      <template v-else-if="baseTier === 'core' || baseTier === 'premium'">
         <!-- Automated matching status (success-tinted; the only green surface on the page). -->
         <div class="mb-8 rounded-[12px] border border-green-200 bg-green-50 px-5 py-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -566,12 +614,25 @@ onMounted(() => {
             @remove="handleRemoveApplication"
           />
         </div>
-      </template>
 
-      <!--
-        TODO(premium dashboard — task after): render under v-else-if="baseTier === 'premium'".
-        Everything in Core plus the five Premium Tools concept cards.
-      -->
+        <!-- Premium only: link out to the dedicated Premium Tools surface. -->
+        <div v-if="baseTier === 'premium'" class="mb-8 card p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex items-center gap-2.5">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-brand-primary" aria-hidden="true" />
+              <p class="font-heading font-semibold text-brand-charcoal">
+                Manage Sponsor Watch and explore Premium Tools
+              </p>
+            </div>
+            <router-link
+              :to="{ name: 'premium-tools' }"
+              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+            >
+              Open Premium Tools →
+            </router-link>
+          </div>
+        </div>
+      </template>
 
       <!-- Recent job matches -->
       <div
@@ -747,7 +808,7 @@ onMounted(() => {
       <template v-else>
         <div class="grid grid-cols-1 gap-6">
           <JobCard
-            v-for="job in filteredMatches"
+            v-for="job in pagedMatches"
             :key="job.matchId"
             :job="job"
             :advicePurchase="adviceByMatchId[job.matchId] ?? null"
@@ -758,6 +819,54 @@ onMounted(() => {
             @update-application-status="handleUpdateApplicationStatus"
           />
         </div>
+
+        <!-- Pagination -->
+        <nav
+          v-if="totalPages > 1"
+          class="mt-8 flex flex-wrap items-center justify-center gap-2"
+          aria-label="Job matches pages"
+        >
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border border-neutral-border bg-neutral-bg px-3.5 py-1.5 text-sm font-medium text-neutral-body transition-colors hover:border-neutral-body/40 hover:bg-neutral-border/30 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+            :disabled="currentPage === 1"
+            @click="goToPage(currentPage - 1)"
+          >
+            <font-awesome-icon :icon="['fas', 'chevron-left']" aria-hidden="true" />
+            Previous
+          </button>
+
+          <template v-for="(item, idx) in pageItems" :key="`${item}-${idx}`">
+            <span
+              v-if="item === 'gap'"
+              class="px-2 text-sm text-neutral-body select-none"
+              aria-hidden="true"
+            >…</span>
+            <button
+              v-else
+              type="button"
+              class="inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+              :class="item === currentPage
+                ? 'bg-brand-primary text-white shadow-sm hover:opacity-90'
+                : 'border border-neutral-border bg-neutral-bg text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30'"
+              :aria-current="item === currentPage ? 'page' : undefined"
+              :aria-label="`Page ${item}`"
+              @click="goToPage(item)"
+            >
+              {{ item }}
+            </button>
+          </template>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border border-neutral-border bg-neutral-bg px-3.5 py-1.5 text-sm font-medium text-neutral-body transition-colors hover:border-neutral-body/40 hover:bg-neutral-border/30 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+            :disabled="currentPage === totalPages"
+            @click="goToPage(currentPage + 1)"
+          >
+            Next
+            <font-awesome-icon :icon="['fas', 'chevron-right']" aria-hidden="true" />
+          </button>
+        </nav>
       </template>
     </div>
   </div>

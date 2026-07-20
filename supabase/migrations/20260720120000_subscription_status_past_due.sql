@@ -1,0 +1,17 @@
+-- Add a distinct `past_due` status to the subscription_status enum.
+--
+-- Before this, stripe-webhook/reconcile mapped Stripe's `past_due` to `active`,
+-- so a failed payment (e.g. a trial that ends and the card is declined) granted
+-- the same access as a paid subscription and triggered a "subscription updated"
+-- email. Every server- and client-side entitlement check whitelists
+-- ('trial','active') — resolveBaseTier (base-tier.ts), the frontend baseTier
+-- store, and getProfileSubscriptionData — so a `past_due` subscription is
+-- automatically non-entitling (base tier -> free) with no further logic changes.
+--
+-- Recovery is handled by Stripe: when a retried payment succeeds the
+-- subscription transitions back to `active` and the customer.subscription.updated
+-- webhook rewrites the row to `active`.
+--
+-- ALTER TYPE ... ADD VALUE is safe inside the CLI's migration transaction because
+-- the new value is not *used* in this same migration.
+ALTER TYPE public.subscription_status ADD VALUE IF NOT EXISTS 'past_due';

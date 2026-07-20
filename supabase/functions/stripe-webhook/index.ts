@@ -7,6 +7,7 @@ import { sendEmail } from '../_shared/email.ts'
 import {
   renderSubscriptionStarted,
   renderSubscriptionUpdated,
+  renderSubscriptionPaymentFailed,
   renderSubscriptionCancelScheduled,
   renderSubscriptionCanceled,
 } from '../_shared/email-templates.ts'
@@ -25,9 +26,13 @@ const LOG_PREFIX = '[stripe-webhook]'
 /** Grep-friendly prefix for resume_products + n8n path inside checkout.session.completed. */
 const RESUME_LOG = `${LOG_PREFIX}[resume]`
 
-function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'canceled' {
+function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'past_due' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
-  if (stripeStatus === 'active' || stripeStatus === 'past_due') return 'active'
+  if (stripeStatus === 'active') return 'active'
+  // A failed payment (incl. a trial that ends and the card is declined) lands in
+  // `past_due`. It must NOT be treated as `active` — that would grant paid access
+  // for free. `past_due` is non-entitling everywhere ('trial'/'active' whitelist).
+  if (stripeStatus === 'past_due') return 'past_due'
   return 'canceled'
 }
 
@@ -654,7 +659,30 @@ serve(async (req) => {
                 planName = (products ?? []).map((p) => p.display_name).join(', ')
               }
               const footer = await getFooterLinksForProfile(profileIdUpdated)
-              if (isCancelScheduled && subscriptionStatus !== 'canceled') {
+              if (subscriptionStatus === 'past_due') {
+                // Payment failed (e.g. trial ended and the card was declined). Do
+                // NOT send the "subscription updated" email — the customer has not
+                // been granted paid access. Prompt them to update their card.
+                const { html, text } = renderSubscriptionPaymentFailed({
+                  recipientName: recipient.firstName,
+                  footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
+                })
+                await sendEmail({
+                  to: recipient.email,
+                  subject: 'Your Job-Hopper payment failed',
+                  html,
+                  text,
+                  profileId: profileIdUpdated,
+                  eventType: 'subscription_update',
+                  templateKey: 'subscription_payment_failed',
+                  payload: null,
+                  supabase: supabaseAdmin,
+                })
+                console.log(`${LOG_PREFIX} payment failed email sent (past_due)`, {
+                  profileId: profileIdUpdated,
+                  stripeSubscriptionId: stripeSub.id,
+                })
+              } else if (isCancelScheduled && subscriptionStatus !== 'canceled') {
                 const { html, text } = renderSubscriptionCancelScheduled({
                   recipientName: recipient.firstName,
                   cancelAtDate,

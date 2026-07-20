@@ -247,6 +247,14 @@ verify_jwt = false
 [functions.premium-waitlist]
 verify_jwt = false
 
+# D51-55: invoked by run-scheduled-jobs (no user JWT) and self-enqueues its own next run,
+# same shape as reconcile-subscriptions. Secured with x-cron-secret (CRON_SECRET) or service
+# role bearer via the function's own isAuthorized() - this override is what lets that check
+# run at all, otherwise the platform gateway 401s the request first, before isAuthorized()
+# ever executes, regardless of how valid the bearer token is.
+[functions.sponsor-watch-check]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

@@ -7,7 +7,14 @@ from pathlib import Path
 import httpx
 import typer
 
-from job_processor import sponsorship_ingest, sponsorship_resolution, sponsorship_scope
+from job_processor import (
+    sponsorship_domain_backfill,
+    sponsorship_ingest,
+    sponsorship_resolution,
+    sponsorship_scope,
+    sponsorship_scoring,
+)
+from job_processor.llm_ops import openai_client
 from job_processor.settings import get_settings
 from job_processor.supabase_client import SupabaseRest
 
@@ -179,6 +186,94 @@ def sponsorship_seed_employers(
             typer.echo(f"      but covers {len(norms)} distinct orgs, e.g.:")
             for n in norms[:4]:
                 typer.echo(f"        - {n}")
+
+
+@sponsorship_app.command("apply-d37-decisions")
+def sponsorship_apply_d37_decisions(
+    merge_csv: Path = typer.Option(
+        Path("data/review_merge_candidates.csv"), "--merge-csv", exists=True, dir_okay=False
+    ),
+    umbrella_csv: Path = typer.Option(
+        Path("data/review_umbrella_feins.csv"), "--umbrella-csv", exists=True, dir_okay=False
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D37 (reduced scope, §3 decision 7): applies the human-reviewed decisions in the two CSVs.
+    Merges confirmed multi-FEIN brands (Goldman, Amazon, ...) into one employers row each, and
+    flags genuine umbrella FEINs (SUNY, NYC, ...) with excluded_from_scoring=true. Reads decisions
+    from the CSVs - does not detect anything itself. Merges run before exclusions, since a FEIN's
+    employer_id can change during a merge and the exclusion must land on the current row.
+    """
+
+    async def run() -> tuple[sponsorship_resolution.MergeApplyCounts, list[sponsorship_resolution.MergeGroupResult], sponsorship_resolution.ExclusionApplyCounts]:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            merge_counts, merge_results = await sponsorship_resolution.apply_merge_decisions(db, merge_csv, dry_run=dry_run)
+            excl_counts = await sponsorship_resolution.apply_scoring_exclusions(db, umbrella_csv, dry_run=dry_run)
+            return merge_counts, merge_results, excl_counts
+
+    merge_counts, merge_results, excl_counts = asyncio.run(run())
+
+    typer.echo("=== merge ===")
+    typer.echo(json.dumps(merge_counts, indent=2))
+    typer.echo("\nper-brand:")
+    for r in merge_results:
+        status = "already merged" if r["already_merged"] else f"merging {len(r['other_employer_ids'])} into primary"
+        typer.echo(
+            f"  {r['brand']:<16} {len(r['feins'])} FEINs, primary={r['primary_fein']}"
+            f"  [{status}]  aliases={r['aliases_repointed']:>4}  filings={r['filings_repointed']:>6}"
+        )
+
+    typer.echo("\n=== scoring exclusions ===")
+    typer.echo(json.dumps(excl_counts, indent=2))
+
+
+@sponsorship_app.command("compute-scores")
+def sponsorship_compute_scores(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D41-45 (§3 decision 7): scores every non-excluded employer Low/Medium/High from
+    lca_filings alone (volume + recency) - no USCIS input. excluded_from_scoring=true employers
+    get no row (fall back to the heuristic badge). Re-runnable: upserts on employer_id.
+    """
+
+    async def run() -> sponsorship_scoring.ScoreComputeCounts:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            return await sponsorship_scoring.compute_and_write_scores(db, dry_run=dry_run)
+
+    counts = asyncio.run(run())
+    typer.echo(json.dumps(counts, indent=2))
+
+
+@sponsorship_app.command("backfill-employer-domains")
+def sponsorship_backfill_employer_domains(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """D46-50 (§3 decision 11): resolves employers.domain for scored employers via the same
+    resolve_company_domain used for job postings in pipeline.py (Brave + LLM, no Apollo credits),
+    so job<->employer matching can go through domain equality instead of lossy name matching.
+    Skips excluded_from_scoring=true and already-resolved employers. Re-runnable.
+    """
+
+    async def run() -> sponsorship_domain_backfill.DomainBackfillCounts:
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds) as client:
+            db = SupabaseRest(settings, client)
+            oai = openai_client(settings)
+            return await sponsorship_domain_backfill.backfill_employer_domains(
+                db,
+                settings=settings,
+                http_client=client,
+                oai=oai,
+                model=settings.llm_model_domain,
+                dry_run=dry_run,
+            )
+
+    counts = asyncio.run(run())
+    typer.echo(json.dumps(counts, indent=2))
 
 
 def main() -> None:

@@ -233,6 +233,30 @@ class SupabaseRest:
             prefer="return=minimal",
         )
 
+    async def count_rows(
+        self, table: str, *, params: list[tuple[str, str]] | None = None, select: str = "id"
+    ) -> int:
+        """Exact row count via limit=0 + Prefer: count=exact - fetches no rows, just the
+        Content-Range total. Used for dry-run reporting (show what a write WOULD affect without
+        doing it) and post-apply verification (e.g. counting orphans). `select` defaults to "id"
+        but must be overridden for tables with no `id` column (e.g. employer_sponsorship_scores,
+        whose primary key is employer_id)."""
+        query = [("select", select), ("limit", "0")] + list(params or [])
+        r = await self._client.request(
+            "GET",
+            f"{self._rest}/{table}",
+            headers=self._headers(prefer="count=exact"),
+            params=query,
+        )
+        if r.status_code >= 400:
+            raise SupabaseRestError(f"GET /{table} {r.status_code}: {r.text}")
+        content_range = r.headers.get("content-range", "")
+        if "/" in content_range:
+            total = content_range.rsplit("/", 1)[-1]
+            if total.isdigit():
+                return int(total)
+        return 0
+
     async def select(
         self,
         table: str,

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
 import { getEffectiveSponsorshipLikelihood } from '@shared/infer-sponsorship-likelihood'
+import { jobExceedsMaxAge, defaultConfig, type JobRecord } from '@shared/job-matching-algorithm'
 import type {
   JobMatch,
   SavedJob,
@@ -12,7 +13,74 @@ import type {
   JobContact,
   JobHiringContactsStatus,
   PremiumInsightsOrgChoice,
+  RealSponsorshipTier,
+  SponsorWatchSubscription,
 } from '@/types/database'
+
+/** Narrows the DB's `text` + check-constraint columns to the app's Low/Medium/High type. */
+function asRealSponsorshipTier(value: string | null | undefined): RealSponsorshipTier | null {
+  return value === 'Low' || value === 'Medium' || value === 'High' ? value : null
+}
+
+/** Real Sponsorship Score, keyed by employer domain (§3 decision 11). Looked up via
+ * job_hopper_live.company_domain = employers.domain - see docs/sponsorship-data-engine.md D46-50
+ * for why domain, not company name. Excludes employers.excluded_from_scoring=true (no row
+ * fetched for them at all - not a degraded score) and employers with no score row yet.
+ * `employerId` (added D51-55) is what Sponsor Watch subscribes/unsubscribes against - only
+ * ever needed alongside a real score, since watching is only offered where the badge is
+ * real-score-backed (same §3 decision 11 gate). */
+type RealScoreByDomain = Map<
+  string,
+  {
+    employerId: string
+    score: RealSponsorshipTier
+    confidence: RealSponsorshipTier | null
+    rationale: string | null
+  }
+>
+
+async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDomain> {
+  const map: RealScoreByDomain = new Map()
+  if (domains.length === 0) return map
+
+  const { data, error } = await supabase
+    .from('employers')
+    .select('id, domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
+    .in('domain', domains)
+    .eq('excluded_from_scoring', false)
+
+  if (error || !data) return map
+
+  for (const row of data as unknown as {
+    id: string
+    domain: string | null
+    employer_sponsorship_scores: { score: string | null; confidence: string | null; rationale: string | null } | null
+  }[]) {
+    const domain = row.domain
+    const scoreRow = row.employer_sponsorship_scores
+    const score = asRealSponsorshipTier(scoreRow?.score)
+    if (!domain || !score) continue
+    map.set(domain, {
+      employerId: row.id,
+      score,
+      confidence: asRealSponsorshipTier(scoreRow?.confidence),
+      rationale: scoreRow?.rationale ?? null,
+    })
+  }
+
+  return map
+}
+
+/** Employer ids the current profile has an active Sponsor Watch subscription for. */
+async function fetchWatchedEmployerIds(profileId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('sponsor_watch_subscriptions')
+    .select('employer_id')
+    .eq('profile_id', profileId)
+
+  if (error || !data) return new Set()
+  return new Set(data.map((row) => row.employer_id as string))
+}
 
 function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
@@ -43,6 +111,19 @@ function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[
 
 export type { PayType, RoleCategory, MatchedJob, MatchingStats }
 
+/** A Sponsor Watch subscription joined with its employer's identity + Real Score, for the
+ * Premium Tools management view (list + unwatch). `subscriptionId` is the row to key on;
+ * `employerId` is what `unwatchEmployer` takes. */
+export type WatchedEmployer = {
+  subscriptionId: string
+  employerId: string
+  name: string
+  domain: string | null
+  score: RealSponsorshipTier | null
+  confidence: RealSponsorshipTier | null
+  watchedSince: string
+}
+
 /** Columns selected from job_hopper_live for match list and detail (single source of truth) */
 const JOB_HOPPER_LIVE_SELECT = `
   id,
@@ -63,7 +144,8 @@ const JOB_HOPPER_LIVE_SELECT = `
   employee_count,
   posted_date,
   is_remote,
-  sponsorship_likelihood
+  sponsorship_likelihood,
+  company_domain
 ` as const
 
 function parseJobContactsFromJson(raw: unknown): JobContact[] | undefined {
@@ -84,12 +166,23 @@ function parseJobContactsFromJson(raw: unknown): JobContact[] | undefined {
   return out.length ? out : undefined
 }
 
+/** Whole days between an ISO timestamp and now. Null on an unparseable/missing input. */
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const ms = Date.parse(iso)
+  if (Number.isNaN(ms)) return null
+  return Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000))
+}
+
 function toMatchedJob(
   match: JobMatch,
   job: JobHopperLive | null,
   isSaved: boolean,
+  realScoresByDomain: RealScoreByDomain,
+  watchedEmployerIds: Set<string>,
 ): MatchedJob {
   const storedSponsorship = job?.sponsorship_likelihood ?? null
+  const realScore = job?.company_domain ? realScoresByDomain.get(job.company_domain) ?? null : null
   const jobData = job
     ? {
         title: job.job_title ?? null,
@@ -105,6 +198,16 @@ function toMatchedJob(
     jobData != null
       ? getEffectiveSponsorshipLikelihood(storedSponsorship ?? 'N/A', jobData)
       : null
+
+  // Same posted_date-else-created_at source match-jobs uses at creation time
+  // (docs/job-matching-rules.md gate #2) - re-checked here at read time only to surface a
+  // note, not to re-gate or hide anything already matched.
+  const ageSourceIso = job?.posted_date ?? job?.created_at ?? null
+  const isStale = ageSourceIso
+    ? jobExceedsMaxAge({ postedDate: ageSourceIso, createdAt: ageSourceIso } as JobRecord, defaultConfig)
+    : false
+  const daysSincePosted = daysSince(ageSourceIso)
+  const isRecentlyPosted = daysSincePosted != null && daysSincePosted <= 7
 
   return {
     matchId: match.id,
@@ -130,6 +233,14 @@ function toMatchedJob(
     postedDate: job?.posted_date ?? null,
     isRemote: job?.is_remote ?? null,
     sponsorshipLikelihood: effectiveSponsorship ?? storedSponsorship,
+    sponsorshipRealScore: realScore?.score ?? null,
+    sponsorshipRealConfidence: realScore?.confidence ?? null,
+    sponsorshipRealRationale: realScore?.rationale ?? null,
+    sponsorshipEmployerId: realScore?.employerId ?? null,
+    sponsorshipWatched: realScore?.employerId ? watchedEmployerIds.has(realScore.employerId) : false,
+    isStale,
+    daysSincePosted,
+    isRecentlyPosted,
   }
 }
 
@@ -201,6 +312,18 @@ export const jobsAPI = {
     const jobs = (jobsRaw ?? []) as JobHopperLive[]
     const savedRows = (savedRowsRaw ?? []) as SavedJob[]
 
+    const domains = Array.from(
+      new Set(
+        jobs
+          .map((j) => j.company_domain)
+          .filter((d): d is string => typeof d === 'string' && d.length > 0),
+      ),
+    )
+    const realScoresByDomain = await fetchRealScoresByDomain(domains)
+    const watchedEmployerIds = await getCurrentProfileId()
+      .then(fetchWatchedEmployerIds)
+      .catch(() => new Set<string>())
+
     const hiringByMatchId = new Map<
       string,
       {
@@ -263,7 +386,7 @@ export const jobsAPI = {
 
     const result: MatchedJob[] = matches.map((match) => {
       const job = match.job_id ? jobById.get(match.job_id) ?? null : null
-      const base = toMatchedJob(match, job, savedMatchIds.has(match.id))
+      const base = toMatchedJob(match, job, savedMatchIds.has(match.id), realScoresByDomain, watchedEmployerIds)
       const tierName =
         base.subscriptionTier != null
           ? tierNameByKey.get(base.subscriptionTier) ?? null
@@ -378,7 +501,12 @@ export const jobsAPI = {
         (product as { display_name?: string } | null)?.display_name ?? null
     }
 
-    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow)
+    const jobDomain = (job as JobHopperLive).company_domain
+    const realScoresByDomain = jobDomain ? await fetchRealScoresByDomain([jobDomain]) : new Map()
+    const watchedEmployerIds = await getCurrentProfileId()
+      .then(fetchWatchedEmployerIds)
+      .catch(() => new Set<string>())
+    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow, realScoresByDomain, watchedEmployerIds)
 
     const hiringStatus = hiringRow?.status as JobHiringContactsStatus | undefined
     const contacts =
@@ -487,6 +615,85 @@ export const jobsAPI = {
     }
 
     return { error: null }
+  },
+
+  /** Sponsor Watch (Premium, D51-55): subscribe to quarterly filing-volume alerts for the
+   * job's resolved employer. `employerId` is `employers.id`, brand-level (§3 decision 5) -
+   * watching "Goldman Sachs" covers all of its filers. Premium gating happens in the UI layer
+   * (same condition as the real-score badge), not here - RLS/grants are the DB-level backstop. */
+  async watchEmployer(employerId: string): Promise<{ error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { error } = await supabase.from('sponsor_watch_subscriptions').insert({
+      profile_id: profileId,
+      employer_id: employerId,
+    } satisfies Partial<SponsorWatchSubscription>)
+
+    if (error) {
+      return { error }
+    }
+
+    return { error: null }
+  },
+
+  async unwatchEmployer(employerId: string): Promise<{ error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { error } = await supabase
+      .from('sponsor_watch_subscriptions')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('employer_id', employerId)
+
+    if (error) {
+      return { error }
+    }
+
+    return { error: null }
+  },
+
+  /** Premium Tools management view: every employer the current profile is watching, with
+   * enough identity + score data to render a manage/unwatch list. */
+  async listWatchedEmployers(): Promise<{ data: WatchedEmployer[]; error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { data, error } = await supabase
+      .from('sponsor_watch_subscriptions')
+      .select(
+        'id, employer_id, created_at, employers(canonical_name, domain, employer_sponsorship_scores(score, confidence))',
+      )
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+
+    if (error || !data) {
+      return { data: [], error }
+    }
+
+    const rows = data as unknown as {
+      id: string
+      employer_id: string
+      created_at: string
+      employers: {
+        canonical_name: string
+        domain: string | null
+        employer_sponsorship_scores: { score: string | null; confidence: string | null } | null
+      } | null
+    }[]
+
+    return {
+      data: rows
+        .filter((row) => row.employers != null)
+        .map((row) => ({
+          subscriptionId: row.id,
+          employerId: row.employer_id,
+          name: row.employers!.canonical_name,
+          domain: row.employers!.domain,
+          score: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.score),
+          confidence: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.confidence),
+          watchedSince: row.created_at,
+        })),
+      error: null,
+    }
   },
 
   /**
