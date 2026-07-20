@@ -178,6 +178,12 @@ const handleSignOutAndCloseMenu = async () => {
                   Profile
                 </router-link>
                 <router-link
+                  to="/premium-tools"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                >
+                  Premium Tools
+                </router-link>
+                <router-link
                   to="/billing"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
@@ -291,6 +297,13 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Profile
+                </router-link>
+                <router-link
+                  to="/premium-tools"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Premium Tools
                 </router-link>
                 <router-link
                   to="/billing"

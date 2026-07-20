@@ -564,12 +564,12 @@ onMounted(() => {
       </template>
 
       <!--
-        Core tier: automated-matching status, Application Tracker, and fully
-        unblurred Resume Advice + Premium Insights. Also serves the 6 legacy trial
-        plans (entry_mid / senior_management / director_vp_c_level), which map to
-        'core' in the store — they differ only by the subscription card's plan name.
+        Core and Premium share this branch: automated-matching status, Application Tracker, and
+        fully unblurred Resume Advice + Premium Insights (also serves the 6 legacy trial plans,
+        which map to 'core'). Premium gets an extra banner below linking out to /premium-tools
+        (Sponsor Watch management + future tools) rather than duplicating that content inline.
       -->
-      <template v-else-if="baseTier === 'core'">
+      <template v-else-if="baseTier === 'core' || baseTier === 'premium'">
         <!-- Automated matching status (success-tinted; the only green surface on the page). -->
         <div class="mb-8 rounded-[12px] border border-green-200 bg-green-50 px-5 py-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -614,12 +614,25 @@ onMounted(() => {
             @remove="handleRemoveApplication"
           />
         </div>
-      </template>
 
-      <!--
-        TODO(premium dashboard — task after): render under v-else-if="baseTier === 'premium'".
-        Everything in Core plus the five Premium Tools concept cards.
-      -->
+        <!-- Premium only: link out to the dedicated Premium Tools surface. -->
+        <div v-if="baseTier === 'premium'" class="mb-8 card p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex items-center gap-2.5">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-brand-primary" aria-hidden="true" />
+              <p class="font-heading font-semibold text-brand-charcoal">
+                Manage Sponsor Watch and explore Premium Tools
+              </p>
+            </div>
+            <router-link
+              :to="{ name: 'premium-tools' }"
+              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+            >
+              Open Premium Tools →
+            </router-link>
+          </div>
+        </div>
+      </template>
 
       <!-- Recent job matches -->
       <div

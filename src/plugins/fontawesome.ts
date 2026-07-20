@@ -33,6 +33,8 @@ import {
   faSackDollar,
   faTag,
   faBell,
+  faBellSlash,
+  faCrown,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -68,6 +70,8 @@ library.add(
   faSackDollar,
   faTag,
   faBell,
+  faBellSlash,
+  faCrown,
   faTiktok,
   faInstagram,
 )

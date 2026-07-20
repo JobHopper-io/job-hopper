@@ -110,6 +110,19 @@ function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[
 
 export type { PayType, RoleCategory, MatchedJob, MatchingStats }
 
+/** A Sponsor Watch subscription joined with its employer's identity + Real Score, for the
+ * Premium Tools management view (list + unwatch). `subscriptionId` is the row to key on;
+ * `employerId` is what `unwatchEmployer` takes. */
+export type WatchedEmployer = {
+  subscriptionId: string
+  employerId: string
+  name: string
+  domain: string | null
+  score: RealSponsorshipTier | null
+  confidence: RealSponsorshipTier | null
+  watchedSince: string
+}
+
 /** Columns selected from job_hopper_live for match list and detail (single source of truth) */
 const JOB_HOPPER_LIVE_SELECT = `
   id,
@@ -615,6 +628,50 @@ export const jobsAPI = {
     }
 
     return { error: null }
+  },
+
+  /** Premium Tools management view: every employer the current profile is watching, with
+   * enough identity + score data to render a manage/unwatch list. */
+  async listWatchedEmployers(): Promise<{ data: WatchedEmployer[]; error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { data, error } = await supabase
+      .from('sponsor_watch_subscriptions')
+      .select(
+        'id, employer_id, created_at, employers(canonical_name, domain, employer_sponsorship_scores(score, confidence))',
+      )
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+
+    if (error || !data) {
+      return { data: [], error }
+    }
+
+    const rows = data as unknown as {
+      id: string
+      employer_id: string
+      created_at: string
+      employers: {
+        canonical_name: string
+        domain: string | null
+        employer_sponsorship_scores: { score: string | null; confidence: string | null } | null
+      } | null
+    }[]
+
+    return {
+      data: rows
+        .filter((row) => row.employers != null)
+        .map((row) => ({
+          subscriptionId: row.id,
+          employerId: row.employer_id,
+          name: row.employers!.canonical_name,
+          domain: row.employers!.domain,
+          score: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.score),
+          confidence: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.confidence),
+          watchedSince: row.created_at,
+        })),
+      error: null,
+    }
   },
 
   /**

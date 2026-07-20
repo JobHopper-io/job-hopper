@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { SponsorshipLikelihood } from '@/types/database'
 import InfoHint from '@/components/InfoHint.vue'
+import SponsorshipTierBadge from '@/components/SponsorshipTierBadge.vue'
 
 const props = defineProps<{
   value: SponsorshipLikelihood | null
@@ -14,13 +15,6 @@ const props = defineProps<{
 }>()
 
 const label = computed(() => props.value ?? 'N/A')
-
-const toneClass = computed(() => {
-  if (props.value === 'High') return 'bg-emerald-50 text-emerald-800 border-emerald-200'
-  if (props.value === 'Medium') return 'bg-amber-50 text-amber-800 border-amber-200'
-  if (props.value === 'Low') return 'bg-red-50 text-red-700 border-red-200'
-  return 'bg-neutral-bg text-neutral-body border-neutral-border'
-})
 </script>
 
 <template>
@@ -40,14 +34,10 @@ const toneClass = computed(() => {
       aria-hidden="true"
     />
   </span>
-  <span
-    v-else
-    class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-    :class="toneClass"
-  >
+  <SponsorshipTierBadge v-else :value="value">
     <font-awesome-icon :icon="['fas', 'globe-americas']" class="shrink-0" aria-hidden="true" />
     <span>Chance to provide sponsorship: {{ label }}</span>
     <InfoHint v-if="rationale" :tooltip="rationale" />
-  </span>
+  </SponsorshipTierBadge>
 </template>
 
