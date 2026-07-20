@@ -10,6 +10,7 @@ import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import SponsorWatchToggle from '@/components/SponsorWatchToggle.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
@@ -511,6 +512,11 @@ async function runAdviceCheckout() {
               v-else-if="showSponsorshipTeaser"
               :value="null"
               locked
+            />
+            <SponsorWatchToggle
+              v-if="isPremium && job.sponsorshipRealScore && job.sponsorshipEmployerId"
+              :employer-id="job.sponsorshipEmployerId"
+              :watched="job.sponsorshipWatched"
             />
             <span
               v-if="!isFree && currentStatusConfig"

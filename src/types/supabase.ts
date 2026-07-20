@@ -238,6 +238,9 @@ export type Database = {
           fiscal_years_used: number[]
           rationale: string | null
           score: string | null
+          watch_last_checked_at: string | null
+          watch_last_checked_positions: number | null
+          watch_last_checked_score: string | null
         }
         Insert: {
           algorithm_version?: string | null
@@ -248,6 +251,9 @@ export type Database = {
           fiscal_years_used?: number[]
           rationale?: string | null
           score?: string | null
+          watch_last_checked_at?: string | null
+          watch_last_checked_positions?: number | null
+          watch_last_checked_score?: string | null
         }
         Update: {
           algorithm_version?: string | null
@@ -258,6 +264,9 @@ export type Database = {
           fiscal_years_used?: number[]
           rationale?: string | null
           score?: string | null
+          watch_last_checked_at?: string | null
+          watch_last_checked_positions?: number | null
+          watch_last_checked_score?: string | null
         }
         Relationships: [
           {
@@ -2093,6 +2102,13 @@ export type Database = {
         Returns: undefined
       }
       reset_apollo_limits_usage: { Args: never; Returns: undefined }
+      sum_counted_lca_positions: {
+        Args: { p_employer_ids: string[] }
+        Returns: {
+          counted_positions: number
+          employer_id: string
+        }[]
+      }
       try_consume_apollo_credits: {
         Args: { p_amount: number; p_name: string }
         Returns: {
@@ -2130,6 +2146,7 @@ export type Database = {
         | "job_match_digest"
         | "subscription_update"
         | "system_announcement"
+        | "sponsor_watch_alert"
       job_hiring_contacts_status:
         | "pending"
         | "complete"
@@ -2155,7 +2172,7 @@ export type Database = {
       scheduled_job_status: "pending" | "running" | "completed" | "failed"
       scraper_raw_job_status: "pending" | "processed" | "processing"
       sponsorship_likelihood: "Low" | "Medium" | "High" | "N/A"
-      subscription_status: "trial" | "active" | "canceled"
+      subscription_status: "trial" | "active" | "canceled" | "past_due"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2304,6 +2321,7 @@ export const Constants = {
         "job_match_digest",
         "subscription_update",
         "system_announcement",
+        "sponsor_watch_alert",
       ],
       job_hiring_contacts_status: [
         "pending",
@@ -2333,7 +2351,7 @@ export const Constants = {
       scheduled_job_status: ["pending", "running", "completed", "failed"],
       scraper_raw_job_status: ["pending", "processed", "processing"],
       sponsorship_likelihood: ["Low", "Medium", "High", "N/A"],
-      subscription_status: ["trial", "active", "canceled"],
+      subscription_status: ["trial", "active", "canceled", "past_due"],
     },
   },
 } as const

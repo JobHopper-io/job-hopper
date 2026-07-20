@@ -13,6 +13,7 @@ import type {
   JobHiringContactsStatus,
   PremiumInsightsOrgChoice,
   RealSponsorshipTier,
+  SponsorWatchSubscription,
 } from '@/types/database'
 
 /** Narrows the DB's `text` + check-constraint columns to the app's Low/Medium/High type. */
@@ -23,10 +24,18 @@ function asRealSponsorshipTier(value: string | null | undefined): RealSponsorshi
 /** Real Sponsorship Score, keyed by employer domain (§3 decision 11). Looked up via
  * job_hopper_live.company_domain = employers.domain - see docs/sponsorship-data-engine.md D46-50
  * for why domain, not company name. Excludes employers.excluded_from_scoring=true (no row
- * fetched for them at all - not a degraded score) and employers with no score row yet. */
+ * fetched for them at all - not a degraded score) and employers with no score row yet.
+ * `employerId` (added D51-55) is what Sponsor Watch subscribes/unsubscribes against - only
+ * ever needed alongside a real score, since watching is only offered where the badge is
+ * real-score-backed (same §3 decision 11 gate). */
 type RealScoreByDomain = Map<
   string,
-  { score: RealSponsorshipTier; confidence: RealSponsorshipTier | null; rationale: string | null }
+  {
+    employerId: string
+    score: RealSponsorshipTier
+    confidence: RealSponsorshipTier | null
+    rationale: string | null
+  }
 >
 
 async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDomain> {
@@ -35,13 +44,14 @@ async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDo
 
   const { data, error } = await supabase
     .from('employers')
-    .select('domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
+    .select('id, domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
     .in('domain', domains)
     .eq('excluded_from_scoring', false)
 
   if (error || !data) return map
 
   for (const row of data as unknown as {
+    id: string
     domain: string | null
     employer_sponsorship_scores: { score: string | null; confidence: string | null; rationale: string | null } | null
   }[]) {
@@ -50,6 +60,7 @@ async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDo
     const score = asRealSponsorshipTier(scoreRow?.score)
     if (!domain || !score) continue
     map.set(domain, {
+      employerId: row.id,
       score,
       confidence: asRealSponsorshipTier(scoreRow?.confidence),
       rationale: scoreRow?.rationale ?? null,
@@ -57,6 +68,17 @@ async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDo
   }
 
   return map
+}
+
+/** Employer ids the current profile has an active Sponsor Watch subscription for. */
+async function fetchWatchedEmployerIds(profileId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('sponsor_watch_subscriptions')
+    .select('employer_id')
+    .eq('profile_id', profileId)
+
+  if (error || !data) return new Set()
+  return new Set(data.map((row) => row.employer_id as string))
 }
 
 function parsePremiumInsightsOrgChoices(raw: unknown): PremiumInsightsOrgChoice[] | null {
@@ -135,6 +157,7 @@ function toMatchedJob(
   job: JobHopperLive | null,
   isSaved: boolean,
   realScoresByDomain: RealScoreByDomain,
+  watchedEmployerIds: Set<string>,
 ): MatchedJob {
   const storedSponsorship = job?.sponsorship_likelihood ?? null
   const realScore = job?.company_domain ? realScoresByDomain.get(job.company_domain) ?? null : null
@@ -181,6 +204,8 @@ function toMatchedJob(
     sponsorshipRealScore: realScore?.score ?? null,
     sponsorshipRealConfidence: realScore?.confidence ?? null,
     sponsorshipRealRationale: realScore?.rationale ?? null,
+    sponsorshipEmployerId: realScore?.employerId ?? null,
+    sponsorshipWatched: realScore?.employerId ? watchedEmployerIds.has(realScore.employerId) : false,
   }
 }
 
@@ -260,6 +285,9 @@ export const jobsAPI = {
       ),
     )
     const realScoresByDomain = await fetchRealScoresByDomain(domains)
+    const watchedEmployerIds = await getCurrentProfileId()
+      .then(fetchWatchedEmployerIds)
+      .catch(() => new Set<string>())
 
     const hiringByMatchId = new Map<
       string,
@@ -323,7 +351,7 @@ export const jobsAPI = {
 
     const result: MatchedJob[] = matches.map((match) => {
       const job = match.job_id ? jobById.get(match.job_id) ?? null : null
-      const base = toMatchedJob(match, job, savedMatchIds.has(match.id), realScoresByDomain)
+      const base = toMatchedJob(match, job, savedMatchIds.has(match.id), realScoresByDomain, watchedEmployerIds)
       const tierName =
         base.subscriptionTier != null
           ? tierNameByKey.get(base.subscriptionTier) ?? null
@@ -440,7 +468,10 @@ export const jobsAPI = {
 
     const jobDomain = (job as JobHopperLive).company_domain
     const realScoresByDomain = jobDomain ? await fetchRealScoresByDomain([jobDomain]) : new Map()
-    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow, realScoresByDomain)
+    const watchedEmployerIds = await getCurrentProfileId()
+      .then(fetchWatchedEmployerIds)
+      .catch(() => new Set<string>())
+    const base = toMatchedJob(match, job as JobHopperLive, !!savedRow, realScoresByDomain, watchedEmployerIds)
 
     const hiringStatus = hiringRow?.status as JobHiringContactsStatus | undefined
     const contacts =
@@ -543,6 +574,41 @@ export const jobsAPI = {
       .from('saved_jobs')
       .delete()
       .eq('match_id', matchId)
+
+    if (error) {
+      return { error }
+    }
+
+    return { error: null }
+  },
+
+  /** Sponsor Watch (Premium, D51-55): subscribe to quarterly filing-volume alerts for the
+   * job's resolved employer. `employerId` is `employers.id`, brand-level (§3 decision 5) -
+   * watching "Goldman Sachs" covers all of its filers. Premium gating happens in the UI layer
+   * (same condition as the real-score badge), not here - RLS/grants are the DB-level backstop. */
+  async watchEmployer(employerId: string): Promise<{ error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { error } = await supabase.from('sponsor_watch_subscriptions').insert({
+      profile_id: profileId,
+      employer_id: employerId,
+    } satisfies Partial<SponsorWatchSubscription>)
+
+    if (error) {
+      return { error }
+    }
+
+    return { error: null }
+  },
+
+  async unwatchEmployer(employerId: string): Promise<{ error: Error | null }> {
+    const profileId = await getCurrentProfileId()
+
+    const { error } = await supabase
+      .from('sponsor_watch_subscriptions')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('employer_id', employerId)
 
     if (error) {
       return { error }

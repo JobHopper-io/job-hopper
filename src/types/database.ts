@@ -68,6 +68,12 @@ export type Employer = Tables<'employers'>
 export type EmployerSponsorshipScore = Tables<'employer_sponsorship_scores'>
 export type RealSponsorshipTier = 'Low' | 'Medium' | 'High'
 
+// Sponsor Watch (Premium, D51-55): quarterly diff-alert subscription on a brand-level employer.
+// Users manage their own rows directly (subscribe/unsubscribe), no update - a subscription is
+// either present or absent, nothing on the row itself is user-editable.
+export type SponsorWatchSubscription = Tables<'sponsor_watch_subscriptions'>
+export type SponsorWatchSubscriptionInsert = TablesInsert<'sponsor_watch_subscriptions'>
+
 /** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
 export interface JobContact {
   name: string
@@ -119,6 +125,11 @@ export interface MatchedJob {
   sponsorshipRealScore: RealSponsorshipTier | null
   sponsorshipRealConfidence: RealSponsorshipTier | null
   sponsorshipRealRationale: string | null
+  /** employers.id for the job's resolved employer, when real-score-backed (§3 decision 11 gate -
+   * same condition as sponsorshipRealScore). Needed to subscribe/unsubscribe Sponsor Watch. */
+  sponsorshipEmployerId: string | null
+  /** Whether the current profile has an active Sponsor Watch subscription for this employer. */
+  sponsorshipWatched: boolean
   contacts?: JobContact[]
   /** Premium Insights pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null

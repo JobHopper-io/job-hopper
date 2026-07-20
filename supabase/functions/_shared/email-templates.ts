@@ -290,6 +290,84 @@ export function renderSubscriptionCanceled(params: {
 }
 
 /**
+ * Sponsor Watch alert (D51-55): an employer's summed DOL LCA filing volume moved enough since
+ * the last quarterly check to cross a score bucket (Low/Medium/High) or change by >=25%. Copy
+ * must state this is quarterly filing-VOLUME data, not real-time and not an approval-outcome
+ * signal - matches the disclaimer language already used in the Real Sponsorship Score rationale
+ * (D41-45, job_processor/sponsorship_scoring.py::build_rationale).
+ */
+export function renderSponsorWatchAlert(params: {
+  recipientName: string
+  employerName: string
+  previousPositions: number
+  currentPositions: number
+  previousScore: string | null
+  currentScore: string
+  direction: "up" | "down"
+  pctChange: number
+  dashboardUrl: string
+  footer?: Partial<TemplateFooterOptions>
+}): { html: string; text: string } {
+  const {
+    recipientName,
+    employerName,
+    previousPositions,
+    currentPositions,
+    previousScore,
+    currentScore,
+    direction,
+    pctChange,
+    dashboardUrl,
+    footer,
+  } = params
+  const prefsUrl = footer?.preferencesUrl ?? DEFAULT_FOOTER_OPTIONS.preferencesUrl
+  const unsubUrl = footer?.unsubscribeUrl ?? DEFAULT_FOOTER_OPTIONS.unsubscribeUrl
+
+  const verb = direction === "up" ? "increased" : "decreased"
+  const scoreLine =
+    previousScore && previousScore !== currentScore
+      ? `Its sponsorship score moved from ${previousScore} to ${currentScore}.`
+      : `Its sponsorship score is ${currentScore}.`
+  const summary = `${employerName}'s DOL filing volume ${verb} ${pctChange.toFixed(0)}% since we last checked - from ${previousPositions.toLocaleString()} to ${currentPositions.toLocaleString()} sponsored positions.`
+  const disclaimer =
+    "This reflects DOL Labor Condition Application filing volume, checked quarterly - not real-time activity, and not H-1B petition approval outcomes."
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Sponsor Watch: ${escapeHtml(employerName)}</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 1rem;">
+  <h1 style="font-size: 1.5rem;">Hi ${escapeHtml(recipientName)},</h1>
+  <p>You're watching <strong>${escapeHtml(employerName)}</strong> on Job-Hopper. Here's what changed.</p>
+  <div style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+    <p style="margin: 0 0 0.5rem 0;">${escapeHtml(summary)}</p>
+    <p style="margin: 0;">${escapeHtml(scoreLine)}</p>
+  </div>
+  <p style="font-size: 0.85rem; color: #666;">${escapeHtml(disclaimer)}</p>
+  <p><a href="${escapeHtml(dashboardUrl)}">View jobs at ${escapeHtml(employerName)} in your dashboard</a></p>
+  ${footerHtml({ preferencesUrl: prefsUrl, unsubscribeUrl: unsubUrl })}
+</body>
+</html>`
+
+  const text = [
+    `Hi ${recipientName},`,
+    `You're watching ${employerName} on Job-Hopper. Here's what changed.`,
+    "",
+    summary,
+    scoreLine,
+    "",
+    disclaimer,
+    "",
+    `View jobs: ${dashboardUrl}`,
+    "",
+    "Manage preferences: " + prefsUrl,
+    "Unsubscribe: " + unsubUrl,
+  ].join("\n")
+
+  return { html, text }
+}
+
+/**
  * System announcement: body is pre-rendered HTML from system_announcements.email_body_html.
  * We only wrap with footer.
  */

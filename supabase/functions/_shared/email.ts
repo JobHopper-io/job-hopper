@@ -18,7 +18,7 @@ export interface SendEmailOptions {
   metadata?: Record<string, unknown>
   /** For email_events logging */
   profileId?: string | null
-  eventType?: "job_match_digest" | "subscription_update" | "system_announcement"
+  eventType?: "job_match_digest" | "subscription_update" | "system_announcement" | "sponsor_watch_alert"
   templateKey?: string | null
   payload?: Record<string, unknown> | null
   /** Supabase client (service_role) to insert into email_events. If omitted, no DB log. */

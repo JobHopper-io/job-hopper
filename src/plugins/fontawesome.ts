@@ -32,6 +32,7 @@ import {
   faArrowUpRightFromSquare,
   faSackDollar,
   faTag,
+  faBell,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -66,6 +67,7 @@ library.add(
   faArrowUpRightFromSquare,
   faSackDollar,
   faTag,
+  faBell,
   faTiktok,
   faInstagram,
 )
