@@ -2,7 +2,7 @@
 
 Working document for the Premium "Real Sponsorship Score" and Sponsor Watch features.
 Covers: data sources, current-state audit, the scoring approach, a proposed data model,
-and the revised day-by-day plan. Last updated 2026-07-18.
+and the revised day-by-day plan. Last updated 2026-07-20.
 
 **Status: D31–35 (ingest) DONE. D36 (seed) DONE — 400 employers → 374 post-merge. D37 (reduced)
 DONE — 16 brands merged, 6 umbrella FEINs flagged `excluded_from_scoring`. D41–45 (scoring) DONE
@@ -11,6 +11,22 @@ DONE — 16 brands merged, 6 umbrella FEINs flagged `excluded_from_scoring`. D41
 D46–50 (UI wiring) DONE 2026-07-18, browser-verified against an isolated local stack — see §5a.
 Real-world coverage still depends on the `employers.domain` backfill, **not yet run** (needs a
 real `BRAVE_SEARCH_API_KEY`; blocked on that, not on code).
+
+**D51–55 (Sponsor Watch) BUILT 2026-07-20 — migrations/edge function written, NOT pushed/deployed
+to production yet (pending explicit go-ahead), and the recurring cron is NOT seeded.** Threshold
+decided with Nick/Syed (2026-07-20): alert on score-bucket crossing OR >=25% relative change in
+summed `total_worker_positions` — see §5 D51–55 for the full reasoning, the measured real
+distribution (367 employers, 62 to 73,690 positions, ~1,189x spread), and why the 25% guard is a
+starting estimate, not a measured one (no historical quarter-over-quarter data exists yet).
+
+**D56–60 (Validation) DONE 2026-07-20 — score/confidence distributions and known-sponsor
+spot-checks all correct against real data; zero mismatches on independent re-derivation.** One
+data-quality edge case found (Tavaro - High score driven by a single 400-position filing); a
+≥3-certified-filing floor was proposed, impact measured before applying (dropped exactly 1 of 123
+currently-High employers), and **APPLIED to production 2026-07-20** — `compute-scores` re-run,
+live distribution confirmed `High 122 / Medium 124 / Low 122` (368 total), Tavaro confirmed
+`High → Medium` and nothing else changed. See §5 D56–60. Launch remains blocked on D46–50's
+domain backfill and D51–55's deploy, independent of validation/scoring being done.
 
 **🔻 SCOPE: Phase 5 v1 is LCA-ONLY (decided 2026-07-17, §3 decision 7).** D38–40 — the LCA↔USCIS
 join and its verification — are **cut from v1 and deferred to a v2 enrichment**. v1 ships a
@@ -64,6 +80,13 @@ them threw an error.** They returned plausible numbers and exit code 0:
 | Alias uniqueness constraint | Inserts "worked" for two wrong index designs | Counting rows the constraint *permits* (400, then 517) vs. rows actually needed (642) |
 | `max()` similarity mislabelling umbrellas | Sensible-looking a/b/c label distribution | Checking SUNY/NYC/UMass specifically → all three mislabelled as "typos". With 22 names there are 231 pairs, so *some* pair is always ≥0.75 similar and `max()` always fires |
 | RLS policy with no underlying `GRANT` (D46–50) | `npm run build` green, page rendered fine, badge showed a value — looked like the ordinary "no match, fell back to heuristic" path | Only caught by an actual authenticated browser request: PostgREST 403'd the query outright. `create policy ... using (true)` was live and correct, but Postgres requires the base `GRANT SELECT` before a policy is even evaluated — RLS filters rows an *already-permitted* operation returns, it doesn't itself grant the permission. `employers`/`employer_sponsorship_scores` were readable by literally nobody (service role only) from `20260717180000` until this was caught and fixed in `20260718120000`, in production. Neither `npm run build` nor `npm run type-check` can catch this class of bug — nothing about it is a type error. |
+| `sponsor-watch-check` manual auth test 401'd with a "confirmed-valid" key (D51–55) | `{"error":"Unauthorized"}` on every attempt, including a fresh key pasted straight from `job-processor-service/.env` — looked exactly like a code bug in `isAuthorized()` or a broken/corrupted platform auto-injection | A length-only diagnostic log (never the secret itself) showed the deployed function's live `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` is **41 characters**, not the **~219-character** legacy JWT sitting in `.env`. Adding the same log to the already-working `reconcile-subscriptions` confirmed it *also* reports 41 — proving this is project-wide and current (Supabase's newer `sb_secret_...` key format), not corrupted and not specific to the new function. `.env` held a stale legacy-format key. Production's real cron path (pg_cron → `run-scheduled-jobs` → target function) was never affected: both sides always read the *live* auto-injected value fresh at request time and never touch `.env`, so they're self-consistent by construction regardless of which format is current. Only manual hand-testing with a stale copied credential surfaced this. |
+
+**⚠️ Manual hand-testing a service-role-gated edge function must pull the current key from Supabase
+Dashboard → Project Settings → API, not from `job-processor-service/.env`.** That file is a
+manually-maintained snapshot and can silently go stale relative to whatever Supabase currently
+auto-injects as `SUPABASE_SERVICE_ROLE_KEY` — as it did here. A `===` comparison against a stale
+copy fails exactly like a broken function even when nothing is broken.
 
 **The pattern is identical every time: the failure is silent and the output is plausible.** A
 number that looks about right is the characteristic *symptom*, not evidence of correctness. Green
@@ -186,8 +209,8 @@ restriction on reuse).** Acquisition is trivial; the work is normalization + ent
 | **Entity resolution** (D36–40) | ✅ **D36–37 done 2026-07-17 (LCA-only, reduced scope)** | `employers` (374, brand-level) + `employer_name_aliases` (642) live. `job_processor/sponsorship_resolution.py`, CLI `job-processor sponsorship {seed-employers,apply-d37-decisions}`. Systematic merge/split + `uscis_h1b_hub` join still D38–40, deferred to v2. |
 | **Scoring/confidence** (D41–45) | ✅ **DONE 2026-07-17, LCA-only** (§3 decision 7) | `employer_sponsorship_scores` populated for 368/374 employers (Low/Medium/High score **and** confidence, same scale as the heuristic — no numeric score). `job_processor/sponsorship_scoring.py`, CLI `job-processor sponsorship compute-scores`. Old heuristic (`_shared/infer-sponsorship-likelihood.ts`) untouched — still the fallback for the 6 `excluded_from_scoring` employers and for any company outside this 374-employer scope. |
 | **Sponsorship UI** (D46–50) | ✅ **Wiring DONE 2026-07-18**, 0% live coverage until domain backfill runs | `JobSponsorshipBadge.vue` Premium-only data-source swap + rationale tooltip, domain-based job↔employer matching (`job_hopper_live.company_domain` ↔ `employers.domain`), browser-verified. See §5a D46–50. Still needed: run the domain backfill against prod, Sponsor-Watch surface. |
-| **Sponsor Watch** (D51–55) | ❌ None (infra exists) | No worker/route/page. But `scheduled_jobs` + pg_cron + `run-scheduled-jobs` and provider-agnostic `sendEmail` (`_shared/email.ts`) are ready to host it. |
-| **Validation + launch** (D56–60) | ❌ N/A | — |
+| **Sponsor Watch** (D51–55) | 🟡 **Built 2026-07-20, not deployed** | Migrations (`20260720130000`, `20260720140000`), `sponsor-watch-check` edge function, `sponsor_watch_alert` email template, `SponsorWatchToggle.vue` wired into `JobCard.vue`/`JobDetail.vue` all written. Not pushed to production DB, edge function not deployed, no `scheduled_jobs` seed row (cron not started) — pending go-ahead. See §5 D51–55. |
+| **Validation + launch** (D56–60) | 🟡 **Validation + scoring fix done 2026-07-20, launch pending** | Spot-checked score/confidence for all 368 scored employers against known sponsors and against independently re-derived source numbers - zero mismatches. One real data-quality edge case found (Tavaro, single-filing-driven High) - fix (≥3 certified-filing floor) measured, applied, and confirmed in production. Feature launch itself still blocked on D46–50's domain backfill + D51–55's deploy. See §5 D56–60. |
 | **LCA↔USCIS join** (D38–40) | ⛔ **CUT from v1 → v2** | `uscis_h1b_hub` stays ingested (36,624 rows, `employer_id` null), untouched and ready. Design kept in §5. **Scope cut, not rollback** (§3 decision 7). |
 
 **Reusable today:** the `sponsorship_likelihood` column + enum, the heuristic scorer, the badge
@@ -704,9 +727,12 @@ Overall arc **kept**; four scope changes marked **[CHANGED]**.
   D46–50 for the full discovery + build writeup). Browser-verified; production coverage is 0%
   until the `employers.domain` backfill runs (blocked on a real Brave key, not on code).
 - **D51–55 — Sponsor Watch.** **[CHANGED]** *Reframe.* Quarterly diff-alert worker on
-  `scheduled_jobs` + pg_cron; alerts via `sendEmail`. Not real-time.
+  `scheduled_jobs` + pg_cron; alerts via `sendEmail`. Not real-time. **Built 2026-07-20** — see §5a.
 - **D56–60 — Validation + launch, Score v1.** *Stick.* Validate on the 300–500 set; spot-check
-  against known sponsors; launch scoped, expand the employer universe after.
+  against known sponsors; launch scoped, expand the employer universe after. **Validation done
+  2026-07-20** — see §5a. Launch itself still pending (production coverage is still 0% - see
+  D46–50's open item on the `employers.domain` backfill - and Sponsor Watch isn't deployed yet -
+  see D51–55).
 
 ---
 
@@ -835,7 +861,206 @@ posting (the domain backfill hasn't run yet, see below).
   backfilled with `company_domain` — real Brave+LLM cost across thousands of lookups for postings
   that may already be stale. Coverage grows organically as the scraper pipeline re-ingests with
   the `pipeline.py` fix in place.
-- D51–55 (Sponsor Watch) not started.
+- D51–55 (Sponsor Watch) built (see below); not yet pushed/deployed to production.
+
+### D51–55 — Sponsor Watch (BUILT 2026-07-20, not deployed to production yet)
+
+**Threshold decision (Nick/Syed, 2026-07-20).** Sponsor Watch alerts fire when, at a quarterly
+check, an employer's summed `total_worker_positions` (Certified/Certified-Withdrawn `lca_filings`
+only, same rule as D41–45's `score`) either (a) crosses a score bucket (Low/Medium/High, reusing
+the exact tertile boundaries already measured for D41–45 — 99/192) or (b) moves by **>=25%**
+relative to the value recorded at the previous check.
+
+**Why relative, not absolute, and why 25% is an estimate, not a measurement.** Queried the real
+`lca_filings` data before proposing anything (367 currently-scored employers, umbrella-FEIN
+exclusions already removed): summed positions range from **62 to 73,690**, median **137**, p75
+**285**, p90 **1,241** — a ~1,189x spread, heavily right-skewed (mean 1,031 is 7.5x the median).
+That skew rules out any flat absolute-position cutoff (meaningless noise for a 73,690-position
+employer, would never fire for a 62-position one) — it has to be a percentage. But there is **no
+historical quarter-over-quarter data yet** to measure real volatility against (only one FY has
+ever been ingested), so 25% is a starting estimate grounded in the cross-sectional skew, not a
+measured quantity the way the 99/192 tertile cutoffs are. **Revisit once the first real
+quarter-over-quarter delta lands** (i.e. after someone re-ingests a second DOL quarterly file and
+a watch check actually runs against it) — same "measure, don't guess" principle as the rest of
+this doc, just not yet possible here for lack of a second data point.
+
+**Why bucket-crossing alone isn't enough.** The `score_bucket` High band is open-ended (193+) and
+in the real data spans 193 to 73,690 — a huge employer could lose thousands of positions and stay
+"High" with bucket-crossing as the only signal, which is exactly the flagship "watch a big
+well-known employer" case Sponsor Watch is for. Hence the OR: either signal alone is enough to
+alert.
+
+**Spot-checked against known cases before trusting it** (same working principle as every other
+automated pass in this doc): top 10 employers by summed counted positions are Qualcomm (73,690),
+Amazon (47,702), Goldman Sachs (42,850), Grandison Management, Cisco, Apple, CGI, NVIDIA, Infosys,
+Meta — all recognizable major H-1B filers, not an artifact of a matching bug. 52 employers sit
+within +/-10 positions of the 99 tertile boundary, confirming bucket-crossing is a real, densely
+populated signal rather than a boundary nobody is ever near.
+
+**What shipped:**
+1. **Schema** (`20260720130000`, `20260720140000`): `sponsor_watch_alert` added to the
+   `email_event_type` enum (its own migration file - `ALTER TYPE ... ADD VALUE` can't share a
+   transaction with anything that reads the new value); `watch_last_checked_positions` /
+   `watch_last_checked_score` / `watch_last_checked_at` added to `employer_sponsorship_scores`
+   (chosen over a new table since watching is only ever offered for employers that already have a
+   scores row, and the Python `compute-scores` upsert never includes these columns in its payload,
+   so PostgREST's merge-duplicates upsert leaves them untouched on every rescore); a
+   `sum_counted_lca_positions(uuid[])` SQL function + explicit `grant execute ... to service_role`
+   (PostgREST can't express a `GROUP BY` over its REST interface — deliberately not repeating the
+   D46-50 "policy without a GRANT" incident on the RPC path).
+2. **`sponsor-watch-check` edge function**: self-enqueues its next run first (same resilience
+   pattern as `reconcile-subscriptions` - recurrence survives a mid-run throw), checks only
+   actively-watched employers (not the full 367-employer sweep the Python scorer does), skips
+   profiles that have since downgraded off Premium (subscription row is left alone - re-upgrading
+   just resumes watching) or globally unsubscribed
+   (`notification_settings.email_unsubscribed_at`), writes a `sponsor_watch_events` row and emails
+   every eligible subscriber on a meaningful change, and always advances the baseline to the
+   current value after each check (matches "last-checked value" literally - not a cumulative
+   drift tracker). First check for a newly-watched employer only establishes the baseline, no
+   alert (nothing to compare to yet).
+3. **Email** (`renderSponsorWatchAlert` in `_shared/email-templates.ts`): explicitly states this
+   is quarterly DOL filing-VOLUME data, checked periodically, not real-time and not an H-1B
+   approval-outcome signal — same disclaimer register as D41–45's `rationale` text.
+4. **Frontend**: `employers.id` now flows through `src/lib/jobs.ts`'s `fetchRealScoresByDomain`
+   onto `MatchedJob.sponsorshipEmployerId`, alongside a new `sponsorshipWatched` boolean sourced
+   from one `sponsor_watch_subscriptions` query per page load (`fetchWatchedEmployerIds`) - same
+   shape as the existing `savedMatchIds` pattern, not a query per card. `jobsAPI.watchEmployer` /
+   `unwatchEmployer` mirror `saveJob`/`unsaveJob`. New `SponsorWatchToggle.vue` (self-contained,
+   calls `jobsAPI` directly rather than emitting up - a per-employer toggle doesn't need the whole
+   match list re-sorted the way saving does) wired into both `JobCard.vue` and `JobDetail.vue`,
+   gated on the exact same condition as the real-score badge (`isPremium && job.sponsorshipRealScore
+   && job.sponsorshipEmployerId`) - watching is only ever offered where there's a real score to
+   watch.
+
+**Deliberately NOT done yet, pending explicit go-ahead:**
+- Migrations not pushed to the production DB (`supabase db push`).
+- `sponsor-watch-check` not deployed (`supabase functions deploy sponsor-watch-check`).
+- No `scheduled_jobs` seed row - the recurring quarterly cron has not been started. (The seed
+  migration itself is intentionally not written yet either, so pushing migrations doesn't
+  silently start the cron as a side effect - it needs its own deliberate step.)
+- Not browser/integration-tested against a live stack the way D46–50 was (no isolated Docker
+  Supabase run this time) - only the position-summing computation itself was verified, by running
+  the identical Certified/Certified-Withdrawn summation logic client-side against real production
+  `lca_filings` and confirming it lands on known-correct results (the spot-check above). The RPC
+  function, the edge function's control flow (tier/unsubscribe gating, baseline bootstrap, email
+  send), and the frontend toggle are all unexercised against a real request/response cycle.
+
+### D56–60 — Validation (DONE 2026-07-20); launch still pending
+
+Pulled the live `employer_sponsorship_scores` + `employers` data (368 scored, 6
+`excluded_from_scoring`) and ran the spot-check working principle (§ top of doc) against it -
+known-answer cases first, then looked for what a plausible-looking pass might have gotten wrong.
+
+**Score distribution:**
+
+| Score | Count | Share |
+|---|---|---|
+| High | 123 | 33.4% |
+| Medium | 123 | 33.4% |
+| Low | 122 | 33.2% |
+
+Near-perfect tertiles, as expected - the 99/192 boundaries were derived from this exact
+distribution, so this is a consistency check, not new information.
+
+**Confidence distribution:**
+
+| Confidence | Count | Share |
+|---|---|---|
+| High | 286 | 77.7% |
+| Medium | 71 | 19.3% |
+| Low | 11 | 3.0% |
+
+Matches D41–45's predicted shape closely (~78% High, ~3% Low). Independently re-derived
+`recency_share` from each row's stored `data_coverage` and re-bucketed against the documented
+0.5/0.8 cutoffs - **zero mismatches** across all 368. Also independently re-summed
+`total_worker_positions` straight from live `lca_filings` (bypassing the stored `score` bucket
+entirely) and re-bucketed - **zero mismatches** there either. The stored scores are in sync with
+current `lca_filings`, not stale.
+
+**Known-heavy spot-check: correct.** Amazon, Goldman Sachs, Qualcomm, Cisco Systems, NVIDIA,
+Apple, Meta, Google, Microsoft, JPMorgan Chase, Deloitte, Accenture, Infosys, Tata Consultancy
+Services, Capital One, Morgan Stanley, Oracle, Intel, IBM, Cognizant, HCL, Wipro, Salesforce - all
+High, all High/Medium confidence. Walmart has no matching `employers` row - not a bug, genuinely
+outside the top-400-by-LCA-volume scope (IT-services/staffing firms dominate top LCA filers by a
+wide margin; a retailer's H-1B volume is real but smaller by comparison). Bottom-of-distribution
+spot-check (Tiger Analytics, Experis, Maplebear/Instacart, HubSpot, Auburn University, Perficient,
+NetApp, ESRI, Pure Storage) - all correctly Low.
+
+**⚠️ Self-correction caught mid-validation, worth naming explicitly:** the first spot-check pass
+flagged "University of California, San Francisco" (Medium, 173 positions) and "Intellectt Inc"
+(Medium, 119 positions) as suspicious non-matches against "Cisco"/"Intel." Both were false
+positives from naive substring matching in the *validation script itself* - `"san franCISCO"` and
+`"INTELlectt"` both contain the search string without being the company being searched for. Not a
+real anomaly in the scoring system; both scores are correct and unsurprising for what these
+employers actually are (a university medical center, a small IT staffing firm). Kept here on
+purpose: the whole point of this working principle is not trusting a plausible-looking automated
+pass at face value, including the validation pass's own tooling.
+
+**Flagged for review:**
+
+1. **Tavaro - High score driven by a single filing. FIXED and APPLIED 2026-07-20.** 3 total
+   filings: one Certified for 400 "Truck Driver" positions (2026-02-01), two Denied - 350
+   "Personal Care and Service Workers, All Other" and 400 "Non-medical care, cleaning, facility
+   support, general labor," both also filed 2026-02-01. Three round-numbered, atypical-for-H-1B
+   blue-collar job titles from one filer, one of which happened to certify. The algorithm did
+   exactly what D41–45 specifies (sum certified positions, bucket by tertile) - this was not a
+   code bug. It was a case where a single filing's face-value volume doesn't match the "broad,
+   sustained hiring pattern" the High badge implies to a job seeker.
+   - **Fix:** a minimum certified-filing-count floor (`MIN_CERTIFIED_FILINGS_FOR_HIGH = 3`) before
+     an employer can reach High, added to `score_bucket()` in
+     `job_processor/sponsorship_scoring.py`. An employer that would be High by position volume
+     alone but fails the floor is capped at Medium, not Low - the position volume is still real
+     signal, just not enough independent filings to back a High-confidence "broad hiring pattern"
+     claim.
+   - **Real impact, measured before committing** (same practice as the original tertile cutoffs -
+     grounded in real numbers, not picked in the abstract): of the 123 then-currently-High
+     employers, a ≥3 floor drops out **exactly 1 - Tavaro, and only Tavaro.** Even a ≥2 floor
+     already isolated it alone; a ≥5 floor would have caught one additional employer. Across *all*
+     368 scored employers (every bucket, not just High), only **2 total** have fewer than 3
+     certified filings - a genuinely rare edge case, not a broad recut. For context,
+     `counted_filing_count` across all 368 scored employers: p10=62, median=111 - the vast
+     majority of employers have abundant filing counts, so a floor of 3 sits nowhere near normal
+     legitimate volume; it targets the single-filing outlier case specifically, not a broad swath
+     of small-but-real sponsors.
+   - **Verified before writing, not just before deciding:** dry-ran `compute-scores --dry-run`
+     first (aggregate distribution shifted exactly as predicted: High 123→122, Medium 123→124, Low
+     unchanged). Then, before running for real, did a precise per-employer diff (current live
+     scores vs. the new in-memory computation, not just aggregate counts) and confirmed the diff
+     was the single Tavaro row and nothing else. Ran `compute-scores` for real, then re-confirmed
+     against the live table directly (not the CLI's own summary): `Tavaro: High -> Medium`,
+     distribution `High 122 / Medium 124 / Low 122`, 368 rows total, no other employer changed.
+     Added `test_score_bucket_high_requires_minimum_certified_filings` to
+     `tests/test_sponsorship_scoring.py` (7/7 tests pass) covering the Tavaro shape (400 positions,
+     1 filing → Medium, not High) and the boundary (3 filings → High).
+   - **Confirmed the right fix, not over-correction** - narrow, measured impact, exactly the
+     pattern this validation pass was designed to catch.
+   - **Rationale text updated to explain the cap, not just state raw numbers.** A user seeing "400
+     sponsored positions" next to a Medium badge with no explanation would reasonably read that as
+     inconsistent. `build_rationale()` gained a `capped_by_filing_floor` flag
+     (`capped_by_filing_floor()` helper, same module) that inserts an explicit sentence when it
+     applies. Live Tavaro rationale after re-running `compute-scores`: *"1 certified LCA filings in
+     FY2026, covering 400 sponsored positions. (2 additional filings were withdrawn or denied and
+     are not counted toward the score.) Reflects DOL filing activity only, not H-1B petition
+     approval outcomes. Medium (based on limited filing history — fewer than 3 certified filings)
+     despite the position volume above. 100% of filings are from the last 150 days (High
+     confidence)."* Regression-checked against Amazon/Goldman Sachs/Qualcomm (real, uncapped High
+     employers) directly against production - none picked up the new sentence. Two new tests
+     (`test_capped_by_filing_floor`, `test_rationale_explains_the_cap_when_capped_by_filing_floor`,
+     `test_rationale_omits_cap_note_when_not_capped` - 10/10 total pass).
+2. **COIN & LIFE SAVING EXCHANGE - correct behavior, closed, no action.** 0 certified positions
+   (both filings Denied), correctly Low with High confidence. "High confidence" paired with "0
+   positions" reads unusual at a glance, but the rationale text is coherent on inspection -
+   confidence answers "how current is this data," not "how much do they sponsor," and the
+   generated rationale text already makes that distinction in plain language. Confirmed correct,
+   closed out.
+
+**No instances found of:** High score + Low confidence (a "used to file a lot, has gone quiet"
+signal) - none of the 368 currently show this combination. Nothing to spot-check on that axis yet
+with only one FY of data; revisit once a second quarter is ingested.
+
+**Launch itself is still pending**, independent of this validation - blocked on the same two open
+items already logged above: the `employers.domain` backfill (D46–50, 0% production coverage until
+it runs) and Sponsor Watch not yet deployed (D51–55).
 
 Systematic merge/split detection, the durable override store, the domain/Apollo grouping pass, and
 the LCA↔USCIS join all still defer to v2 with D38–40. Their design (§3 decision 6, §5 D38–39) is

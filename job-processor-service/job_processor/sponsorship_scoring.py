@@ -18,6 +18,18 @@ Bucketed into tertiles measured against the real 368-scored-employer distributio
 Re-derive these from real data (don't guess round numbers) if the employer scope ever changes
 materially - see the working principle in the doc.
 
+High additionally requires >=MIN_CERTIFIED_FILINGS_FOR_HIGH certified filings (D56-60,
+2026-07-20), not position volume alone. Found during validation: "Tavaro" reached High off a
+single 400-position Truck Driver filing while two other same-day filings for similarly round,
+atypical-for-H-1B position counts were Denied - a single filing's face-value volume doesn't match
+the "broad, sustained hiring pattern" the High badge implies. Impact was measured before this was
+added, not guessed: of the 123 employers that were High before this floor, exactly 1 (Tavaro)
+drops out under >=3; across all 368 scored employers only 2 total have fewer than 3 certified
+filings at all, so this is a narrow, targeted fix, not a broad recut of the distribution. An
+employer that would be High by position volume alone but fails the floor is capped at Medium, not
+Low - the position volume is still real signal, just not enough independent filings to back a
+High-confidence "broad hiring pattern" claim.
+
 Confidence (Low/Medium/High) reflects filing-data coverage/recency, NOT approval likelihood.
 fiscal_year is uniformly 2026 in this scope (single-FY ingest), so there's no multi-year signal;
 instead this uses the share of an employer's filings (any status - this is about activity volume,
@@ -56,6 +68,10 @@ COUNTED_STATUSES = frozenset({"Certified", "Certified - Withdrawn"})
 SCORE_LOW_MAX = 99
 SCORE_MEDIUM_MAX = 192
 
+# D56-60, 2026-07-20: minimum certified filings before position volume alone can reach High - see
+# module docstring for the Tavaro case this catches and the measured impact (1 of 123 employers).
+MIN_CERTIFIED_FILINGS_FOR_HIGH = 3
+
 RECENCY_WINDOW_DAYS = 150  # ~5 months; matches the observed concentration in received_date
 CONFIDENCE_LOW_MAX_SHARE = 0.5
 CONFIDENCE_HIGH_MIN_SHARE = 0.8
@@ -63,12 +79,22 @@ CONFIDENCE_HIGH_MIN_SHARE = 0.8
 ALGORITHM_VERSION = "lca_volume_recency_v1"
 
 
-def score_bucket(counted_positions: int) -> Bucket:
+def score_bucket(counted_positions: int, counted_filing_count: int) -> Bucket:
     if counted_positions <= SCORE_LOW_MAX:
         return "Low"
     if counted_positions <= SCORE_MEDIUM_MAX:
         return "Medium"
+    if counted_filing_count < MIN_CERTIFIED_FILINGS_FOR_HIGH:
+        return "Medium"
     return "High"
+
+
+def capped_by_filing_floor(counted_positions: int, counted_filing_count: int) -> bool:
+    """True when position volume alone would reach High but MIN_CERTIFIED_FILINGS_FOR_HIGH caps
+    the score at Medium instead (the Tavaro case, D56-60) - callers use this to make the rationale
+    say so explicitly, rather than stating the raw numbers with no explanation for why the bucket
+    doesn't match what the volume alone would suggest."""
+    return counted_positions > SCORE_MEDIUM_MAX and counted_filing_count < MIN_CERTIFIED_FILINGS_FOR_HIGH
 
 
 def confidence_bucket(recency_share: float) -> Bucket:
@@ -87,6 +113,7 @@ def build_rationale(
     fiscal_years: list[int],
     recency_share: float,
     confidence: Bucket,
+    capped_by_filing_floor: bool = False,
 ) -> str:
     fy_label = f"FY{fiscal_years[0]}" if len(fiscal_years) == 1 else f"FY{min(fiscal_years)}-FY{max(fiscal_years)}"
     parts = [
@@ -99,6 +126,11 @@ def build_rationale(
             1,
             f"({total_filing_count - counted_filing_count} additional filings were withdrawn or "
             f"denied and are not counted toward the score.)",
+        )
+    if capped_by_filing_floor:
+        parts.append(
+            f"Medium (based on limited filing history — fewer than "
+            f"{MIN_CERTIFIED_FILINGS_FOR_HIGH} certified filings) despite the position volume above."
         )
     parts.append(f"{recency_share:.0%} of filings are from the last {RECENCY_WINDOW_DAYS} days ({confidence} confidence).")
     return " ".join(parts)
@@ -231,7 +263,7 @@ async def compute_and_write_scores(db: SupabaseRest, *, dry_run: bool) -> ScoreC
             continue
 
         recency_share = s["recent_filing_count"] / s["total_filing_count"] if s["total_filing_count"] else 0.0
-        score = score_bucket(s["counted_positions"])
+        score = score_bucket(s["counted_positions"], s["counted_filing_count"])
         confidence = confidence_bucket(recency_share)
         rationale = build_rationale(
             counted_filing_count=s["counted_filing_count"],
@@ -240,6 +272,7 @@ async def compute_and_write_scores(db: SupabaseRest, *, dry_run: bool) -> ScoreC
             fiscal_years=s["fiscal_years"] or [0],
             recency_share=recency_share,
             confidence=confidence,
+            capped_by_filing_floor=capped_by_filing_floor(s["counted_positions"], s["counted_filing_count"]),
         )
         score_dist[score] += 1
         conf_dist[confidence] += 1
