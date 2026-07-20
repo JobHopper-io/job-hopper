@@ -164,6 +164,14 @@ onUnmounted(() => {
           </div>
 
           <template v-else>
+            <p
+              v-if="hasContacts"
+              class="rounded-lg border border-brand-primary/20 bg-brand-primary/10 px-3 py-2 text-xs text-brand-primary"
+            >
+              Tip: Reaching out directly to a contact below — in addition to applying online — is
+              a common way to help your application stand out.
+            </p>
+
             <template v-if="showOrgChoice">
               <p class="text-sm text-neutral-body">
                 Choose the one that best represents this posting’s employer, or choose none if there are no good matches.

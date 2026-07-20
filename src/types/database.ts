@@ -138,6 +138,10 @@ export interface MatchedJob {
   /** Days since the job's posted_date (falling back to job_hopper_live.created_at), for the
    * staleness note's copy. Null when neither date is available. */
   daysSincePosted: number | null
+  /** True within the first 7 days of a posting (Apply Intelligence A). Mutually exclusive with
+   * isStale by construction (7 vs. >45 day thresholds never overlap) - advice-only, no claim
+   * this app's data proves early applications do better. */
+  isRecentlyPosted: boolean
   contacts?: JobContact[]
   /** Premium Insights pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null

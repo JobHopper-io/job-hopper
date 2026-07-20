@@ -117,7 +117,7 @@ that copy is still accurate regardless of individual feature status).
 |---|---|---|
 | 1 | Real Sponsorship Score | ✅ Done, launch blocked on the `employers.domain` backfill (see D46–50 below) |
 | 2 | Sponsor Watch | 🟡 Built, not deployed to production (see D51–55 below) |
-| 3 | Apply Intelligence | ⛔ Not started |
+| 3 | Apply Intelligence | 🟡 **Scoped 2026-07-20 — v1 = A+B, advice-only** (see below); not yet built |
 | 4 | Hiring Manager Contact | ✅ **Done and verified 2026-07-20** |
 | 5 | Ghost Listing Detector | ❌ **Investigated 2026-07-20, not viable as scoped** — closed, not shelved (see below) |
 
@@ -134,6 +134,37 @@ Goleta Sanitary District (Peter Regis, Laura Romano, Robert Hidalgo), matching w
 undeployed code). Still open: overall `job_hiring_contacts` data quality/reliability at scale
 beyond this one spot-check.
 
+**Apply Intelligence v1 scope, decided 2026-07-20: A+B only, both advice-only, no outcome-based
+claims.** Original framing ("the best time and way to apply") broke into four sub-claims; only
+two survive contact with the actual data:
+- **A — "apply while it's fresh":** surfaces the same `daysSincePosted`/`isStale` computation
+  already shipped for the staleness badge (`src/lib/jobs.ts`, `toMatchedJob`), just applied at
+  the fresh end instead of the stale end. No new data, no new pipeline.
+- **B — "apply through your contact":** copy-only layer on Feature 4's existing
+  `job_hiring_contacts` output — when a contact was successfully revealed, recommend using it
+  alongside the normal apply link. No new data.
+- **Timing (response-rate-by-day/time) is dropped, not deferred:** would need `job_applications.applied_at`,
+  which has existed since the table was created (`20260711120600_create_job_applications.sql`)
+  but is **never written by any code path** — `applicationsAPI.setStatus` (`src/lib/applications.ts`)
+  never sets it, and `updated_at` is overwritten on every subsequent status change, so the moment
+  of applying isn't reconstructable after the fact either. Not a sample-size problem — the field
+  is structurally dead.
+- **Competition/volume signals are dropped:** no applicant-count data exists anywhere in
+  `job_hopper_live` or the scraping pipeline; would be a wholly new data source, not a reuse of
+  something that exists.
+- **C — outcome-rate signal from tracked application outcomes — closed, not deferred.**
+  `job_applications` has **5 total rows across 3 profiles** project-wide. This isn't "wait for
+  more sample size" — there is currently no dataset to have an opinion about. Reopen only if
+  real tracker adoption changes that materially (see `docs/architecture.md` for the adoption
+  finding itself, which is a separate, non-Premium concern).
+
+**Hard constraint on A and B, because it's an easy line to cross:** both are general
+job-search-advice framing, not measured claims — no percentages, no "X% better," no tone
+implying the app's own data proves either recommendation. That register is earned by Real
+Sponsorship Score (complete government filing data) and not available here (a thin, voluntary,
+self-reported dataset for C, and no outcome data backing A or B's effectiveness at all — they're
+restated best practice, not findings).
+
 **Ghost Listing Detector is closed, not shelved for later.** The schema cannot distinguish a
 genuine refill from a ghost repost — both produce an identical row signature (same
 `company_name`+`job_title`, new `apply_link`, roughly periodic recurrence in `job_hopper_live`,
@@ -149,9 +180,9 @@ real-world behavior (a role gets re-advertised) looks the same either way. **Reo
 requires a real outcome signal that doesn't exist today** — ATS integration or equivalent hire
 feedback — not a smarter heuristic on existing data.
 
-**Net: 2 of 5 Premium features remain to build** (Apply Intelligence not started; Ghost Listing
-Detector closed as not viable with current data — see above). 3 of 5 done: Real Sponsorship
-Score, Sponsor Watch, Hiring Manager Contact.
+**Net: 3 of 5 done** (Real Sponsorship Score, Sponsor Watch, Hiring Manager Contact), **1 of 5
+scoped and ready to build** (Apply Intelligence v1 = A+B, advice-only), **1 of 5 closed**
+(Ghost Listing Detector, not viable with current data).
 
 *(A related but separate finding surfaced during this investigation — matched jobs going stale
 in a user's own feed/saved list with no re-check — is a data-hygiene/UX gap affecting all users,

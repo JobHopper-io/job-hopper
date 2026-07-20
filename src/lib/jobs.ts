@@ -207,6 +207,7 @@ function toMatchedJob(
     ? jobExceedsMaxAge({ postedDate: ageSourceIso, createdAt: ageSourceIso } as JobRecord, defaultConfig)
     : false
   const daysSincePosted = daysSince(ageSourceIso)
+  const isRecentlyPosted = daysSincePosted != null && daysSincePosted <= 7
 
   return {
     matchId: match.id,
@@ -239,6 +240,7 @@ function toMatchedJob(
     sponsorshipWatched: realScore?.employerId ? watchedEmployerIds.has(realScore.employerId) : false,
     isStale,
     daysSincePosted,
+    isRecentlyPosted,
   }
 }
 

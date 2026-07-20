@@ -497,6 +497,13 @@ async function runAdviceCheckout() {
               {{ job.location }}
             </span>
             <span
+              v-if="job.isRecentlyPosted"
+              class="inline-flex items-center gap-1.5 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-2.5 py-0.5 text-xs font-medium text-brand-primary"
+            >
+              <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
+              Recently posted — early applicants tend to get noticed first
+            </span>
+            <span
               v-if="job.isStale"
               class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800"
             >

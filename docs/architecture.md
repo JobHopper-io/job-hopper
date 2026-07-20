@@ -77,10 +77,28 @@ Net effect: a job matched when 5 days old can sit in a user's dashboard, saved j
 indefinitely, rendering identically to a fresh match regardless of how old the underlying
 posting actually is now. This is a general data-hygiene/UX gap affecting all users on every
 tier — not tied to any Premium feature. (Surfaced while investigating Ghost Listing Detector;
-see `docs/sponsorship-data-engine.md` §0 for that separate, closed investigation.) Fix proposed,
-not yet built as of 2026-07-20 — pending a decision on what to do with a match found stale at
-read time (silent hide vs. a "may no longer be active" note vs. something else) before writing
-code.
+see `docs/sponsorship-data-engine.md` §0 for that separate, closed investigation.)
+
+**Fixed 2026-07-20** — `toMatchedJob()` (`src/lib/jobs.ts`) now computes `isStale`/
+`daysSincePosted` via the same `jobExceedsMaxAge` check, reused from
+`_shared/job-matching-algorithm.ts` rather than reimplemented, at read time. Both `getJobMatches()`
+and `getJobMatchByJobId()` route through it, so both surfaces are covered by one change.
+Deliberately **never hides anything** — saved jobs, tracked applications, and regular matches all
+just render an additional note ("Posted N days ago — may no longer be accepting applications")
+on `JobCard.vue`/`JobDetail.vue` when stale. The 45-day threshold used is `defaultConfig`'s, not
+any live admin override from `matching_algorithm_config` — a deliberate scope call to keep this
+a cheap read-time note rather than an extra config fetch on every job-list load; if an admin
+tunes the real gate away from 45 days, this note's threshold won't follow it.
+
+### Application Tracker: near-zero adoption (found 2026-07-20, unrelated to Apply Intelligence)
+
+While scoping Apply Intelligence's "outcome-rate" candidate (see
+`docs/sponsorship-data-engine.md` §0), checked real usage of the Application Tracker feature
+(`job_applications`, shipped alongside the Saved/Applied/Interviewing/Rejected/Ghosted pipeline):
+**5 total rows across 3 profiles, project-wide.** Whatever the cause — discoverability, the
+feature not being valuable as built, or something else — this is worth someone actually looking
+at on its own merits; it's not a data problem to route around, it's a product-adoption question.
+Not investigated further here since it's outside the scope of what surfaced it.
 
 ### Supabase client
 
