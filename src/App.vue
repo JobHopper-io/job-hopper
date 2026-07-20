@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 import { useUserStore } from '@/stores/user'
@@ -12,6 +13,12 @@ import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { baseTier } = storeToRefs(userStore)
+
+/** Same tier check as JobCard.vue/JobDetail.vue's isPremium - the Premium Tools nav link is
+ * discovery only (hiding it doesn't gate the route itself; direct /premium-tools navigation
+ * still shows the waitlist panel for Free/Core, unchanged). */
+const isPremium = computed(() => baseTier.value === 'premium')
 
 // The public landing page (`/`) ships its own bespoke fixed nav + dark footer that
 // match the redesign, so suppress the shared app chrome there. Authenticated users are
@@ -178,6 +185,7 @@ const handleSignOutAndCloseMenu = async () => {
                   Profile
                 </router-link>
                 <router-link
+                  v-if="isPremium"
                   to="/premium-tools"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
@@ -299,6 +307,7 @@ const handleSignOutAndCloseMenu = async () => {
                   Profile
                 </router-link>
                 <router-link
+                  v-if="isPremium"
                   to="/premium-tools"
                   class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
                   @click="mobileMenuOpen = false"
