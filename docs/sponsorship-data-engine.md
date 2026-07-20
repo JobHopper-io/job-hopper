@@ -105,6 +105,40 @@ every time it was checked** in this project.
 
 ---
 
+## 0. Premium features roadmap status (2026-07-20)
+
+This doc is Phase 5's working doc for features 1–2 only; no other doc tracks all five Premium
+features in one place, so status for the other three is summarized here for visibility. Feature
+list/order follows the user-facing table in `src/views/Pricing.vue:99-103` (all five still show
+"Coming soon" there — Premium itself isn't purchasable yet, `available_for_purchase=false`, so
+that copy is still accurate regardless of individual feature status).
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | Real Sponsorship Score | ✅ Done, launch blocked on the `employers.domain` backfill (see D46–50 below) |
+| 2 | Sponsor Watch | 🟡 Built, not deployed to production (see D51–55 below) |
+| 3 | Apply Intelligence | ⛔ Not started |
+| 4 | Hiring Manager Contact | ✅ **Done and verified 2026-07-20** |
+| 5 | Ghost Listing Detector | ⛔ Not started |
+
+**Hiring Manager Contact was substantially pre-existing, not net-new** — built via
+`premium-insights` (`supabase/functions/premium-insights/index.ts`) + `job_hiring_contacts`,
+predating this Phase 5 engine entirely. It does a live Apollo people-search per request (not a
+stored/cached contact list), tier-gated by `baseTier` (free 1 / core 2 / premium 3 contacts,
+seniority-ranked for Premium via `pickTopPeople` in `_shared/apollo.ts`). That tier-depth logic
+was added 2026-07-16 but hadn't been verified against a real execution until today: a fresh
+production run against a Premium test account returned 3 real, seniority-ranked contacts for
+Goleta Sanitary District (Peter Regis, Laura Romano, Robert Hidalgo), matching what was stored in
+`job_hiring_contacts` exactly — that live result is itself confirmation `premium-insights` and
+`_shared/apollo.ts`'s tier logic are deployed (a real production execution can't succeed against
+undeployed code). Still open: overall `job_hiring_contacts` data quality/reliability at scale
+beyond this one spot-check.
+
+**Net: 3 of 5 Premium features done** (Real Sponsorship Score, Sponsor Watch, Hiring Manager
+Contact); Apply Intelligence and Ghost Listing Detector remain unstarted.
+
+---
+
 ## 1. Data sources (verified 2026-07-15)
 
 Both sources are **free, public, no API key, U.S. government works (public domain — no license
