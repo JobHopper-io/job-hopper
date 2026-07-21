@@ -251,6 +251,19 @@ def sponsorship_compute_scores(
 @sponsorship_app.command("backfill-employer-domains")
 def sponsorship_backfill_employer_domains(
     dry_run: bool = typer.Option(False, "--dry-run"),
+    brave_only: bool = typer.Option(
+        False,
+        "--brave-only",
+        help="Skip the LLM confirmation step and take Brave's top search result's domain "
+        "directly. For use when no LLM key is available - only safe for well-known, "
+        "unambiguous company names, not the long tail where disambiguation matters.",
+    ),
+    only_name: list[str] = typer.Option(
+        [],
+        "--only-name",
+        help="Restrict to these canonical_name(s) (repeatable). For spot-checking a handful "
+        "of employers before running the full backfill.",
+    ),
 ) -> None:
     """D46-50 (§3 decision 11): resolves employers.domain for scored employers via the same
     resolve_company_domain used for job postings in pipeline.py (Brave + LLM, no Apollo credits),
@@ -270,6 +283,8 @@ def sponsorship_backfill_employer_domains(
                 oai=oai,
                 model=settings.llm_model_domain,
                 dry_run=dry_run,
+                brave_only=brave_only,
+                only_names=only_name or None,
             )
 
     counts = asyncio.run(run())
