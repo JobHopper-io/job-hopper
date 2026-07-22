@@ -134,17 +134,16 @@ export function relatedPages(row, allRows, max = 5) {
  * Choose the template for a row by page type. `page_type` may not exist yet;
  * read it defensively and default to the listing template.
  *
- * Returns `null` for any page type we cannot render yet (including `content`,
- * whose template is not built). Callers must skip null rows — never fail the
- * build over one unsupported row.
+ * Returns `null` for any page type we cannot render yet. Callers must skip
+ * null rows — never fail the build over one unsupported row.
  */
 export function pickTemplate(row) {
   const type = row.page_type ?? 'listing';
   switch (type) {
     case 'listing':
       return renderListingPage;
-    // 'content' is intentionally unsupported until the content template is
-    // built (see renderContentPage); it falls through to null and is skipped.
+    case 'content':
+      return renderContentPage;
     default:
       return null;
   }
@@ -274,15 +273,170 @@ ${relatedHtml}
 }
 
 // --------------------------------------------------------------------------
-// Content template (Type 3 problem/frustration pages) — STUB ONLY
+// Content template (Type 3 stat/editorial pages)
 // --------------------------------------------------------------------------
 
-export function renderContentPage() {
-  // TODO: content page template — built in a later task.
-  // Will read a `page_data` jsonb column for the headline stat and emit
-  // Article / FAQPage structured data. Not implemented yet, so fail loudly
-  // rather than emit an empty/broken page if a content row appears early.
-  throw new Error('Content page template not implemented yet (page_type="content").');
+/** 16000 -> "16,000". Falls back to "0" for non-finite input. */
+function formatNumber(n) {
+  return Number.isFinite(n) ? n.toLocaleString('en-US') : '0';
+}
+
+/**
+ * Breadcrumb for content pages: Home / Career Advice / {section}. Deliberately
+ * NOT the listing template's url-segment breadcrumb (there is no real hub page
+ * behind "Career Advice" yet, so that crumb is unlinked).
+ */
+function contentBreadcrumb(row) {
+  const pd = row.page_data ?? {};
+  let section;
+  if (row.url_path.startsWith('/jobs/ghost-jobs/')) {
+    section = `Ghost Jobs · ${pd.city_name ?? humanizeSegment(row.url_path.split('/').filter(Boolean).pop())}`;
+  } else {
+    section = humanizeSegment(row.url_path.split('/').filter(Boolean).pop());
+  }
+  return [
+    { name: 'Home', urlPath: '/' },
+    { name: 'Career Advice', urlPath: null },
+    { name: section, urlPath: row.url_path },
+  ];
+}
+
+/**
+ * CTA target/label for a content row. City ghost-jobs pages try to link the
+ * matching Type 1 listing page (same city slug, among already-queried rows);
+ * everything else falls back to signupUrl. Deliberately never includes a
+ * number in the label (a 0%-fresh city would otherwise read "0 listings").
+ */
+function contentCta(row, allRows, signupUrl) {
+  const pd = row.page_data ?? {};
+  if (typeof pd.ghost_rate_pct !== 'number') {
+    return { href: signupUrl, label: 'Get your free resume check' };
+  }
+  if (pd.city_name && pd.scope !== 'national') {
+    const citySlug = row.url_path.split('/').filter(Boolean).pop();
+    const match = allRows.find(
+      (r) =>
+        (r.page_type ?? 'listing') === 'listing' &&
+        r.url_path.split('/').filter(Boolean).pop() === citySlug,
+    );
+    if (match) {
+      return { href: match.url_path, label: `See verified fresh ${pd.city_name} listings` };
+    }
+  }
+  return { href: signupUrl, label: 'Browse verified job listings' };
+}
+
+/**
+ * Render a content (stat/editorial) page. No job grid, no ItemList/JobPosting
+ * JSON-LD — this is an Article. Branches on `page_data.ghost_rate_pct`: only
+ * render the stat callout when it's actually a number (some content rows,
+ * e.g. the resume-advice hook page, have no stat at all).
+ */
+export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRows = [] } = {}) {
+  const pd = row.page_data;
+  if (!pd || typeof pd !== 'object') {
+    throw new Error(`content row has missing/invalid page_data: ${row.url_path}`);
+  }
+
+  const canonical = absoluteUrl(siteUrl, row.url_path);
+  const h1 = row.h1 ?? '';
+  const title = `${h1} | ${SITE_SUFFIX}`;
+  const metaDescription = row.meta_description ?? '';
+  const crumbs = contentBreadcrumb(row);
+  const hasStat = typeof pd.ghost_rate_pct === 'number';
+
+  const breadcrumbNav = crumbs
+    .map((c, i) =>
+      i === crumbs.length - 1
+        ? `<span aria-current="page">${escapeHtml(c.name)}</span>`
+        : c.urlPath
+          ? `<a href="${escapeHtml(c.urlPath)}">${escapeHtml(c.name)}</a>`
+          : `<span>${escapeHtml(c.name)}</span>`,
+    )
+    .join('<span class="crumb-sep"> / </span>');
+
+  const statHtml = hasStat
+    ? `    <section class="stat-callout">
+      <p class="stat-percent">${escapeHtml(String(pd.ghost_rate_pct))}%</p>
+      <p class="stat-label">of postings tracked may no longer be active</p>
+      <dl class="stat-details">
+        <div><dt>Total postings tracked</dt><dd>${formatNumber(pd.total_postings)}</dd></div>
+        <div><dt>Stale (${formatNumber(pd.stale_threshold_days)}+ days old)</dt><dd>${formatNumber(pd.stale_postings)}</dd></div>
+        <div><dt>Fresh (posted in last ${formatNumber(pd.fresh_threshold_days)} days)</dt><dd>${formatNumber(pd.fresh_count)}</dd></div>
+      </dl>
+    </section>`
+    : '';
+
+  const cta = contentCta(row, allRows, signupUrl);
+
+  const contentRelated = relatedPages(
+    row,
+    allRows.filter((r) => (r.page_type ?? 'listing') === 'content'),
+  );
+  const relatedHtml = contentRelated.length
+    ? `      <section class="related">
+        <h2>Related reading</h2>
+        <ul class="related-list">
+${contentRelated
+  .map((r) => `          <li><a href="${escapeHtml(r.url_path)}">${escapeHtml(r.h1 ?? r.url_path)}</a></li>`)
+  .join('\n')}
+        </ul>
+      </section>`
+    : '';
+
+  const articleLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: h1,
+    description: metaDescription,
+    datePublished: pd.computed_at,
+    dateModified: row.last_generated,
+  };
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      ...(c.urlPath ? { item: absoluteUrl(siteUrl, c.urlPath) } : {}),
+    })),
+  };
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(metaDescription)}" />
+  <link rel="canonical" href="${escapeHtml(canonical)}" />
+  <link rel="stylesheet" href="/seo-pages.css" />
+  <script type="application/ld+json">
+${jsonLdScript(articleLd)}
+  </script>
+  <script type="application/ld+json">
+${jsonLdScript(breadcrumbLd)}
+  </script>
+</head>
+<body>
+  <main class="seo-page seo-content">
+    <nav class="breadcrumb" aria-label="Breadcrumb">${breadcrumbNav}</nav>
+    <header class="seo-header">
+      <h1>${escapeHtml(h1)}</h1>
+    </header>
+${statHtml}
+    <section class="content-body">
+      <p class="intro">${escapeHtml(row.intro_copy ?? '')}</p>
+    </section>
+    <section class="cta">
+      <a class="cta-button" href="${escapeHtml(cta.href)}">${escapeHtml(cta.label)}</a>
+    </section>
+${relatedHtml}
+  </main>
+</body>
+</html>
+`;
 }
 
 // --------------------------------------------------------------------------
@@ -366,6 +520,7 @@ async function main() {
         siteUrl,
         signupUrl: ctaHref,
         related: relatedPages(row, pages),
+        allRows: pages,
       });
       const outFile = outputFileForUrlPath(DIST_DIR, row.url_path);
       await mkdir(dirname(outFile), { recursive: true });
