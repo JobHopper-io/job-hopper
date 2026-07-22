@@ -12,6 +12,8 @@ import {
 } from '../_shared/job-matching-algorithm.ts'
 import { getCareerLevelTierKeysForProfile } from '../_shared/subscription-tier-product-keys.ts'
 import { isFreemiumBasePlanTierKey } from '../_shared/freemium-tier-keys.ts'
+import { resolveBaseTier } from '../_shared/base-tier.ts'
+import { clampJobMatchFrequency } from '../_shared/job-match-email-frequency.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderJobMatchDigest,
@@ -293,7 +295,11 @@ serve(async (req) => {
         }
         const unsubscribed = settingsRow?.email_unsubscribed_at != null
         const enabled = settingsRow?.job_match_email_enabled !== false
-        const frequency = settingsRow?.job_match_email_frequency ?? 'daily'
+        const baseTier = await resolveBaseTier(supabaseAdminClient, payload.profile_id)
+        const frequency = clampJobMatchFrequency(
+          settingsRow?.job_match_email_frequency ?? 'daily',
+          baseTier,
+        )
         const lastSent = settingsRow?.last_job_match_email_sent_at
           ? new Date(settingsRow.last_job_match_email_sent_at).getTime()
           : 0

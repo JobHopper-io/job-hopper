@@ -4,9 +4,14 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { profileAPI } from '@/lib/profile'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
-import { notificationsAPI, JOB_MATCH_FREQUENCY_OPTIONS } from '@/lib/notifications'
+import {
+  notificationsAPI,
+  allowedJobMatchFrequencyOptions,
+  clampJobMatchFrequency,
+} from '@/lib/notifications'
 import type {
   JobMatchEmailFrequency,
+  NotificationSettings,
   NotificationSettingsUpdate,
   ResumeProduct,
 } from '@/types/database'
@@ -20,7 +25,9 @@ import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
-const { profile, basePlan, isLoading } = storeToRefs(userStore)
+const { profile, basePlan, baseTier, isLoading } = storeToRefs(userStore)
+
+const allowedFrequencyOptions = computed(() => allowedJobMatchFrequencyOptions(baseTier.value))
 
 const unsubscribeMessage = computed(() => {
   const q = route.query.unsubscribe
@@ -30,13 +37,15 @@ const unsubscribeMessage = computed(() => {
   return null
 })
 
-const notificationSettings = ref<{
-  job_match_email_enabled: boolean
-  job_match_email_frequency: JobMatchEmailFrequency
-  subscription_updates_email_enabled: boolean
-  system_announcements_email_enabled: boolean
-  email_unsubscribed_at: string | null
-} | null>(null)
+type NotificationSettingsView = Pick<
+  NotificationSettings,
+  | 'job_match_email_enabled'
+  | 'job_match_email_frequency'
+  | 'subscription_updates_email_enabled'
+  | 'system_announcements_email_enabled'
+  | 'email_unsubscribed_at'
+>
+const notificationSettings = ref<NotificationSettingsView | null>(null)
 const notificationSettingsLoading = ref(true)
 const notificationSettingsSaving = ref(false)
 
@@ -75,15 +84,7 @@ async function loadResumeUpgradePurchase() {
 /** Same rules as job cards: purchased and not cancelled → show View + modal. */
 const showResumeUpgradeAdviceButton = computed(() => {
   const p = resumeUpgradePurchase.value
-  if (!p || p.status === 'cancelled') return false
-  return true
-})
-
-const resumeUpgradeAdviceStatusText = computed<string | null>(() => {
-  const p = resumeUpgradePurchase.value
-  if (!p || p.status === 'cancelled') return null
-  if (p.status === 'pending') return 'Generating resume advice'
-  return null
+  return !!p && p.status !== 'cancelled'
 })
 
 function syncFormFromProfile() {
@@ -139,18 +140,36 @@ onActivated(() => {
   void loadResumeUpgradePurchase()
 })
 
+function pickNotificationSettingsView(data: NotificationSettings): NotificationSettingsView {
+  const {
+    job_match_email_enabled,
+    job_match_email_frequency,
+    subscription_updates_email_enabled,
+    system_announcements_email_enabled,
+    email_unsubscribed_at,
+  } = data
+  return {
+    job_match_email_enabled,
+    job_match_email_frequency,
+    subscription_updates_email_enabled,
+    system_announcements_email_enabled,
+    email_unsubscribed_at,
+  }
+}
+
 async function loadNotificationSettings() {
   notificationSettingsLoading.value = true
   try {
     const { data } = await notificationsAPI.getNotificationSettings()
-    if (data) {
-      notificationSettings.value = {
-        job_match_email_enabled: data.job_match_email_enabled,
-        job_match_email_frequency: data.job_match_email_frequency,
-        subscription_updates_email_enabled: data.subscription_updates_email_enabled,
-        system_announcements_email_enabled: data.system_announcements_email_enabled,
-        email_unsubscribed_at: data.email_unsubscribed_at,
-      }
+    if (!data) return
+    notificationSettings.value = pickNotificationSettingsView(data)
+
+    // A tier downgrade (e.g. Premium -> Free) can leave a stale frequency the
+    // current tier no longer allows (server-side send is clamped too; this just
+    // keeps the stored preference and the UI honest going forward).
+    const clamped = clampJobMatchFrequency(data.job_match_email_frequency, baseTier.value)
+    if (clamped !== data.job_match_email_frequency) {
+      await saveNotificationSettings({ job_match_email_frequency: clamped })
     }
   } finally {
     notificationSettingsLoading.value = false
@@ -162,15 +181,7 @@ async function saveNotificationSettings(updates: Partial<NotificationSettingsUpd
   notificationSettingsSaving.value = true
   try {
     const { data, error } = await notificationsAPI.updateNotificationSettings(updates)
-    if (!error && data) {
-      notificationSettings.value = {
-        job_match_email_enabled: data.job_match_email_enabled,
-        job_match_email_frequency: data.job_match_email_frequency,
-        subscription_updates_email_enabled: data.subscription_updates_email_enabled,
-        system_announcements_email_enabled: data.system_announcements_email_enabled,
-        email_unsubscribed_at: data.email_unsubscribed_at,
-      }
-    }
+    if (!error && data) notificationSettings.value = pickNotificationSettingsView(data)
   } finally {
     notificationSettingsSaving.value = false
   }
@@ -204,7 +215,7 @@ const saveProfile = async () => {
     isSaving.value = true
     saveSuccess.value = false
 
-    await profileAPI.updateProfile({
+    const { data, error } = await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
       target_job_title: targetJobTitle.value,
       career_level: careerLevel.value || undefined,
@@ -220,6 +231,12 @@ const saveProfile = async () => {
       requires_us_sponsorship:
         requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
     })
+    if (error) throw error
+
+    // Reflect the saved row in the shared store immediately, instead of waiting on
+    // the Supabase Realtime round-trip — other views (dashboard, header) read profile
+    // from the same store and should see the change right away.
+    if (data) userStore.profile = data
 
     saveSuccess.value = true
     setTimeout(() => {
@@ -264,7 +281,29 @@ watch(
 <template>
   <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
-      <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-8">Your Profile</h1>
+      <div class="sticky top-4 z-10 mb-8 flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Your Profile</h1>
+        <Transition
+          enter-active-class="transition-opacity duration-150"
+          leave-active-class="transition-opacity duration-300"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+        >
+          <span
+            v-if="isSaving || saveSuccess"
+            class="inline-flex items-center gap-2 rounded-[12px] border border-neutral-border bg-white/95 px-3 py-1.5 text-sm shadow-sm backdrop-blur"
+          >
+            <template v-if="isSaving">
+              <font-awesome-icon :icon="['fas', 'spinner']" spin class="h-3.5 w-3.5 text-brand-primary" aria-hidden="true" />
+              <span class="text-neutral-body">Saving...</span>
+            </template>
+            <template v-else>
+              <font-awesome-icon :icon="['fas', 'circle-check']" class="h-3.5 w-3.5 text-brand-success" aria-hidden="true" />
+              <span class="text-brand-success font-medium">All changes saved</span>
+            </template>
+          </span>
+        </Transition>
+      </div>
 
       <div v-if="isLoading" class="text-center py-12">
         <font-awesome-icon
@@ -292,7 +331,10 @@ watch(
 
         <!-- Subscription Info -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Current Subscription</h2>
+          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            <font-awesome-icon :icon="['fas', 'crown']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
+            Current Subscription
+          </h2>
           <div v-if="basePlan">
             <p class="text-neutral-body">
               <span class="font-semibold">Plan:</span> {{ basePlan?.display_name }}
@@ -308,7 +350,10 @@ watch(
 
         <!-- About You -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">About You</h2>
+          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            <font-awesome-icon :icon="['fas', 'user-tie']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
+            About You
+          </h2>
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Current job title</label>
@@ -366,7 +411,10 @@ watch(
 
         <!-- Resume -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Resume</h2>
+          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            <font-awesome-icon :icon="['fas', 'clipboard-list']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
+            Resume
+          </h2>
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
@@ -388,10 +436,10 @@ watch(
               View resume advice
             </button>
             <p
-              v-if="resumeUpgradeAdviceStatusText"
+              v-if="resumeUpgradePurchase?.status === 'pending'"
               class="text-xs text-neutral-body"
             >
-              {{ resumeUpgradeAdviceStatusText }}
+              Generating resume advice
             </p>
           </div>
           <ResumeAdviceModal
@@ -404,7 +452,10 @@ watch(
 
         <!-- Target Preferences -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Target Preferences</h2>
+          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            <font-awesome-icon :icon="['fas', 'crosshairs']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
+            Target Preferences
+          </h2>
           <div class="space-y-6">
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
@@ -468,7 +519,10 @@ watch(
 
         <!-- Email / Notification Preferences -->
         <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Email preferences</h2>
+          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
+            <font-awesome-icon :icon="['fas', 'bell']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
+            Email preferences
+          </h2>
           <p class="text-sm text-neutral-body mb-4">
             Choose which emails you receive. You can change these anytime.
           </p>
@@ -505,6 +559,7 @@ watch(
                     class="flex w-full min-w-0 flex-col gap-1.5 pl-7 sm:max-w-xs sm:flex-none sm:shrink-0 sm:pl-0"
                   >
                     <div
+                      v-if="allowedFrequencyOptions.length > 1"
                       class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2"
                     >
                       <label
@@ -520,7 +575,7 @@ watch(
                         @change="saveNotificationSettings({ job_match_email_frequency: ($event.target as HTMLSelectElement).value as JobMatchEmailFrequency })"
                       >
                         <option
-                          v-for="opt in JOB_MATCH_FREQUENCY_OPTIONS"
+                          v-for="opt in allowedFrequencyOptions"
                           :key="opt.value"
                           :value="opt.value"
                         >
@@ -528,6 +583,13 @@ watch(
                         </option>
                       </select>
                     </div>
+                    <p v-else class="text-xs text-neutral-body sm:text-right">
+                      Weekly digest
+                      <router-link to="/pricing" class="text-brand-primary font-medium hover:underline">
+                        Upgrade
+                      </router-link>
+                      for daily or instant alerts
+                    </p>
                   </div>
                 </div>
               </div>
@@ -563,11 +625,6 @@ watch(
               </div>
             </template>
           </div>
-        </div>
-
-        <div class="flex justify-end items-center gap-2 text-sm text-neutral-body min-h-[1.5rem]">
-          <span v-if="isSaving">Saving...</span>
-          <span v-else-if="saveSuccess" class="text-green-600">Saved</span>
         </div>
       </div>
     </div>
