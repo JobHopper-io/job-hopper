@@ -312,8 +312,11 @@ onMounted(async () => {
         if (byPrice !== 0) return byPrice
         return a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' })
       })
-      if (!selectedBasePlanId.value && basePlan.value) {
-        selectedBasePlanId.value = basePlan.value.id
+      if (!selectedBasePlanId.value) {
+        // Pre-select the current plan, or the cheapest option for a brand-new
+        // (Free) subscriber, so "Choose base plan" works on the first click
+        // instead of requiring the user to notice they must pick a radio first.
+        selectedBasePlanId.value = basePlan.value?.id ?? basePlanProducts.value[0]?.id ?? null
       }
     }
   } catch (err) {
@@ -403,7 +406,12 @@ onMounted(async () => {
               <label
                 v-for="product in basePlanProducts"
                 :key="product.id"
-                class="flex items-start cursor-pointer"
+                :class="[
+                  'flex items-start cursor-pointer rounded-[12px] border-2 p-3 transition-colors',
+                  selectedBasePlanId === product.id
+                    ? 'border-brand-primary bg-brand-primary/5'
+                    : 'border-transparent hover:border-neutral-border',
+                ]"
               >
                 <input
                   v-model="selectedBasePlanId"
