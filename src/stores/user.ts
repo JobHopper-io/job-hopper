@@ -180,6 +180,10 @@ export const useUserStore = defineStore('user', () => {
   const canRequestPremiumInsights = computed(() => {
     if (profile.value?.onboarding_completed !== true) return false
     if (!apolloPremiumInsightsCanAffordColdPath.value) return false
+    // Premium tier and premium_insights add-on holders get unlimited insights —
+    // no freemium credit check. (The Apollo system-budget guard above still applies,
+    // exactly as it does for add-on holders; it is not a freemium quota.)
+    if (baseTier.value === 'premium') return true
     if (hasPremiumInsightsAddon.value) return true
     if (freemiumMaxPremiumInsights.value <= 0) return false
     return freemiumPremiumInsightsRemaining.value > 0

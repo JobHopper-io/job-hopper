@@ -47,19 +47,7 @@ async function joinWaitlist() {
       </div>
 
       <template v-if="isPremium">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SponsorWatchManagementCard />
-
-          <!-- Reserved for future Premium Tools (Apply Intelligence, Ghost Listing Detector,
-               Hiring Manager Contact) - not built yet, so no stub cards here. -->
-          <div class="card p-5 border-dashed">
-            <h3 class="font-heading font-semibold text-brand-charcoal mb-1.5">More tools are on the way</h3>
-            <p class="text-sm text-neutral-body">
-              We're building more Premium sponsorship tools on top of the same real filing data
-              behind Sponsor Watch. Check back here as they launch.
-            </p>
-          </div>
-        </div>
+        <SponsorWatchManagementCard />
       </template>
 
       <!-- Free/Core: Premium isn't purchasable yet, so this is a waitlist capture, not an upsell CTA. -->

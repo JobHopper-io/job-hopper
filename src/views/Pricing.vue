@@ -8,6 +8,7 @@ import type { Product } from '@/types/database'
 const faqOpen = ref<number | null>(null)
 const resumeUpgradeProduct = ref<Product | null>(null)
 const resumeTailoringProduct = ref<Product | null>(null)
+const premiumProduct = ref<Product | null>(null)
 
 // Premium is not sellable yet. This modal captures interest (email + profile id if
 // signed in, resolved server-side) via the premium-waitlist edge function.
@@ -40,10 +41,11 @@ const submitWaitlist = async () => {
 }
 
 onMounted(async () => {
-  const [addonRes, adviceRes, userRes] = await Promise.all([
+  const [addonRes, adviceRes, userRes, premiumRes] = await Promise.all([
     subscriptionAPI.getAddonProducts(),
     resumeProductsAPI.getResumeAdviceProduct(),
     authAPI.getCurrentUser(),
+    subscriptionAPI.getBasePlanByKey('premium'),
   ])
   if (addonRes.data) {
     resumeUpgradeProduct.value = addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
@@ -55,6 +57,9 @@ onMounted(async () => {
   if (user) {
     currentUserId.value = user.id
     if (user.email) waitlistEmail.value = user.email
+  }
+  if (premiumRes.data) {
+    premiumProduct.value = premiumRes.data
   }
 })
 
@@ -200,8 +205,28 @@ const pricingFaq = [
             </router-link>
           </div>
 
-          <!-- Premium (locked / not yet buyable) -->
-          <div class="card p-8 text-left flex flex-col border-2 border-dashed border-neutral-border bg-neutral-bg">
+          <!-- Premium: sellable once available_for_purchase is true, locked/waitlist otherwise -->
+          <div
+            v-if="premiumProduct?.available_for_purchase"
+            class="card p-8 text-left flex flex-col border-2 border-brand-primary"
+          >
+            <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
+            <p class="text-lg font-semibold text-neutral-body mb-1">
+              ${{ getProductPrice(premiumProduct) }}/mo
+            </p>
+            <p class="text-sm text-neutral-body mb-6">Billed monthly</p>
+            <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
+            <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
+              <li v-for="f in premiumFeatures" :key="f" class="flex items-start">
+                <font-awesome-icon :icon="['fas', 'check']" class="mr-2 mt-1 flex-shrink-0 text-brand-primary" />
+                <span>{{ f }}</span>
+              </li>
+            </ul>
+            <router-link to="/register" class="btn-primary w-full text-center block">
+              Start with Premium
+            </router-link>
+          </div>
+          <div v-else class="card p-8 text-left flex flex-col border-2 border-dashed border-neutral-border bg-neutral-bg">
             <div class="inline-flex items-center gap-1.5 self-start bg-neutral-border text-brand-charcoal text-xs font-semibold px-3 py-1 rounded-full mb-4">
               <font-awesome-icon :icon="['fas', 'lock']" /> Coming soon
             </div>

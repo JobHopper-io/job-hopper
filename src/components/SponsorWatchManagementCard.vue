@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { jobsAPI, type WatchedEmployer } from '@/lib/jobs'
 import SponsorshipTierBadge from '@/components/SponsorshipTierBadge.vue'
 
@@ -43,17 +43,56 @@ function formatWatchedSince(iso: string): string {
     return ''
   }
 }
+
+function formatRelative(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24))
+    if (days <= 0) return 'today'
+    if (days === 1) return 'yesterday'
+    if (days < 30) return `${days} days ago`
+    const months = Math.floor(days / 30)
+    return months === 1 ? '1 month ago' : `${months} months ago`
+  } catch {
+    return ''
+  }
+}
+
+/** Most recent check across every watched employer, for the header's freshness note. */
+const lastOverallCheck = computed(() => {
+  const checked = employers.value
+    .map((e) => e.lastCheckedAt)
+    .filter((v): v is string => !!v)
+    .sort()
+  return checked.length ? checked[checked.length - 1] : null
+})
 </script>
 
 <template>
   <div class="card p-5">
-    <div class="mb-4 flex items-center gap-2.5">
-      <font-awesome-icon :icon="['fas', 'bell']" class="text-brand-primary" aria-hidden="true" />
-      <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch</h3>
-      <span v-if="employers.length" class="ml-auto text-xs text-neutral-body">
-        {{ employers.length }} watched
-      </span>
+    <div class="mb-4 flex items-start justify-between gap-4 border-b border-neutral-border pb-4">
+      <div class="flex items-center gap-2.5">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+          <font-awesome-icon :icon="['fas', 'bell']" class="text-brand-primary" aria-hidden="true" />
+        </span>
+        <div>
+          <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch</h3>
+          <p class="text-xs text-neutral-body">Alerts on H-1B filing volume changes</p>
+        </div>
+      </div>
+      <div v-if="employers.length" class="text-right">
+        <p class="font-heading text-2xl font-semibold text-brand-charcoal">{{ employers.length }}</p>
+        <p class="text-xs text-neutral-body">
+          {{ employers.length === 1 ? 'employer tracked' : 'employers tracked' }}
+        </p>
+      </div>
     </div>
+
+    <p v-if="lastOverallCheck" class="mb-4 flex items-center gap-1.5 text-xs text-neutral-body">
+      <font-awesome-icon :icon="['fas', 'rotate']" class="shrink-0 text-neutral-body/60" aria-hidden="true" />
+      Most recently checked {{ formatRelative(lastOverallCheck) }}
+    </p>
 
     <p v-if="loadError" class="mb-3 rounded-[12px] bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
       {{ loadError }}
@@ -83,6 +122,25 @@ function formatWatchedSince(iso: string): string {
 
             <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-body">
               <span>Watching since {{ formatWatchedSince(employer.watchedSince) }}</span>
+            </div>
+
+            <div class="mt-1.5 text-xs">
+              <span v-if="!employer.lastCheckedAt" class="text-neutral-body/70">
+                <font-awesome-icon :icon="['fas', 'hourglass-half']" class="mr-1" aria-hidden="true" />
+                Not checked yet — new watches are picked up on the next quarterly run
+              </span>
+              <span
+                v-else-if="employer.lastCheckedScore && employer.lastCheckedScore !== employer.score"
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary/10 px-2 py-1 font-medium text-brand-primary"
+              >
+                <font-awesome-icon :icon="['fas', 'arrow-right-arrow-left']" aria-hidden="true" />
+                Changed from {{ employer.lastCheckedScore }} to {{ employer.score }} ·
+                checked {{ formatRelative(employer.lastCheckedAt) }}
+              </span>
+              <span v-else class="text-neutral-body/70">
+                <font-awesome-icon :icon="['fas', 'circle-check']" class="mr-1" aria-hidden="true" />
+                No change · checked {{ formatRelative(employer.lastCheckedAt) }}
+              </span>
             </div>
           </div>
 

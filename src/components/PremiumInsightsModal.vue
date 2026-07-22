@@ -77,6 +77,13 @@ function onKeydown(ev: KeyboardEvent) {
   if (ev.key === 'Escape' && props.open) emit('close')
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
+  return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase()
+}
+
 function onConfirmOrgChoiceClick() {
   if (selectedOrgKey.value === null) return
   if (selectedOrgKey.value === NONE_KEY) {
@@ -222,24 +229,38 @@ onUnmounted(() => {
               <p v-if="freemiumNote" class="text-red-900/90 text-xs leading-snug">{{ freemiumNote }}</p>
             </div>
 
-            <ul v-else-if="hasContacts" class="space-y-4">
+            <ul v-else-if="hasContacts" class="space-y-3">
               <li
                 v-for="(c, idx) in contacts"
                 :key="idx"
-                class="rounded-lg border border-neutral-border bg-neutral-bg/40 px-4 py-3"
+                class="flex gap-3 rounded-[12px] border border-neutral-border bg-white px-4 py-3 shadow-sm"
               >
-                <p class="font-heading font-semibold text-brand-charcoal">{{ c.name }}</p>
-                <p v-if="c.title" class="text-sm text-neutral-body mt-0.5">{{ c.title }}</p>
-                <p v-if="c.location" class="text-xs text-neutral-body mt-1">{{ c.location }}</p>
-                <p v-if="c.note" class="text-xs text-neutral-body mt-2">{{ c.note }}</p>
-                <a
-                  v-if="c.email"
-                  :href="`mailto:${c.email}`"
-                  class="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:underline"
+                <span
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 font-heading text-sm font-semibold text-brand-primary"
+                  aria-hidden="true"
                 >
-                  <font-awesome-icon :icon="['fas', 'envelope']" class="shrink-0" aria-hidden="true" />
-                  {{ c.email }}
-                </a>
+                  {{ initials(c.name) }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="font-heading font-semibold text-brand-charcoal">{{ c.name }}</p>
+                  <p v-if="c.title" class="mt-0.5 flex items-center gap-1.5 text-sm text-neutral-body">
+                    <font-awesome-icon :icon="['fas', 'user-tie']" class="shrink-0 text-neutral-body/60" aria-hidden="true" />
+                    {{ c.title }}
+                  </p>
+                  <p v-if="c.location" class="mt-1 flex items-center gap-1.5 text-xs text-neutral-body">
+                    <font-awesome-icon :icon="['fas', 'location-dot']" class="shrink-0 text-neutral-body/50" aria-hidden="true" />
+                    {{ c.location }}
+                  </p>
+                  <p v-if="c.note" class="mt-2 text-xs text-neutral-body">{{ c.note }}</p>
+                  <a
+                    v-if="c.email"
+                    :href="`mailto:${c.email}`"
+                    class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand-primary/30 bg-brand-primary/5 px-3 py-1 text-xs font-medium text-brand-primary transition-colors hover:bg-brand-primary/10"
+                  >
+                    <font-awesome-icon :icon="['fas', 'envelope']" class="shrink-0" aria-hidden="true" />
+                    {{ c.email }}
+                  </a>
+                </div>
               </li>
             </ul>
 

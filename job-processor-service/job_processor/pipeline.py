@@ -114,6 +114,9 @@ async def process_one_job(
             sem_brave=sem_brave,
             sem_fetch=sem_fetch,
             sem_llm=sem_llm,
+            # No direct Courier/LLM_API_KEY available - route the confirmation step
+            # through the n8n domain-resolver webhook instead (see domain_resolution.py).
+            n8n_proxy=True,
         )
 
     apollo_body: dict[str, Any] | None = None

@@ -115,11 +115,44 @@ that copy is still accurate regardless of individual feature status).
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | Real Sponsorship Score | ✅ Done, launch blocked on the `employers.domain` backfill (see D46–50 below) |
+| 1 | Real Sponsorship Score | ✅ Done, `employers.domain` backfill run in production 2026-07-21 (358/368 resolved; see below) — still confirming real scores surface on live postings + Premium purchasability before full launch |
 | 2 | Sponsor Watch | 🟡 Built, not deployed to production (see D51–55 below) |
 | 3 | Apply Intelligence | 🟡 **Scoped 2026-07-20 — v1 = A+B, advice-only** (see below); not yet built |
 | 4 | Hiring Manager Contact | ✅ **Done and verified 2026-07-20** |
 | 5 | Ghost Listing Detector | ❌ **Investigated 2026-07-20, not viable as scoped** — closed, not shelved (see below) |
+
+**Real Sponsorship Score's `employers.domain` backfill ran in production 2026-07-21**, via a new
+Brave-only mode (`job-processor sponsorship backfill-employer-domains --brave-only`; see
+`job-processor-service/job_processor/domain_resolution.py`) added because a real LLM key isn't
+available today — skips the fetch+LLM confirmation step and takes Brave's top (blocklist-filtered,
+apex-normalized) search result directly. **358/368** scored, non-excluded employers resolved and
+verified directly against the `employers` table (not just the CLI's own counts). **10 deliberately
+left `null`** — all 10 came back "resolved" with *some* domain from the CLI, just the wrong one,
+so only caught by cross-checking against known cases (the same working principle as the rest of
+this doc), not by any success/failure signal:
+
+- **LinkedIn Corporation, Indeed, Inc., Bloomberg L.P.** — each one's own real domain
+  (linkedin.com / indeed.com / bloomberg.com) is itself in the Brave-only blocklist (added because
+  those sites outrank almost every *other* company's "official website" search without being that
+  company's site) — so brave-only skipped past its own correct domain to a wrong one
+  (britannica.com / wwwindeed.com / ebsco.com respectively).
+- **Maplebear Inc.** (Instacart's legal entity name) and **Deutsche Bank Securities, Inc.** — both
+  resolved to `sec.gov` (a regulatory filings site, not either company's own site).
+- **General Hospital Corporation** and **Adventist Health System/Sunbelt, Inc.** — both resolved
+  to `cms.gov` (a Medicare/Medicaid regulatory site).
+- **Verizon Data Services LLC** — resolved to `opencorporates.com` (a company-registry
+  aggregator).
+- **PERSISTENT SYSTEMS, INC.** — resolved to `servicenow.com` (a ServiceNow partner-listing page
+  ranked top for the search; collides with ServiceNow, Inc.'s own, correct `servicenow.com`).
+- **Weill Cornell Medical College** — apex-domain normalization (added to fix `play.google.com` →
+  `google.com`) collapsed its real `weill.cornell.edu` subdomain down to `cornell.edu`, same as
+  Cornell University; the normalization can't distinguish a legitimately-distinct affiliated
+  subdomain from an ordinary `www.` one.
+
+These 10 are **not a permanent gap** — `employers.domain` stays `null` for them until a real LLM
+key (the "Courier" key, currently locked inside n8n with no raw-value access) is available again
+to run the existing LLM-confirmed path for just these 10, rather than guessing at their domains by
+hand.
 
 **Hiring Manager Contact was substantially pre-existing, not net-new** — built via
 `premium-insights` (`supabase/functions/premium-insights/index.ts`) + `job_hiring_contacts`,

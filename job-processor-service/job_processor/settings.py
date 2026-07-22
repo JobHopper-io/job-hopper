@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     llm_model_enrich: str = Field(default="gpt-4o-mini", description="Model for job enrichment")
     llm_model_domain: str = Field(default="gpt-4o-mini", description="Model for domain resolution")
 
+    n8n_domain_resolver_webhook_url: str = Field(
+        default="", description="n8n webhook URL for domain resolution (proxies the LLM confirmation step)"
+    )
+    n8n_webhook_secret: str = Field(
+        default="", description="Shared secret sent as X-Webhook-Secret to the n8n domain resolver webhook"
+    )
+
     default_sponsorship_likelihood: str = Field(default="N/A")
 
     http_timeout_seconds: float = Field(default=60.0)
