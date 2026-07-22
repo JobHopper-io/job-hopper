@@ -122,6 +122,12 @@ export type WatchedEmployer = {
   score: RealSponsorshipTier | null
   confidence: RealSponsorshipTier | null
   watchedSince: string
+  /** Sponsor Watch's last automated check (sponsor-watch-check edge function) - null until the
+   * first check has run for this employer. No per-event history exists (see D51-55): this is
+   * only the most recent check's snapshot, not a full log. */
+  lastCheckedAt: string | null
+  lastCheckedScore: RealSponsorshipTier | null
+  lastCheckedPositions: number | null
 }
 
 /** Columns selected from job_hopper_live for match list and detail (single source of truth) */
@@ -660,7 +666,7 @@ export const jobsAPI = {
     const { data, error } = await supabase
       .from('sponsor_watch_subscriptions')
       .select(
-        'id, employer_id, created_at, employers(canonical_name, domain, employer_sponsorship_scores(score, confidence))',
+        'id, employer_id, created_at, employers(canonical_name, domain, employer_sponsorship_scores(score, confidence, watch_last_checked_at, watch_last_checked_score, watch_last_checked_positions))',
       )
       .eq('profile_id', profileId)
       .order('created_at', { ascending: false })
@@ -676,22 +682,34 @@ export const jobsAPI = {
       employers: {
         canonical_name: string
         domain: string | null
-        employer_sponsorship_scores: { score: string | null; confidence: string | null } | null
+        employer_sponsorship_scores: {
+          score: string | null
+          confidence: string | null
+          watch_last_checked_at: string | null
+          watch_last_checked_score: string | null
+          watch_last_checked_positions: number | null
+        } | null
       } | null
     }[]
 
     return {
       data: rows
         .filter((row) => row.employers != null)
-        .map((row) => ({
-          subscriptionId: row.id,
-          employerId: row.employer_id,
-          name: row.employers!.canonical_name,
-          domain: row.employers!.domain,
-          score: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.score),
-          confidence: asRealSponsorshipTier(row.employers!.employer_sponsorship_scores?.confidence),
-          watchedSince: row.created_at,
-        })),
+        .map((row) => {
+          const scores = row.employers!.employer_sponsorship_scores
+          return {
+            subscriptionId: row.id,
+            employerId: row.employer_id,
+            name: row.employers!.canonical_name,
+            domain: row.employers!.domain,
+            score: asRealSponsorshipTier(scores?.score),
+            confidence: asRealSponsorshipTier(scores?.confidence),
+            watchedSince: row.created_at,
+            lastCheckedAt: scores?.watch_last_checked_at ?? null,
+            lastCheckedScore: asRealSponsorshipTier(scores?.watch_last_checked_score),
+            lastCheckedPositions: scores?.watch_last_checked_positions ?? null,
+          }
+        }),
       error: null,
     }
   },

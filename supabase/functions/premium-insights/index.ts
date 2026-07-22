@@ -15,6 +15,7 @@ import {
 } from '../_shared/apollo.ts'
 import { refundApolloCredits, tryConsumeApolloCredits } from '../_shared/apollo-limits.ts'
 import { resolveBaseTier } from '../_shared/base-tier.ts'
+import { getFreemiumSettings } from '../_shared/freemium-settings.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,7 +115,13 @@ function userMessageForPremiumInsightsFailure(code: string): string {
   }
 }
 
-type RpcRow = { ok?: boolean; hiring_contact_id?: string; err?: string }
+type RpcRow = {
+  ok?: boolean
+  hiring_contact_id?: string
+  err?: string
+  daily_used?: number
+  daily_limit?: number
+}
 
 async function profileHasPremiumInsightsAddon(
   admin: ReturnType<typeof createClient>,
@@ -364,6 +371,16 @@ serve(async (req) => {
   }
 
   const hasAddon = await profileHasPremiumInsightsAddon(admin, profileId)
+  // Premium base tier gets unlimited insights too — not only premium_insights add-on holders.
+  // Both skip the freemium quota entirely and use the addon-claim RPC (which has no quota
+  // check); only Free/Core-without-addon fall through to the freemium credit pool.
+  const insightsBaseTier = await resolveBaseTier(admin, profileId)
+  const unlimitedInsights = hasAddon || insightsBaseTier === 'premium'
+  // Per-UTC-day anti-abuse cap for the unlimited path (Premium tier + add-on). Only fetched
+  // when relevant; the freemium path uses its own lifetime quota instead.
+  const dailyInsightsLimit = unlimitedInsights
+    ? (await getFreemiumSettings(admin)).premium_daily_insights
+    : 0
 
   let hiringContactId: string | null =
     existingRow?.status === 'pending' ? (existingRow.id as string) : null
@@ -390,7 +407,7 @@ serve(async (req) => {
       user_message,
       cached_miss: true,
     }
-    if (!hasAddon) {
+    if (!unlimitedInsights) {
       missBody.freemium_credit_never_consumed = true
       missBody.freemium_credit_refunded = false
     }
@@ -401,10 +418,11 @@ serve(async (req) => {
   }
 
   if (!hiringContactId) {
-    if (hasAddon) {
+    if (unlimitedInsights) {
       const { data: claimData, error: claimErr } = await admin.rpc('claim_premium_insights_for_addon', {
         p_profile_id: profileId,
         p_job_match_id: jobMatchId,
+        p_daily_limit: dailyInsightsLimit,
       })
       if (claimErr) {
         console.error('claim_premium_insights_for_addon', claimErr)
@@ -417,8 +435,24 @@ serve(async (req) => {
       const cr = row as RpcRow
       if (!cr?.ok) {
         const code = cr?.err ?? 'unknown'
-        const status = code === 'in_progress' ? 409 : code === 'already_exists' ? 400 : 400
-        return new Response(JSON.stringify({ error: code }), {
+        // quota_exceeded / disabled map to 403 (the unlimited-path daily cap), in_progress to
+        // 409, everything else to 400.
+        const status =
+          code === 'in_progress'
+            ? 409
+            : code === 'quota_exceeded' || code === 'disabled'
+              ? 403
+              : 400
+        const errorBody: Record<string, unknown> = { error: code }
+        if (code === 'quota_exceeded') {
+          const limit = typeof cr.daily_limit === 'number' ? cr.daily_limit : dailyInsightsLimit
+          const used = typeof cr.daily_used === 'number' ? cr.daily_used : limit
+          errorBody.user_message = `You've reached your daily hiring-contacts limit (${limit}/day). It resets at midnight UTC.`
+          errorBody.dailyUsed = used
+          errorBody.dailyLimit = limit
+          errorBody.dailyRemaining = Math.max(0, limit - used)
+        }
+        return new Response(JSON.stringify(errorBody), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status,
         })
@@ -475,6 +509,16 @@ serve(async (req) => {
       return { refunded: !rfErr }
     }
     if (hiringContactId) {
+      // Unlimited path: reverse the daily credit this row consumed so an Apollo/LLM failure
+      // doesn't burn part of the user's daily quota. Idempotent (no-op if no credit / no stamp).
+      let dailyRefunded = false
+      if (unlimitedInsights) {
+        const { error: rdErr } = await admin.rpc('refund_daily_premium_insights', {
+          p_hiring_contact_id: hiringContactId,
+        })
+        if (rdErr) console.error('refund_daily_premium_insights', rdErr)
+        dailyRefunded = !rdErr
+      }
       await admin
         .from('job_hiring_contacts')
         .update({
@@ -484,6 +528,7 @@ serve(async (req) => {
           org_disambiguation_options: null,
         })
         .eq('id', hiringContactId)
+      return { refunded: dailyRefunded }
     }
     return { refunded: false }
   }
@@ -501,7 +546,7 @@ serve(async (req) => {
       error_code: code,
       user_message,
     }
-    if (!hasAddon) {
+    if (!unlimitedInsights) {
       body.freemium_credit_never_consumed = !freemiumChargedThisRequest
       if (freemiumChargedThisRequest) body.freemium_credit_refunded = fin.refunded
     }
@@ -788,7 +833,7 @@ serve(async (req) => {
 
     // Tier-driven contact depth: free → 1 (teaser), core → up to 2, premium → up to 3
     // seniority-ranked so the actual hiring manager/decision-maker surfaces first.
-    const baseTier = await resolveBaseTier(admin, profileId)
+    const baseTier = insightsBaseTier
     const targetContacts = baseTier === 'premium' ? 3 : baseTier === 'core' ? 2 : 1
     const candidates = pickTopPeople(pool, phrases, targetContacts, {
       prioritizeSeniority: baseTier === 'premium',

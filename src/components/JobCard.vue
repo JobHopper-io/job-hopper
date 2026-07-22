@@ -10,6 +10,7 @@ import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import PremiumSponsorshipPanel from '@/components/PremiumSponsorshipPanel.vue'
 import SponsorWatchToggle from '@/components/SponsorWatchToggle.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
@@ -415,6 +416,13 @@ const sponsorshipBadgeRationale = computed(() =>
   isPremium.value && props.job.sponsorshipRealScore ? props.job.sponsorshipRealRationale : null,
 )
 
+/** Premium + a real score gets the heavier panel instead of the small pill (design pass,
+ * 2026-07-22) - Free/Core and Premium-without-a-real-score-yet keep the pill unchanged. */
+const showPremiumSponsorshipPanel = computed(
+  () => showSponsorshipBadge.value && isPremium.value && !!props.job.sponsorshipRealScore,
+)
+const premiumPanelScore = computed(() => props.job.sponsorshipRealScore)
+
 /* Compact action-row buttons: one shared size so the footer reads as a single
  * balanced toolbar (the global btn-primary/btn-secondary are heavier and sized
  * for standalone CTAs). */
@@ -518,7 +526,7 @@ async function runAdviceCheckout() {
               Match score: {{ job.score.toFixed(0) }}
             </span>
             <JobSponsorshipBadge
-              v-if="showSponsorshipBadge"
+              v-if="showSponsorshipBadge && !showPremiumSponsorshipPanel"
               :value="sponsorshipBadgeValue"
               :rationale="sponsorshipBadgeRationale"
             />
@@ -562,6 +570,13 @@ async function runAdviceCheckout() {
           </span>
         </button>
       </div>
+
+      <PremiumSponsorshipPanel
+        v-if="showPremiumSponsorshipPanel && premiumPanelScore && sponsorshipBadgeRationale"
+        class="mt-3"
+        :score="premiumPanelScore"
+        :rationale="sponsorshipBadgeRationale"
+      />
 
       <p v-if="job.aiBriefing" class="mt-3 text-sm text-neutral-body line-clamp-2">
         {{ job.aiBriefing }}

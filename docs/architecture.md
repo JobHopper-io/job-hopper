@@ -60,6 +60,36 @@ monitoring/alerting layer (e.g. paging if `daily-job-matching` or `reconcile-sub
 haven't completed within some expected window) — flagging for Nick/Syed to prioritize, out of
 scope for today.
 
+### job-processor-service's Python pipeline is not the live ingestion path (confirmed 2026-07-21)
+
+**Finding:** `job-processor-service`'s Python pipeline (`pipeline.py`'s live-ingestion path,
+reachable only via `POST /v1/runs` and `POST /v1/runs/sync`) has **not run in production since
+2026-04-16**. `job_processor_runs` — written by both of those endpoints before anything else
+happens — has exactly **4 rows total, ever**, all dated 2026-04-15/16, and **2 of the 4 are stuck
+in `status: "running"` with `finished_at: null`**, i.e. abandoned mid-run. Meanwhile
+`job_hopper_live` has grown to 16,541+ rows over that same 3+ months, including rows created
+today, and `scraper_raw_jobs` also has fresh rows scraped today — so ingestion is very much
+alive, just not through this service's Python code.
+
+**Independently confirmed today** (while debugging the `employers.domain`/`company_domain`
+join gap — see `docs/sponsorship-data-engine.md` D46–50): the actual live job-ingestion pipeline
+is entirely in **n8n** (the "Job Processor" and "Job Processor - Scheduler" workflows), not
+`job-processor-service`. This also fully explains why `pipeline.py`'s `resolve_company_domain`
+fix (persisting `company_domain` on insert) never showed up on any real posting — that code path
+simply hasn't executed since April.
+
+**Implication:** don't assume a fix to `job-processor-service`'s Python pipeline affects
+production — it currently doesn't, regardless of how correct the code is, because nothing live
+calls it. This includes the `n8n_proxy` domain-resolution mode wired into `pipeline.py` on
+2026-07-21: correct as written, but inert until/unless `job-processor-service` is deliberately
+reinstated as the live ingestion path. The real fix for live ingestion has to happen in the n8n
+workflow itself.
+
+**Separate flag, not a fix:** 18 rows in `scraper_raw_jobs` are stuck in `status: "processing"`
+since around 2026-04-16 — almost certainly an abandoned claim from that same dead pipeline run
+(consistent with the two abandoned `job_processor_runs` rows above). Worth cleaning up
+eventually; not blocking anything today.
+
 ### Job match staleness (known gap, unfixed)
 
 The 45-day recency gate (`recency.maxAgeDays` in `_shared/job-matching-algorithm.ts`,

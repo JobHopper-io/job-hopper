@@ -5,6 +5,7 @@ const FALLBACK_MAX_RESUME_ADVICE = 3
 const FALLBACK_MAX_PREMIUM_INSIGHTS = 3
 const FALLBACK_CORE_DAILY_RESUME_ADVICE = 5
 const FALLBACK_PREMIUM_DAILY_RESUME_ADVICE = 20
+const FALLBACK_PREMIUM_DAILY_INSIGHTS = 20
 
 export interface FreemiumSettingsRow {
   max_job_searches: number
@@ -14,6 +15,8 @@ export interface FreemiumSettingsRow {
   core_daily_resume_advice: number
   /** Per-UTC-day resume-advice cap for Premium-tier subscribers. */
   premium_daily_resume_advice: number
+  /** Per-UTC-day Premium Insights cap for the unlimited path (Premium tier + add-on). */
+  premium_daily_insights: number
 }
 
 export async function getFreemiumSettings(
@@ -22,7 +25,7 @@ export async function getFreemiumSettings(
   const { data, error } = await client
     .from('freemium_settings')
     .select(
-      'max_job_searches, max_resume_advice, max_premium_insights, core_daily_resume_advice, premium_daily_resume_advice',
+      'max_job_searches, max_resume_advice, max_premium_insights, core_daily_resume_advice, premium_daily_resume_advice, premium_daily_insights',
     )
     .eq('id', 1)
     .maybeSingle()
@@ -34,6 +37,7 @@ export async function getFreemiumSettings(
       max_premium_insights: FALLBACK_MAX_PREMIUM_INSIGHTS,
       core_daily_resume_advice: FALLBACK_CORE_DAILY_RESUME_ADVICE,
       premium_daily_resume_advice: FALLBACK_PREMIUM_DAILY_RESUME_ADVICE,
+      premium_daily_insights: FALLBACK_PREMIUM_DAILY_INSIGHTS,
     }
   }
 
@@ -50,5 +54,9 @@ export async function getFreemiumSettings(
       typeof data.premium_daily_resume_advice === 'number'
         ? data.premium_daily_resume_advice
         : FALLBACK_PREMIUM_DAILY_RESUME_ADVICE,
+    premium_daily_insights:
+      typeof data.premium_daily_insights === 'number'
+        ? data.premium_daily_insights
+        : FALLBACK_PREMIUM_DAILY_INSIGHTS,
   }
 }

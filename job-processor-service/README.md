@@ -24,6 +24,8 @@ FastAPI port of the n8n workflows in `../n8n-workflows/job-processor/`.
 | `LLM_MODEL_FILTER` | no | Default `gpt-4o-mini` |
 | `LLM_MODEL_ENRICH` | no | Default `gpt-4o-mini` |
 | `LLM_MODEL_DOMAIN` | no | Default `gpt-4o-mini` |
+| `N8N_DOMAIN_RESOLVER_WEBHOOK_URL` | for domain resolution's `n8n_proxy` mode | POSTs `{"company_name", "candidate_urls"}`, expects `{"domain": string}` (`"NONE"` = no match) |
+| `N8N_WEBHOOK_SECRET` | for domain resolution's `n8n_proxy` mode | Sent as `X-Webhook-Secret` |
 
 Optional tuning: `HTTP_TIMEOUT_SECONDS`, `FETCH_MAX_BYTES`, `DEFAULT_SPONSORSHIP_LIKELIHOOD` (default `N/A`).
 

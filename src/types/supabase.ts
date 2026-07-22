@@ -420,6 +420,7 @@ export type Database = {
           max_job_searches: number
           max_premium_insights: number
           max_resume_advice: number
+          premium_daily_insights: number
           premium_daily_resume_advice: number
           updated_at: string
         }
@@ -429,6 +430,7 @@ export type Database = {
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_insights?: number
           premium_daily_resume_advice?: number
           updated_at?: string
         }
@@ -438,6 +440,7 @@ export type Database = {
           max_job_searches?: number
           max_premium_insights?: number
           max_resume_advice?: number
+          premium_daily_insights?: number
           premium_daily_resume_advice?: number
           updated_at?: string
         }
@@ -610,6 +613,7 @@ export type Database = {
           completed_at: string | null
           contacts: Json | null
           created_at: string
+          daily_usage_date: string | null
           error_code: string | null
           id: string
           job_match_id: string
@@ -623,6 +627,7 @@ export type Database = {
           completed_at?: string | null
           contacts?: Json | null
           created_at?: string
+          daily_usage_date?: string | null
           error_code?: string | null
           id?: string
           job_match_id: string
@@ -636,6 +641,7 @@ export type Database = {
           completed_at?: string | null
           contacts?: Json | null
           created_at?: string
+          daily_usage_date?: string | null
           error_code?: string | null
           id?: string
           job_match_id?: string
@@ -1100,6 +1106,32 @@ export type Database = {
             foreignKeyName: "notification_settings_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      premium_insights_daily_usage: {
+        Row: {
+          count: number
+          profile_id: string
+          usage_date: string
+        }
+        Insert: {
+          count?: number
+          profile_id: string
+          usage_date: string
+        }
+        Update: {
+          count?: number
+          profile_id?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "premium_insights_daily_usage_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1976,8 +2008,14 @@ export type Database = {
     Functions: {
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
       claim_premium_insights_for_addon: {
-        Args: { p_job_match_id: string; p_profile_id: string }
+        Args: {
+          p_daily_limit: number
+          p_job_match_id: string
+          p_profile_id: string
+        }
         Returns: {
+          daily_limit: number
+          daily_used: number
           err: string
           hiring_contact_id: string
           ok: boolean
@@ -2091,6 +2129,10 @@ export type Database = {
       }
       refund_apollo_credits: {
         Args: { p_amount: number; p_name: string }
+        Returns: undefined
+      }
+      refund_daily_premium_insights: {
+        Args: { p_hiring_contact_id: string }
         Returns: undefined
       }
       refund_daily_resume_advice: {

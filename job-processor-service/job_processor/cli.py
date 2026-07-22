@@ -258,6 +258,13 @@ def sponsorship_backfill_employer_domains(
         "directly. For use when no LLM key is available - only safe for well-known, "
         "unambiguous company names, not the long tail where disambiguation matters.",
     ),
+    n8n_proxy: bool = typer.Option(
+        False,
+        "--n8n-proxy",
+        help="Route the LLM confirmation step through the n8n domain-resolver webhook "
+        "(N8N_DOMAIN_RESOLVER_WEBHOOK_URL/N8N_WEBHOOK_SECRET) instead of a direct "
+        "LLM_API_KEY call. Mutually exclusive with --brave-only.",
+    ),
     only_name: list[str] = typer.Option(
         [],
         "--only-name",
@@ -284,6 +291,7 @@ def sponsorship_backfill_employer_domains(
                 model=settings.llm_model_domain,
                 dry_run=dry_run,
                 brave_only=brave_only,
+                n8n_proxy=n8n_proxy,
                 only_names=only_name or None,
             )
 

@@ -93,6 +93,53 @@ def _first_company_hostname(urls: list[str]) -> str | None:
     return None
 
 
+def _clean_domain_response(raw: str) -> str | None:
+    s = raw.strip()
+    if not s or s.upper() == "NONE":
+        return None
+    host = urlparse(s).hostname if "://" in s else s.split("/")[0]
+    if not host:
+        return None
+    return host.lower().removeprefix("www.")
+
+
+async def _call_n8n_domain_resolver(
+    http_client: httpx.AsyncClient,
+    settings: Settings,
+    company_name: str,
+    candidate_urls: list[str],
+) -> str | None:
+    if not settings.n8n_domain_resolver_webhook_url:
+        logger.warning("n8n_proxy requested but N8N_DOMAIN_RESOLVER_WEBHOOK_URL is unset")
+        return None
+    try:
+        r = await http_client.post(
+            settings.n8n_domain_resolver_webhook_url,
+            json={"company_name": company_name, "candidate_urls": candidate_urls},
+            headers={
+                "Content-Type": "application/json",
+                "X-Webhook-Secret": settings.n8n_webhook_secret,
+            },
+        )
+    except httpx.HTTPError as e:
+        logger.warning("n8n domain resolver request failed company=%s: %s", company_name, e)
+        return None
+    if r.status_code != 200:
+        logger.warning(
+            "n8n domain resolver non-200 company=%s status=%s", company_name, r.status_code
+        )
+        return None
+    try:
+        data = r.json()
+    except Exception:
+        logger.warning("n8n domain resolver returned non-JSON body company=%s", company_name)
+        return None
+    domain = data.get("domain")
+    if not isinstance(domain, str):
+        return None
+    return _clean_domain_response(domain)
+
+
 async def resolve_company_domain(
     *,
     http_client: httpx.AsyncClient,
@@ -106,8 +153,11 @@ async def resolve_company_domain(
     sem_fetch: asyncio.Semaphore,
     sem_llm: asyncio.Semaphore,
     brave_only: bool = False,
+    n8n_proxy: bool = False,
 ) -> str | None:
     """Resolve a company name to a domain via Brave search + an LLM confirmation step.
+
+    Three mutually-exclusive modes (default: direct LLM confirmation below):
 
     brave_only=True skips the fetch+LLM confirmation entirely and returns the bare
     hostname of Brave's top result, skipping past any result matching
@@ -116,8 +166,15 @@ async def resolve_company_domain(
     the spot-check when "Google LLC" resolved to en.wikipedia.org). Added for D46-50's
     employer backfill when a real LLM key isn't available - see
     sponsorship_domain_backfill.py. Viable only where disambiguation is low-risk
-    (well-known, unambiguous company names); the default LLM-confirmed path is
-    untouched for pipeline.py's per-job resolution.
+    (well-known, unambiguous company names), not the long tail.
+
+    n8n_proxy=True sends the Brave candidate URLs to the n8n domain-resolver webhook
+    (N8N_DOMAIN_RESOLVER_WEBHOOK_URL/N8N_WEBHOOK_SECRET) instead of calling an LLM
+    directly - reuses the existing n8n-hosted LLM confirmation without needing a raw
+    LLM_API_KEY. Used by both the employer backfill and pipeline.py's live ingestion
+    now that a direct Courier/LLM_API_KEY isn't available.
+
+    The default LLM-confirmed path (direct OpenAI-compatible call) is untouched.
     """
     q_piece = company_name.replace(" ", "+")
     query = f"{q_piece} official website"
@@ -128,6 +185,10 @@ async def resolve_company_domain(
 
     if brave_only:
         return _first_company_hostname(urls)
+
+    if n8n_proxy:
+        async with sem_llm:
+            return await _call_n8n_domain_resolver(http_client, settings, company_name, urls)
 
     async def one(url: str) -> tuple[str, str]:
         async with sem_fetch:

@@ -89,7 +89,10 @@ function handleGetResumeAdviceClick() {
     precheckOpen.value = true
     return
   }
-  if (freemiumResumeAdviceRemaining.value > 0) {
+  // Only Free tier sees the freemium credit confirmation. Core/Premium skip the popup and
+  // run directly via the free generation path (Core still passes the server-side daily
+  // quota; Premium is uncapped). Matches JobCard.
+  if (isFree.value && freemiumResumeAdviceRemaining.value > 0) {
     precheckVariant.value = 'confirm-free-credit'
     precheckOpen.value = true
     return
@@ -557,7 +560,13 @@ async function executeTailoringCheckout() {
   adviceCheckoutLoading.value = true
   tailoringError.value = null
   const returnPath = route.path
-  const { data, error } = await resumeProductsAPI.startAdviceCheckout(job.value.matchId, returnPath)
+  // Core/Premium get Resume Advice via the free generation path — never the paid Stripe
+  // checkout, even once freemium credits are spent. The edge function still enforces its
+  // own server-side guardrails (per-tier daily quota). Free keeps the credit-then-purchase
+  // flow. Matches JobCard.
+  const { data, error } = await resumeProductsAPI.startAdviceCheckout(job.value.matchId, returnPath, {
+    forceFree: !isFree.value,
+  })
   if (error) {
     adviceCheckoutLoading.value = false
     tailoringError.value = error.message

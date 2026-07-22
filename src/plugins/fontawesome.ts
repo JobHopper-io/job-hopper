@@ -35,6 +35,10 @@ import {
   faBell,
   faBellSlash,
   faCrown,
+  faRotate,
+  faHourglassHalf,
+  faArrowRightArrowLeft,
+  faCheckDouble,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -72,6 +76,10 @@ library.add(
   faBell,
   faBellSlash,
   faCrown,
+  faRotate,
+  faHourglassHalf,
+  faArrowRightArrowLeft,
+  faCheckDouble,
   faTiktok,
   faInstagram,
 )

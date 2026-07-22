@@ -98,6 +98,7 @@ async def backfill_employer_domains(
     max_concurrent_llm: int = 4,
     dry_run: bool,
     brave_only: bool = False,
+    n8n_proxy: bool = False,
     only_names: list[str] | None = None,
 ) -> DomainBackfillCounts:
     employers = await _fetch_all_employers(db)
@@ -130,6 +131,7 @@ async def backfill_employer_domains(
             sem_fetch=sem_fetch,
             sem_llm=sem_llm,
             brave_only=brave_only,
+            n8n_proxy=n8n_proxy,
         )
         if domain:
             resolved[emp["id"]] = domain
