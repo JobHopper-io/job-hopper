@@ -281,10 +281,18 @@ function formatNumber(n) {
   return Number.isFinite(n) ? n.toLocaleString('en-US') : '0';
 }
 
+/** ISO string for a date-ish value, or undefined if absent/unparseable. */
+function toIso(value) {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
 /**
  * Breadcrumb for content pages: Home / Career Advice / {section}. Deliberately
- * NOT the listing template's url-segment breadcrumb (there is no real hub page
- * behind "Career Advice" yet, so that crumb is unlinked).
+ * NOT the listing template's url-segment breadcrumb — "Jobs" and "Jobs / Ghost
+ * Jobs" have no real page behind them (bare /jobs redirects to /dashboard, and
+ * there's no hub page for /jobs/ghost-jobs), so linking those crumbs 404s.
  */
 function contentBreadcrumb(row) {
   const pd = row.page_data ?? {};
@@ -299,6 +307,22 @@ function contentBreadcrumb(row) {
     { name: 'Career Advice', urlPath: null },
     { name: section, urlPath: row.url_path },
   ];
+}
+
+/**
+ * Up to `max` OTHER content pages for "Related reading", highest ghost rate
+ * first (rows without a numeric ghost_rate_pct, e.g. the resume-advice hook
+ * page, sort last but are still eligible). Pulled from the already-queried
+ * set; no extra DB calls.
+ */
+export function relatedContentPages(row, allRows, max = 5) {
+  return allRows
+    .filter((r) => r.url_path !== row.url_path && (r.page_type ?? 'listing') === 'content')
+    .sort(
+      (a, b) =>
+        Number(b.page_data?.ghost_rate_pct ?? -1) - Number(a.page_data?.ghost_rate_pct ?? -1),
+    )
+    .slice(0, max);
 }
 
 /**
@@ -359,6 +383,7 @@ export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRo
     ? `    <section class="stat-callout">
       <p class="stat-percent">${escapeHtml(String(pd.ghost_rate_pct))}%</p>
       <p class="stat-label">of postings tracked may no longer be active</p>
+      <p class="stat-note">Based on how long each posting has been live — a staleness proxy, not a confirmed count of filled or fake roles.</p>
       <dl class="stat-details">
         <div><dt>Total postings tracked</dt><dd>${formatNumber(pd.total_postings)}</dd></div>
         <div><dt>Stale (${formatNumber(pd.stale_threshold_days)}+ days old)</dt><dd>${formatNumber(pd.stale_postings)}</dd></div>
@@ -369,10 +394,7 @@ export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRo
 
   const cta = contentCta(row, allRows, signupUrl);
 
-  const contentRelated = relatedPages(
-    row,
-    allRows.filter((r) => (r.page_type ?? 'listing') === 'content'),
-  );
+  const contentRelated = relatedContentPages(row, allRows);
   const relatedHtml = contentRelated.length
     ? `      <section class="related">
         <h2>Related reading</h2>
@@ -389,8 +411,8 @@ ${contentRelated
     '@type': 'Article',
     headline: h1,
     description: metaDescription,
-    datePublished: pd.computed_at,
-    dateModified: row.last_generated,
+    datePublished: toIso(pd.computed_at) ?? toIso(row.last_generated),
+    dateModified: toIso(row.last_generated) ?? toIso(pd.computed_at),
   };
   const breadcrumbLd = {
     '@context': 'https://schema.org',
@@ -522,6 +544,12 @@ async function main() {
         related: relatedPages(row, pages),
         allRows: pages,
       });
+      if (html == null) {
+        // Template declined to render (e.g. content row with missing page_data).
+        console.warn(`WARNING: skipping ${row.url_path} — missing/invalid page_data.`);
+        skipped.push(row.url_path);
+        continue;
+      }
       const outFile = outputFileForUrlPath(DIST_DIR, row.url_path);
       await mkdir(dirname(outFile), { recursive: true });
       await writeFile(outFile, html, 'utf8');

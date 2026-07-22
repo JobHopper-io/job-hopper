@@ -178,7 +178,13 @@ a:hover {
 
 .stat-label {
   color: var(--color-neutral-muted);
-  margin: 8px 0 20px;
+  margin: 8px 0 4px;
+}
+
+.stat-note {
+  font-size: 13px;
+  color: var(--color-neutral-muted);
+  margin: 0 0 20px;
 }
 
 .stat-details {

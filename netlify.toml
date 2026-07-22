@@ -14,6 +14,13 @@
   status = 301
   force = true
 
+# Same canonicalization for content pages under /career/ (e.g. /career/no-responses/).
+[[redirects]]
+  from = "/career/*/"
+  to = "/career/:splat"
+  status = 301
+  force = true
+
 # Bare /jobs (no category/location) has no generated SEO page and no Vue route,
 # but dist/jobs/ exists as a directory (holding the generated category/location
 # pages), so it counts as an asset match and would 404 before reaching the SPA
