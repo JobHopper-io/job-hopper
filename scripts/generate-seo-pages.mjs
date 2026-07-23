@@ -462,6 +462,151 @@ ${relatedHtml}
 }
 
 // --------------------------------------------------------------------------
+// Hub page (/jobs/browse) — links to every generated listing + content page
+// --------------------------------------------------------------------------
+
+export const HUB_URL_PATH = '/jobs/browse';
+
+/**
+ * Role-only /jobs/{role}/ aggregate rows (no location segment) — there are
+ * only a handful of these, so they get one small "all locations" list rather
+ * than a per-row heading.
+ */
+export function roleOnlyPages(rows) {
+  return rows
+    .map((row) => ({ urlPath: row.url_path, segs: row.url_path.split('/').filter(Boolean) }))
+    .filter(({ segs }) => segs.length === 2 && segs[0] === 'jobs')
+    .map(({ urlPath, segs }) => ({ urlPath, label: humanizeSegment(segs[1]) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * Group /jobs/{role}/{location} rows alphabetically by the FIRST LETTER of
+ * the location, not by individual location: with 607 listing rows spread
+ * across ~370 distinct locations, most locations have only 1-2 roles, so a
+ * heading per location is mostly single-item sections — heading spam, not a
+ * skimmable index. ~23 letter buckets of real size (see each entry labeled
+ * "{role} in {location}") reads like an actual index.
+ */
+export function groupListingsByLocationLetter(rows) {
+  const byLetter = new Map();
+  for (const row of rows) {
+    const segs = row.url_path.split('/').filter(Boolean);
+    if (segs[0] !== 'jobs' || segs.length !== 3) continue;
+    const [, role, location] = segs;
+    const locationLabel = humanizeSegment(location);
+    const letter = locationLabel.charAt(0).toUpperCase() || '#';
+    if (!byLetter.has(letter)) byLetter.set(letter, []);
+    byLetter.get(letter).push({ urlPath: row.url_path, locationLabel, roleLabel: humanizeSegment(role) });
+  }
+  return [...byLetter.entries()]
+    .map(([letter, entries]) => ({
+      letter,
+      entries: entries.sort((a, b) =>
+        a.locationLabel === b.locationLabel
+          ? a.roleLabel.localeCompare(b.roleLabel)
+          : a.locationLabel.localeCompare(b.locationLabel),
+      ),
+    }))
+    .sort((a, b) => a.letter.localeCompare(b.letter));
+}
+
+/**
+ * Render the /jobs/browse hub page: every listing page grouped by location,
+ * plus a short section linking the content (stat/editorial) pages. This page
+ * is generated unconditionally (not gated by any row's `indexed` flag) — it's
+ * link infrastructure, not an SEO landing page itself — but it only links to
+ * rows already generated, so it never links a skipped/unindexed page.
+ */
+export function renderHubPage(rows, { siteUrl, signupUrl = '/register' } = {}) {
+  const canonical = absoluteUrl(siteUrl, HUB_URL_PATH);
+  const title = `Browse All Jobs & Career Guides | ${SITE_SUFFIX}`;
+  const metaDescription = 'Browse every city and role we track, plus our career advice guides.';
+
+  const listingRows = rows.filter((r) => (r.page_type ?? 'listing') === 'listing');
+  const contentRows = rows.filter((r) => (r.page_type ?? 'listing') === 'content');
+  const roleOnly = roleOnlyPages(listingRows);
+  const letterGroups = groupListingsByLocationLetter(listingRows);
+
+  const roleOnlyHtml = roleOnly.length
+    ? `      <section class="browse-group">
+        <h2>Browse by Role (All Locations)</h2>
+        <ul class="browse-list">
+${roleOnly.map((r) => `          <li><a href="${escapeHtml(r.urlPath)}">${escapeHtml(r.label)}</a></li>`).join('\n')}
+        </ul>
+      </section>`
+    : '';
+
+  const groupsHtml = letterGroups
+    .map(
+      (g) => `      <section class="browse-group">
+        <h2>${escapeHtml(g.letter)}</h2>
+        <ul class="browse-list">
+${g.entries
+  .map(
+    (e) =>
+      `          <li><a href="${escapeHtml(e.urlPath)}">${escapeHtml(e.roleLabel)} in ${escapeHtml(e.locationLabel)}</a></li>`,
+  )
+  .join('\n')}
+        </ul>
+      </section>`,
+    )
+    .join('\n');
+
+  // Split content rows: the ~70 per-city "Ghost Jobs in X" stat pages are all
+  // near-identical, and burying the 2 general advice pages at the end of that
+  // list makes them invisible. Advice comes first, in its own small section.
+  const adviceRows = contentRows.filter((r) => !r.url_path.startsWith('/jobs/ghost-jobs/'));
+  const ghostJobsRows = contentRows.filter((r) => r.url_path.startsWith('/jobs/ghost-jobs/'));
+
+  const renderLinkSection = (heading, sectionRows) =>
+    sectionRows.length
+      ? `      <section class="browse-group">
+        <h2>${escapeHtml(heading)}</h2>
+        <ul class="browse-list">
+${sectionRows
+  .map((r) => `          <li><a href="${escapeHtml(r.url_path)}">${escapeHtml(r.h1 ?? r.url_path)}</a></li>`)
+  .join('\n')}
+        </ul>
+      </section>`
+      : '';
+
+  const contentHtml = [
+    renderLinkSection('Why Am I Not Getting Hired?', adviceRows),
+    renderLinkSection('Ghost Jobs by City', ghostJobsRows),
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(metaDescription)}" />
+  <link rel="canonical" href="${escapeHtml(canonical)}" />
+  <link rel="stylesheet" href="/seo-pages.css" />
+</head>
+<body>
+  <main class="seo-page seo-hub">
+    <header class="seo-header">
+      <h1>Browse All Jobs &amp; Career Guides</h1>
+      <p class="intro">Every city and role we track, plus our career advice guides.</p>
+    </header>
+${roleOnlyHtml}
+${groupsHtml}
+${contentHtml}
+    <section class="cta">
+      <a class="cta-button" href="${escapeHtml(signupUrl)}">Get matched with jobs</a>
+    </section>
+  </main>
+</body>
+</html>
+`;
+}
+
+// --------------------------------------------------------------------------
 // Sitemap
 // --------------------------------------------------------------------------
 
@@ -561,9 +706,19 @@ async function main() {
     }
   }
 
+  // Hub page: links to every successfully generated row above, grouped by
+  // location + a content-pages section. Reuses `generated` — no extra query.
+  const hubHtml = renderHubPage(generated, { siteUrl, signupUrl: ctaHref });
+  const hubOutFile = outputFileForUrlPath(DIST_DIR, HUB_URL_PATH);
+  await mkdir(dirname(hubOutFile), { recursive: true });
+  await writeFile(hubOutFile, hubHtml, 'utf8');
+  console.log(`Generated hub page at ${HUB_URL_PATH} (${generated.length} links).`);
+
   // Sitemap is written last, after every page exists. Only successfully
-  // generated pages are listed (skipped rows have no file to serve).
-  const sitemap = buildSitemap(generated, siteUrl);
+  // generated pages are listed (skipped rows have no file to serve), plus
+  // the hub page itself.
+  const hubRow = { url_path: HUB_URL_PATH, last_generated: new Date().toISOString() };
+  const sitemap = buildSitemap([...generated, hubRow], siteUrl);
   await writeFile(join(DIST_DIR, 'sitemap.xml'), sitemap, 'utf8');
 
   console.log(

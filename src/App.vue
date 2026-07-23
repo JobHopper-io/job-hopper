@@ -382,6 +382,7 @@ const handleSignOutAndCloseMenu = async () => {
                 <li><router-link to="/pricing" class="text-sm text-neutral-body hover:text-brand-primary">Pricing</router-link></li>
                 <li><router-link to="/install-app" class="text-sm text-neutral-body hover:text-brand-primary">Get the app</router-link></li>
                 <li><router-link to="/faq" class="text-sm text-neutral-body hover:text-brand-primary">FAQ</router-link></li>
+                <li><a href="/jobs/browse" class="text-sm text-neutral-body hover:text-brand-primary">Browse Jobs</a></li>
               </ul>
             </div>
             <div>
