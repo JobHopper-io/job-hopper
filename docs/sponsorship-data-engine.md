@@ -602,6 +602,11 @@ scheduled-jobs/email plumbing.
       re-ingests with the fix in place; until then, unmatched postings fall back to the heuristic
       exactly as `excluded_from_scoring` ones do (3a is a data-coverage gap, not a defect - no UI
       difference, no user-facing signal that a match wasn't found).
+      **No backfill script for the pre-2026-07-22 `company_domain = null` rows, by design:** the
+      45-day matching cutoff ages every affected posting out of the visible feed on its own within
+      ~45 days, replaced by correctly-resolved rows going forward — so a backfill would only touch
+      rows that are about to disappear anyway. Verify: re-check `job_hopper_live` once the scraper's
+      natural schedule produces a fresh batch and confirm new rows have `company_domain` populated.
    4. `requires_us_sponsorship` filtering is unaffected — still boolean, independent of the
       score/badge value.
 

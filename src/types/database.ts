@@ -148,6 +148,10 @@ export interface MatchedJob {
   premiumInsightsErrorCode?: string | null
   /** When Premium Insights needs the user to pick among tied Apollo organizations */
   premiumInsightsOrgChoices?: PremiumInsightsOrgChoice[] | null
+  /** LLM-generated "why this is a fit" bullets (job_matches.why_fit_bullets), cached after
+   * first generation via the generate-why-fit edge function. Null until generated. */
+  whyFitBullets: string[] | null
+  whyFitGeneratedAt: string | null
 }
 
 /** Aggregate stats for the current user's job matches */
