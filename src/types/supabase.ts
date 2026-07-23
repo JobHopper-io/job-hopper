@@ -1250,6 +1250,7 @@ export type Database = {
           email: string
           first_name: string
           id: string
+          landing_path: string | null
           last_name: string
           location_radius_miles: number | null
           onboarding_completed: boolean | null
@@ -1276,6 +1277,7 @@ export type Database = {
           email: string
           first_name: string
           id?: string
+          landing_path?: string | null
           last_name: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
@@ -1302,6 +1304,7 @@ export type Database = {
           email?: string
           first_name?: string
           id?: string
+          landing_path?: string | null
           last_name?: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
@@ -1562,6 +1565,24 @@ export type Database = {
         Update: {
           id?: number
           search_term?: string
+        }
+        Relationships: []
+      }
+      seo_page_views: {
+        Row: {
+          day: string
+          url_path: string
+          views: number
+        }
+        Insert: {
+          day: string
+          url_path: string
+          views?: number
+        }
+        Update: {
+          day?: string
+          url_path?: string
+          views?: number
         }
         Relationships: []
       }
@@ -2080,6 +2101,10 @@ export type Database = {
       enable_premium_addon: {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
+      }
+      increment_seo_page_view: {
+        Args: { p_url_path: string }
+        Returns: undefined
       }
       match_support_chunks: {
         Args: {

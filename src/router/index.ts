@@ -39,6 +39,7 @@ const adminPaths = [
   '/admin/settings',
   '/admin/dashboard-banner',
   '/admin/user-lifecycle',
+  '/admin/seo-performance',
 ]
 
 const router = createRouter({
@@ -206,6 +207,11 @@ const router = createRouter({
       path: '/admin/user-lifecycle',
       name: 'admin-user-lifecycle',
       component: () => import('../views/AdminUserLifecycle.vue'),
+    },
+    {
+      path: '/admin/seo-performance',
+      name: 'admin-seo-performance',
+      component: () => import('../views/AdminSeoPerformance.vue'),
     },
     {
       path: '/:pathMatch(.*)*',

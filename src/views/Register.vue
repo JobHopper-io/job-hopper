@@ -125,6 +125,12 @@ const handleCreateAccount = async () => {
     }
 
     const redirectTo = `${window.location.origin}/email-verified`
+    let landingPath: string | undefined
+    try {
+      landingPath = sessionStorage.getItem('landing_path') ?? undefined
+    } catch {
+      landingPath = undefined
+    }
     const { data: signUpData, error: signUpError } = await authAPI.signUp(
       email.value,
       password.value,
@@ -132,6 +138,7 @@ const handleCreateAccount = async () => {
       '',
       normalizedPhone,
       redirectTo,
+      landingPath,
     )
     if (signUpError) {
       const authErr = signUpError as AuthError & {

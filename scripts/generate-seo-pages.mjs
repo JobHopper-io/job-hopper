@@ -54,6 +54,29 @@ export function jsonLdScript(obj) {
     .replace(/&/g, '\\u0026');
 }
 
+/**
+ * Fire-and-forget pageview beacon + first-touch landing_path capture, injected into
+ * listing and content pages (not the hub, which isn't itself a measured landing page).
+ * Reuses jsonLdScript's escaping so pageViewEndpoint/url_path can't break out of the
+ * <script> tag. Both effects are wrapped in try/catch so a beacon failure (blocked
+ * fetch, disabled storage) never breaks the page.
+ */
+export function pageViewBeaconScript(row, pageViewEndpoint) {
+  return `  <script>
+    (function () {
+      try { sessionStorage.setItem('landing_path', location.pathname); } catch (e) {}
+      try {
+        fetch(${jsonLdScript(pageViewEndpoint)}, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url_path: ${jsonLdScript(row.url_path)} }),
+          keepalive: true,
+        }).catch(function () {});
+      } catch (e) {}
+    })();
+  </script>`;
+}
+
 // --------------------------------------------------------------------------
 // URL / path helpers
 // --------------------------------------------------------------------------
@@ -180,7 +203,7 @@ function listingCard(listing) {
  * an aggregation page risks a domain-wide Google manual action. Everything in
  * the JSON-LD is also rendered visibly on the page.
  */
-export function renderListingPage(row, { siteUrl, related = [], signupUrl = '/register' }) {
+export function renderListingPage(row, { siteUrl, related = [], signupUrl = '/register', pageViewEndpoint }) {
   const canonical = absoluteUrl(siteUrl, row.url_path);
   const h1 = row.h1 ?? '';
   const title = `${h1} | ${SITE_SUFFIX}`;
@@ -267,6 +290,7 @@ ${cards}
     </section>
 ${relatedHtml}
   </main>
+${pageViewEndpoint ? pageViewBeaconScript(row, pageViewEndpoint) : ''}
 </body>
 </html>
 `;
@@ -356,7 +380,7 @@ function contentCta(row, allRows, signupUrl) {
  * render the stat callout when it's actually a number (some content rows,
  * e.g. the resume-advice hook page, have no stat at all).
  */
-export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRows = [] } = {}) {
+export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRows = [], pageViewEndpoint } = {}) {
   const pd = row.page_data;
   if (!pd || typeof pd !== 'object') {
     throw new Error(`content row has missing/invalid page_data: ${row.url_path}`);
@@ -456,6 +480,7 @@ ${statHtml}
     </section>
 ${relatedHtml}
   </main>
+${pageViewEndpoint ? pageViewBeaconScript(row, pageViewEndpoint) : ''}
 </body>
 </html>
 `;
@@ -666,6 +691,7 @@ async function main() {
     console.warn('WARNING: SIGNUP_URL is unset; CTA falling back to relative "/register".');
   }
   const ctaHref = signupUrl || '/register';
+  const pageViewEndpoint = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/log-seo-page-view`;
 
   const pages = rows ?? [];
   console.log(`Generating ${pages.length} indexed SEO page(s)...`);
@@ -688,6 +714,7 @@ async function main() {
         signupUrl: ctaHref,
         related: relatedPages(row, pages),
         allRows: pages,
+        pageViewEndpoint,
       });
       if (html == null) {
         // Template declined to render (e.g. content row with missing page_data).

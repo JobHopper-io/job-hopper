@@ -255,6 +255,11 @@ verify_jwt = false
 [functions.sponsor-watch-check]
 verify_jwt = false
 
+# Public pageview beacon called via `fetch(..., {keepalive: true})` from static SEO
+# pages -- logged-out visitors, no JWT available.
+[functions.log-seo-page-view]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

@@ -132,7 +132,7 @@ const handleSignOutAndCloseMenu = async () => {
             <!-- Logo -->
             <div class="flex items-center">
               <router-link
-                :to="isAuthenticated ? (isOnboarded ? '/dashboard' : '/onboarding') : '/'"
+                to="/"
                 class="flex items-center space-x-2"
               >
                 <img
