@@ -173,6 +173,7 @@ onMounted(async () => {
       return
     }
     job.value = data
+    void loadWhyFit(data.matchId)
     await loadTailoringPurchase(data.matchId)
     // A generation started on an earlier visit may still be in flight.
     if (advicePurchase.value?.status === 'pending') {
@@ -339,7 +340,8 @@ const postedDateText = computed(() => {
   return formatDate(j.postedDate) ?? formatDate(j.createdAt)
 })
 
-const whyFitBullets = computed(() => {
+/** Rule-based fallback only - used when LLM generation is unavailable (see loadWhyFit). */
+const staticWhyFitBullets = computed(() => {
   const j = job.value
   const profile = userStore.profile
   const bullets: string[] = []
@@ -370,6 +372,32 @@ const whyFitBullets = computed(() => {
   }
   return bullets;
 })
+
+const whyFitBullets = ref<string[]>([])
+const whyFitLoading = ref(false)
+
+/** Generates (or reads the cache for) the LLM "why this is a fit" bullets. Falls back
+ * silently to the rule-based static bullets if the LLM path errors or is unavailable -
+ * the page should never show an error for this, just a less personalized reason. */
+async function loadWhyFit(matchId: string) {
+  const cached = job.value?.whyFitBullets
+  if (cached && cached.length > 0) {
+    whyFitBullets.value = cached
+    return
+  }
+  whyFitLoading.value = true
+  try {
+    const { data, error } = await jobsAPI.generateWhyFit(matchId)
+    if (error || !data) {
+      whyFitBullets.value = staticWhyFitBullets.value
+      return
+    }
+    whyFitBullets.value = data.bullets
+    if (job.value) job.value.whyFitBullets = data.bullets
+  } finally {
+    whyFitLoading.value = false
+  }
+}
 
 async function reloadJobFromRoute() {
   if (!jobIdParam) return
@@ -921,7 +949,11 @@ async function executeTailoringCheckout() {
         <!-- Why this might be a fit -->
         <div class="card p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Why this might be a fit</h2>
-          <ul class="list-disc pl-5 space-y-2 text-neutral-body">
+          <div v-if="whyFitLoading" class="flex items-center gap-2 text-neutral-body text-sm">
+            <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
+            <span>Generating your personalized match reasoning...</span>
+          </div>
+          <ul v-else-if="whyFitBullets.length" class="list-disc pl-5 space-y-2 text-neutral-body">
             <li
               v-for="(bullet, idx) in whyFitBullets"
               :key="idx"
@@ -929,6 +961,9 @@ async function executeTailoringCheckout() {
               {{ bullet }}
             </li>
           </ul>
+          <p v-else class="text-sm text-neutral-body">
+            This match is based on your profile and the role requirements.
+          </p>
         </div>
 
         <!-- How to apply -->

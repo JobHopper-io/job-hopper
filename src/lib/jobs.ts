@@ -180,6 +180,12 @@ function daysSince(iso: string | null | undefined): number | null {
   return Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000))
 }
 
+function parseWhyFitBullets(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null
+  const bullets = raw.filter((b): b is string => typeof b === 'string' && b.trim().length > 0)
+  return bullets.length > 0 ? bullets : null
+}
+
 function toMatchedJob(
   match: JobMatch,
   job: JobHopperLive | null,
@@ -247,6 +253,8 @@ function toMatchedJob(
     isStale,
     daysSincePosted,
     isRecentlyPosted,
+    whyFitBullets: parseWhyFitBullets(match.why_fit_bullets),
+    whyFitGeneratedAt: match.why_fit_generated_at ?? null,
   }
 }
 
@@ -264,7 +272,7 @@ export const jobsAPI = {
   ): Promise<{ data: MatchedJob[]; error: Error | null }> {
     const query = supabase
       .from('job_matches')
-      .select('id, profile_id, job_id, score, created_at')
+      .select('id, profile_id, job_id, score, created_at, why_fit_bullets, why_fit_generated_at')
       .order('created_at', { ascending: false })
 
     const { data: matchesRaw, error } = await query
@@ -418,7 +426,7 @@ export const jobsAPI = {
   ): Promise<{ data: MatchedJob | null; error: Error | null }> {
     const { data: matchRaw, error: matchError } = await supabase
       .from('job_matches')
-      .select('id, job_id, score, created_at')
+      .select('id, job_id, score, created_at, why_fit_bullets, why_fit_generated_at')
       .eq('job_id', jobId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -719,6 +727,33 @@ export const jobsAPI = {
    * the `run-job-search` edge function so subscribers aren't stuck waiting for the next
    * automated digest. No per-search cap (unlike the freemium path).
    */
+  /**
+   * LLM-generated "why this is a fit" bullets for a single job match (JobDetail). Cached
+   * server-side on job_matches after first generation - safe to call on every page load,
+   * a cache hit costs one DB read and no LLM call.
+   */
+  async generateWhyFit(matchId: string): Promise<{
+    data: { bullets: string[]; generatedAt: string | null } | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke<{
+      bullets?: string[]
+      generatedAt?: string | null
+      error?: string
+    }>('generate-why-fit', { body: { job_match_id: matchId } })
+
+    if (error) {
+      return { data: null, error: new Error(error.message) }
+    }
+    if (data && typeof data === 'object' && 'error' in data && data.error) {
+      return { data: null, error: new Error(String(data.error)) }
+    }
+    if (!data || !Array.isArray(data.bullets) || data.bullets.length === 0) {
+      return { data: null, error: new Error('Unexpected response') }
+    }
+    return { data: { bullets: data.bullets, generatedAt: data.generatedAt ?? null }, error: null }
+  },
+
   async runManualJobSearch(): Promise<{
     data: { matchesCreated: number } | null
     error: Error | null

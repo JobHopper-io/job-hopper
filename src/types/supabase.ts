@@ -751,6 +751,8 @@ export type Database = {
           job_id: string
           profile_id: string
           score: number | null
+          why_fit_bullets: Json | null
+          why_fit_generated_at: string | null
         }
         Insert: {
           created_at?: string
@@ -758,6 +760,8 @@ export type Database = {
           job_id: string
           profile_id: string
           score?: number | null
+          why_fit_bullets?: Json | null
+          why_fit_generated_at?: string | null
         }
         Update: {
           created_at?: string
@@ -765,6 +769,8 @@ export type Database = {
           job_id?: string
           profile_id?: string
           score?: number | null
+          why_fit_bullets?: Json | null
+          why_fit_generated_at?: string | null
         }
         Relationships: [
           {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { authAPI } from '@/lib/auth'
@@ -110,28 +110,32 @@ const premiumFeatures = [
 
 // ── Feature comparison. Cell values: true = included, false = not included, string = label. ──
 const comparisonColumns = ['Free', 'Core', 'Premium']
-const comparisonRows: { feature: string; cells: (boolean | string)[] }[] = [
-  { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
-  { feature: 'Automated matching + email digest', cells: [false, true, true] },
-  { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
-  { feature: 'Premium Insights', cells: ['Limited', 'Full', 'Full'] },
-  { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
-  { feature: 'Application tracker', cells: [false, true, true] },
-  { feature: 'Real Sponsorship Score', cells: [false, false, 'Coming soon'] },
-  { feature: 'Sponsor Watch', cells: [false, false, 'Coming soon'] },
-  { feature: 'Apply Intelligence', cells: [false, false, 'Coming soon'] },
-  { feature: 'Hiring manager contact', cells: [false, false, 'Coming soon'] },
-  { feature: 'Ghost Listing Detector', cells: [false, false, 'Coming soon'] },
-]
+const comparisonRows = computed<{ feature: string; cells: (boolean | string)[] }[]>(() => {
+  const premiumLive = premiumProduct.value?.available_for_purchase === true
+  const premiumOnly = premiumLive ? true : 'Coming soon'
+  return [
+    { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
+    { feature: 'Automated matching + email digest', cells: [false, true, true] },
+    { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
+    { feature: 'Premium Insights', cells: ['Limited', 'Full', 'Full'] },
+    { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
+    { feature: 'Application tracker', cells: [false, true, true] },
+    { feature: 'Real Sponsorship Score', cells: [false, false, premiumOnly] },
+    { feature: 'Sponsor Watch', cells: [false, false, premiumOnly] },
+    { feature: 'Apply Intelligence', cells: [false, false, premiumOnly] },
+    { feature: 'Hiring manager contact', cells: [false, false, premiumOnly] },
+    { feature: 'Ghost Listing Detector', cells: [false, false, premiumOnly] },
+  ]
+})
 
 const pricingFaq = [
   {
     q: 'Why are there different prices?',
-    a: "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium (coming soon) layers on a deeper sponsorship intelligence set.",
+    a: "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium layers on a deeper sponsorship intelligence set.",
   },
   {
     q: 'Do higher tiers come with different features?',
-    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Premium Insights, full Resume Advice, and the application tracker. Premium (coming soon) adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
+    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Premium Insights, full Resume Advice, and the application tracker. Premium adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
   },
   {
     q: 'Can I change tiers later?',
@@ -143,11 +147,11 @@ const pricingFaq = [
   },
   {
     q: 'Is there a free trial?',
-    a: "Yes — Core starts with a free trial, so you can see the quality and relevance of your matches before you commit. Premium isn't purchasable yet, so there's no trial for it; join the waitlist and we'll notify you the moment it launches.",
+    a: "Yes — Core and Premium both start with a free trial, so you can see the quality and relevance of your matches before you commit.",
   },
   {
     q: 'How do billing and cancellation work?',
-    a: 'Core is billed monthly and you can cancel at any time in a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges.',
+    a: 'Core and Premium are billed monthly and you can cancel at any time in a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges.',
   },
 ]
 </script>
@@ -211,14 +215,14 @@ const pricingFaq = [
             class="card p-8 text-left flex flex-col border-2 border-brand-primary"
           >
             <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
-            <p class="text-lg font-semibold text-neutral-body mb-1">
-              ${{ getProductPrice(premiumProduct) }}/mo
+            <p class="text-3xl font-bold text-brand-primary mb-1">
+              ${{ getProductPrice(premiumProduct) }}<span class="text-lg font-normal text-neutral-body">/month</span>
             </p>
             <p class="text-sm text-neutral-body mb-6">Billed monthly</p>
             <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
               <li v-for="f in premiumFeatures" :key="f" class="flex items-start">
-                <font-awesome-icon :icon="['fas', 'check']" class="mr-2 mt-1 flex-shrink-0 text-brand-primary" />
+                <font-awesome-icon :icon="['fas', 'check']" class="mr-2 mt-1 flex-shrink-0 text-brand-success" />
                 <span>{{ f }}</span>
               </li>
             </ul>
@@ -231,7 +235,9 @@ const pricingFaq = [
               <font-awesome-icon :icon="['fas', 'lock']" /> Coming soon
             </div>
             <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
-            <p class="text-lg font-semibold text-neutral-body mb-1">$49/mo at launch</p>
+            <p class="text-3xl font-bold text-brand-primary mb-1">
+              $49<span class="text-lg font-normal text-neutral-body">/month</span>
+            </p>
             <p class="text-sm text-neutral-body mb-6">Not purchasable yet — join the waitlist for early access.</p>
             <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
@@ -268,7 +274,10 @@ const pricingFaq = [
                   class="text-center font-semibold text-brand-charcoal py-3 px-4"
                 >
                   {{ col }}
-                  <span v-if="col === 'Premium'" class="block text-xs font-normal text-neutral-body">Coming soon</span>
+                  <span
+                    v-if="col === 'Premium' && !premiumProduct?.available_for_purchase"
+                    class="block text-xs font-normal text-neutral-body"
+                  >Coming soon</span>
                 </th>
               </tr>
             </thead>
@@ -398,7 +407,7 @@ const pricingFaq = [
           Pick your plan. We'll handle the search.
         </h2>
         <p class="text-neutral-body mb-8 max-w-2xl mx-auto">
-          Choose Free or Core, set up your profile in about a minute, and start receiving curated job matches. Premium's deeper sponsorship tools are coming soon—join the waitlist to get early access.
+          Choose Free, Core, or Premium, set up your profile in about a minute, and start receiving curated job matches.
         </p>
         <router-link to="/register" class="btn-primary inline-block mb-4">
           Start your free trial

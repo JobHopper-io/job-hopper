@@ -100,3 +100,26 @@ export const JOB_MATCH_FREQUENCY_OPTIONS: { value: JobMatchEmailFrequency; label
   { value: 'daily', label: 'Daily digest' },
   { value: 'weekly', label: 'Weekly digest' },
 ]
+
+export type BaseTier = 'free' | 'core' | 'premium'
+
+/** Ordered most-frequent-first. Mirrors supabase/functions/_shared/job-match-email-frequency.ts. */
+export const ALLOWED_JOB_MATCH_FREQUENCIES: Record<BaseTier, JobMatchEmailFrequency[]> = {
+  free: ['weekly'],
+  core: ['daily', 'weekly'],
+  premium: ['immediate', 'daily', 'weekly'],
+}
+
+export function allowedJobMatchFrequencyOptions(tier: BaseTier) {
+  const allowed = ALLOWED_JOB_MATCH_FREQUENCIES[tier]
+  return JOB_MATCH_FREQUENCY_OPTIONS.filter((opt) => allowed.includes(opt.value))
+}
+
+/** Falls back to the tier's most frequent allowed cadence (e.g. a downgraded Premium user). */
+export function clampJobMatchFrequency(
+  frequency: JobMatchEmailFrequency,
+  tier: BaseTier,
+): JobMatchEmailFrequency {
+  const allowed = ALLOWED_JOB_MATCH_FREQUENCIES[tier]
+  return allowed.includes(frequency) ? frequency : allowed[0]
+}

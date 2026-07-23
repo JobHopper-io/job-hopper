@@ -134,8 +134,8 @@ export function relatedPages(row, allRows, max = 5) {
  * Choose the template for a row by page type. `page_type` may not exist yet;
  * read it defensively and default to the listing template.
  *
- * Returns `null` for any UNRECOGNIZED page type — those rows are skipped with a
- * warning rather than failing the build. That safety net stays for future types.
+ * Returns `null` for any page type we cannot render yet. Callers must skip
+ * null rows — never fail the build over one unsupported row.
  */
 export function pickTemplate(row) {
   const type = row.page_type ?? 'listing';
@@ -273,8 +273,13 @@ ${relatedHtml}
 }
 
 // --------------------------------------------------------------------------
-// Content template (Type 3 — Ghost Jobs staleness pages)
+// Content template (Type 3 stat/editorial pages)
 // --------------------------------------------------------------------------
+
+/** 16000 -> "16,000". Falls back to "0" for non-finite input. */
+function formatNumber(n) {
+  return Number.isFinite(n) ? n.toLocaleString('en-US') : '0';
+}
 
 /** ISO string for a date-ish value, or undefined if absent/unparseable. */
 function toIso(value) {
@@ -283,127 +288,131 @@ function toIso(value) {
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
-/** The city slug of a url_path is its last segment, e.g. ".../houston" -> "houston". */
-function citySlugOf(urlPath) {
-  return urlPath.split('/').filter(Boolean).pop() ?? '';
+/**
+ * Breadcrumb for content pages: Home / Career Advice / {section}. Deliberately
+ * NOT the listing template's url-segment breadcrumb — "Jobs" and "Jobs / Ghost
+ * Jobs" have no real page behind them (bare /jobs redirects to /dashboard, and
+ * there's no hub page for /jobs/ghost-jobs), so linking those crumbs 404s.
+ */
+function contentBreadcrumb(row) {
+  const pd = row.page_data ?? {};
+  let section;
+  if (row.url_path.startsWith('/jobs/ghost-jobs/')) {
+    section = `Ghost Jobs · ${pd.city_name ?? humanizeSegment(row.url_path.split('/').filter(Boolean).pop())}`;
+  } else {
+    section = humanizeSegment(row.url_path.split('/').filter(Boolean).pop());
+  }
+  return [
+    { name: 'Home', urlPath: '/' },
+    { name: 'Career Advice', urlPath: null },
+    { name: section, urlPath: row.url_path },
+  ];
 }
 
 /**
- * Up to `max` OTHER content pages, highest ghost rate first, for "Related cities".
- * Pulled from the already-queried set; no extra DB calls.
+ * Up to `max` OTHER content pages for "Related reading", highest ghost rate
+ * first (rows without a numeric ghost_rate_pct, e.g. the resume-advice hook
+ * page, sort last but are still eligible). Pulled from the already-queried
+ * set; no extra DB calls.
  */
 export function relatedContentPages(row, allRows, max = 5) {
   return allRows
-    .filter(
-      (r) =>
-        r.url_path !== row.url_path &&
-        (r.page_type ?? 'listing') === 'content' &&
-        Number.isFinite(Number(r.page_data?.ghost_rate_pct)),
+    .filter((r) => r.url_path !== row.url_path && (r.page_type ?? 'listing') === 'content')
+    .sort(
+      (a, b) =>
+        Number(b.page_data?.ghost_rate_pct ?? -1) - Number(a.page_data?.ghost_rate_pct ?? -1),
     )
-    .sort((a, b) => Number(b.page_data.ghost_rate_pct) - Number(a.page_data.ghost_rate_pct))
     .slice(0, max);
 }
 
 /**
- * Find a Type 1 listing page for the same city as `row` (match on the city slug,
- * the last url_path segment). Returns its url_path, or null if none exists.
+ * CTA target/label for a content row. City ghost-jobs pages try to link the
+ * matching Type 1 listing page (same city slug, among already-queried rows);
+ * everything else falls back to signupUrl. Deliberately never includes a
+ * number in the label (a 0%-fresh city would otherwise read "0 listings").
  */
-export function listingForCity(row, allRows) {
-  const citySlug = citySlugOf(row.url_path);
-  if (!citySlug) return null;
-  const match = allRows.find(
-    (r) => (r.page_type ?? 'listing') === 'listing' && citySlugOf(r.url_path) === citySlug,
-  );
-  return match ? match.url_path : null;
+function contentCta(row, allRows, signupUrl) {
+  const pd = row.page_data ?? {};
+  if (typeof pd.ghost_rate_pct !== 'number') {
+    return { href: signupUrl, label: 'Get your free resume check' };
+  }
+  if (pd.city_name && pd.scope !== 'national') {
+    const citySlug = row.url_path.split('/').filter(Boolean).pop();
+    const match = allRows.find(
+      (r) =>
+        (r.page_type ?? 'listing') === 'listing' &&
+        r.url_path.split('/').filter(Boolean).pop() === citySlug,
+    );
+    if (match) {
+      return { href: match.url_path, label: `See verified fresh ${pd.city_name} listings` };
+    }
+  }
+  return { href: signupUrl, label: 'Browse verified job listings' };
 }
 
 /**
- * Render a Type 3 "Ghost Jobs" content page — a stat/editorial page, NOT a job
- * grid (sample_listings is empty by design here). The staleness stat is the content.
- *
- * Structured data is Article + BreadcrumbList ONLY. Deliberately NOT ItemList
- * (there is no list of jobs) and NOT JobPosting. Everything in the JSON-LD is
- * also rendered visibly on the page.
- *
- * Returns `null` when required stat data is missing/malformed so the caller
- * skips the row with a warning — never render a broken page.
+ * Render a content (stat/editorial) page. No job grid, no ItemList/JobPosting
+ * JSON-LD — this is an Article. Branches on `page_data.ghost_rate_pct`: only
+ * render the stat callout when it's actually a number (some content rows,
+ * e.g. the resume-advice hook page, have no stat at all).
  */
-export function renderContentPage(row, { siteUrl, allRows = [], signupUrl = '/register' }) {
-  const data = row.page_data;
-  const pct = Number(data?.ghost_rate_pct);
-  // Required field guard: without a numeric ghost_rate_pct there is no page.
-  if (!data || typeof data !== 'object' || !Number.isFinite(pct)) {
-    return null;
+export function renderContentPage(row, { siteUrl, signupUrl = '/register', allRows = [] } = {}) {
+  const pd = row.page_data;
+  if (!pd || typeof pd !== 'object') {
+    throw new Error(`content row has missing/invalid page_data: ${row.url_path}`);
   }
 
-  const cityName =
-    data.city_name || humanizeSegment(citySlugOf(row.url_path)) || 'this city';
   const canonical = absoluteUrl(siteUrl, row.url_path);
   const h1 = row.h1 ?? '';
   const title = `${h1} | ${SITE_SUFFIX}`;
   const metaDescription = row.meta_description ?? '';
-  const crumbs = breadcrumbTrail(row.url_path);
+  const crumbs = contentBreadcrumb(row);
+  const hasStat = typeof pd.ghost_rate_pct === 'number';
 
   const breadcrumbNav = crumbs
     .map((c, i) =>
       i === crumbs.length - 1
         ? `<span aria-current="page">${escapeHtml(c.name)}</span>`
-        : `<a href="${escapeHtml(c.urlPath)}">${escapeHtml(c.name)}</a>`,
+        : c.urlPath
+          ? `<a href="${escapeHtml(c.urlPath)}">${escapeHtml(c.name)}</a>`
+          : `<span>${escapeHtml(c.name)}</span>`,
     )
     .join('<span class="crumb-sep"> / </span>');
 
-  // Supporting figures, rendered plainly as data. Only emit a line when its
-  // number is present. The staleness line keeps the hedged "may no longer be
-  // active" language — this is a posting-age proxy, not a confirmed-ghost claim.
-  const totalPostings = Number(data.total_postings);
-  const stalePostings = Number(data.stale_postings);
-  const staleDays = Number(data.stale_threshold_days);
-  const freshCount = Number(data.fresh_count);
-  const freshDays = Number(data.fresh_threshold_days);
+  const statHtml = hasStat
+    ? `    <section class="stat-callout">
+      <p class="stat-percent">${escapeHtml(String(pd.ghost_rate_pct))}%</p>
+      <p class="stat-label">of postings tracked may no longer be active</p>
+      <p class="stat-note">Based on how long each posting has been live — a staleness proxy, not a confirmed count of filled or fake roles.</p>
+      <dl class="stat-details">
+        <div><dt>Total postings tracked</dt><dd>${formatNumber(pd.total_postings)}</dd></div>
+        <div><dt>Stale (${formatNumber(pd.stale_threshold_days)}+ days old)</dt><dd>${formatNumber(pd.stale_postings)}</dd></div>
+        <div><dt>Fresh (posted in last ${formatNumber(pd.fresh_threshold_days)} days)</dt><dd>${formatNumber(pd.fresh_count)}</dd></div>
+      </dl>
+    </section>`
+    : '';
 
-  const dataItem = (label, value) =>
-    `          <li><span class="data-label">${label}</span> <span class="data-value">${escapeHtml(String(value))}</span></li>`;
-  const dataItems = [
-    Number.isFinite(totalPostings) ? dataItem('Postings tracked', totalPostings) : '',
-    Number.isFinite(stalePostings)
-      ? dataItem(
-          `Posted more than ${Number.isFinite(staleDays) ? staleDays : ''} days ago (may no longer be active)`,
-          stalePostings,
-        )
-      : '',
-    Number.isFinite(freshCount)
-      ? dataItem(`Posted in the last ${Number.isFinite(freshDays) ? freshDays : ''} days`, freshCount)
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const cta = contentCta(row, allRows, signupUrl);
 
-  // CTA: point at the city's Type 1 listing page if one exists in the queried
-  // set; otherwise fall back to signup. No reference to the fresh-count number,
-  // so a 0-fresh page never renders "see all 0 roles".
-  const cityListing = listingForCity(row, allRows);
-  const ctaHref = cityListing || signupUrl;
-
-  const relatedCities = relatedContentPages(row, allRows);
-  const relatedHtml = relatedCities.length
+  const contentRelated = relatedContentPages(row, allRows);
+  const relatedHtml = contentRelated.length
     ? `      <section class="related">
-        <h2>Related cities</h2>
+        <h2>Related reading</h2>
         <ul class="related-list">
-${relatedCities
+${contentRelated
   .map((r) => `          <li><a href="${escapeHtml(r.url_path)}">${escapeHtml(r.h1 ?? r.url_path)}</a></li>`)
   .join('\n')}
         </ul>
       </section>`
     : '';
 
-  // JSON-LD: Article (the stat editorial) + BreadcrumbList (the visible trail).
   const articleLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: h1,
     description: metaDescription,
-    datePublished: toIso(data.computed_at) ?? toIso(row.last_generated),
-    dateModified: toIso(row.last_generated) ?? toIso(data.computed_at),
+    datePublished: toIso(pd.computed_at) ?? toIso(row.last_generated),
+    dateModified: toIso(row.last_generated) ?? toIso(pd.computed_at),
   };
   const breadcrumbLd = {
     '@context': 'https://schema.org',
@@ -412,7 +421,7 @@ ${relatedCities
       '@type': 'ListItem',
       position: i + 1,
       name: c.name,
-      item: absoluteUrl(siteUrl, c.urlPath),
+      ...(c.urlPath ? { item: absoluteUrl(siteUrl, c.urlPath) } : {}),
     })),
   };
 
@@ -438,22 +447,12 @@ ${jsonLdScript(breadcrumbLd)}
     <header class="seo-header">
       <h1>${escapeHtml(h1)}</h1>
     </header>
-    <section class="stat-callout" aria-label="Ghost job rate">
-      <p class="stat-figure"><span class="stat-number">${pct}%</span></p>
-      <p class="stat-statement">of ${escapeHtml(cityName)} job postings may no longer be active</p>
-      <p class="stat-note">Based on how long each posting has been live — a staleness proxy, not a confirmed count of filled or fake roles.</p>
-    </section>
+${statHtml}
     <section class="content-body">
       <p class="intro">${escapeHtml(row.intro_copy ?? '')}</p>
     </section>
-    <section class="supporting-data" aria-label="Underlying figures">
-      <h2>The numbers</h2>
-      <ul class="data-list">
-${dataItems}
-      </ul>
-    </section>
     <section class="cta">
-      <a class="cta-button" href="${escapeHtml(ctaHref)}">See verified fresh ${escapeHtml(cityName)} listings</a>
+      <a class="cta-button" href="${escapeHtml(cta.href)}">${escapeHtml(cta.label)}</a>
     </section>
 ${relatedHtml}
   </main>
