@@ -147,6 +147,11 @@ const router = createRouter({
       component: () => import('../views/JobDetail.vue'),
     },
     {
+      path: '/interview-practice/:jobMatchId',
+      name: 'interview-practice',
+      component: () => import('../views/InterviewPractice.vue'),
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: () => import('../views/Profile.vue'),

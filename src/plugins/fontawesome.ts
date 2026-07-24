@@ -39,6 +39,7 @@ import {
   faHourglassHalf,
   faArrowRightArrowLeft,
   faCheckDouble,
+  faComments,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -80,6 +81,7 @@ library.add(
   faHourglassHalf,
   faArrowRightArrowLeft,
   faCheckDouble,
+  faComments,
   faTiktok,
   faInstagram,
 )

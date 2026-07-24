@@ -484,6 +484,77 @@ export type Database = {
           },
         ]
       }
+      interview_practice_daily_usage: {
+        Row: {
+          count: number
+          profile_id: string
+          usage_date: string
+        }
+        Insert: {
+          count?: number
+          profile_id: string
+          usage_date: string
+        }
+        Update: {
+          count?: number
+          profile_id?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_practice_daily_usage_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interview_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          job_match_id: string
+          profile_id: string
+          resume_text: string | null
+          transcript: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_match_id: string
+          profile_id: string
+          resume_text?: string | null
+          transcript?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_match_id?: string
+          profile_id?: string
+          resume_text?: string | null
+          transcript?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_sessions_job_match_id_fkey"
+            columns: ["job_match_id"]
+            isOneToOne: false
+            referencedRelation: "job_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interview_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_applications: {
         Row: {
           applied_at: string | null
@@ -2202,6 +2273,14 @@ export type Database = {
           job_searches_used: number
           max_job_searches: number
           success: boolean
+        }[]
+      }
+      try_consume_interview_question: {
+        Args: { p_daily_limit: number; p_profile_id: string }
+        Returns: {
+          daily_limit: number
+          ok: boolean
+          used: number
         }[]
       }
     }
