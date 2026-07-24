@@ -23,8 +23,8 @@
   - Each subscription belongs to one profile
   - Subscription items (recurring products) are stored in `subscription_product` (subscription_id + product_id → `products`).
 - **Non‑obvious rules**:
-  - `status` uses enum `subscription_status`: `trial` | `active` | `canceled`. Map Stripe `trialing` → `trial`, `active`/`past_due` → `active`, `canceled`/`unpaid`/`expired` → `canceled`.
-  - **Active subscriptions**: any row with `status IN ('trial','active')` is active. A profile can have multiple active subscriptions; the app does not choose a single “current” one—it considers all active rows when deriving products and entitlements.
+  - `status` uses enum `subscription_status`: `trial` | `active` | `past_due` | `canceled`. Map Stripe `trialing` → `trial`, `active` → `active`, `past_due` → `past_due` (its own status since migration `20260720120000_subscription_status_past_due.sql` — before that it was folded into `active`, which wrongly granted paid access on a failed payment), `canceled`/`unpaid`/`expired` → `canceled`.
+  - **Entitled subscriptions**: any row with `status IN ('trial','active')` is entitled (grants base-tier access); `past_due` is deliberately non-entitling (see `_shared/base-tier.ts`). A profile can have multiple entitled subscriptions; the app does not choose a single “current” one—it considers all entitled rows when deriving products and entitlements.
   - Rows are not deleted when Stripe cancels; status is set to `canceled` for history.
 
 ### products

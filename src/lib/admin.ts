@@ -1,6 +1,33 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
 
+export interface SeoPerformanceRow {
+  urlPath: string
+  pageType: string
+  h1: string | null
+  views: number
+  signups: number
+  payingConversions: number
+}
+
+export interface SeoPerformanceReport {
+  rows: SeoPerformanceRow[]
+  totalRows: number
+}
+
+export interface AcquisitionChannelRow {
+  /** "seo", "direct", a raw utm_source value (e.g. "linkedin"), or "<host> (organic)". */
+  channel: string
+  signups: number
+  payingConversions: number
+  conversionRate: number
+}
+
+export interface AcquisitionChannelReport {
+  rows: AcquisitionChannelRow[]
+  totalSignups: number
+}
+
 export type AdminTestEmailKind =
   | 'job_match_digest'
   | 'subscription_started'
@@ -111,6 +138,33 @@ export const adminAPI = {
     }
 
     return { data: data as UserLifecycleReport, error: null }
+  },
+
+  async getSeoPerformanceReport(): Promise<{ data: SeoPerformanceReport | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-seo-performance-report', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as SeoPerformanceReport, error: null }
+  },
+
+  async getAcquisitionChannelReport(): Promise<{
+    data: AcquisitionChannelReport | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-acquisition-channel-report', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as AcquisitionChannelReport, error: null }
   },
 }
 

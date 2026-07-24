@@ -225,3 +225,30 @@ a:hover {
   flex-direction: column;
   gap: 8px;
 }
+
+.seo-hub {
+  max-width: 960px;
+}
+
+.browse-group {
+  margin-bottom: 28px;
+}
+
+.browse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  column-gap: 24px;
+}
+
+.browse-list li {
+  break-inside: avoid;
+  margin-bottom: 4px;
+}
+
+@media (min-width: 640px) {
+  .browse-list {
+    columns: 3;
+  }
+}

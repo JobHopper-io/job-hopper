@@ -1250,6 +1250,7 @@ export type Database = {
           email: string
           first_name: string
           id: string
+          landing_path: string | null
           last_name: string
           location_radius_miles: number | null
           onboarding_completed: boolean | null
@@ -1257,12 +1258,14 @@ export type Database = {
           open_to_remote: boolean | null
           phone_number: string | null
           preferred_locations: string[] | null
+          referrer_host: string | null
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
           target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
+          utm_source: string | null
           years_of_experience: number | null
         }
         Insert: {
@@ -1276,6 +1279,7 @@ export type Database = {
           email: string
           first_name: string
           id?: string
+          landing_path?: string | null
           last_name: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
@@ -1283,12 +1287,14 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_source?: string | null
           years_of_experience?: number | null
         }
         Update: {
@@ -1302,6 +1308,7 @@ export type Database = {
           email?: string
           first_name?: string
           id?: string
+          landing_path?: string | null
           last_name?: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
@@ -1309,12 +1316,14 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_source?: string | null
           years_of_experience?: number | null
         }
         Relationships: []
@@ -1562,6 +1571,24 @@ export type Database = {
         Update: {
           id?: number
           search_term?: string
+        }
+        Relationships: []
+      }
+      seo_page_views: {
+        Row: {
+          day: string
+          url_path: string
+          views: number
+        }
+        Insert: {
+          day: string
+          url_path: string
+          views?: number
+        }
+        Update: {
+          day?: string
+          url_path?: string
+          views?: number
         }
         Relationships: []
       }
@@ -2080,6 +2107,10 @@ export type Database = {
       enable_premium_addon: {
         Args: { addon_type: string; user_id: string }
         Returns: boolean
+      }
+      increment_seo_page_view: {
+        Args: { p_url_path: string }
+        Returns: undefined
       }
       match_support_chunks: {
         Args: {

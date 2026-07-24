@@ -84,6 +84,31 @@ onUnmounted(() => {
 
 onMounted(async () => {
   try {
+    // First-touch paid/campaign attribution for signups that land directly on the
+    // SPA (e.g. an ad link), mirroring landing_path's capture on static SEO pages
+    // (scripts/generate-seo-pages.mjs). Read once per app load; never overwritten.
+    try {
+      const utmSource = new URLSearchParams(window.location.search).get('utm_source')
+      if (utmSource) sessionStorage.setItem('utm_source', utmSource)
+    } catch {
+      // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
+    }
+
+    // Organic-referral fallback (no utm tag needed) for the same first-touch moment -
+    // only meaningful on this initial load (App.vue mounts once per full page load,
+    // not per in-app route change) and only when it's an external site, not our own
+    // client-side navigation re-entering via a full reload.
+    try {
+      if (document.referrer) {
+        const referrerHost = new URL(document.referrer).hostname
+        if (referrerHost && referrerHost !== window.location.hostname) {
+          sessionStorage.setItem('referrer_host', referrerHost)
+        }
+      }
+    } catch {
+      // Malformed/opaque referrer - attribution is best-effort.
+    }
+
     const { user } = await authAPI.getCurrentUser()
     isAuthenticated.value = !!user
     // watch(isAuthenticated) above handles loadUserData() / clear() when this changes
@@ -132,7 +157,7 @@ const handleSignOutAndCloseMenu = async () => {
             <!-- Logo -->
             <div class="flex items-center">
               <router-link
-                :to="isAuthenticated ? (isOnboarded ? '/dashboard' : '/onboarding') : '/'"
+                to="/"
                 class="flex items-center space-x-2"
               >
                 <img
@@ -382,6 +407,7 @@ const handleSignOutAndCloseMenu = async () => {
                 <li><router-link to="/pricing" class="text-sm text-neutral-body hover:text-brand-primary">Pricing</router-link></li>
                 <li><router-link to="/install-app" class="text-sm text-neutral-body hover:text-brand-primary">Get the app</router-link></li>
                 <li><router-link to="/faq" class="text-sm text-neutral-body hover:text-brand-primary">FAQ</router-link></li>
+                <li><a href="/jobs/browse" class="text-sm text-neutral-body hover:text-brand-primary">Browse Jobs</a></li>
               </ul>
             </div>
             <div>
