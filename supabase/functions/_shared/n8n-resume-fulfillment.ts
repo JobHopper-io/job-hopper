@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { downloadResumeBytes, bytesToResumePlainText } from './resume-text.ts'
 
 type AdminClient = SupabaseClient
 
@@ -24,41 +25,6 @@ function webhookUrlForProductKey(key: string): string | null {
     const u = UPGRADE_URL()
     return u || null
   }
-  return null
-}
-
-async function downloadResumeBytes(
-  supabaseAdmin: AdminClient,
-  bucketKey: string,
-): Promise<Uint8Array | null> {
-  const { data, error } = await supabaseAdmin.storage.from('resumes').download(bucketKey)
-  if (error || !data) {
-    console.error(`${LOG} storage download failed`, { bucketKey, message: error?.message })
-    return null
-  }
-  return new Uint8Array(await data.arrayBuffer())
-}
-
-async function bytesToResumePlainText(
-  bucketKey: string,
-  bytes: Uint8Array,
-): Promise<string | null> {
-  const lower = bucketKey.toLowerCase()
-  if (lower.endsWith('.txt') || lower.endsWith('.md')) {
-    return new TextDecoder('utf-8', { fatal: false }).decode(bytes).trim() || null
-  }
-  if (lower.endsWith('.pdf')) {
-    try {
-      const { extractText } = await import('https://esm.sh/unpdf@0.12.1')
-      const { text } = await extractText(bytes, { mergePages: true })
-      const s = (text ?? '').trim()
-      return s || null
-    } catch (e) {
-      console.error(`${LOG} PDF text extraction failed`, e)
-      return null
-    }
-  }
-  console.warn(`${LOG} unsupported resume file type (use PDF or TXT)`, { bucketKey })
   return null
 }
 

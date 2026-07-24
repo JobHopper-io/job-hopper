@@ -840,6 +840,18 @@ async function executeTailoringCheckout() {
                   </button>
                 </template>
                 </template>
+                <router-link
+                  v-if="job"
+                  :to="{
+                    name: 'interview-practice',
+                    params: { jobMatchId: job.matchId },
+                    query: { jobTitle: job.title, companyName: job.company },
+                  }"
+                  class="btn-secondary inline-flex items-center justify-center gap-2"
+                >
+                  <font-awesome-icon :icon="['fas', 'comments']" class="opacity-80" aria-hidden="true" />
+                  Practice interview for this job
+                </router-link>
               </div>
             </div>
             <ResumeAdvicePrecheckModal

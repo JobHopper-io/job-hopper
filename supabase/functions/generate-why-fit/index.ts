@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { WHY_FIT_SYSTEM, extractWhyFitBullets, whyFitUserMessage } from '../_shared/why-fit-prompt.ts'
+import { callChatCompletion } from '../_shared/llm.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,14 +95,6 @@ serve(async (req) => {
       return jsonResponse({ error: 'Job not found for this match' }, 404)
     }
 
-    const llmApiKey = Deno.env.get('LLM_API_KEY') ?? ''
-    if (!llmApiKey) {
-      return jsonResponse(
-        { error: 'LLM_API_KEY must be set as an Edge Function secret (Dashboard → Edge Functions → Secrets).' },
-        500,
-      )
-    }
-    const llmBaseUrl = (Deno.env.get('LLM_BASE_URL') || 'https://api.openai.com/v1').replace(/\/$/, '')
     const llmModel = Deno.env.get('LLM_MODEL_WHY_FIT') || 'gpt-4o-mini'
 
     const userMessage = whyFitUserMessage({
@@ -126,42 +119,22 @@ serve(async (req) => {
       matchScore: match.score,
     })
 
-    let chatRes: Response
-    try {
-      chatRes = await fetch(`${llmBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${llmApiKey}` },
-        body: JSON.stringify({
-          model: llmModel,
-          temperature: 0.2,
-          messages: [
-            { role: 'system', content: WHY_FIT_SYSTEM },
-            { role: 'user', content: userMessage },
-          ],
-        }),
-        signal: AbortSignal.timeout(20_000),
-      })
-    } catch (fetchErr) {
-      console.error('generate-why-fit: LLM request failed', {
-        message: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
-      })
-      return jsonResponse({ error: 'Why-fit generation is temporarily unavailable' }, 502)
+    const chatResult = await callChatCompletion(
+      [
+        { role: 'system', content: WHY_FIT_SYSTEM },
+        { role: 'user', content: userMessage },
+      ],
+      { model: llmModel },
+    )
+    if (!chatResult.ok) {
+      console.error('generate-why-fit: chat completion failed', chatResult.error)
+      return jsonResponse({ error: 'Why-fit generation is temporarily unavailable' }, chatResult.status)
     }
 
-    if (!chatRes.ok) {
-      const errText = await chatRes.text().catch(() => '')
-      console.error('generate-why-fit: LLM returned an error', { status: chatRes.status, body: errText })
-      return jsonResponse({ error: 'Why-fit generation failed' }, 502)
-    }
-
-    const chatData = (await chatRes.json()) as {
-      choices?: { message?: { content?: string } }[]
-    }
-    const rawContent = chatData.choices?.[0]?.message?.content ?? null
-    const bullets = extractWhyFitBullets(rawContent)
+    const bullets = extractWhyFitBullets(chatResult.content)
 
     if (bullets.length === 0) {
-      console.error('generate-why-fit: LLM response had no usable bullets', { rawContent })
+      console.error('generate-why-fit: LLM response had no usable bullets', { rawContent: chatResult.content })
       return jsonResponse({ error: 'Why-fit generation returned no bullets' }, 502)
     }
 
