@@ -82,16 +82,21 @@ serve(async (req) => {
     auth: { persistSession: false },
   })
 
+  type FetchFilter =
+    | { column: string; op: 'not_null' }
+    | { column: string; op: 'eq'; value: string }
+
   /** Paginate through a table with `.select(columns)`, up to MAX_ROWS, collecting all pages. */
-  async function fetchAll<T>(table: string, columns: string, filter?: (q: any) => any): Promise<T[]> {
+  async function fetchAll<T>(table: string, columns: string, filter?: FetchFilter): Promise<T[]> {
     const all: T[] = []
     let offset = 0
     while (all.length < MAX_ROWS) {
       const remaining = MAX_ROWS - all.length
       const take = Math.min(PAGE_SIZE, remaining)
-      let query = supabaseAdminClient.from(table).select(columns).range(offset, offset + take - 1)
-      if (filter) query = filter(query)
-      const { data: page, error: pageError } = await query
+      let query = supabaseAdminClient.from(table).select(columns)
+      if (filter?.op === 'not_null') query = query.not(filter.column, 'is', null)
+      else if (filter?.op === 'eq') query = query.eq(filter.column, filter.value)
+      const { data: page, error: pageError } = await query.range(offset, offset + take - 1)
       if (pageError) {
         throw new Error(`Failed to load ${table}: ${pageError.message}`)
       }
@@ -118,7 +123,7 @@ serve(async (req) => {
     const profilesWithLanding = await fetchAll<{ id: string; landing_path: string }>(
       'profiles',
       'id, landing_path',
-      (q) => q.not('landing_path', 'is', null),
+      { column: 'landing_path', op: 'not_null' },
     )
     const signupsByPath = new Map<string, number>()
     const landingPathByProfileId = new Map<string, string>()
@@ -127,9 +132,11 @@ serve(async (req) => {
       landingPathByProfileId.set(profile.id, profile.landing_path)
     }
 
-    const activeSubs = await fetchAll<{ profile_id: string }>('subscriptions', 'profile_id', (q) =>
-      q.eq('status', 'active'),
-    )
+    const activeSubs = await fetchAll<{ profile_id: string }>('subscriptions', 'profile_id', {
+      column: 'status',
+      op: 'eq',
+      value: 'active',
+    })
     const payingByPath = new Map<string, number>()
     for (const sub of activeSubs) {
       const landingPath = landingPathByProfileId.get(sub.profile_id)
