@@ -606,10 +606,10 @@ const handleProceedToCheckout = async () => {
           </p>
 
           <div class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="flex flex-wrap justify-center gap-4">
               <div
                 :class="[
-                  'card p-6 text-left transition-all flex flex-col',
+                  'card p-6 text-left transition-all flex flex-col w-full sm:w-72',
                   startFreePlan ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
@@ -627,7 +627,7 @@ const handleProceedToCheckout = async () => {
                 v-for="product in basePlanProducts"
                 :key="product.id"
                 :class="[
-                  'card p-6 text-left transition-all',
+                  'card p-6 text-left transition-all w-full sm:w-72',
                   !startFreePlan && selectedBasePlanId === product.id ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
                 ]"
               >
@@ -645,7 +645,7 @@ const handleProceedToCheckout = async () => {
 
               <div
                 v-if="premiumComingSoon"
-                class="card p-6 text-left transition-all flex flex-col border-2 border-dashed border-neutral-border"
+                class="card p-6 text-left transition-all flex flex-col border-2 border-dashed border-neutral-border w-full sm:w-72"
               >
                 <div class="flex items-center justify-between mb-2">
                   <h3 class="font-semibold">{{ premiumComingSoon.display_name }}</h3>
