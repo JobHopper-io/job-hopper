@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
-import { deriveAcquisitionChannel, type AcquisitionChannel } from '../_shared/acquisition-channel.ts'
+import { deriveAcquisitionChannel } from '../_shared/acquisition-channel.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +83,7 @@ serve(async (req) => {
     auth: { persistSession: false },
   })
 
-  type FetchFilter = { column: string; op: 'eq'; value: string }
+  type FetchFilter = { column: string; op: 'eq'; value: string } | { column: string; op: 'in'; values: string[] }
 
   /** Paginate through a table with `.select(columns)`, up to MAX_ROWS, collecting all pages. */
   async function fetchAll<T>(table: string, columns: string, filter?: FetchFilter): Promise<T[]> {
@@ -94,6 +94,7 @@ serve(async (req) => {
       const take = Math.min(PAGE_SIZE, remaining)
       let query = supabaseAdminClient.from(table).select(columns)
       if (filter?.op === 'eq') query = query.eq(filter.column, filter.value)
+      else if (filter?.op === 'in') query = query.in(filter.column, filter.values)
       const { data: page, error: pageError } = await query.range(offset, offset + take - 1)
       if (pageError) {
         throw new Error(`Failed to load ${table}: ${pageError.message}`)
@@ -107,26 +108,30 @@ serve(async (req) => {
   }
 
   try {
-    const profiles = await fetchAll<{ id: string; landing_path: string | null; utm_source: string | null }>(
-      'profiles',
-      'id, landing_path, utm_source',
-    )
+    const profiles = await fetchAll<{
+      id: string
+      landing_path: string | null
+      utm_source: string | null
+      referrer_host: string | null
+    }>('profiles', 'id, landing_path, utm_source, referrer_host')
 
-    const channelByProfileId = new Map<string, AcquisitionChannel>()
-    const signupsByChannel = new Map<AcquisitionChannel, number>()
+    const channelByProfileId = new Map<string, string>()
+    const signupsByChannel = new Map<string, number>()
     for (const profile of profiles) {
       const channel = deriveAcquisitionChannel(profile)
       channelByProfileId.set(profile.id, channel)
       signupsByChannel.set(channel, (signupsByChannel.get(channel) ?? 0) + 1)
     }
 
-    const activeSubs = await fetchAll<{ profile_id: string }>('subscriptions', 'profile_id', {
+    // 'trial' counts as converted (they picked a paid plan), same definition resolveBaseTier
+    // uses; 'past_due' is deliberately excluded (non-entitling, see base-tier.ts).
+    const entitledSubs = await fetchAll<{ profile_id: string }>('subscriptions', 'profile_id', {
       column: 'status',
-      op: 'eq',
-      value: 'active',
+      op: 'in',
+      values: ['trial', 'active'],
     })
-    const payingProfileIds = new Set(activeSubs.map((sub) => sub.profile_id))
-    const payingByChannel = new Map<AcquisitionChannel, number>()
+    const payingProfileIds = new Set(entitledSubs.map((sub) => sub.profile_id))
+    const payingByChannel = new Map<string, number>()
     for (const profileId of payingProfileIds) {
       const channel = channelByProfileId.get(profileId)
       if (channel) {
@@ -134,17 +139,17 @@ serve(async (req) => {
       }
     }
 
-    const channels: AcquisitionChannel[] = ['seo', 'paid', 'direct']
-    const rows = channels.map((channel) => {
-      const signups = signupsByChannel.get(channel) ?? 0
-      const payingConversions = payingByChannel.get(channel) ?? 0
-      return {
-        channel,
-        signups,
-        payingConversions,
-        conversionRate: signups > 0 ? payingConversions / signups : 0,
-      }
-    })
+    const rows = Array.from(signupsByChannel.entries())
+      .map(([channel, signups]) => {
+        const payingConversions = payingByChannel.get(channel) ?? 0
+        return {
+          channel,
+          signups,
+          payingConversions,
+          conversionRate: signups > 0 ? payingConversions / signups : 0,
+        }
+      })
+      .sort((a, b) => b.signups - a.signups)
 
     return new Response(
       JSON.stringify({

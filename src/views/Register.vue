@@ -127,12 +127,15 @@ const handleCreateAccount = async () => {
     const redirectTo = `${window.location.origin}/email-verified`
     let landingPath: string | undefined
     let utmSource: string | undefined
+    let referrerHost: string | undefined
     try {
       landingPath = sessionStorage.getItem('landing_path') ?? undefined
       utmSource = sessionStorage.getItem('utm_source') ?? undefined
+      referrerHost = sessionStorage.getItem('referrer_host') ?? undefined
     } catch {
       landingPath = undefined
       utmSource = undefined
+      referrerHost = undefined
     }
     const { data: signUpData, error: signUpError } = await authAPI.signUp(
       email.value,
@@ -143,6 +146,7 @@ const handleCreateAccount = async () => {
       redirectTo,
       landingPath,
       utmSource,
+      referrerHost,
     )
     if (signUpError) {
       const authErr = signUpError as AuthError & {

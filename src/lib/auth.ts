@@ -94,6 +94,7 @@ export const authAPI = {
     emailRedirectTo?: string,
     landingPath?: string,
     utmSource?: string,
+    referrerHost?: string,
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -106,6 +107,7 @@ export const authAPI = {
           phone_number: phoneNumber || null,
           landing_path: landingPath || null,
           utm_source: utmSource || null,
+          referrer_host: referrerHost || null,
         },
       },
     })

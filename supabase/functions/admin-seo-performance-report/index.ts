@@ -85,6 +85,7 @@ serve(async (req) => {
   type FetchFilter =
     | { column: string; op: 'not_null' }
     | { column: string; op: 'eq'; value: string }
+    | { column: string; op: 'in'; values: string[] }
 
   /** Paginate through a table with `.select(columns)`, up to MAX_ROWS, collecting all pages. */
   async function fetchAll<T>(table: string, columns: string, filter?: FetchFilter): Promise<T[]> {
@@ -96,6 +97,7 @@ serve(async (req) => {
       let query = supabaseAdminClient.from(table).select(columns)
       if (filter?.op === 'not_null') query = query.not(filter.column, 'is', null)
       else if (filter?.op === 'eq') query = query.eq(filter.column, filter.value)
+      else if (filter?.op === 'in') query = query.in(filter.column, filter.values)
       const { data: page, error: pageError } = await query.range(offset, offset + take - 1)
       if (pageError) {
         throw new Error(`Failed to load ${table}: ${pageError.message}`)
@@ -132,10 +134,12 @@ serve(async (req) => {
       landingPathByProfileId.set(profile.id, profile.landing_path)
     }
 
+    // 'trial' counts as converted (they picked a paid plan), same definition resolveBaseTier
+    // uses; 'past_due' is deliberately excluded (non-entitling, see _shared/base-tier.ts).
     const activeSubs = await fetchAll<{ profile_id: string }>('subscriptions', 'profile_id', {
       column: 'status',
-      op: 'eq',
-      value: 'active',
+      op: 'in',
+      values: ['trial', 'active'],
     })
     const payingByPath = new Map<string, number>()
     for (const sub of activeSubs) {

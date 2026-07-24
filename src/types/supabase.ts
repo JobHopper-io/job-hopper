@@ -1258,6 +1258,7 @@ export type Database = {
           open_to_remote: boolean | null
           phone_number: string | null
           preferred_locations: string[] | null
+          referrer_host: string | null
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
           stripe_customer_id: string | null
@@ -1286,6 +1287,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null
@@ -1314,6 +1316,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
           stripe_customer_id?: string | null

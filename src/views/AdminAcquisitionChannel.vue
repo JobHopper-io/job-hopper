@@ -5,8 +5,10 @@
         Acquisition Channels
       </h1>
       <p class="text-sm text-neutral-body max-w-3xl">
-        Signups and paying conversions by first-touch channel (SEO, paid/campaign, or
-        unattributed direct). Referral and outbound-BD channels aren't tracked here yet.
+        Signups and paying conversions by first-touch channel: SEO pages, a tagged campaign
+        link's <code>utm_source</code> value (e.g. "linkedin", "instagram", "google"), an
+        untagged organic referrer the browser reported (e.g. "google (organic)"), or
+        unattributed direct. Referral and outbound-BD channels aren't tracked here yet.
       </p>
     </header>
 

@@ -16,7 +16,8 @@ export interface SeoPerformanceReport {
 }
 
 export interface AcquisitionChannelRow {
-  channel: 'seo' | 'paid' | 'direct'
+  /** "seo", "direct", a raw utm_source value (e.g. "linkedin"), or "<host> (organic)". */
+  channel: string
   signups: number
   payingConversions: number
   conversionRate: number

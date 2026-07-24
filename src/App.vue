@@ -94,6 +94,21 @@ onMounted(async () => {
       // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
     }
 
+    // Organic-referral fallback (no utm tag needed) for the same first-touch moment -
+    // only meaningful on this initial load (App.vue mounts once per full page load,
+    // not per in-app route change) and only when it's an external site, not our own
+    // client-side navigation re-entering via a full reload.
+    try {
+      if (document.referrer) {
+        const referrerHost = new URL(document.referrer).hostname
+        if (referrerHost && referrerHost !== window.location.hostname) {
+          sessionStorage.setItem('referrer_host', referrerHost)
+        }
+      }
+    } catch {
+      // Malformed/opaque referrer - attribution is best-effort.
+    }
+
     const { user } = await authAPI.getCurrentUser()
     isAuthenticated.value = !!user
     // watch(isAuthenticated) above handles loadUserData() / clear() when this changes
