@@ -84,6 +84,16 @@ onUnmounted(() => {
 
 onMounted(async () => {
   try {
+    // First-touch paid/campaign attribution for signups that land directly on the
+    // SPA (e.g. an ad link), mirroring landing_path's capture on static SEO pages
+    // (scripts/generate-seo-pages.mjs). Read once per app load; never overwritten.
+    try {
+      const utmSource = new URLSearchParams(window.location.search).get('utm_source')
+      if (utmSource) sessionStorage.setItem('utm_source', utmSource)
+    } catch {
+      // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
+    }
+
     const { user } = await authAPI.getCurrentUser()
     isAuthenticated.value = !!user
     // watch(isAuthenticated) above handles loadUserData() / clear() when this changes

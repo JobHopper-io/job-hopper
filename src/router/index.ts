@@ -40,6 +40,7 @@ const adminPaths = [
   '/admin/dashboard-banner',
   '/admin/user-lifecycle',
   '/admin/seo-performance',
+  '/admin/acquisition-channels',
 ]
 
 const router = createRouter({
@@ -212,6 +213,11 @@ const router = createRouter({
       path: '/admin/seo-performance',
       name: 'admin-seo-performance',
       component: () => import('../views/AdminSeoPerformance.vue'),
+    },
+    {
+      path: '/admin/acquisition-channels',
+      name: 'admin-acquisition-channels',
+      component: () => import('../views/AdminAcquisitionChannel.vue'),
     },
     {
       path: '/:pathMatch(.*)*',

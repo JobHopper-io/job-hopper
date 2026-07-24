@@ -91,6 +91,18 @@
           Views, signups, and paying conversions for each static SEO page.
         </p>
       </router-link>
+
+      <router-link
+        to="/admin/acquisition-channels"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Acquisition Channels
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Signups and paying conversions by first-touch channel (SEO, paid, direct).
+        </p>
+      </router-link>
     </section>
   </main>
 </template>

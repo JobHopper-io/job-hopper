@@ -1264,6 +1264,7 @@ export type Database = {
           target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
+          utm_source: string | null
           years_of_experience: number | null
         }
         Insert: {
@@ -1291,6 +1292,7 @@ export type Database = {
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_source?: string | null
           years_of_experience?: number | null
         }
         Update: {
@@ -1318,6 +1320,7 @@ export type Database = {
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_source?: string | null
           years_of_experience?: number | null
         }
         Relationships: []

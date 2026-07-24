@@ -15,6 +15,18 @@ export interface SeoPerformanceReport {
   totalRows: number
 }
 
+export interface AcquisitionChannelRow {
+  channel: 'seo' | 'paid' | 'direct'
+  signups: number
+  payingConversions: number
+  conversionRate: number
+}
+
+export interface AcquisitionChannelReport {
+  rows: AcquisitionChannelRow[]
+  totalSignups: number
+}
+
 export type AdminTestEmailKind =
   | 'job_match_digest'
   | 'subscription_started'
@@ -137,6 +149,21 @@ export const adminAPI = {
     }
 
     return { data: data as SeoPerformanceReport, error: null }
+  },
+
+  async getAcquisitionChannelReport(): Promise<{
+    data: AcquisitionChannelReport | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-acquisition-channel-report', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as AcquisitionChannelReport, error: null }
   },
 }
 
