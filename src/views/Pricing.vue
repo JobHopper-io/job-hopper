@@ -355,7 +355,7 @@ const pricingFaq = [
           No matter which tier you choose, Job-Hopper gives you:
         </p>
         <p class="text-sm text-neutral-body mb-6 text-center max-w-2xl mx-auto">
-          The same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood signals when they are relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship-only service.
+          The same curated matching, dashboard feed, and optional tools such as sponsorship-likelihood signals when they are relevant to your search—still fundamentally an AI that runs your job search, not a niche sponsorship only service.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
           <div class="flex items-start">
