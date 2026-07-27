@@ -15,10 +15,12 @@ const route = useRoute()
 const userStore = useUserStore()
 const { baseTier } = storeToRefs(userStore)
 
-/** Same tier check as JobCard.vue/JobDetail.vue's isPremium - the Premium Tools nav link is
+/** Same tier check as JobCard.vue/JobDetail.vue's isPremium - the Sponsor Watch nav link is
  * discovery only (hiding it doesn't gate the route itself; direct /premium-tools navigation
  * still shows the waitlist panel for Free/Core, unchanged). */
 const isPremium = computed(() => baseTier.value === 'premium')
+/** Application Tracker (its own page, not on the dashboard) is Core+Premium. */
+const isCoreOrPremium = computed(() => baseTier.value === 'core' || baseTier.value === 'premium')
 
 // The public landing page (`/`) ships its own bespoke fixed nav + dark footer that
 // match the redesign, so suppress the shared app chrome there. Authenticated users are
@@ -204,6 +206,13 @@ const handleSignOutAndCloseMenu = async () => {
                   Dashboard
                 </router-link>
                 <router-link
+                  v-if="isCoreOrPremium"
+                  to="/applications"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                >
+                  Applications
+                </router-link>
+                <router-link
                   to="/profile"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
@@ -214,7 +223,7 @@ const handleSignOutAndCloseMenu = async () => {
                   to="/premium-tools"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
-                  Premium Tools
+                  Sponsor Watch
                 </router-link>
                 <router-link
                   to="/billing"
@@ -325,6 +334,14 @@ const handleSignOutAndCloseMenu = async () => {
                   Dashboard
                 </router-link>
                 <router-link
+                  v-if="isCoreOrPremium"
+                  to="/applications"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Applications
+                </router-link>
+                <router-link
                   to="/profile"
                   class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
                   @click="mobileMenuOpen = false"
@@ -337,7 +354,7 @@ const handleSignOutAndCloseMenu = async () => {
                   class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
                   @click="mobileMenuOpen = false"
                 >
-                  Premium Tools
+                  Sponsor Watch
                 </router-link>
                 <router-link
                   to="/billing"

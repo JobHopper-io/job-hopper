@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { ApplicationStatus, Product, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
-import ApplicationTrackerCard from '@/components/ApplicationTrackerCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
+import FilterDropdown from '@/components/FilterDropdown.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { applicationsAPI, type TrackedApplicationRow, type JobSnapshot } from '@/lib/applications'
@@ -14,6 +14,7 @@ import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { freemiumAPI } from '@/lib/freemium'
 import { getProductPrice } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
+import { formatEmploymentType } from '@/lib/formatJob'
 import { dashboardBannerAPI, isDashboardBannerActive } from '@/lib/dashboardBanner'
 import { markdownToSafeHtml } from '@/lib/markdown'
 import type { DashboardBanner } from '@/types/database'
@@ -85,12 +86,93 @@ const showDashboardBanner = computed(() => isDashboardBannerActive(dashboardBann
 const dashboardBannerMessageHtml = computed(() => markdownToSafeHtml(dashboardBanner.value?.message))
 
 // Filters
-/** Hidden to match the current dashboard design; filtering logic stays wired in case the panel returns. */
-const showFiltersPanel = false
 const selectedRoleTypes = ref<RoleCategoryValue[]>([])
 const selectedLocation = ref('')
-const salaryRange = ref<[number, number]>([0, 200000])
+const selectedEmploymentTypes = ref<string[]>([])
+const selectedWorkModel = ref<('remote' | 'onsite')[]>([])
+const selectedDatePosted = ref<'24h' | 'week' | 'month' | null>(null)
+const sortOrder = ref<'recommended' | 'newest' | 'pay'>('recommended')
 const showSavedOnly = ref(false)
+
+const WORK_MODEL_OPTIONS: { value: 'remote' | 'onsite'; label: string }[] = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'onsite', label: 'Onsite' },
+]
+const DATE_POSTED_OPTIONS: { value: '24h' | 'week' | 'month'; label: string }[] = [
+  { value: '24h', label: 'Past 24 hours' },
+  { value: 'week', label: 'Past week' },
+  { value: 'month', label: 'Past month' },
+]
+const SORT_OPTIONS: { value: 'recommended' | 'newest' | 'pay'; label: string }[] = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'pay', label: 'Highest pay' },
+]
+
+/** Employment-type options are derived from the actual matches instead of a hardcoded list -
+ * job_hopper_live.employment_types is free-form text populated by the scraper, not a DB enum,
+ * so this stays accurate to whatever casing/wording actually shows up in the data. */
+const availableEmploymentTypes = computed(() => {
+  const set = new Set<string>()
+  for (const m of matches.value) {
+    for (const t of m.employmentTypes ?? []) set.add(t)
+  }
+  return Array.from(set).sort()
+})
+
+function toggleInList<T>(list: Ref<T[]>, value: T) {
+  list.value = list.value.includes(value) ? list.value.filter((v) => v !== value) : [...list.value, value]
+}
+const toggleRoleType = (v: RoleCategoryValue) => toggleInList(selectedRoleTypes, v)
+const toggleEmploymentType = (v: string) => toggleInList(selectedEmploymentTypes, v)
+const toggleWorkModel = (v: 'remote' | 'onsite') => toggleInList(selectedWorkModel, v)
+
+function selectDatePosted(v: '24h' | 'week' | 'month', close: () => void) {
+  selectedDatePosted.value = selectedDatePosted.value === v ? null : v
+  close()
+}
+function selectSort(v: 'recommended' | 'newest' | 'pay', close: () => void) {
+  sortOrder.value = v
+  close()
+}
+
+const roleTypeLabel = computed(() => {
+  const n = selectedRoleTypes.value.length
+  if (n === 0) return 'Job Function'
+  const first = ROLE_CATEGORIES.find((r) => r.value === selectedRoleTypes.value[0])?.label ?? selectedRoleTypes.value[0]
+  return n === 1 ? first : `${first} (+${n - 1})`
+})
+const employmentTypeLabel = computed(() => {
+  const n = selectedEmploymentTypes.value.length
+  if (n === 0) return 'Job Type'
+  const first = formatEmploymentType([selectedEmploymentTypes.value[0]]) ?? selectedEmploymentTypes.value[0]
+  return n === 1 ? first : `${first} (+${n - 1})`
+})
+const workModelLabel = computed(() => {
+  const n = selectedWorkModel.value.length
+  if (n === 0 || n === 2) return 'Work Model'
+  return WORK_MODEL_OPTIONS.find((o) => o.value === selectedWorkModel.value[0])?.label ?? 'Work Model'
+})
+const datePostedLabel = computed(
+  () => DATE_POSTED_OPTIONS.find((o) => o.value === selectedDatePosted.value)?.label ?? 'Date Posted',
+)
+const sortLabel = computed(() => SORT_OPTIONS.find((o) => o.value === sortOrder.value)?.label ?? 'Recommended')
+
+const hasActiveFilters = computed(
+  () =>
+    selectedRoleTypes.value.length > 0 ||
+    selectedEmploymentTypes.value.length > 0 ||
+    (selectedWorkModel.value.length > 0 && selectedWorkModel.value.length < 2) ||
+    selectedDatePosted.value != null ||
+    selectedLocation.value.trim().length > 0,
+)
+function clearAllFilters() {
+  selectedRoleTypes.value = []
+  selectedEmploymentTypes.value = []
+  selectedWorkModel.value = []
+  selectedDatePosted.value = null
+  selectedLocation.value = ''
+}
 
 // Dynamic greeting
 const greeting = computed(() => {
@@ -150,6 +232,8 @@ const applicationStatusByMatchId = computed<Record<string, ApplicationStatus>>((
   }
   return map
 })
+/** Powers the "Open Applications" link-out card - the full list lives on its own page now. */
+const trackedApplicationsCount = computed(() => trackedApplications.value.length)
 
 async function loadApplications() {
   applicationsLoading.value = true
@@ -176,26 +260,32 @@ async function handleUpdateApplicationStatus(
   await loadApplications()
 }
 
-async function handleRemoveApplication(matchId: string) {
-  const { error } = await applicationsAPI.remove(matchId)
-  if (!error) await loadApplications()
+// Profile completion: key fields that improve matching, itemized so the card can point at
+// exactly what's missing instead of just a percentage.
+interface ProfileCompletionItem {
+  label: string
+  done: boolean
 }
 
-// Profile completion: key fields that improve matching
-const profileCompletion = computed(() => {
+const profileCompletionItems = computed<ProfileCompletionItem[]>(() => {
   const p = profile.value
-  if (!p) return { filled: 0, total: 7, percent: 0 }
-  const fields = [
-    !!p.first_name?.trim(),
-    !!p.last_name?.trim(),
-    !!p.current_job_title?.trim(),
-    !!p.target_job_title?.trim(),
-    (p.target_role_categories?.length ?? 0) > 0,
-    (p.desired_salary_min != null || p.desired_salary_max != null) || (p.preferred_locations?.length ?? 0) > 0,
-    !!p.resume_bucket_key
+  return [
+    { label: 'Add your name', done: !!p?.first_name?.trim() && !!p?.last_name?.trim() },
+    { label: 'Add your current job title', done: !!p?.current_job_title?.trim() },
+    { label: 'Add your target job title', done: !!p?.target_job_title?.trim() },
+    { label: 'Select target role categories', done: (p?.target_role_categories?.length ?? 0) > 0 },
+    {
+      label: 'Add salary expectations or preferred locations',
+      done: p?.desired_salary_min != null || p?.desired_salary_max != null || (p?.preferred_locations?.length ?? 0) > 0,
+    },
+    { label: 'Upload your resume', done: !!p?.resume_bucket_key },
   ]
-  const filled = fields.filter(Boolean).length
-  return { filled, total: fields.length, percent: Math.round((filled / fields.length) * 100) }
+})
+
+const profileCompletion = computed(() => {
+  const items = profileCompletionItems.value
+  const filled = items.filter((i) => i.done).length
+  return { filled, total: items.length, percent: items.length ? Math.round((filled / items.length) * 100) : 0 }
 })
 
 const showProfileCompletionCard = computed(
@@ -213,6 +303,10 @@ const matchesThisWeekLabel = computed(() => {
   const n = matchingStats.value.thisWeek ?? 0
   return `${n} new match${n === 1 ? '' : 'es'} this week`
 })
+
+/** A brand-new account has thisWeek === totalDelivered === 0; the summary card reframes
+ * that as a nudge to run a search instead of a flat "0 matches". */
+const hasMatchingActivity = computed(() => (matchingStats.value.totalDelivered ?? 0) > 0)
 
 const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
 
@@ -232,10 +326,37 @@ const filteredMatches = computed(() => {
     )
   }
 
-  // Placeholder: salary and role-type filtering can be layered in here
-  // once those attributes are available on MatchedJob/job metadata.
+  if (selectedRoleTypes.value.length > 0) {
+    result = result.filter((m) => m.roleCategory != null && selectedRoleTypes.value.includes(m.roleCategory))
+  }
 
-  return result
+  if (selectedEmploymentTypes.value.length > 0) {
+    result = result.filter((m) => (m.employmentTypes ?? []).some((t) => selectedEmploymentTypes.value.includes(t)))
+  }
+
+  // Checking both Remote and Onsite is equivalent to no filter; only a single
+  // selection actually narrows the result (no "hybrid" signal in the job data).
+  if (selectedWorkModel.value.length === 1) {
+    const wantRemote = selectedWorkModel.value[0] === 'remote'
+    result = result.filter((m) => m.isRemote === wantRemote)
+  }
+
+  if (selectedDatePosted.value) {
+    const maxDays = selectedDatePosted.value === '24h' ? 1 : selectedDatePosted.value === 'week' ? 7 : 30
+    result = result.filter((m) => m.daysSincePosted != null && m.daysSincePosted <= maxDays)
+  }
+
+  const sorted = [...result]
+  if (sortOrder.value === 'newest') {
+    sorted.sort(
+      (a, b) => new Date(b.postedDate ?? b.createdAt).getTime() - new Date(a.postedDate ?? a.createdAt).getTime(),
+    )
+  } else if (sortOrder.value === 'pay') {
+    sorted.sort((a, b) => (b.payMax ?? b.payMin ?? -1) - (a.payMax ?? a.payMin ?? -1))
+  } else {
+    sorted.sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+  }
+  return sorted
 })
 
 // --- Pagination for the job feed -------------------------------------------
@@ -282,9 +403,13 @@ watch(
     if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
   },
 )
-watch([showSavedOnly, selectedLocation], () => {
-  currentPage.value = 1
-})
+watch(
+  [showSavedOnly, selectedLocation, selectedRoleTypes, selectedEmploymentTypes, selectedWorkModel, selectedDatePosted, sortOrder],
+  () => {
+    currentPage.value = 1
+  },
+  { deep: true },
+)
 
 const showFreemiumExhaustedUpgrade = computed(
   () =>
@@ -443,7 +568,12 @@ onMounted(() => {
       <div class="grid-auto-fill mb-8">
         <!-- Subscription status and tier -->
         <div class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Subscription</h3>
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Subscription</h3>
+          </div>
           <!-- Free tier: plain, low-pressure upgrade prompt (no urgency styling). -->
           <template v-if="baseTier === 'free'">
             <p class="font-heading font-semibold text-brand-charcoal">Free</p>
@@ -481,7 +611,12 @@ onMounted(() => {
 
         <!-- Active add-ons -->
         <div class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Active add-ons</h3>
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Active add-ons</h3>
+          </div>
           <p class="font-heading font-semibold text-brand-charcoal">
             {{ activeAddonsForDisplay.length }} active
           </p>
@@ -495,26 +630,65 @@ onMounted(() => {
 
         <!-- Matching statistics -->
         <div class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Matching statistics</h3>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
-          </p>
-          <p class="text-sm text-neutral-body mt-1">This week</p>
-          <p class="text-xs text-neutral-body mt-2">
-            Total delivered: {{ matchingStats.totalDelivered != null ? matchingStats.totalDelivered : '—' }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
-          </p>
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Matching statistics</h3>
+          </div>
+          <template v-if="hasMatchingActivity">
+            <p class="font-heading font-semibold text-brand-charcoal">
+              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
+            </p>
+            <p class="text-sm text-neutral-body mt-1">This week</p>
+            <p class="text-xs text-neutral-body mt-2">
+              Total delivered: {{ matchingStats.totalDelivered }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
+            </p>
+          </template>
+          <template v-else>
+            <p class="font-heading font-semibold text-brand-charcoal">No matches yet</p>
+            <p class="text-sm text-neutral-body mt-1">Run a search below to get started</p>
+          </template>
         </div>
 
         <!-- Profile strength (hidden when 100% or dismissed) -->
         <div v-if="showProfileCompletionCard" class="card p-5">
-          <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide mb-3">Profile strength</h3>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ profileCompletion.percent }}%
-          </p>
-          <p class="text-sm text-neutral-body mt-1">
-            {{ profileCompletion.filled }} of {{ profileCompletion.total }} key fields
-          </p>
-          <div class="mt-2 flex flex-col items-start gap-0.5">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Profile strength</h3>
+          </div>
+          <div class="mb-3">
+            <div class="mb-1 flex items-center justify-between text-xs text-neutral-body">
+              <span>{{ profileCompletion.filled }} of {{ profileCompletion.total }} complete</span>
+              <span class="font-semibold text-brand-charcoal">{{ profileCompletion.percent }}%</span>
+            </div>
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg">
+              <div
+                class="h-full rounded-full bg-brand-primary transition-all"
+                :style="{ width: `${profileCompletion.percent}%` }"
+              />
+            </div>
+          </div>
+          <ul class="mb-3 space-y-1.5">
+            <li
+              v-for="item in profileCompletionItems"
+              :key="item.label"
+              class="flex items-center gap-2 text-sm"
+              :class="item.done ? 'text-neutral-body line-through decoration-neutral-border' : 'text-brand-charcoal'"
+            >
+              <font-awesome-icon
+                v-if="item.done"
+                :icon="['fas', 'circle-check']"
+                class="shrink-0 text-green-600"
+                aria-hidden="true"
+              />
+              <span v-else class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-neutral-border" aria-hidden="true" />
+              {{ item.label }}
+            </li>
+          </ul>
+          <div class="flex flex-col items-start gap-0.5">
             <router-link to="/profile" class="text-sm text-brand-primary font-medium hover:underline">
               Complete profile →
             </router-link>
@@ -538,7 +712,6 @@ onMounted(() => {
         <!-- Manual job search (freemium): below status cards, above Recent matches -->
         <div v-if="showFreemiumJobSearchCta" class="mb-8">
           <FreemiumManualJobSearchPanel
-            :centered="false"
             :can-run="freemiumCanRunManualJobSearch"
             :used-searches="freemiumJobSearchesUsed"
             :max-searches="freemiumMaxJobSearches"
@@ -552,11 +725,13 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
           <FeatureTeaserCard
             title="Resume Advice"
+            :icon="['fas', 'file-lines']"
             :real-fields="resumeAdviceTeaser.real"
             :blurred-fields="resumeAdviceTeaser.blurred"
           />
           <FeatureTeaserCard
             title="Premium Insights"
+            :icon="['fas', 'user-tie']"
             :real-fields="premiumInsightsTeaser.real"
             :blurred-fields="premiumInsightsTeaser.blurred"
           />
@@ -564,10 +739,12 @@ onMounted(() => {
       </template>
 
       <!--
-        Core and Premium share this branch: automated-matching status, Application Tracker, and
-        fully unblurred Resume Advice + Premium Insights (also serves the 6 legacy trial plans,
-        which map to 'core'). Premium gets an extra banner below linking out to /premium-tools
-        (Sponsor Watch management + future tools) rather than duplicating that content inline.
+        Core and Premium share this branch: automated-matching status and fully unblurred
+        Resume Advice + Premium Insights (also serves the 6 legacy trial plans, which map to
+        'core'). Application Tracker moved to its own /applications page (2026-07-27) so it's
+        not competing with the job feed for space on the dashboard; both tiers get a link-out
+        banner here instead of the full card inline. Premium additionally gets a banner linking
+        out to /premium-tools (Sponsor Watch management).
       -->
       <template v-else-if="baseTier === 'core' || baseTier === 'premium'">
         <!-- Automated matching status (success-tinted; the only green surface on the page). -->
@@ -575,14 +752,12 @@ onMounted(() => {
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <div class="flex items-center gap-2.5">
-                <font-awesome-icon
-                  :icon="['fas', 'circle-check']"
-                  class="text-green-700"
-                  aria-hidden="true"
-                />
+                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+                  <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
+                </span>
                 <p class="font-heading font-semibold text-green-700">Automated matching active</p>
               </div>
-              <p class="mt-1 pl-7 text-sm text-green-700">
+              <p class="mt-1 pl-[42px] text-sm text-green-700">
                 Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
               </p>
             </div>
@@ -602,33 +777,51 @@ onMounted(() => {
               {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
             </button>
           </div>
-          <p v-if="subscriberSearchMessage" class="mt-3 pl-7 text-sm text-green-700">
+          <p v-if="subscriberSearchMessage" class="mt-3 pl-[42px] text-sm text-green-700">
             {{ subscriberSearchMessage }}
           </p>
         </div>
 
-        <!-- Application Tracker (compact). -->
-        <div class="mb-8">
-          <ApplicationTrackerCard
-            :applications="trackedApplications"
-            @remove="handleRemoveApplication"
-          />
+        <!-- Application Tracker moved to its own page - link out instead of the full card. -->
+        <div class="mb-8 card p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex items-center gap-2.5">
+              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                <font-awesome-icon :icon="['fas', 'clipboard-list']" class="text-sm" aria-hidden="true" />
+              </span>
+              <div class="min-w-0">
+                <p class="font-heading font-semibold text-brand-charcoal">Application Tracker</p>
+                <p v-if="trackedApplicationsCount > 0" class="text-sm text-neutral-body">
+                  {{ trackedApplicationsCount }} application{{ trackedApplicationsCount === 1 ? '' : 's' }} tracked
+                </p>
+                <p v-else class="text-sm text-neutral-body">Track every job you've applied to, all in one place.</p>
+              </div>
+            </div>
+            <router-link
+              :to="{ name: 'applications' }"
+              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+            >
+              Open Applications →
+            </router-link>
+          </div>
         </div>
 
-        <!-- Premium only: link out to the dedicated Premium Tools surface. -->
+        <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
         <div v-if="baseTier === 'premium'" class="mb-8 card p-5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex items-center gap-2.5">
-              <font-awesome-icon :icon="['fas', 'crown']" class="text-brand-primary" aria-hidden="true" />
+              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
+              </span>
               <p class="font-heading font-semibold text-brand-charcoal">
-                Manage Sponsor Watch and explore Premium Tools
+                Manage your Sponsor Watch alerts
               </p>
             </div>
             <router-link
               :to="{ name: 'premium-tools' }"
               class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
             >
-              Open Premium Tools →
+              Open Sponsor Watch →
             </router-link>
           </div>
         </div>
@@ -646,8 +839,124 @@ onMounted(() => {
         <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
           Recent job matches
         </h2>
-        <!-- Saved-jobs view: the full filters panel is disabled (showFiltersPanel),
-             so this standalone toggle is the one way to see saved jobs. -->
+      </div>
+
+      <!-- Filter bar -->
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <FilterDropdown :label="roleTypeLabel" :active="selectedRoleTypes.length > 0">
+          <template #default="{ close }">
+            <div class="max-h-64 w-56 space-y-0.5 overflow-y-auto">
+              <label
+                v-for="opt in ROLE_CATEGORIES"
+                :key="opt.value"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-neutral-body hover:bg-neutral-bg"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="selectedRoleTypes.includes(opt.value)"
+                  @change="toggleRoleType(opt.value)"
+                />
+                {{ opt.label }}
+              </label>
+            </div>
+            <button
+              type="button"
+              class="mt-2 w-full rounded-lg py-1.5 text-center text-xs font-semibold text-brand-primary hover:bg-brand-primary/5"
+              @click="close()"
+            >
+              Done
+            </button>
+          </template>
+        </FilterDropdown>
+
+        <FilterDropdown
+          v-if="availableEmploymentTypes.length > 0"
+          :label="employmentTypeLabel"
+          :active="selectedEmploymentTypes.length > 0"
+        >
+          <template #default="{ close }">
+            <div class="max-h-64 w-56 space-y-0.5 overflow-y-auto">
+              <label
+                v-for="t in availableEmploymentTypes"
+                :key="t"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm capitalize text-neutral-body hover:bg-neutral-bg"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="selectedEmploymentTypes.includes(t)"
+                  @change="toggleEmploymentType(t)"
+                />
+                {{ formatEmploymentType([t]) }}
+              </label>
+            </div>
+            <button
+              type="button"
+              class="mt-2 w-full rounded-lg py-1.5 text-center text-xs font-semibold text-brand-primary hover:bg-brand-primary/5"
+              @click="close()"
+            >
+              Done
+            </button>
+          </template>
+        </FilterDropdown>
+
+        <FilterDropdown :label="workModelLabel" :active="selectedWorkModel.length === 1">
+          <template #default="{ close }">
+            <div class="w-44 space-y-0.5">
+              <label
+                v-for="opt in WORK_MODEL_OPTIONS"
+                :key="opt.value"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-neutral-body hover:bg-neutral-bg"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4"
+                  :checked="selectedWorkModel.includes(opt.value)"
+                  @change="toggleWorkModel(opt.value)"
+                />
+                {{ opt.label }}
+              </label>
+            </div>
+            <button
+              type="button"
+              class="mt-2 w-full rounded-lg py-1.5 text-center text-xs font-semibold text-brand-primary hover:bg-brand-primary/5"
+              @click="close()"
+            >
+              Done
+            </button>
+          </template>
+        </FilterDropdown>
+
+        <FilterDropdown :label="datePostedLabel" :active="selectedDatePosted != null">
+          <template #default="{ close }">
+            <div class="w-44 space-y-0.5">
+              <button
+                v-for="opt in DATE_POSTED_OPTIONS"
+                :key="opt.value"
+                type="button"
+                class="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-neutral-bg"
+                :class="selectedDatePosted === opt.value ? 'font-semibold text-brand-primary' : 'text-neutral-body'"
+                @click="selectDatePosted(opt.value, close)"
+              >
+                {{ opt.label }}
+                <font-awesome-icon v-if="selectedDatePosted === opt.value" :icon="['fas', 'check']" class="text-xs" aria-hidden="true" />
+              </button>
+            </div>
+          </template>
+        </FilterDropdown>
+
+        <FilterDropdown label="Location" :active="!!selectedLocation.trim()">
+          <template #default>
+            <input
+              v-model="selectedLocation"
+              type="text"
+              class="input w-56 text-sm"
+              placeholder="City, State"
+            />
+          </template>
+        </FilterDropdown>
+
         <button
           type="button"
           class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
@@ -660,60 +969,35 @@ onMounted(() => {
           <font-awesome-icon :icon="['fas', 'bookmark']" aria-hidden="true" />
           Saved{{ savedCount > 0 ? ` (${savedCount})` : '' }}
         </button>
-      </div>
-      <div v-if="showFiltersPanel" class="card p-6 mb-8">
-        <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-4">
-          Filters
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-brand-charcoal mb-2">Role type</label>
-            <select v-model="selectedRoleTypes" multiple class="input">
-              <option v-for="opt in ROLE_CATEGORIES" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-brand-charcoal mb-2">Location</label>
-            <input
-              v-model="selectedLocation"
-              type="text"
-              class="input"
-              placeholder="City, State"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-brand-charcoal mb-2">Salary range</label>
-            <div class="flex gap-2">
-              <input
-                v-model.number="salaryRange[0]"
-                type="number"
-                class="input"
-                placeholder="Min"
-              />
-              <input
-                v-model.number="salaryRange[1]"
-                type="number"
-                class="input"
-                placeholder="Max"
-              />
-            </div>
-          </div>
-          <div class="flex items-end">
-            <label class="flex items-center">
-              <input
-                v-model="showSavedOnly"
-                type="checkbox"
-                class="mr-2 w-4 h-4"
-              />
-              <span class="text-sm text-neutral-body">Show saved jobs only</span>
-            </label>
-          </div>
+
+        <button
+          v-if="hasActiveFilters"
+          type="button"
+          class="text-sm font-medium text-neutral-body hover:text-brand-charcoal hover:underline"
+          @click="clearAllFilters"
+        >
+          Clear filters
+        </button>
+
+        <div class="ml-auto">
+          <FilterDropdown :label="sortLabel">
+            <template #default="{ close }">
+              <div class="w-44 space-y-0.5">
+                <button
+                  v-for="opt in SORT_OPTIONS"
+                  :key="opt.value"
+                  type="button"
+                  class="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-neutral-bg"
+                  :class="sortOrder === opt.value ? 'font-semibold text-brand-primary' : 'text-neutral-body'"
+                  @click="selectSort(opt.value, close)"
+                >
+                  {{ opt.label }}
+                  <font-awesome-icon v-if="sortOrder === opt.value" :icon="['fas', 'check']" class="text-xs" aria-hidden="true" />
+                </button>
+              </div>
+            </template>
+          </FilterDropdown>
         </div>
-        <p class="text-xs text-neutral-body mt-4">
-          Use filters to broaden or narrow what you see. Your core preferences still guide your matches behind the scenes.
-        </p>
       </div>
 
       <!-- Loading State -->

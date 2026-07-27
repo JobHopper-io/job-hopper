@@ -40,8 +40,11 @@ import {
   faArrowRightArrowLeft,
   faCheckDouble,
   faComments,
+  faGraduationCap,
+  faFileLines,
+  faLightbulb,
 } from '@fortawesome/free-solid-svg-icons'
-import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
+import { faTiktok, faInstagram, faYoutube, faLinkedin, faFreeCodeCamp } from '@fortawesome/free-brands-svg-icons'
 
 library.add(
   faTrash,
@@ -82,8 +85,14 @@ library.add(
   faArrowRightArrowLeft,
   faCheckDouble,
   faComments,
+  faGraduationCap,
+  faFileLines,
+  faLightbulb,
   faTiktok,
   faInstagram,
+  faYoutube,
+  faLinkedin,
+  faFreeCodeCamp,
 )
 
 export function registerFontAwesome(app: App) {

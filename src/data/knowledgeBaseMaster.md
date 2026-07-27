@@ -1,6 +1,19 @@
-Job-Hopper Chatbot Knowledge Base — Master v1.2
+Job-Hopper Chatbot Knowledge Base — Master v1.3
 Consolidated from JHIL v1.0 (KB-0001–KB-0050) + University/Partnership & Internal Ops extension (KB-0051–KB-0055)
-Compiled July 16, 2026. Corrected July 16, 2026.
+Compiled July 16, 2026. Corrected July 16, 2026. Updated July 28, 2026.
+
+v1.3 CHANGE NOTE
+Premium launched as a purchasable plan on 2026-07-22 (available_for_purchase flipped true, migration
+20260722130000_premium_sellable.sql); it was waitlist-only when v1.2 was written. Three articles were
+updated to reflect this: KB-0038 (renamed from "Premium Plan and Waitlist" to "Premium Plan" — waitlist
+language, launch-date hedging, and the Ghost Listing Detector removed from its feature list; Sponsor
+Watch marked explicitly not-yet-available rather than bundled in as shipped), KB-0008 (Plans and
+Pricing Overview — same waitlist language removed), and KB-0033 (Understanding Sponsorship-Likelihood
+Signals — Real Sponsorship Score changed from "future Premium feature" to live, with the caveat that
+coverage across postings is still expanding as employer-domain matching backfills). The Ghost Listing
+Detector was investigated and closed as not viable with current data; it should not appear as a current
+or upcoming feature in any article. Sponsor Watch is built but not deployed to production as of this
+update — re-verify before the next review. All other articles are unchanged from v1.2.
 
 v1.2 CHANGE NOTE
 v1.1 was written without direct product/codebase access — confirmed by the source Operating
@@ -9,11 +22,12 @@ pricing, tier features, and sponsorship-signal methodology as open questions. Th
 since been verified directly against the live codebase (Pricing.vue, FAQ.vue, and the freemium
 settings backend). Five articles were corrected to state verified facts instead of deferring to
 "check the live page": KB-0008 (Plans and Pricing Overview), KB-0036 (Free Plan), KB-0037
-(Core Plan), KB-0038 (Premium Plan and Waitlist), and KB-0033 (Understanding
-Sponsorship-Likelihood Signals — clarified that today's signal is a heuristic, not filing-data-backed,
-to avoid conflating it with the future Real Sponsorship Score). All other 50 articles are unchanged
-from v1.1. If any corrected fact and the live product ever disagree going forward, the live product
-wins — update this file, not the other way around.
+(Core Plan), KB-0038 (Premium Plan and Waitlist — later renamed, see v1.3 note above), and KB-0033
+(Understanding Sponsorship-Likelihood Signals — clarified that today's signal is a heuristic, not
+filing-data-backed, to avoid conflating it with the future Real Sponsorship Score — see v1.3 note
+above for the update once that feature shipped). All other 50 articles are unchanged from v1.1. If
+any corrected fact and the live product ever disagree going forward, the live product wins — update
+this file, not the other way around.
 
 WHAT THIS FILE IS
 This is the single, complete knowledge base for the Job-Hopper chatbot: 55 articles, one format,
@@ -551,7 +565,7 @@ Job-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and
 verified on the official pricing page or live checkout before quoting.
 
 Detailed Explanation
-Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Premium is $49/month at launch, not yet purchasable - join the waitlist for early access - and adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of everything in Core. Plans differ by depth of automation, not by seniority or job type.
+Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Premium is $49/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type.
 Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
 
 Key Benefits
@@ -562,14 +576,14 @@ Plan choice based on depth rather than seniority
 Examples
 User wants to test: recommend Free.
 User wants daily automated matching and full insights: explain Core.
-User needs deeper sponsorship intelligence: explain Premium and verify availability.
+User needs deeper sponsorship intelligence: explain Premium, which is available to purchase today.
 
 FAQs
 Which plan should I choose?
 Choose by search depth and sponsorship needs, not seniority.
 
 Is Premium live?
-Verify the current pricing page or checkout.
+Yes, it is purchasable today at $49/month; verify exact price on the current pricing page.
 
 Can prices change?
 Yes; always use the current official page.
@@ -581,7 +595,7 @@ Training AI
 Canonical Response
 This article explains Job-Hopper's plans, pricing, and subscription tiers.
 
-Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month at launch, waitlist only) adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of Core.
+Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.
 
 Related Intents
 pricing
@@ -589,20 +603,22 @@ plans
 free vs core
 premium price
 which plan
+is premium available
 
 AI Do Rules
 State when the price was verified.
 Link to the pricing page.
-Explain availability honestly.
+Confirm Premium is purchasable today when asked.
 
 AI Don’t Rules
 Do not invent discounts.
-Do not promise Premium availability without verification.
+Do not describe Premium as waitlist-only or not yet available.
 Do not sell by seniority.
 
 Sales Opportunity
-Core is appropriate for ongoing automated matching and full insights. Premium is relevant only when
-sponsorship depth is important and availability is confirmed.
+Core is appropriate for ongoing automated matching and full insights. Premium is relevant when
+sponsorship depth matters to the user - it's a normal purchase now, not something to gate on
+availability.
 
 Escalation Rules
 Escalate billing discrepancies, checkout errors, legacy-plan questions, coupon requests, or conflicts
@@ -2224,8 +2240,8 @@ A sponsorship-likelihood signal summarizes available evidence that may help a us
 employer or role.
 
 Detailed Explanation
-Today's signal is a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data. A future Premium feature (Real Sponsorship Score) will be built on real DOL/USCIS filing data; until that ships, describe the current signal strictly as a heuristic, never as filing-history-backed.
-Positive, neutral, or low signals are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.
+Free and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.
+Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.
 
 Key Benefits
 Faster prioritization
@@ -2267,7 +2283,9 @@ Do not call a signal a legal determination.
 Do not say never or guaranteed based solely on the score.
 
 Sales Opportunity
-Premium is the relevant plan when deeper sponsorship signals are available and useful to the user.
+Premium is the relevant plan when deeper, filing-data-backed sponsorship signals are useful to the
+user - Real Sponsorship Score is live today, not a future promise, though coverage across postings is
+still growing.
 
 Escalation Rules
 Escalate disputed employer data, clearly incorrect signals, or user reliance in a legal decision.
@@ -2545,74 +2563,88 @@ URL, screenshot if available, steps already tried.
 Internal Notes
 Price-sensitive; review monthly.
 
-KB-0038 - Premium Plan and Waitlist
+KB-0038 - Premium Plan
 Purpose
-Explain Premium without promising availability.
+Explain Premium and what it actually includes now that it is live.
 
 Summary
-Premium is positioned around deeper sponsorship intelligence and has been publicly shown at $49 per
-month at launch; availability may be staged or waitlist-based.
+Premium is Job-Hopper's top plan, $49 per month, built around deeper sponsorship intelligence. It is
+purchasable today, not a waitlist.
 
 Detailed Explanation
-Premium is $49/month at launch and includes everything in Core, plus: Real Sponsorship Score (built on actual government filing data instead of today's heuristic), Sponsor Watch (alerts on employer filing activity), Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector.
-Premium should be recommended only to users for whom sponsorship intelligence materially affects the search. It is not yet purchasable - do not promise a launch date, first-month promotion, waitlist reward, or guaranteed access unless an approved campaign record is active. Direct the user to the official waitlist.
+Premium is $49/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Premium Insights surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes.
+Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming.
+Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.
 
 Key Benefits
-Deeper sponsorship context
-More focused employer prioritization
+Deeper sponsorship context backed by real filing data
+More hiring contacts per job
+Small, honest nudges on when and how to apply
 A specialized path for sponsorship-aware users
 
 Examples
-A user repeatedly asks which employers have relevant sponsorship history; explain Premium and verify
-whether enrollment or waitlist is active.
+A user repeatedly asks which employers have relevant sponsorship history; explain Premium's Real
+Sponsorship Score and recommend upgrading.
 
 FAQs
-How much will Premium cost?
-Current public language shows $49 per month at launch; verify the live page.
+How much does Premium cost?
+$49 per month; verify the live pricing page before quoting.
 
-When will it launch?
-Do not give a date unless Product has approved it.
+Can I buy Premium today?
+Yes, it is a purchasable plan, not a waitlist.
 
-Is a free-month offer available?
-Only if an active approved campaign confirms it.
+Does Premium guarantee sponsorship?
+No. Real Sponsorship Score is built on real filing data, but it is still a likelihood signal, not a
+guarantee, and coverage is still expanding across postings.
 
 Related Articles
 KB-0008; KB-0009; KB-0033
 
 Training AI
 Canonical Response
-This article explains the Premium plan and waitlist.
+This article explains the Premium plan.
 
-Premium is $49/month at launch (not yet purchasable - waitlist only) and includes everything in Core plus Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector.
+Premium is $49/month and is purchasable today. It includes everything in Core plus Real Sponsorship
+Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact
+tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing
+Detector was investigated but is not being built - do not present either as available.
 
 Related Intents
 premium plan
-premium waitlist
+premium price
 sponsorship plan
 $49 plan
+is premium available
 
 AI Do Rules
-Verify availability before recommending purchase.
-Use sponsorship need as the trigger.
+Confirm Premium is purchasable today when asked.
+Use sponsorship need as the trigger for recommending it.
+Verify current price and checkout before a definitive quote.
 
 AI Don’t Rules
-Do not invent launch dates or promotions.
+Do not describe Sponsor Watch as available.
+Do not mention the Ghost Listing Detector as a current or upcoming feature.
 Do not imply sponsorship is guaranteed.
 
 Sales Opportunity
-Recommend Premium only when deeper sponsorship context is relevant and current availability is
-verified.
+Recommend Premium when deeper sponsorship context is relevant to the user's search; it is now a
+straightforward purchase, not something requiring a waitlist explanation.
 
 Escalation Rules
-Escalate waitlist problems, promotional disputes, early-access promises, or inconsistent public
-availability.
+Escalate checkout errors, billing discrepancies, or a user who was told Sponsor Watch or the Ghost
+Listing Detector are available.
 
 Required Ticket Payload
 Article ID, user email if voluntarily provided, account plan, exact error or question, timestamp, page
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Campaign promotions require an expiry date and approval owner in the campaign register.
+Updated 2026-07-28 to reflect Premium's launch (available_for_purchase flipped true on 2026-07-22,
+migration 20260722130000_premium_sellable.sql). Real Sponsorship Score and Hiring Manager Contact are
+live; Apply Intelligence v1 (recency badge + reach-out nudge) shipped 2026-07-21. Sponsor Watch is
+built but not deployed - re-check before this article is next reviewed. Ghost Listing Detector was
+closed as not viable with current data and should be dropped from all plan-comparison copy, not just
+this article.
 
 KB-0039 - Upgrading, Downgrading, and Cancelling a Subscription
 Purpose

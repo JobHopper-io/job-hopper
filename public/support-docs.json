@@ -167,7 +167,7 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Why do I still see ghost jobs or listings that never get filled?",
-    "content": "We actively filter for this — postings get screened for freshness and signs of real hiring activity before they reach your feed, and low-activity or obvious 'ghost' listings get excluded. It's not perfect; some slip through, especially on fast-moving boards. The upcoming Ghost Listing Detector is built specifically to catch reposted, stale listings that current filtering misses."
+    "content": "We actively filter for this — postings get screened for freshness and signs of real hiring activity before they reach your feed, and low-activity or obvious 'ghost' listings get excluded. It's not perfect; some slip through, especially on fast-moving boards. If a specific listing looks stale or fake to you, flagging it to support helps us improve filtering directly."
   },
   {
     "source_doc": "chatbot_kb",
@@ -177,7 +177,7 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Why do I see the same job posted twice?",
-    "content": "Employers and job boards sometimes repost the same listing under slightly different titles or dates, which can make it through as a separate posting. This is exactly the pattern the Ghost Listing Detector is built to catch and consolidate."
+    "content": "Employers and job boards sometimes repost the same listing under slightly different titles or dates, which can make it through as a separate posting. Our filtering catches most of this, but not all of it — if you spot a clear duplicate, reporting it to support helps us tighten the filtering."
   },
   {
     "source_doc": "chatbot_kb",
@@ -192,7 +192,7 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Is the sponsorship badge based on real government data or a guess?",
-    "content": "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. The upcoming Real Sponsorship Score (Premium) is the version built on actual DOL/USCIS filing data — that's the real difference between the two."
+    "content": "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
   },
   {
     "source_doc": "chatbot_kb",
@@ -207,7 +207,7 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Does upgrading to Core or Premium improve my actual chances of getting sponsored?",
-    "content": "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium (coming soon) adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
+    "content": "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
   },
   {
     "source_doc": "chatbot_kb",
@@ -321,7 +321,7 @@
   {
     "source_doc": "kb_master",
     "title": "KB-0008 Plans and Pricing Overview",
-    "content": "This article explains Job-Hopper's plans, pricing, and subscription tiers.\nFree ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month at launch, waitlist only) adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of Core.\n\nJob-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be verified on the official pricing page or live checkout before quoting.\n\nFree is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Premium is $49/month at launch, not yet purchasable - join the waitlist for early access - and adds Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector on top of everything in Core. Plans differ by depth of automation, not by seniority or job type. Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.",
+    "content": "This article explains Job-Hopper's plans, pricing, and subscription tiers.\nFree ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.\n\nJob-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be verified on the official pricing page or live checkout before quoting.\n\nFree is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Premium Insights fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Premium Insights, full Resume Advice, and the Job Tracker. Premium is $49/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type. Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
@@ -496,7 +496,7 @@
   {
     "source_doc": "kb_master",
     "title": "KB-0033 Understanding Sponsorship-Likelihood Signals",
-    "content": "Use the signal to prioritize research, not as a promise. Confirm sponsorship directly with the employer and get legal advice for your personal eligibility.\n\nA sponsorship-likelihood signal summarizes available evidence that may help a user prioritize an employer or role.\n\nToday's signal is a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data. A future Premium feature (Real Sponsorship Score) will be built on real DOL/USCIS filing data; until that ships, describe the current signal strictly as a heuristic, never as filing-history-backed. Positive, neutral, or low signals are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.",
+    "content": "Use the signal to prioritize research, not as a promise. Confirm sponsorship directly with the employer and get legal advice for your personal eligibility.\n\nA sponsorship-likelihood signal summarizes available evidence that may help a user prioritize an employer or role.\n\nFree and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees. Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
@@ -530,10 +530,10 @@
   },
   {
     "source_doc": "kb_master",
-    "title": "KB-0038 Premium Plan and Waitlist",
-    "content": "[NOT YET LIVE - do not present as available]\n\nThis article explains the Premium plan and waitlist.\nPremium is $49/month at launch (not yet purchasable - waitlist only) and includes everything in Core plus Real Sponsorship Score, Sponsor Watch, Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector.\n\nPremium is positioned around deeper sponsorship intelligence and has been publicly shown at $49 per month at launch; availability may be staged or waitlist-based.\n\nPremium is $49/month at launch and includes everything in Core, plus: Real Sponsorship Score (built on actual government filing data instead of today's heuristic), Sponsor Watch (alerts on employer filing activity), Apply Intelligence, Hiring Manager Contact, and the Ghost Listing Detector. Premium should be recommended only to users for whom sponsorship intelligence materially affects the search. It is not yet purchasable - do not promise a launch date, first-month promotion, waitlist reward, or guaranteed access unless an approved campaign record is active. Direct the user to the official waitlist.",
-    "ai_approved": "Conditional",
-    "live_state": "Planned"
+    "title": "KB-0038 Premium Plan",
+    "content": "This article explains the Premium plan.\nPremium is $49/month and is purchasable today. It includes everything in Core plus Real Sponsorship Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing Detector was investigated but is not being built - do not present either as available.\n\nPremium is Job-Hopper's top plan, $49 per month, built around deeper sponsorship intelligence. It is purchasable today, not a waitlist.\n\nPremium is $49/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Premium Insights surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes. Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming. Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
@@ -657,7 +657,7 @@
   {
     "source_doc": "kb_master",
     "title": "Plans Overview (short)",
-    "content": "Job-Hopper has three plans: Free, Core, and Premium. Free is $0 with no card required. Core is $29 per month. Premium is $49 per month at launch and is currently waitlist-only. Ask about any specific plan for full details on what's included.",
+    "content": "Job-Hopper has three plans: Free, Core, and Premium, all purchasable today. Free is $0 with no card required. Core is $29 per month. Premium is $49 per month and adds Real Sponsorship Score and deeper hiring contacts. Ask about any specific plan for full details on what's included.",
     "ai_approved": "Yes",
     "live_state": "Live"
   }

@@ -9,7 +9,9 @@ import type { ApplicationStatus, PremiumInsightsOrgChoice, ResumeProduct } from 
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
+import { formatPayRange, formatEmploymentType } from '@/lib/formatJob'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
+import MatchScoreRing from '@/components/MatchScoreRing.vue'
 import PremiumSponsorshipPanel from '@/components/PremiumSponsorshipPanel.vue'
 import SponsorWatchToggle from '@/components/SponsorWatchToggle.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
@@ -432,6 +434,14 @@ const actionBtnPrimary = `${actionBtn} bg-brand-primary text-white shadow-sm hov
 const actionBtnOutline = `${actionBtn} border border-brand-primary/40 bg-white text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5`
 const actionBtnLocked = `${actionBtn} border border-neutral-border bg-neutral-bg text-gray-400 hover:text-gray-500`
 
+const remoteLabel = computed(() => {
+  if (props.job.isRemote === true) return 'Remote'
+  if (props.job.isRemote === false) return 'Onsite'
+  return null
+})
+const payRangeLabel = computed(() => formatPayRange(props.job.payMin, props.job.payMax, props.job.payType))
+const employmentTypeLabel = computed(() => formatEmploymentType(props.job.employmentTypes))
+
 function handleViewDetails() {
   void router.push(`/job/${props.job.jobId}`)
 }
@@ -505,6 +515,26 @@ async function runAdviceCheckout() {
               {{ job.location }}
             </span>
             <span
+              v-if="remoteLabel"
+              class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body"
+            >
+              <font-awesome-icon :icon="['fas', 'globe-americas']" class="shrink-0 opacity-70" aria-hidden="true" />
+              {{ remoteLabel }}
+            </span>
+            <span
+              v-if="payRangeLabel"
+              class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body"
+            >
+              <font-awesome-icon :icon="['fas', 'sack-dollar']" class="shrink-0 opacity-70" aria-hidden="true" />
+              {{ payRangeLabel }}
+            </span>
+            <span
+              v-if="employmentTypeLabel"
+              class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium capitalize text-neutral-body"
+            >
+              {{ employmentTypeLabel }}
+            </span>
+            <span
               v-if="job.isRecentlyPosted"
               class="inline-flex items-center gap-1.5 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-2.5 py-0.5 text-xs font-medium text-brand-primary"
             >
@@ -518,13 +548,7 @@ async function runAdviceCheckout() {
               <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
               Posted {{ job.daysSincePosted }} days ago — may no longer be accepting applications
             </span>
-            <span
-              v-if="job.score != null"
-              class="inline-flex rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal"
-              aria-label="Match score"
-            >
-              Match score: {{ job.score.toFixed(0) }}
-            </span>
+            <MatchScoreRing v-if="job.score != null" :score="job.score" :size="28" show-label />
             <JobSponsorshipBadge
               v-if="showSponsorshipBadge && !showPremiumSponsorshipPanel"
               :value="sponsorshipBadgeValue"

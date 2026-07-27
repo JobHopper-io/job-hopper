@@ -22,6 +22,8 @@ import ResumeUploader from '@/components/ResumeUploader.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
+import TagInput from '@/components/TagInput.vue'
+import { splitTagsField, joinTagsField } from '@/lib/tags'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -57,7 +59,10 @@ const isSyncingFromProfile = ref(false)
 
 // Profile fields
 const currentJobTitle = ref('')
-const targetJobTitle = ref('')
+/** Displayed as removable tags; stored as one comma-joined string (profiles.target_job_title) -
+ * the matching algorithm already splits on comma/slash/pipe into separate title alternatives
+ * (see phrase-matching.ts's splitFieldAlternatives), so no schema change was needed for this. */
+const targetJobTitles = ref<string[]>([])
 // Job-matching tier; changing it re-scopes which jobs the matcher considers.
 const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 const yearsOfExperience = ref<number | null>(null)
@@ -91,7 +96,7 @@ function syncFormFromProfile() {
   const p = profile.value
   if (!p) return
   currentJobTitle.value = p.current_job_title || ''
-  targetJobTitle.value = p.target_job_title || ''
+  targetJobTitles.value = splitTagsField(p.target_job_title)
   careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
   yearsOfExperience.value = p.years_of_experience ?? null
   currentIndustry.value = p.current_industry || ''
@@ -217,7 +222,7 @@ const saveProfile = async () => {
 
     const { data, error } = await profileAPI.updateProfile({
       current_job_title: currentJobTitle.value,
-      target_job_title: targetJobTitle.value,
+      target_job_title: joinTagsField(targetJobTitles.value),
       career_level: careerLevel.value || undefined,
       years_of_experience: yearsOfExperience.value ?? undefined,
       current_industry: currentIndustry.value,
@@ -258,7 +263,7 @@ const debouncedSave = () => {
 watch(
   () => ({
     currentJobTitle: currentJobTitle.value,
-    targetJobTitle: targetJobTitle.value,
+    targetJobTitles: [...targetJobTitles.value],
     careerLevel: careerLevel.value,
     yearsOfExperience: yearsOfExperience.value,
     currentIndustry: currentIndustry.value,
@@ -458,8 +463,15 @@ watch(
           </h2>
           <div class="space-y-6">
             <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
-              <input v-model="targetJobTitle" type="text" class="input" />
+              <TagInput
+                v-model="targetJobTitles"
+                label="Target job title(s)"
+                input-id="profile-target-job-titles"
+                placeholder="e.g., Software Engineer — press Enter to add another"
+              />
+              <p class="mt-1.5 text-xs text-neutral-body">
+                Add every title you'd consider — matching checks jobs against all of them.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories</label>

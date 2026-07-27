@@ -10,6 +10,8 @@ import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
 import ResumeUploader from '@/components/ResumeUploader.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
+import TagInput from '@/components/TagInput.vue'
+import { splitTagsField, joinTagsField } from '@/lib/tags'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -27,7 +29,7 @@ const currentIndustry = ref('')
 const requiresUsSponsorship = ref<boolean | null>(null)
 
 // Step 2: Role & Level
-const targetJobTitle = ref('')
+const targetJobTitles = ref<string[]>([])
 const targetRoleCategories = ref<RoleCategoryValue[]>([])
 
 // Step 3: Compensation & Location
@@ -83,7 +85,7 @@ const canProceedStep2 = computed(() => {
     careerLevel.value as FreemiumBasePlanTierKey,
   )
   return (
-    targetJobTitle.value.trim().length > 0 &&
+    targetJobTitles.value.length > 0 &&
     targetRoleCategories.value.length > 0 &&
     hasCareerLevel
   )
@@ -132,7 +134,7 @@ function populateFromProfile() {
   currentIndustry.value = p.current_industry ?? ''
   careerLevel.value = (p.career_level as FreemiumBasePlanTierKey | null) ?? ''
 
-  targetJobTitle.value = p.target_job_title ?? ''
+  targetJobTitles.value = splitTagsField(p.target_job_title)
   const validCategories = (p.target_role_categories ?? []).filter(
     (v): v is RoleCategoryValue => ROLE_CATEGORIES.some((r) => r.value === v)
   )
@@ -240,7 +242,7 @@ async function persistProfileAndResume(): Promise<boolean> {
     last_name: lastName.value.trim() || undefined,
     current_job_title: currentJobTitle.value,
     career_level: careerLevel.value || undefined,
-    target_job_title: targetJobTitle.value.trim(),
+    target_job_title: joinTagsField(targetJobTitles.value),
     current_industry: currentIndustry.value,
     target_role_categories: targetRoleCategories.value,
     desired_salary_min: desiredSalaryMin.value ?? undefined,
@@ -457,15 +459,15 @@ const handleProceedToCheckout = async () => {
 
           <div class="space-y-6">
             <div>
-              <label for="targetJobTitle" class="block text-sm font-medium text-brand-charcoal mb-2">Target job title</label>
-              <input
-                id="targetJobTitle"
-                v-model="targetJobTitle"
-                type="text"
-                required
-                class="input"
-                placeholder="e.g., Maintenance Supervisor"
+              <TagInput
+                v-model="targetJobTitles"
+                label="Target job title(s)"
+                input-id="onboarding-target-job-titles"
+                placeholder="e.g., Maintenance Supervisor — press Enter to add another"
               />
+              <p class="mt-1.5 text-xs text-neutral-body">
+                Add every title you'd consider — matching checks jobs against all of them.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-1">Role categories (select all that apply)</label>

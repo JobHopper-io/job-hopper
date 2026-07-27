@@ -167,6 +167,11 @@ const router = createRouter({
       component: () => import('../views/PremiumTools.vue'),
     },
     {
+      path: '/applications',
+      name: 'applications',
+      component: () => import('../views/Applications.vue'),
+    },
+    {
       path: '/billing/manage',
       name: 'billing-purchase',
       component: () => import('../views/ManageSubscription.vue'),
