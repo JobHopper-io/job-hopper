@@ -13,7 +13,7 @@ export const chatbotKnowledge = [
   // ---------- GHOST JOBS / TRUST / FRUSTRATION ----------
   {
     q: "Why do I still see ghost jobs or listings that never get filled?",
-    a: "We actively filter for this — postings get screened for freshness and signs of real hiring activity before they reach your feed, and low-activity or obvious 'ghost' listings get excluded. It's not perfect; some slip through, especially on fast-moving boards. The upcoming Ghost Listing Detector is built specifically to catch reposted, stale listings that current filtering misses."
+    a: "We actively filter for this — postings get screened for freshness and signs of real hiring activity before they reach your feed, and low-activity or obvious 'ghost' listings get excluded. It's not perfect; some slip through, especially on fast-moving boards. If a specific listing looks stale or fake to you, flagging it to support helps us improve filtering directly."
   },
   {
     q: "Why did I get a match that's clearly wrong for me?",
@@ -21,7 +21,7 @@ export const chatbotKnowledge = [
   },
   {
     q: "Why do I see the same job posted twice?",
-    a: "Employers and job boards sometimes repost the same listing under slightly different titles or dates, which can make it through as a separate posting. This is exactly the pattern the Ghost Listing Detector is built to catch and consolidate."
+    a: "Employers and job boards sometimes repost the same listing under slightly different titles or dates, which can make it through as a separate posting. Our filtering catches most of this, but not all of it — if you spot a clear duplicate, reporting it to support helps us tighten the filtering."
   },
   {
     q: "This feels like every other job board — how is it actually different?",
@@ -36,7 +36,7 @@ export const chatbotKnowledge = [
   // ---------- VISA / SPONSORSHIP NUANCE ----------
   {
     q: "Is the sponsorship badge based on real government data or a guess?",
-    a: "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. The upcoming Real Sponsorship Score (Premium) is the version built on actual DOL/USCIS filing data — that's the real difference between the two."
+    a: "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
   },
   {
     q: "Can you tell me if [a specific company] sponsors visas?",
@@ -48,7 +48,7 @@ export const chatbotKnowledge = [
   },
   {
     q: "Does upgrading to Core or Premium improve my actual chances of getting sponsored?",
-    a: "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium (coming soon) adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
+    a: "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
   },
   {
     q: "Why can't you just guarantee sponsorship-friendly jobs only?",

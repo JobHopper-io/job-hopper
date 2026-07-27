@@ -45,12 +45,18 @@ const SECTION_HEADINGS = new Set([
 // Articles with no metadata block whose status we assert explicitly, because
 // their subject matter is known and the phrase scan below would get it wrong.
 const STATUS_OVERRIDES = {
-  // Premium is not purchasable yet — must be flagged despite having no metadata.
-  'KB-0038': { ai_approved: 'Conditional', live_state: 'Planned' },
-  // Describes today's shipped sponsorship heuristic, not the future Real Score.
+  // Premium shipped as a purchasable plan 2026-07-22. The article correctly says
+  // Sponsor Watch is "not yet available" (it isn't, still undeployed) — but that
+  // phrase would trip the blunt not-live scan below and wrongly mark the whole
+  // article, and therefore Premium itself, as not-live. Force it live; the
+  // article's own Do/Don't rules carry the Sponsor Watch / Ghost Listing Detector
+  // nuance instead.
+  'KB-0038': { ai_approved: 'Yes', live_state: 'Live' },
+  // Describes today's shipped sponsorship heuristic plus the now-live Real Score
+  // for Premium; no longer purely a "future feature" article.
   'KB-0033': { ai_approved: 'Yes', live_state: 'Live' },
-  // Mostly covers live Free/Core pricing; only mentions Premium's waitlist in
-  // passing, so the phrase scan would wrongly condemn the whole article.
+  // Mostly covers live Free/Core/Premium pricing; the phrase scan would still
+  // wrongly condemn the whole article over incidental wording.
   'KB-0008': { ai_approved: 'Yes', live_state: 'Live' },
 }
 
@@ -233,14 +239,15 @@ for (const article of articles) {
 // CAUTION: the prices below are hardcoded and do NOT track knowledgeBaseMaster.md.
 // If a plan's price or availability changes, edit this string too — and note it is
 // tuned to win vague plan queries, so if it goes stale it is the answer users get.
+// Updated 2026-07-28: Premium shipped as purchasable 2026-07-22 (was waitlist-only
+// when this chunk was first written) — see KB-0038.
 entries.push({
   source_doc: SOURCE_DOC,
   title: 'Plans Overview (short)',
   content:
-    'Job-Hopper has three plans: Free, Core, and Premium. Free is $0 with no card ' +
-    'required. Core is $29 per month. Premium is $49 per month at launch and is ' +
-    "currently waitlist-only. Ask about any specific plan for full details on what's " +
-    'included.',
+    'Job-Hopper has three plans: Free, Core, and Premium, all purchasable today. Free is $0 with no ' +
+    'card required. Core is $29 per month. Premium is $49 per month and adds Real Sponsorship Score ' +
+    "and deeper hiring contacts. Ask about any specific plan for full details on what's included.",
   ai_approved: 'Yes',
   live_state: 'Live',
 })
