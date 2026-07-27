@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/bodyScrollLock'
 import type { SkillsGapResult } from '@/lib/skillsGap'
+import { coursePlatformsForTier, type CourseTier } from '@/lib/coursePlatforms'
 
 const props = defineProps<{
   open: boolean
@@ -14,14 +15,10 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const activeTier = ref<CourseTier>('free')
+
 function onBackdropClick() {
   emit('close')
-}
-
-/** No course-catalog API is wired up, and letting the LLM name specific courses/URLs risks
- * hallucinated links - so each topic links to a search instead of a claimed specific course. */
-function courseSearchUrl(topic: string): string {
-  return `https://www.google.com/search?q=${encodeURIComponent(`${topic} course`)}`
 }
 
 function onKeydown(ev: KeyboardEvent) {
@@ -112,27 +109,57 @@ onUnmounted(() => {
               </ul>
             </div>
             <div v-if="result.learningTopics.length">
-              <h3 class="mb-2 flex items-center gap-2 text-sm font-semibold text-brand-charcoal">
-                <font-awesome-icon :icon="['fas', 'graduation-cap']" class="text-brand-primary" aria-hidden="true" />
-                What to go learn
-              </h3>
-              <ul class="list-disc space-y-1 pl-5 text-sm">
-                <li v-for="topic in result.learningTopics" :key="topic">
-                  <a
-                    :href="courseSearchUrl(topic)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-brand-primary hover:underline"
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <h3 class="flex items-center gap-2 text-sm font-semibold text-brand-charcoal">
+                  <font-awesome-icon :icon="['fas', 'graduation-cap']" class="text-brand-primary" aria-hidden="true" />
+                  What to go learn
+                </h3>
+                <div class="inline-flex shrink-0 rounded-full border border-neutral-border bg-neutral-bg p-0.5">
+                  <button
+                    type="button"
+                    class="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                    :class="activeTier === 'free' ? 'bg-white text-brand-primary shadow-sm' : 'text-neutral-body'"
+                    @click="activeTier = 'free'"
                   >
-                    {{ topic }}
-                    <font-awesome-icon
-                      :icon="['fas', 'arrow-up-right-from-square']"
-                      class="text-xs opacity-70"
-                      aria-hidden="true"
-                    />
-                  </a>
-                </li>
-              </ul>
+                    Free
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                    :class="activeTier === 'paid' ? 'bg-white text-brand-primary shadow-sm' : 'text-neutral-body'"
+                    @click="activeTier = 'paid'"
+                  >
+                    Paid
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div
+                  v-for="topic in result.learningTopics"
+                  :key="topic"
+                  class="rounded-[12px] border border-neutral-border p-3"
+                >
+                  <p class="mb-2 text-sm font-medium text-brand-charcoal">{{ topic }}</p>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      v-for="platform in coursePlatformsForTier(activeTier)"
+                      :key="platform.name"
+                      :href="platform.buildUrl(topic)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-3 py-1.5 text-xs font-medium text-neutral-body transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/5 hover:text-brand-primary"
+                    >
+                      <font-awesome-icon :icon="platform.icon" class="text-[11px] opacity-80" aria-hidden="true" />
+                      {{ platform.name }}
+                      <font-awesome-icon
+                        :icon="['fas', 'arrow-up-right-from-square']"
+                        class="text-[10px] opacity-60"
+                        aria-hidden="true"
+                      />
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
             <p v-if="!result.missingSkills.length" class="text-sm text-neutral-body">
               Your resume already shows everything this job asks for.

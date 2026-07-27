@@ -11,6 +11,7 @@
 withDefaults(
   defineProps<{
     title: string
+    icon: [string, string]
     realFields: string[]
     blurredFields?: string[]
   }>(),
@@ -20,7 +21,12 @@ withDefaults(
 
 <template>
   <div class="card p-5">
-    <p class="mb-3 text-sm font-semibold text-brand-charcoal">{{ title }}</p>
+    <div class="mb-3 flex items-center gap-2.5">
+      <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+        <font-awesome-icon :icon="icon" class="text-sm" aria-hidden="true" />
+      </span>
+      <p class="text-sm font-semibold text-brand-charcoal">{{ title }}</p>
+    </div>
 
     <div class="space-y-1.5">
       <p v-for="field in realFields" :key="field" class="text-sm leading-relaxed text-neutral-body">

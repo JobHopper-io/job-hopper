@@ -39,10 +39,10 @@ async function joinWaitlist() {
       <div class="mb-8">
         <h1 class="flex items-center gap-3 text-3xl font-heading font-bold text-brand-charcoal mb-2">
           <font-awesome-icon :icon="['fas', 'crown']" class="text-brand-primary" aria-hidden="true" />
-          Premium Tools
+          Sponsor Watch
         </h1>
         <p class="text-neutral-body">
-          Deeper sponsorship intelligence for your job search, built on real DOL/USCIS filing data.
+          Real-time alerts when a watched employer's H-1B filing volume changes, built on real DOL/USCIS filing data.
         </p>
       </div>
 
@@ -55,13 +55,12 @@ async function joinWaitlist() {
         <div class="card max-w-xl p-6">
           <div class="mb-4 flex items-center gap-2.5">
             <font-awesome-icon :icon="['fas', 'lock']" class="text-brand-primary" aria-hidden="true" />
-            <h3 class="font-heading font-semibold text-brand-charcoal">Premium Tools are coming soon</h3>
+            <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch is coming soon</h3>
           </div>
           <p class="text-sm text-neutral-body mb-4">
             Premium unlocks Sponsor Watch — real-time alerts when an employer's H-1B filing
-            volume changes — plus more sponsorship intelligence tools built on real DOL/USCIS
-            data. Premium isn't purchasable yet; leave your email and we'll notify you the moment
-            it launches.
+            volume changes, built on real DOL/USCIS data. Premium isn't purchasable yet; leave
+            your email and we'll notify you the moment it launches.
           </p>
 
           <template v-if="waitlistState !== 'done'">

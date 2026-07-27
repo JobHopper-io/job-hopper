@@ -1,16 +1,29 @@
 <template>
   <main class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <header class="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal mb-1">
-          Mock Interview Practice
-        </h1>
-        <p class="text-sm text-neutral-body">
-          Practicing for <span class="font-medium text-brand-charcoal">{{ jobTitle }}</span>
-          <template v-if="companyName">
-            at <span class="font-medium text-brand-charcoal">{{ companyName }}</span>
-          </template>
-        </p>
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white">
+          <font-awesome-icon :icon="['fas', 'comments']" aria-hidden="true" />
+        </span>
+        <div>
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal">
+              Mock Interview Practice
+            </h1>
+            <span
+              v-if="questionNumber > 0"
+              class="inline-flex items-center rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal"
+            >
+              Question {{ questionNumber }}
+            </span>
+          </div>
+          <p class="text-sm text-neutral-body">
+            Practicing for <span class="font-medium text-brand-charcoal">{{ jobTitle }}</span>
+            <template v-if="companyName">
+              at <span class="font-medium text-brand-charcoal">{{ companyName }}</span>
+            </template>
+          </p>
+        </div>
       </div>
       <button type="button" class="btn-secondary text-sm px-4 py-2 shrink-0" @click="endSession">
         End session
@@ -50,13 +63,29 @@
 
           <div
             v-else
-            class="max-w-[88%] ml-[42px] border-l-[3px] border-brand-success bg-green-50 rounded-r-lg px-3.5 py-2 text-[13px] text-neutral-body"
+            class="max-w-[88%] ml-[42px] flex items-start gap-2 border-l-[3px] border-brand-success bg-green-50 rounded-r-lg px-3.5 py-2 text-[13px] text-neutral-body"
           >
-            <span class="font-semibold text-brand-charcoal">Feedback:</span> {{ item.text }}
+            <font-awesome-icon :icon="['fas', 'lightbulb']" class="mt-0.5 shrink-0 text-brand-success" aria-hidden="true" />
+            <span><span class="font-semibold text-brand-charcoal">Feedback:</span> {{ item.text }}</span>
           </div>
         </template>
 
-        <p v-if="loading" class="text-sm text-neutral-body">Thinking…</p>
+        <div v-if="loading" class="flex gap-2.5 max-w-[88%]">
+          <div class="w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center shrink-0">
+            <font-awesome-icon :icon="['fas', 'comments']" class="text-xs" aria-hidden="true" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-semibold uppercase tracking-wide text-neutral-body">Interviewer</span>
+            <div class="bg-neutral-bg rounded-2xl rounded-tl-md px-4 py-3.5 flex items-center gap-1.5">
+              <span
+                v-for="d in [0, 1, 2]"
+                :key="d"
+                class="h-1.5 w-1.5 rounded-full bg-neutral-body/40 animate-bounce"
+                :style="{ animationDelay: `${d * 150}ms` }"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="border-t border-neutral-border p-4 flex flex-col gap-2">
@@ -83,12 +112,21 @@
               Send
             </button>
           </div>
-          <p v-if="quota" class="text-xs text-neutral-body text-center">
-            Free plan: {{ quota.used }} of {{ quota.dailyLimit }} questions used today ·
-            <router-link to="/premium-tools" class="text-brand-primary font-medium">
+          <p class="text-[11px] text-neutral-body/70">Press Enter to send</p>
+          <div v-if="quota" class="mx-auto w-full max-w-xs">
+            <div class="mb-1 flex items-center justify-between text-xs text-neutral-body">
+              <span>Free plan: {{ quota.used }} of {{ quota.dailyLimit }} used today</span>
+            </div>
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg">
+              <div
+                class="h-full rounded-full bg-brand-primary transition-all"
+                :style="{ width: `${quota.dailyLimit > 0 ? Math.min(100, (quota.used / quota.dailyLimit) * 100) : 0}%` }"
+              />
+            </div>
+            <router-link :to="{ name: 'billing-purchase' }" class="mt-1 inline-block text-xs font-medium text-brand-primary hover:underline">
               Upgrade for unlimited practice
             </router-link>
-          </p>
+          </div>
         </template>
         <p v-else class="text-sm text-neutral-body text-center">Session ended.</p>
       </div>
@@ -97,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { interviewPracticeAPI, type InterviewPracticeQuotaExceeded } from '@/lib/interviewPractice'
 
@@ -119,6 +157,8 @@ const loadError = ref<string | null>(null)
 const answerText = ref('')
 const ended = ref(false)
 const transcriptEl = ref<HTMLElement | null>(null)
+
+const questionNumber = computed(() => renderItems.value.filter((i) => i.kind === 'question').length)
 
 async function scrollToBottom() {
   await nextTick()

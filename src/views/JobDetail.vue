@@ -16,6 +16,7 @@ import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
 import SkillsGapModal from '@/components/SkillsGapModal.vue'
+import MatchScoreRing from '@/components/MatchScoreRing.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -767,13 +768,7 @@ async function executeTailoringCheckout() {
             <!-- Match + actions -->
             <div class="mt-6 flex flex-col gap-4 border-t border-neutral-border pt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
               <div class="flex flex-wrap items-center gap-3">
-                <span
-                  v-if="job.score != null"
-                  class="inline-flex items-center rounded-full bg-neutral-bg px-3 py-1 text-sm font-semibold text-brand-charcoal"
-                  aria-label="Match score"
-                >
-                  Match score: {{ job.score.toFixed(0) }}
-                </span>
+                <MatchScoreRing v-if="job.score != null" :score="job.score" :size="56" show-label />
               </div>
               <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                 <button
