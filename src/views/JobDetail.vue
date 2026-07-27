@@ -6,6 +6,8 @@ import { jobsAPI } from '@/lib/jobs'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { premiumInsightsAPI, premiumInsightsFreemiumReassurance } from '@/lib/premiumInsights'
 import { mapPremiumInsightsClientError } from '@/lib/premiumInsightsErrors'
+import { skillsGapAPI } from '@/lib/skillsGap'
+import type { SkillsGapResult } from '@/lib/skillsGap'
 import { useUserStore } from '@/stores/user'
 import type { MatchedJob, PayType, PremiumInsightsOrgChoice, ResumeProduct } from '@/types/database'
 import JobSponsorshipBadge from '@/components/JobSponsorshipBadge.vue'
@@ -13,6 +15,7 @@ import SponsorWatchToggle from '@/components/SponsorWatchToggle.vue'
 import ResumeAdviceModal from '@/components/ResumeAdviceModal.vue'
 import ResumeAdvicePrecheckModal from '@/components/ResumeAdvicePrecheckModal.vue'
 import PremiumInsightsModal from '@/components/PremiumInsightsModal.vue'
+import SkillsGapModal from '@/components/SkillsGapModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -397,6 +400,41 @@ async function loadWhyFit(matchId: string) {
   } finally {
     whyFitLoading.value = false
   }
+}
+
+const skillsGapModalOpen = ref(false)
+const skillsGapLoading = ref(false)
+const skillsGapResult = ref<SkillsGapResult | null>(null)
+const skillsGapError = ref<string | null>(null)
+
+/** Runs (or reads the cache for) the skills-gap analysis for this job match. Requires a
+ * resume on file - falls back to the existing "upload your resume first" precheck modal,
+ * same as Resume Advice, instead of a bespoke error state. */
+async function handleSkillsGapClick() {
+  if (!job.value) return
+  const profile = userStore.profile
+  if (!profile?.resume_bucket_key?.trim()) {
+    precheckVariant.value = 'upload-required'
+    precheckOpen.value = true
+    return
+  }
+  skillsGapModalOpen.value = true
+  skillsGapLoading.value = true
+  skillsGapError.value = null
+  skillsGapResult.value = null
+  const { data, error, noResume } = await skillsGapAPI.generate(job.value.matchId)
+  skillsGapLoading.value = false
+  if (noResume) {
+    skillsGapModalOpen.value = false
+    precheckVariant.value = 'upload-required'
+    precheckOpen.value = true
+    return
+  }
+  if (error || !data) {
+    skillsGapError.value = error?.message ?? 'Something went wrong'
+    return
+  }
+  skillsGapResult.value = data
 }
 
 async function reloadJobFromRoute() {
@@ -840,18 +878,6 @@ async function executeTailoringCheckout() {
                   </button>
                 </template>
                 </template>
-                <router-link
-                  v-if="job"
-                  :to="{
-                    name: 'interview-practice',
-                    params: { jobMatchId: job.matchId },
-                    query: { jobTitle: job.title, companyName: job.company },
-                  }"
-                  class="btn-secondary inline-flex items-center justify-center gap-2"
-                >
-                  <font-awesome-icon :icon="['fas', 'comments']" class="opacity-80" aria-hidden="true" />
-                  Practice interview for this job
-                </router-link>
               </div>
             </div>
             <ResumeAdvicePrecheckModal
@@ -875,6 +901,13 @@ async function executeTailoringCheckout() {
               :advice-text="advicePurchase?.improvements_text"
               :error-message="adviceErrorMessage"
               @close="adviceModalOpen = false"
+            />
+            <SkillsGapModal
+              :open="skillsGapModalOpen"
+              :loading="skillsGapLoading"
+              :result="skillsGapResult"
+              :error-message="skillsGapError"
+              @close="skillsGapModalOpen = false"
             />
             <PremiumInsightsModal
               :open="insightsModalOpen"
@@ -926,6 +959,58 @@ async function executeTailoringCheckout() {
             </div>
           </div>
         </article>
+
+        <!-- Get ready for this job: practice interview + skills gap. Pulled out of the action
+             row and given their own prominent section right under the hero, since these two
+             tools are easy to miss buried among the smaller secondary buttons. -->
+        <div v-if="job" class="card p-6">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-1">Get ready for this job</h2>
+          <p class="text-sm text-neutral-body mb-4">Two quick ways to walk in prepared.</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <router-link
+              :to="{
+                name: 'interview-practice',
+                params: { jobMatchId: job.matchId },
+                query: { jobTitle: job.title, companyName: job.company },
+              }"
+              class="group flex flex-col gap-3 rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-5 transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/10"
+            >
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white">
+                <font-awesome-icon :icon="['fas', 'comments']" aria-hidden="true" />
+              </span>
+              <span>
+                <span class="block font-heading font-semibold text-brand-charcoal">Practice interview for this job</span>
+                <span class="mt-1 block text-sm text-neutral-body">
+                  Mock questions tailored to this role, with feedback on your answers.
+                </span>
+              </span>
+              <span class="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary">
+                Start practicing
+                <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+              </span>
+            </router-link>
+
+            <button
+              type="button"
+              class="group flex flex-col gap-3 rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-5 text-left transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/10"
+              @click="handleSkillsGapClick"
+            >
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white">
+                <font-awesome-icon :icon="['fas', 'graduation-cap']" aria-hidden="true" />
+              </span>
+              <span>
+                <span class="block font-heading font-semibold text-brand-charcoal">See your skills gap</span>
+                <span class="mt-1 block text-sm text-neutral-body">
+                  Compare your resume to this posting — what matches, what's missing, what to learn.
+                </span>
+              </span>
+              <span class="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary">
+                Analyze my resume
+                <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+              </span>
+            </button>
+          </div>
+        </div>
 
         <!-- Overview -->
         <div class="card p-6">

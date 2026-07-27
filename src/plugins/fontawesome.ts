@@ -40,6 +40,7 @@ import {
   faArrowRightArrowLeft,
   faCheckDouble,
   faComments,
+  faGraduationCap,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram } from '@fortawesome/free-brands-svg-icons'
 
@@ -82,6 +83,7 @@ library.add(
   faArrowRightArrowLeft,
   faCheckDouble,
   faComments,
+  faGraduationCap,
   faTiktok,
   faInstagram,
 )
