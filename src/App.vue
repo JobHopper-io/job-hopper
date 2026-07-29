@@ -27,6 +27,15 @@ const isCoreOrPremium = computed(() => baseTier.value === 'core' || baseTier.val
 // redirected away from `/` by the router guard, so this only ever affects the marketing page.
 const isLandingPage = computed(() => route.path === '/')
 
+// Login/Register/Onboarding ship their own header baked into the hero (transparent nav
+// merged into the gradient on Login/Register, step progress on Onboarding) - the shared
+// sticky white nav would double up on top of it. The shared footer is still used on
+// Login/Register (matches the rest of the app); Onboarding's step flow has none.
+const CHROME_FREE_NAV_ROUTES = ['/login', '/register', '/onboarding', '/confirm-email', '/email-verified']
+const CHROME_FREE_FOOTER_ROUTES = ['/onboarding']
+const hideNav = computed(() => isLandingPage.value || CHROME_FREE_NAV_ROUTES.includes(route.path))
+const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUTES.includes(route.path))
+
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
 const isAdmin = ref(false)
@@ -151,9 +160,9 @@ const handleSignOutAndCloseMenu = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg">
+  <div class="flex min-h-screen flex-col bg-neutral-bg">
       <!-- Navigation Header -->
-      <nav v-if="!isLandingPage" class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
+      <nav v-if="!hideNav" class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-5">
           <div class="flex justify-between items-center h-16">
             <!-- Logo -->
@@ -392,12 +401,14 @@ const handleSignOutAndCloseMenu = async () => {
       </nav>
 
       <!-- Main Content -->
-      <main>
+      <main class="flex-1">
         <RouterView />
       </main>
 
       <!-- Footer -->
-      <footer v-if="!isLandingPage" class="bg-white border-t border-neutral-border mt-16">
+      <!-- No top margin on the auth routes: their hero already fades to white and must butt
+           straight into the footer with no visible seam. -->
+      <footer v-if="!hideFooter" class="bg-white border-t border-neutral-border" :class="hideNav ? '' : 'mt-16'">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">

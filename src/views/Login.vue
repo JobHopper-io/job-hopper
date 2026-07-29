@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
+import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
+import FormField from '@/components/auth/FormField.vue'
+import PasswordField from '@/components/auth/PasswordField.vue'
 
 const router = useRouter()
 
@@ -11,7 +14,6 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const error = ref('')
-const showPassword = ref(false)
 
 const handleLogin = async () => {
   try {
@@ -67,102 +69,70 @@ const goToRegister = () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
+  <AuthSplitPanel
+    headline="Your next role is out there. Let's find it."
+    sub="Visa-sponsored positions matched to your status — updated every day."
+    :stats="[
+      { value: 'Daily Matches', label: 'AI-curated to your role & pay' },
+      { value: 'Sponsorship Signal', label: 'See who\'s likely to sponsor' },
+      { value: 'Application Tracker', label: 'Every application, one place' },
+    ]"
+    hide-login-link
+  >
+    <form class="flex flex-col gap-7" novalidate @submit.prevent="handleLogin">
       <div>
-        <h2 class="text-center text-3xl font-heading font-bold text-brand-charcoal">
-          Sign in to your account
-        </h2>
-        <p class="mt-2 text-center text-sm text-neutral-body">
-          Or
-          <button @click="goToRegister" class="font-medium text-brand-primary hover:underline">
-            create a new account
+        <h2 class="text-[26px] font-heading font-bold text-brand-charcoal">Welcome back</h2>
+        <p class="mt-1 text-sm text-neutral-body">Sign in to continue your search</p>
+      </div>
+
+      <div class="flex flex-col gap-4">
+        <FormField
+          id="email"
+          v-model="email"
+          label="Email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="you@company.com"
+        />
+        <div class="flex flex-col gap-1">
+          <PasswordField
+            id="password"
+            v-model="password"
+            label="Password"
+            autocomplete="current-password"
+            required
+            placeholder="••••••••"
+          />
+          <div class="mt-1 flex justify-end">
+            <router-link to="/forgot-password" class="text-[13px] font-bold text-brand-primary hover:underline">
+              Forgot password?
+            </router-link>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="error" class="text-center text-sm text-red-600">
+        {{ error }}
+      </div>
+
+      <div class="flex flex-col gap-4">
+        <button
+          type="submit"
+          :disabled="isLoading || !email || !password"
+          class="btn-primary flex h-12 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+          <span>{{ isLoading ? 'Signing in…' : 'Sign in' }}</span>
+          <font-awesome-icon v-if="!isLoading" :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
+        </button>
+        <p class="text-center text-[13px] text-neutral-body">
+          Don't have an account?
+          <button type="button" class="font-bold text-brand-primary hover:underline" @click="goToRegister">
+            Sign up free
           </button>
         </p>
       </div>
-
-      <form class="mt-8 space-y-6" @submit.prevent="handleLogin">
-        <div class="space-y-4">
-          <div>
-            <label for="email" class="block text-sm font-medium text-brand-charcoal mb-2">Email address</label>
-            <input
-              id="email"
-              v-model="email"
-              name="email"
-              type="email"
-              autocomplete="email"
-              required
-              class="input"
-              placeholder="Email address"
-            />
-          </div>
-          <div>
-            <label for="password" class="block text-sm font-medium text-brand-charcoal mb-2">Password</label>
-            <div class="relative">
-              <input
-                id="password"
-                v-model="password"
-                name="password"
-                :type="showPassword ? 'text' : 'password'"
-                autocomplete="current-password"
-                required
-                class="input pr-10"
-                placeholder="Password"
-              />
-              <button
-                type="button"
-                @click="showPassword = !showPassword"
-                class="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <svg v-if="showPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                </svg>
-                <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-              </button>
-            </div>
-            <div class="mt-2 text-right">
-              <router-link to="/forgot-password" class="text-sm font-medium text-brand-primary hover:underline">
-                Forgot your password?
-              </router-link>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="error" class="text-red-600 text-sm text-center">
-          {{ error }}
-        </div>
-
-        <div>
-          <button
-            type="submit"
-            :disabled="isLoading || !email || !password"
-            class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span v-if="isLoading" class="flex items-center justify-center">
-              <font-awesome-icon
-                :icon="['fas', 'spinner']"
-                spin
-                class="h-5 w-5 mr-2"
-                aria-hidden="true"
-              />
-              Signing in...
-            </span>
-            <span v-else>Sign in</span>
-          </button>
-        </div>
-
-        <div class="text-center">
-          <p class="text-sm text-neutral-body">
-            Don't have an account yet?
-            <button @click="goToRegister" class="font-medium text-brand-primary hover:underline">
-              Create one here
-            </button>
-          </p>
-        </div>
-      </form>
-    </div>
-  </div>
+    </form>
+  </AuthSplitPanel>
 </template>

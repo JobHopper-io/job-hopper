@@ -3,10 +3,10 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
+import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
 
 const router = useRouter()
 const hasNavigated = ref(false)
-const isCheckingNow = ref(false)
 
 async function goToDestination() {
   if (hasNavigated.value) return
@@ -26,12 +26,6 @@ async function checkIfVerified() {
   }
 }
 
-async function handleManualCheck() {
-  isCheckingNow.value = true
-  await checkIfVerified()
-  isCheckingNow.value = false
-}
-
 // Verification happens in a different tab (the email link). Supabase syncs the new
 // session to this tab via a cross-tab broadcast, so listen for it here instead of only
 // checking once on mount.
@@ -48,58 +42,44 @@ const {
 // periodically in case this tab misses the event.
 const pollId = window.setInterval(checkIfVerified, 3000)
 
+// The realistic path through this page is: user leaves this tab, verifies in the email
+// tab, then comes back - and this tab has been backgrounded that whole time. Browsers
+// throttle/suspend setInterval timers (and can delay BroadcastChannel delivery) for
+// hidden tabs, so neither of the above can be trusted to have fired promptly while the
+// user was away. Re-check immediately the moment this tab is actually looked at again.
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    void checkIfVerified()
+  }
+}
+document.addEventListener('visibilitychange', handleVisibilityChange)
+
 onUnmounted(() => {
   authListener.unsubscribe()
   window.clearInterval(pollId)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onMounted(checkIfVerified)
 </script>
 
 <template>
-  <div class="bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md mx-auto">
-      <div class="card p-8 text-center">
-        <div class="w-14 h-14 mx-auto mb-6 rounded-full bg-brand-primary/10 flex items-center justify-center">
-          <svg class="w-7 h-7 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <h1 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-          Check your email
-        </h1>
-        <p class="text-neutral-body mb-6">
-          We've sent you a confirmation link. Click the link in that email to verify your address and continue to set up your profile.
-        </p>
-        <ul class="text-left text-sm text-neutral-body space-y-2 mb-8 bg-neutral-bg/50 rounded-[12px] p-4">
-          <li class="flex items-start gap-2">
-            <span class="text-brand-primary mt-0.5">•</span>
-            <span>Check your inbox (and spam folder) for an email from us.</span>
-          </li>
-          <li class="flex items-start gap-2">
-            <span class="text-brand-primary mt-0.5">•</span>
-            <span>Click the confirmation link in that email.</span>
-          </li>
-          <li class="flex items-start gap-2">
-            <span class="text-brand-primary mt-0.5">•</span>
-            <span>Once it confirms you're verified, come back to this tab — it'll continue automatically into setting up your profile.</span>
-          </li>
-        </ul>
-        <button
-          type="button"
-          class="btn-primary w-full mb-3"
-          :disabled="isCheckingNow"
-          @click="handleManualCheck"
-        >
-          {{ isCheckingNow ? 'Checking…' : "I've verified — continue" }}
-        </button>
-        <p class="text-sm text-neutral-body mb-6">
-          Didn't get the email? Wait a few minutes and check again, or contact support if the problem continues.
-        </p>
-        <router-link to="/login" class="btn-secondary w-full inline-block text-center">
-          Back to sign in
-        </router-link>
+  <AuthSplitPanel>
+    <div class="text-center">
+      <div class="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary/10">
+        <font-awesome-icon :icon="['fas', 'envelope']" class="text-2xl text-brand-primary" aria-hidden="true" />
       </div>
+      <h1 class="text-2xl font-heading font-bold text-brand-charcoal">Check your email</h1>
+      <p class="mt-2 mb-2 text-neutral-body">
+        Click the confirmation link we sent you — it'll open a new tab and take you straight into
+        setting up your profile.
+      </p>
+      <p class="mb-6 text-xs text-neutral-body">
+        Don't see it? Check spam.
+      </p>
+      <router-link to="/login" class="btn-secondary inline-block w-full text-center">
+        Back to sign in
+      </router-link>
     </div>
-  </div>
+  </AuthSplitPanel>
 </template>

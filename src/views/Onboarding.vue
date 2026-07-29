@@ -11,6 +11,11 @@ import ResumeUploader from '@/components/ResumeUploader.vue'
 import PreferredLocationsInput from '@/components/PreferredLocationsInput.vue'
 import LocationRadiusInput from '@/components/LocationRadiusInput.vue'
 import TagInput from '@/components/TagInput.vue'
+import FormField from '@/components/auth/FormField.vue'
+import OnboardingStepHeader from '@/components/onboarding/OnboardingStepHeader.vue'
+import OnboardingChip from '@/components/onboarding/OnboardingChip.vue'
+import jobHopperLogo from '@/assets/job-hopper-logo.png'
+import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 import { splitTagsField, joinTagsField } from '@/lib/tags'
 
 const router = useRouter()
@@ -20,6 +25,14 @@ const hasPopulatedFromProfile = ref(false)
 // Steps: 1=About, 2=Role & Level, 3=Compensation & Location, 4=Resume, 5=Plan
 const currentStep = ref(1)
 const totalSteps = 5
+const STEP_NAMES = ['About You', 'Role & Level', 'Compensation', 'Resume', 'Plan']
+const STEP_ICONS: [string, string][] = [
+  ['fas', 'user'],
+  ['fas', 'briefcase'],
+  ['fas', 'sack-dollar'],
+  ['fas', 'file-lines'],
+  ['fas', 'star'],
+]
 
 // Step 1: About You
 const firstName = ref('')
@@ -67,6 +80,9 @@ const premiumComingSoon = computed<Product | null>(() =>
     ? premiumPlan.value
     : null,
 )
+
+// Presentational only — mirrors the "Most popular" badge Pricing.vue already puts on Core.
+const isCorePlan = (product: Product) => product.key === 'core'
 
 const isLoading = ref(false)
 const error = ref('')
@@ -344,250 +360,206 @@ const handleProceedToCheckout = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
-    <div :class="currentStep === 5 ? 'max-w-7xl' : 'max-w-2xl'" class="mx-auto">
-      <div class="mb-8">
-        <div class="flex justify-between mb-2">
-          <span class="text-sm font-medium text-neutral-body">Step {{ currentStep }} of {{ totalSteps }}</span>
-          <span class="text-sm text-neutral-body">{{ Math.round((currentStep / totalSteps) * 100) }}%</span>
+  <div class="min-h-screen" style="background: #fafaf8">
+    <!-- Header: logo, step badge, progress bar with rabbit marker -->
+    <div class="border-b border-neutral-border bg-white px-4 py-4 sm:px-6">
+      <div class="mx-auto flex max-w-3xl flex-col gap-5">
+        <div class="flex items-center justify-between">
+          <img :src="jobHopperLogo" alt="Job-Hopper" class="h-7 w-auto object-contain" />
+          <span class="rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
+            Step {{ currentStep }} of {{ totalSteps }} — {{ STEP_NAMES[currentStep - 1] }}
+          </span>
         </div>
-        <div class="w-full bg-neutral-border rounded-full h-2">
+        <div class="relative mx-auto w-full max-w-xl pb-1">
           <div
-            class="bg-brand-primary h-2 rounded-full transition-all duration-300"
-            :style="{ width: `${(currentStep / totalSteps) * 100}%` }"
-          ></div>
+            class="pointer-events-none absolute -top-7 transition-all duration-500 ease-out"
+            :style="{ left: `calc(${((currentStep - 1) / (totalSteps - 1)) * 100}% - 13px)` }"
+          >
+            <img :src="jobHopperRabbitLogo" alt="" aria-hidden="true" class="floating h-[26px] w-[26px] object-contain" />
+          </div>
+          <div class="mt-1 flex gap-1.5">
+            <div v-for="i in totalSteps" :key="i" class="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-border">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="i <= currentStep ? 'bg-brand-primary' : ''"
+                :style="{ width: i <= currentStep ? '100%' : '0%' }"
+              />
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="card p-8">
+    <div class="flex flex-col items-center px-4 py-8">
+      <div :class="currentStep === 5 ? 'max-w-4xl' : 'max-w-xl'" class="w-full">
         <!-- Step 1: About You -->
-        <div v-if="currentStep === 1">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            Tell us about your current role
-          </h2>
-          <p class="text-neutral-body mb-6">
-            This helps us match you more accurately.
-          </p>
-          <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label for="firstName" class="block text-sm font-medium text-brand-charcoal mb-2">First name</label>
-                <input
-                  id="firstName"
-                  v-model="firstName"
-                  type="text"
-                  required
-                  class="input"
-                  placeholder="First name"
-                />
-              </div>
-              <div>
-                <label for="lastName" class="block text-sm font-medium text-brand-charcoal mb-2">Last name</label>
-                <input
-                  id="lastName"
-                  v-model="lastName"
-                  type="text"
-                  required
-                  class="input"
-                  placeholder="Last name"
-                />
-              </div>
-            </div>
-            <div>
-              <label for="currentJobTitle" class="block text-sm font-medium text-brand-charcoal mb-2">Current job title</label>
-              <input
-                id="currentJobTitle"
-                v-model="currentJobTitle"
-                type="text"
-                required
-                class="input"
-                placeholder="e.g., Maintenance Technician"
+        <div
+          v-if="currentStep === 1"
+          class="flex flex-col gap-6 rounded-2xl border border-neutral-border bg-white p-6 shadow-sm sm:p-8"
+        >
+          <OnboardingStepHeader
+            :icon="STEP_ICONS[0]"
+            title="About You"
+            sub="Tell us the basics to surface the best matches"
+          />
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField id="firstName" v-model="firstName" label="First name" required placeholder="First name" />
+            <FormField id="lastName" v-model="lastName" label="Last name" required placeholder="Last name" />
+          </div>
+          <FormField
+            id="currentJobTitle"
+            v-model="currentJobTitle"
+            label="Current job title"
+            required
+            placeholder="e.g., Maintenance Technician"
+          />
+          <FormField
+            id="currentIndustry"
+            v-model="currentIndustry"
+            label="Current industry or environment"
+            required
+            placeholder="e.g., Technology, Healthcare, Manufacturing"
+          />
+          <div>
+            <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-neutral-body">
+              Do you require sponsorship to work in the United States?
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <OnboardingChip
+                label="Yes, I require sponsorship"
+                :selected="requiresUsSponsorship === true"
+                @click="requiresUsSponsorship = true"
+              />
+              <OnboardingChip
+                label="No, I do not require sponsorship"
+                :selected="requiresUsSponsorship === false"
+                @click="requiresUsSponsorship = false"
               />
             </div>
-
-            <div>
-              <label for="currentIndustry" class="block text-sm font-medium text-brand-charcoal mb-2">Current industry or environment</label>
-              <input
-                id="currentIndustry"
-                v-model="currentIndustry"
-                type="text"
-                required
-                class="input"
-                placeholder="e.g., Technology, Healthcare, Manufacturing"
-              />
-            </div>
-
-            <div>
-              <p class="block text-sm font-medium text-brand-charcoal mb-2">
-                Do you require sponsorship to work in the United States?
-              </p>
-              <div class="flex flex-col sm:flex-row gap-3">
-                <label class="inline-flex items-center gap-2">
-                  <input
-                    v-model="requiresUsSponsorship"
-                    type="radio"
-                    :value="true"
-                    class="w-4 h-4"
-                  />
-                  <span class="text-sm text-neutral-body">Yes, I require sponsorship</span>
-                </label>
-                <label class="inline-flex items-center gap-2">
-                  <input
-                    v-model="requiresUsSponsorship"
-                    type="radio"
-                    :value="false"
-                    class="w-4 h-4"
-                  />
-                  <span class="text-sm text-neutral-body">No, I do not require sponsorship</span>
-                </label>
-              </div>
-              <p class="mt-2 text-sm text-neutral-body">
-                If you select yes, Job-Hopper can surface a sponsorship-likelihood signal on postings (from metadata analysis in the Hopper). It helps you focus your time—it does not guarantee an employer will sponsor.
-              </p>
-            </div>
+            <p class="mt-2 text-sm text-neutral-body">
+              If you select yes, Job-Hopper can surface a sponsorship-likelihood signal on postings (from
+              metadata analysis in the Hopper). It helps you focus your time—it does not guarantee an
+              employer will sponsor.
+            </p>
           </div>
         </div>
 
         <!-- Step 2: Role & Level -->
-        <div v-if="currentStep === 2">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            What kind of roles are you targeting?
-          </h2>
-          <p class="text-neutral-body mb-6">
-            A rough target is enough to get started — you can fine-tune it later.
-          </p>
-
-          <div class="space-y-6">
-            <div>
-              <TagInput
-                v-model="targetJobTitles"
-                label="Target job title(s)"
-                input-id="onboarding-target-job-titles"
-                placeholder="e.g., Maintenance Supervisor — press Enter to add another"
+        <div
+          v-if="currentStep === 2"
+          class="flex flex-col gap-6 rounded-2xl border border-neutral-border bg-white p-6 shadow-sm sm:p-8"
+        >
+          <OnboardingStepHeader
+            :icon="STEP_ICONS[1]"
+            title="Role & Level"
+            sub="A rough target is enough to get started — you can fine-tune it later"
+          />
+          <div>
+            <TagInput
+              v-model="targetJobTitles"
+              label="Target job title(s)"
+              input-id="onboarding-target-job-titles"
+              placeholder="e.g., Maintenance Supervisor — press Enter to add another"
+            />
+            <p class="mt-1.5 text-xs text-neutral-body">
+              Add every title you'd consider — matching checks jobs against all of them.
+            </p>
+          </div>
+          <div>
+            <p class="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-body">
+              Role categories (select all that apply)
+            </p>
+            <p class="mb-3 text-sm text-neutral-body">The specific kinds of roles you're open to.</p>
+            <div class="flex flex-wrap gap-2">
+              <OnboardingChip
+                v-for="opt in ROLE_CATEGORIES"
+                :key="opt.value"
+                :label="opt.label"
+                :selected="targetRoleCategories.includes(opt.value)"
+                @click="toggleRoleCategory(opt.value)"
               />
-              <p class="mt-1.5 text-xs text-neutral-body">
-                Add every title you'd consider — matching checks jobs against all of them.
-              </p>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-1">Role categories (select all that apply)</label>
-              <p class="text-sm text-neutral-body mb-3">The specific kinds of roles you're open to.</p>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  v-for="opt in ROLE_CATEGORIES"
-                  :key="opt.value"
-                  type="button"
-                  @click="toggleRoleCategory(opt.value)"
-                  :class="[
-                    'p-3 rounded-[12px] border-2 text-left transition-colors',
-                    targetRoleCategories.includes(opt.value)
-                      ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                      : 'border-neutral-border hover:border-brand-primary/50'
-                  ]"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label for="career-level" class="block text-sm font-medium text-brand-charcoal mb-1">
-                Which level best describes the roles you want? <span class="text-red-600">*</span>
-              </label>
-              <p class="text-sm text-neutral-body mb-2">
-                The overall seniority band we'll match you within, on any plan.
-              </p>
-              <select id="career-level" v-model="careerLevel" class="input w-full">
-                <option disabled value="">Select a level</option>
-                <option
-                  v-for="opt in careerLevelOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ opt.label }}
-                </option>
-              </select>
+          </div>
+          <div>
+            <p class="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-body">
+              Which level best describes the roles you want? <span class="text-red-600">*</span>
+            </p>
+            <p class="mb-2 text-sm text-neutral-body">The overall seniority band we'll match you within, on any plan.</p>
+            <div class="flex flex-wrap gap-2">
+              <OnboardingChip
+                v-for="opt in careerLevelOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :selected="careerLevel === opt.value"
+                @click="careerLevel = opt.value"
+              />
             </div>
           </div>
         </div>
 
         <!-- Step 3: Compensation & Location -->
-        <div v-if="currentStep === 3">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            What are you looking for in pay and location?
-          </h2>
-          <p class="text-neutral-body mb-6">
-            You can fine-tune these later.
-          </p>
-
-          <div class="space-y-6">
-            <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Desired wage or salary range</label>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <input
-                    v-model.number="desiredSalaryMin"
-                    type="number"
-                    min="0"
-                    class="input"
-                    placeholder="Min ($)"
-                  />
-                </div>
-                <div>
-                  <input
-                    v-model.number="desiredSalaryMax"
-                    type="number"
-                    min="0"
-                    class="input"
-                    placeholder="Max ($)"
-                  />
-                </div>
-              </div>
-              <div v-if="salaryRangeError" class="text-red-600 text-sm mt-1">
-                {{ salaryRangeError }}
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <PreferredLocationsInput
-                v-model="preferredLocations"
-                label="Location preferences"
-                input-id="preferredLocations"
+        <div
+          v-if="currentStep === 3"
+          class="flex flex-col gap-6 rounded-2xl border border-neutral-border bg-white p-6 shadow-sm sm:p-8"
+        >
+          <OnboardingStepHeader
+            :icon="STEP_ICONS[2]"
+            title="Compensation & Location"
+            sub="Set your expectations and preferred work area"
+          />
+          <div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                id="salaryMin"
+                :model-value="desiredSalaryMin != null ? String(desiredSalaryMin) : ''"
+                label="Min salary (USD/yr)"
+                type="number"
+                placeholder="$80,000"
+                @update:model-value="desiredSalaryMin = $event ? Number($event) : null"
               />
-              <LocationRadiusInput v-model="locationRadius" label="Location radius" />
+              <FormField
+                id="salaryMax"
+                :model-value="desiredSalaryMax != null ? String(desiredSalaryMax) : ''"
+                label="Max salary (USD/yr)"
+                type="number"
+                placeholder="$150,000"
+                @update:model-value="desiredSalaryMax = $event ? Number($event) : null"
+              />
             </div>
+            <p v-if="salaryRangeError" class="mt-1 text-sm text-red-600">{{ salaryRangeError }}</p>
+          </div>
 
-            <div class="space-y-3">
-              <label class="flex items-center">
-                <input
-                  v-model="openToRelocation"
-                  type="checkbox"
-                  class="mr-3 w-4 h-4"
-                />
-                <span class="text-sm text-neutral-body">Open to relocation</span>
-              </label>
-              <label class="flex items-center">
-                <input
-                  v-model="openToRemote"
-                  type="checkbox"
-                  class="mr-3 w-4 h-4"
-                />
-                <span class="text-sm text-neutral-body">Open to remote roles</span>
-              </label>
-            </div>
+          <div class="flex flex-col gap-3">
+            <PreferredLocationsInput v-model="preferredLocations" label="Location preferences" input-id="preferredLocations" />
+            <LocationRadiusInput v-model="locationRadius" label="Location radius" />
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <label class="flex items-center gap-3">
+              <input v-model="openToRelocation" type="checkbox" class="h-5 w-5 rounded-md border-neutral-border accent-brand-primary" />
+              <span class="text-sm text-neutral-body">Open to relocation</span>
+            </label>
+            <label class="flex items-center gap-3">
+              <input v-model="openToRemote" type="checkbox" class="h-5 w-5 rounded-md border-neutral-border accent-brand-primary" />
+              <span class="text-sm text-neutral-body">Open to remote roles</span>
+            </label>
           </div>
         </div>
 
         <!-- Step 4: Resume Upload -->
-        <div v-if="currentStep === 4">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            Upload your resume (optional, but recommended)
-          </h2>
-          <p class="text-neutral-body font-medium mb-2">
-            We use this only to improve your matches—never to sell your data.
-          </p>
-          <p class="text-neutral-body mb-6">
-            A resume gives our matching engine more context: your skills, equipment or systems you've worked with, and the progression of your career. You can skip this step and come back later if you'd like.
+        <div
+          v-if="currentStep === 4"
+          class="flex flex-col gap-6 rounded-2xl border border-neutral-border bg-white p-6 shadow-sm sm:p-8"
+        >
+          <OnboardingStepHeader
+            :icon="STEP_ICONS[3]"
+            title="Resume Upload"
+            sub="Optional, but recommended — improves match accuracy"
+          />
+          <p class="-mt-2 text-sm text-neutral-body">
+            <span class="font-medium text-brand-charcoal">We use this only to improve your matches—never to sell your data.</span>
+            A resume gives our matching engine more context: your skills, equipment or systems you've worked
+            with, and the progression of your career. You can skip this step and come back later if you'd like.
           </p>
 
           <ResumeUploader
@@ -599,64 +571,78 @@ const handleProceedToCheckout = async () => {
         </div>
 
         <!-- Step 5: Plan Selection -->
-        <div v-if="currentStep === 5">
-          <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-            Choose how you want to start
-          </h2>
-          <p class="text-neutral-body mb-6">
-            Start free, or subscribe with a 7-day trial for automated matching and email digests. Upgrade anytime from billing.
-          </p>
+        <div v-if="currentStep === 5" class="flex flex-col items-center gap-8">
+          <div class="text-center">
+            <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Choose how you want to start</h2>
+            <p class="mt-1 text-sm text-neutral-body">
+              Start free, or subscribe with a 7-day trial for automated matching and email digests. Upgrade
+              anytime from billing.
+            </p>
+          </div>
 
-          <div class="space-y-6">
-            <div class="flex flex-wrap justify-center gap-4">
+          <div class="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="relative flex flex-col">
               <div
-                :class="[
-                  'card p-6 text-left transition-all flex flex-col w-full sm:w-72',
-                  startFreePlan ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
-                ]"
+                class="flex h-full flex-col gap-4 rounded-2xl border p-6"
+                :class="startFreePlan ? 'border-2' : 'border'"
+                :style="startFreePlan ? { borderColor: '#2F6ECC', boxShadow: '0 6px 20px rgba(47,110,204,0.12)' } : { borderColor: '#E5E7EB' }"
               >
-                <h3 class="font-semibold mb-2">Start for free</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">$0</p>
-                <p class="text-sm text-neutral-body mb-4 grow">
-                  Explore the dashboard and preview our features.
+                <div>
+                  <p class="font-heading font-bold text-brand-charcoal">Free</p>
+                  <p class="mt-0.5 text-sm text-neutral-body">Explore the dashboard and preview our features.</p>
+                </div>
+                <p class="text-3xl font-heading font-bold text-brand-primary">$0</p>
+                <p class="flex-1 text-sm text-neutral-body">Manual job search, teaser insights, capped access.</p>
+                <button type="button" class="btn-secondary w-full" @click="selectFreePlan">
+                  {{ startFreePlan ? 'Selected' : 'Choose free' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-for="product in basePlanProducts" :key="product.id" class="relative flex flex-col">
+              <div
+                v-if="isCorePlan(product)"
+                class="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand-primary px-4 py-[5px] text-[11px] font-bold text-white"
+              >
+                Most popular
+              </div>
+              <div
+                class="flex h-full flex-col gap-4 rounded-2xl border p-6"
+                :class="[!startFreePlan && selectedBasePlanId === product.id ? 'border-2' : 'border', isCorePlan(product) ? 'mt-3' : '']"
+                :style="
+                  !startFreePlan && selectedBasePlanId === product.id
+                    ? { borderColor: '#2F6ECC', boxShadow: '0 6px 20px rgba(47,110,204,0.12)' }
+                    : { borderColor: '#E5E7EB' }
+                "
+              >
+                <div>
+                  <p class="font-heading font-bold text-brand-charcoal">{{ product.display_name }}</p>
+                </div>
+                <p class="text-3xl font-heading font-bold text-brand-primary">
+                  ${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span>
                 </p>
-                <button type="button" class="btn-secondary w-full mb-3" @click="selectFreePlan">
-                  Choose free
+                <p class="flex-1 text-sm text-neutral-body">{{ product.description || '' }}</p>
+                <button type="button" class="btn-primary w-full" @click="selectPaidPlan(product.id)">
+                  {{ !startFreePlan && selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}
                 </button>
               </div>
+            </div>
 
+            <div v-if="premiumComingSoon" class="relative flex flex-col">
               <div
-                v-for="product in basePlanProducts"
-                :key="product.id"
-                :class="[
-                  'card p-6 text-left transition-all w-full sm:w-72',
-                  !startFreePlan && selectedBasePlanId === product.id ? 'border-2 border-brand-primary bg-brand-primary/5' : ''
-                ]"
+                class="flex h-full flex-col gap-4 rounded-2xl border-2 border-dashed p-6"
+                style="border-color: #e5e7eb; background: #f9fafb"
               >
-                <h3 class="font-semibold mb-2">{{ product.display_name }}</h3>
-                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
-                <p class="text-sm text-neutral-body mb-4">{{ product.description || '' }}</p>
-                <button
-                  type="button"
-                  @click="selectPaidPlan(product.id)"
-                  class="btn-primary w-full"
-                >
-                  Select plan
-                </button>
-              </div>
-
-              <div
-                v-if="premiumComingSoon"
-                class="card p-6 text-left transition-all flex flex-col border-2 border-dashed border-neutral-border w-full sm:w-72"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="font-semibold">{{ premiumComingSoon.display_name }}</h3>
-                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">
+                <div class="flex items-center justify-between">
+                  <p class="font-heading font-bold text-brand-charcoal">{{ premiumComingSoon.display_name }}</p>
+                  <span class="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-primary">
                     Coming soon
                   </span>
                 </div>
-                <p class="text-2xl font-bold text-brand-primary mb-1">${{ getProductPrice(premiumComingSoon) }}<span class="text-sm font-normal text-neutral-body">/month</span></p>
-                <p class="text-sm text-neutral-body mb-4 grow">{{ premiumComingSoon.description || '' }}</p>
+                <p class="text-3xl font-heading font-bold text-brand-primary">
+                  ${{ getProductPrice(premiumComingSoon) }}<span class="text-sm font-normal text-neutral-body">/month</span>
+                </p>
+                <p class="flex-1 text-sm text-neutral-body">{{ premiumComingSoon.description || '' }}</p>
                 <button
                   v-if="waitlistState !== 'done'"
                   type="button"
@@ -667,87 +653,77 @@ const handleProceedToCheckout = async () => {
                   {{ waitlistState === 'loading' ? 'Joining…' : 'Join the waitlist' }}
                 </button>
                 <p v-else class="text-sm font-medium text-brand-primary">
-                  You’re on the waitlist — we’ll email you when Premium launches.
+                  You're on the waitlist — we'll email you when Premium launches.
                 </p>
-                <p v-if="waitlistState === 'error'" class="text-sm text-red-600 mt-2">{{ waitlistError }}</p>
+                <p v-if="waitlistState === 'error'" class="text-sm text-red-600">{{ waitlistError }}</p>
               </div>
             </div>
+          </div>
 
-            <div v-if="!startFreePlan" class="border-t border-neutral-border pt-6">
-              <h3 class="font-semibold text-brand-charcoal mb-2">Optional add-ons</h3>
-              <p class="text-sm text-neutral-body mb-4">Separately priced; add any you'd like.</p>
-              <div class="space-y-3">
-                <label
-                  v-for="product in addonProducts"
-                  :key="product.id"
-                  class="flex items-start"
-                >
-                  <input
-                    :checked="selectedAddonIds.includes(product.id)"
-                    type="checkbox"
-                    class="mr-3 mt-1 w-4 h-4"
-                    @change="(e) => toggleAddon(product.id, (e.target as HTMLInputElement).checked)"
-                  />
-                  <div>
-                    <span class="font-medium text-brand-charcoal">{{ product.display_name }}</span>
-                    <span class="text-sm text-neutral-body block">
-                      {{
-                        product.category === 'one_time_addon' || product.category === 'one_time_item'
-                          ? `$${getProductPrice(product).toFixed(2)} one-time`
-                          : `+$${getProductPrice(product)}/month`
-                      }}
-                      — {{ product.description || '' }}
-                    </span>
-                  </div>
-                </label>
-              </div>
+          <div v-if="!startFreePlan" class="w-full border-t border-neutral-border pt-6">
+            <h3 class="mb-1 font-heading font-semibold text-brand-charcoal">Optional add-ons</h3>
+            <p class="mb-4 text-sm text-neutral-body">Separately priced; add any you'd like.</p>
+            <div class="space-y-3">
+              <label v-for="product in addonProducts" :key="product.id" class="flex items-start gap-3">
+                <input
+                  :checked="selectedAddonIds.includes(product.id)"
+                  type="checkbox"
+                  class="mt-1 h-5 w-5 rounded-md border-neutral-border accent-brand-primary"
+                  @change="(e) => toggleAddon(product.id, (e.target as HTMLInputElement).checked)"
+                />
+                <div>
+                  <span class="font-medium text-brand-charcoal">{{ product.display_name }}</span>
+                  <span class="block text-sm text-neutral-body">
+                    {{
+                      product.category === 'one_time_addon' || product.category === 'one_time_item'
+                        ? `$${getProductPrice(product).toFixed(2)} one-time`
+                        : `+$${getProductPrice(product)}/month`
+                    }}
+                    — {{ product.description || '' }}
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
 
-        <div v-if="error" class="mt-6 p-4 bg-red-50 border border-red-200 rounded-[12px]">
-          <p class="text-red-800 text-sm">{{ error }}</p>
+        <div v-if="error" class="mt-6 rounded-[12px] border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {{ error }}
         </div>
 
-        <div class="mt-8 flex justify-between">
-          <button
-            v-if="currentStep > 1"
-            @click="prevStep"
-            type="button"
-            class="btn-secondary"
-          >
-            Back
-          </button>
+        <div class="mt-8 flex items-center justify-between">
+          <button v-if="currentStep > 1" type="button" class="btn-secondary" @click="prevStep">Back</button>
           <div v-else></div>
 
           <button
             v-if="currentStep < totalSteps"
-            @click="nextStep"
             type="button"
             :disabled="!canProceedCurrentStep"
-            class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="nextStep"
           >
             {{ currentStep === 4 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
+            <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
           </button>
           <button
             v-else-if="startFreePlan"
-            @click="handleContinueForFree"
             type="button"
             :disabled="!canProceedStep5 || isLoading"
-            class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="handleContinueForFree"
           >
-            <span v-if="isLoading">Saving…</span>
-            <span v-else>Continue for free</span>
+            <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+            <span>{{ isLoading ? 'Saving…' : 'Continue for free' }}</span>
           </button>
           <button
             v-else
-            @click="handleProceedToCheckout"
             type="button"
             :disabled="!canProceedStep5 || isLoading"
-            class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="handleProceedToCheckout"
           >
-            <span v-if="isLoading">Redirecting to checkout...</span>
-            <span v-else>Proceed to checkout</span>
+            <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+            <span>{{ isLoading ? 'Redirecting to checkout...' : 'Proceed to checkout' }}</span>
           </button>
         </div>
       </div>

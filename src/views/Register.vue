@@ -5,6 +5,9 @@ import { onClickOutside } from '@vueuse/core'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI, DEFAULT_PHONE_COUNTRY, getPhoneCountryOptions, validatePhoneNumber } from '@/lib/auth'
 import type { CountryCode } from 'libphonenumber-js'
+import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
+import FormField from '@/components/auth/FormField.vue'
+import PasswordField from '@/components/auth/PasswordField.vue'
 
 const router = useRouter()
 
@@ -25,8 +28,6 @@ onClickOutside(phoneCountryDropdownRef, () => {
 })
 const password = ref('')
 const confirmPassword = ref('')
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
 
 const isLoading = ref(false)
 const error = ref('')
@@ -67,7 +68,28 @@ const phoneValidationError = computed(() =>
 const passwordValidationError = computed(() =>
   password.value ? validatePassword(password.value) : null,
 )
+const confirmPasswordError = computed(() =>
+  confirmPassword.value && confirmPassword.value !== password.value ? 'Passwords do not match' : null,
+)
 const passwordsMatch = computed(() => password.value === confirmPassword.value)
+
+// Purely visual strength feedback — does not affect validation/submit gating.
+const passwordStrength = computed(() => {
+  const p = password.value
+  if (!p) return null
+  let s = 0
+  if (p.length >= 8) s++
+  if (/[A-Z]/.test(p)) s++
+  if (/[0-9]/.test(p)) s++
+  if (/[^A-Za-z0-9]/.test(p)) s++
+  const score = s <= 1 ? 1 : s <= 2 ? 2 : 3
+  const meta = [
+    { label: 'Weak', className: 'bg-red-600 text-red-600' },
+    { label: 'Fair', className: 'bg-amber-600 text-amber-600' },
+    { label: 'Strong', className: 'bg-green-600 text-green-600' },
+  ][score - 1]
+  return { score, ...meta }
+})
 
 const canProceedStep1 = computed(() => {
   return (
@@ -219,202 +241,167 @@ const handleCreateAccount = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-2xl mx-auto">
-      <div class="card p-8">
-        <h2 class="text-2xl font-heading font-bold text-brand-charcoal mb-2">
-          Create your Job-Hopper account
-        </h2>
-        <p class="text-neutral-body mb-6">
-          You'll be done in under a minute.
-        </p>
+  <AuthSplitPanel
+    headline="Join the search. Get matched faster."
+    sub="Apply smarter, see real sponsorship data, and track your pipeline."
+    :stats="[
+      { value: 'Mock Interviews', label: 'AI-powered practice, on demand' },
+      { value: 'Skill Gap Finder', label: 'Know exactly what to learn' },
+      { value: 'Hiring Contacts', label: 'Reach recruiters directly' },
+    ]"
+    hide-register-link
+  >
+    <form class="flex flex-col gap-4" novalidate @submit.prevent="handleCreateAccount">
+      <div>
+        <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Create your account</h2>
+        <p class="mt-1 text-sm text-neutral-body">Start finding visa-friendly roles today</p>
+      </div>
 
-        <form novalidate @submit.prevent="handleCreateAccount">
-          <div class="space-y-4">
-            <div>
-              <label for="email" class="block text-sm font-medium text-brand-charcoal mb-2">Email</label>
-              <input
-                id="email"
-                v-model="email"
-                name="email"
-                type="email"
-                autocomplete="email"
-                required
-                class="input"
-                placeholder="your.email@example.com"
-                @input="clearEmailAlreadyUsed"
-              />
-              <div v-if="emailValidationError" class="text-red-600 text-sm mt-1">
-                {{ emailValidationError }}
-              </div>
-            </div>
+      <!-- Contact -->
+      <div class="flex flex-col gap-3">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-neutral-body/70">Contact</p>
 
-            <div>
-              <label for="phone" class="block text-sm font-medium text-brand-charcoal mb-2">Phone number</label>
-              <div class="flex gap-2" ref="phoneCountryDropdownRef">
-                <div class="relative shrink-0">
-                  <button
-                    type="button"
-                    :aria-label="`Country code: ${selectedCountryCodeDisplay}`"
-                    aria-haspopup="listbox"
-                    :aria-expanded="phoneCountryOpen"
-                    aria-controls="phone-country-listbox"
-                    id="phone-country"
-                    class="input flex items-center gap-1 min-w-[4.5rem] pr-8"
-                    @click="phoneCountryOpen = !phoneCountryOpen"
-                  >
-                    <span>{{ selectedCountryCodeDisplay }}</span>
-                    <svg class="absolute right-2.5 h-4 w-4 text-neutral-body pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  <ul
-                    v-show="phoneCountryOpen"
-                    id="phone-country-listbox"
-                    role="listbox"
-                    aria-label="Country"
-                    class="absolute left-0 top-full z-10 mt-1 max-h-60 w-56 overflow-auto rounded-[12px] border border-neutral-border bg-white py-1 shadow-lg"
-                  >
-                    <li
-                      v-for="opt in phoneCountryOptions"
-                      :key="opt.value"
-                      role="option"
-                      :aria-selected="opt.value === phoneCountry"
-                      class="cursor-pointer px-3 py-2 text-sm text-brand-charcoal hover:bg-neutral-100"
-                      :class="{ 'bg-neutral-100': opt.value === phoneCountry }"
-                      @click="phoneCountry = opt.value; phoneCountryOpen = false; clearPhoneAlreadyUsed()"
-                    >
-                      {{ opt.label }}
-                    </li>
-                  </ul>
-                </div>
-                <input
-                  id="phone"
-                  v-model="phone"
-                  name="tel-national"
-                  type="tel"
-                  autocomplete="tel-national"
-                  required
-                  class="input flex-1 min-w-0"
-                  :placeholder="phoneCountry === 'US' ? 'e.g. (555) 123-4567' : 'e.g. 20 7946 0958'"
-                  @input="clearPhoneAlreadyUsed"
+        <FormField
+          id="email"
+          v-model="email"
+          label="Email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="you@company.com"
+          :error="emailValidationError"
+          @update:model-value="clearEmailAlreadyUsed"
+        />
+
+        <div class="flex flex-col gap-1.5">
+          <label for="phone" class="text-[11px] font-bold uppercase tracking-wider text-neutral-body">Phone</label>
+          <div ref="phoneCountryDropdownRef" class="flex gap-2">
+            <div class="relative shrink-0">
+              <button
+                type="button"
+                :aria-label="`Country code: ${selectedCountryCodeDisplay}`"
+                aria-haspopup="listbox"
+                :aria-expanded="phoneCountryOpen"
+                aria-controls="phone-country-listbox"
+                id="phone-country"
+                class="flex h-12 w-20 items-center gap-1 rounded-[12px] border border-neutral-border bg-neutral-bg pl-3 pr-6 text-sm"
+                @click="phoneCountryOpen = !phoneCountryOpen"
+              >
+                <span>{{ selectedCountryCodeDisplay }}</span>
+                <font-awesome-icon
+                  :icon="['fas', 'chevron-down']"
+                  class="pointer-events-none absolute right-2 text-[10px] text-neutral-body"
+                  aria-hidden="true"
                 />
-              </div>
-              <div v-if="phoneValidationError" class="text-red-600 text-sm mt-1">
-                {{ phoneValidationError }}
-              </div>
-            </div>
-
-            <div>
-              <label for="password" class="block text-sm font-medium text-brand-charcoal mb-2">Password</label>
-              <div class="relative">
-                <input
-                  id="password"
-                  v-model="password"
-                  name="new-password"
-                  :type="showPassword ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  required
-                  class="input pr-10"
-                  placeholder="Password (min 8 characters)"
-                />
-                <button
-                  type="button"
-                  @click="showPassword = !showPassword"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
+              </button>
+              <ul
+                v-show="phoneCountryOpen"
+                id="phone-country-listbox"
+                role="listbox"
+                aria-label="Country"
+                class="absolute left-0 top-full z-10 mt-1 max-h-60 w-56 overflow-auto rounded-[12px] border border-neutral-border bg-white py-1 shadow-lg"
+              >
+                <li
+                  v-for="opt in phoneCountryOptions"
+                  :key="opt.value"
+                  role="option"
+                  :aria-selected="opt.value === phoneCountry"
+                  class="cursor-pointer px-3 py-2 text-sm text-brand-charcoal hover:bg-neutral-100"
+                  :class="{ 'bg-neutral-100': opt.value === phoneCountry }"
+                  @click="phoneCountry = opt.value; phoneCountryOpen = false; clearPhoneAlreadyUsed()"
                 >
-                  <svg v-if="showPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                  </svg>
-                  <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                  </svg>
-                </button>
+                  {{ opt.label }}
+                </li>
+              </ul>
+            </div>
+            <input
+              id="phone"
+              v-model="phone"
+              name="tel-national"
+              type="tel"
+              autocomplete="tel-national"
+              required
+              class="h-12 min-w-0 flex-1 rounded-[12px] border border-neutral-border bg-neutral-bg px-4 text-sm outline-none focus:border-brand-primary focus:bg-white focus:ring-4 focus:ring-brand-primary/10"
+              :placeholder="phoneCountry === 'US' ? 'e.g. (555) 123-4567' : 'e.g. 20 7946 0958'"
+              @input="clearPhoneAlreadyUsed"
+            />
+          </div>
+          <p v-if="phoneValidationError" class="text-xs text-red-600">{{ phoneValidationError }}</p>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="flex flex-col gap-3">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-neutral-body/70">Security</p>
+
+        <div>
+          <PasswordField
+            id="password"
+            v-model="password"
+            label="Password"
+            autocomplete="new-password"
+            required
+            placeholder="Min. 8 characters"
+            :error="passwordValidationError"
+          />
+          <div v-if="passwordStrength" class="mt-1.5 flex flex-col gap-1">
+            <div class="flex gap-1">
+              <div v-for="i in 3" :key="i" class="h-1 flex-1 overflow-hidden rounded-full bg-neutral-border">
+                <div
+                  v-if="passwordStrength.score >= i"
+                  class="h-full rounded-full"
+                  :class="passwordStrength.className.split(' ')[0]"
+                />
               </div>
             </div>
-
-            <div>
-              <label for="confirmPassword" class="block text-sm font-medium text-brand-charcoal mb-2">Confirm password</label>
-              <div class="relative">
-                <input
-                  id="confirmPassword"
-                  v-model="confirmPassword"
-                  name="confirm-password"
-                  :type="showConfirmPassword ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  required
-                  class="input pr-10"
-                  placeholder="Confirm password"
-                />
-                <button
-                  type="button"
-                  @click="showConfirmPassword = !showConfirmPassword"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
-                >
-                  <svg v-if="showConfirmPassword" class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                  </svg>
-                  <svg v-else class="h-5 w-5 text-neutral-body" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div v-if="passwordValidationError" class="text-red-600 text-sm">
-              {{ passwordValidationError }}
-            </div>
-            <div v-else-if="password && confirmPassword && password !== confirmPassword" class="text-red-600 text-sm">
-              Passwords do not match
-            </div>
+            <p class="text-[11px] font-semibold" :class="passwordStrength.className.split(' ')[1]">
+              {{ passwordStrength.label }}
+            </p>
           </div>
+        </div>
 
-          <div class="mt-6">
-            <div class="border border-neutral-border rounded-[12px] p-4 bg-white">
-              <label class="flex items-start gap-3 cursor-pointer" for="email-consent">
-                <input
-                  id="email-consent"
-                  v-model="emailConsent"
-                  type="checkbox"
-                  class="mt-1 h-4 w-4 rounded border-neutral-border text-brand-primary focus:ring-brand-primary"
-                />
-                <div>
-                  <p class="text-sm font-medium text-brand-charcoal">
-                    I agree to receive emails from Job-Hopper about my account and services, including product
-                    updates and general marketing emails.
-                  </p>
-                  <p class="mt-1 text-xs text-neutral-body">
-                    You can change your email preferences or unsubscribe at any time from your settings or
-                    from any email we send.
-                  </p>
-                </div>
-              </label>
-            </div>
-          </div>
+        <PasswordField
+          id="confirmPassword"
+          v-model="confirmPassword"
+          label="Confirm password"
+          autocomplete="new-password"
+          required
+          placeholder="Repeat your password"
+          :error="confirmPasswordError"
+        />
+      </div>
 
-          <div v-if="error" class="mt-6 p-4 bg-red-50 border border-red-200 rounded-[12px]">
-            <p class="text-red-800 text-sm">{{ error }}</p>
-          </div>
+      <label class="flex items-start gap-2.5" for="email-consent">
+        <input
+          id="email-consent"
+          v-model="emailConsent"
+          type="checkbox"
+          class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
+        />
+        <span class="text-[13px] leading-snug text-neutral-body">
+          I agree to receive account and marketing emails from Job-Hopper. Unsubscribe anytime.
+        </span>
+      </label>
 
-          <div class="mt-8">
-            <button
-              type="submit"
-              :disabled="!canProceedStep1 || isLoading"
-              class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span v-if="isLoading">Creating account...</span>
-              <span v-else>Continue</span>
-            </button>
-          </div>
-        </form>
+      <div v-if="error" class="rounded-[12px] border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        {{ error }}
+      </div>
 
-        <p class="mt-6 text-center text-sm text-neutral-body">
+      <div class="flex flex-col gap-3">
+        <button
+          type="submit"
+          :disabled="!canProceedStep1 || isLoading"
+          class="btn-primary flex h-12 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+          <span>{{ isLoading ? 'Creating account…' : 'Create account' }}</span>
+          <font-awesome-icon v-if="!isLoading" :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
+        </button>
+        <p class="text-center text-[13px] text-neutral-body">
           Already have an account?
-          <router-link to="/login" class="font-medium text-brand-primary hover:underline">Sign in</router-link>
+          <router-link to="/login" class="font-bold text-brand-primary hover:underline">Sign in</router-link>
         </p>
       </div>
-    </div>
-  </div>
+    </form>
+  </AuthSplitPanel>
 </template>
