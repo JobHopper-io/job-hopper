@@ -92,7 +92,7 @@ const showFallback = computed(
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-12 px-4 sm:px-6 lg:px-8">
+  <div class="min-h-screen bg-[#fff7ed] py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-3xl mx-auto">
       <div class="mb-8">
         <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-3">

@@ -36,6 +36,12 @@ const CHROME_FREE_FOOTER_ROUTES = ['/onboarding']
 const hideNav = computed(() => isLandingPage.value || CHROME_FREE_NAV_ROUTES.includes(route.path))
 const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUTES.includes(route.path))
 
+// These four marketing pages share the warm cream background used on the landing page's
+// "How It Works"/"Pricing" sections and the auth pages - the shared nav needs to pick up the
+// same tint here instead of its default white, or it'd read as a hard-edged bar again.
+const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq']
+const isWarmPage = computed(() => WARM_BG_ROUTES.includes(route.path))
+
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
 const isAdmin = ref(false)
@@ -162,7 +168,11 @@ const handleSignOutAndCloseMenu = async () => {
 <template>
   <div class="flex min-h-screen flex-col bg-neutral-bg">
       <!-- Navigation Header -->
-      <nav v-if="!hideNav" class="bg-white/95 backdrop-blur-md border-b border-neutral-border sticky top-0 z-50">
+      <nav
+        v-if="!hideNav"
+        class="backdrop-blur-md border-b border-neutral-border sticky top-0 z-50"
+        :class="isWarmPage ? 'bg-[#fff7ed]/95' : 'bg-white/95'"
+      >
         <div class="max-w-6xl mx-auto px-5">
           <div class="flex justify-between items-center h-16">
             <!-- Logo -->
