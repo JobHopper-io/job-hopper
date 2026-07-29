@@ -571,38 +571,9 @@ onMounted(() => {
         (not a Free-tier concept - free users can't hold add-ons).
       -->
       <div class="grid-auto-fill mb-8">
-        <!-- Subscription status and tier -->
-        <div v-if="baseTier !== 'free'" class="card p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Subscription</h3>
-          </div>
-          <div v-if="basePlan">
-            <p class="font-heading font-semibold text-brand-charcoal">
-              {{ baseTierLabel }}
-            </p>
-            <p class="text-sm text-neutral-body mt-1">
-              {{ subscriptionStatusLabel }}
-            </p>
-            <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
-              Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
-            </p>
-            <p class="text-sm text-neutral-body mt-1">
-              Next digest: {{ nextDigestLabel }}
-            </p>
-          </div>
-          <div v-else>
-            <p class="text-sm text-neutral-body">No active plan</p>
-          </div>
-          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Manage plan →
-          </router-link>
-        </div>
-
-        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons) -->
-        <div v-if="baseTier !== 'free'" class="card p-5">
+        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons; the plan
+             summary itself now lives in the side rail's Plan tile, all tiers). -->
+        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
@@ -621,7 +592,7 @@ onMounted(() => {
         </div>
 
         <!-- Matching statistics (Core/Premium only - folded into the Free-tier rail tile instead) -->
-        <div v-if="baseTier !== 'free'" class="card p-5">
+        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
@@ -644,7 +615,7 @@ onMounted(() => {
         </div>
 
         <!-- Profile strength (hidden when 100% or dismissed) -->
-        <div v-if="showProfileCompletionCard" class="card p-5">
+        <div v-if="showProfileCompletionCard" class="rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
@@ -765,7 +736,7 @@ onMounted(() => {
         </div>
 
         <!-- Application Tracker moved to its own page - link out instead of the full card. -->
-        <div class="mb-8 card p-5">
+        <div class="mb-8 rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex items-center gap-2.5">
               <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
@@ -789,7 +760,7 @@ onMounted(() => {
         </div>
 
         <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
-        <div v-if="baseTier === 'premium'" class="mb-8 card p-5">
+        <div v-if="baseTier === 'premium'" class="mb-8 rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex items-center gap-2.5">
               <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
@@ -810,13 +781,10 @@ onMounted(() => {
       </template>
 
       <!--
-        Free tier: job feed + side rail (Run job search, Plan). Stacks to one column
-        below ~1150px instead of squeezing the rail at laptop widths. Core/Premium keep
-        the existing full-width feed (no rail, no grid wrapper needed).
+        Job feed + side rail (Run job search on Free, Plan on every tier). Stacks to one
+        column below ~1150px instead of squeezing the rail at laptop widths.
       -->
-      <div
-        :class="baseTier === 'free' ? 'grid grid-cols-1 gap-6 min-[1150px]:grid-cols-[minmax(0,1fr)_320px] min-[1150px]:items-start' : ''"
-      >
+      <div class="grid grid-cols-1 gap-6 min-[1150px]:grid-cols-[minmax(0,1fr)_320px] min-[1150px]:items-start">
       <div class="min-w-0">
       <!-- Recent job matches -->
       <div
@@ -1145,10 +1113,10 @@ onMounted(() => {
       </template>
       </div>
 
-      <!-- Side rail: Run job search (pale-blue), Plan (pale-amber, the only shadow-lifted tile) -->
-      <aside v-if="baseTier === 'free'" class="flex flex-col gap-5">
+      <!-- Side rail: Run job search on Free (pale-blue), Plan on every tier (pale-amber, the only shadow-lifted tile) -->
+      <aside class="flex flex-col gap-5">
         <FreemiumManualJobSearchPanel
-          v-if="showFreemiumJobSearchCta"
+          v-if="baseTier === 'free' && showFreemiumJobSearchCta"
           :can-run="freemiumCanRunManualJobSearch"
           :used-searches="freemiumJobSearchesUsed"
           :max-searches="freemiumMaxJobSearches"
@@ -1166,6 +1134,7 @@ onMounted(() => {
             </span>
             <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Plan</h3>
           </div>
+          <template v-if="baseTier === 'free'">
           <p class="font-heading font-semibold text-brand-charcoal">Free</p>
           <p class="text-sm text-neutral-body mt-1">No card on file</p>
           <router-link
@@ -1174,6 +1143,29 @@ onMounted(() => {
           >
             Upgrade
           </router-link>
+          </template>
+          <template v-else>
+            <div v-if="basePlan">
+              <p class="font-heading font-semibold text-brand-charcoal">
+                {{ baseTierLabel }}
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                {{ subscriptionStatusLabel }}
+              </p>
+              <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
+                Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Next digest: {{ nextDigestLabel }}
+              </p>
+            </div>
+            <div v-else>
+              <p class="text-sm text-neutral-body">No active plan</p>
+            </div>
+            <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+              Manage plan →
+            </router-link>
+          </template>
         </div>
       </aside>
       </div>
