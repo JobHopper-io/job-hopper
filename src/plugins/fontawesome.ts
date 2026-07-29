@@ -43,6 +43,10 @@ import {
   faGraduationCap,
   faFileLines,
   faLightbulb,
+  faEye,
+  faEyeSlash,
+  faUser,
+  faBriefcase,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram, faYoutube, faLinkedin, faFreeCodeCamp } from '@fortawesome/free-brands-svg-icons'
 
@@ -88,6 +92,10 @@ library.add(
   faGraduationCap,
   faFileLines,
   faLightbulb,
+  faEye,
+  faEyeSlash,
+  faUser,
+  faBriefcase,
   faTiktok,
   faInstagram,
   faYoutube,
