@@ -136,7 +136,7 @@ const faqs = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-white py-20 px-4 sm:px-6 lg:px-8">
+  <div class="min-h-screen bg-[#fff7ed] py-20 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
       <h1 class="text-brand-charcoal mb-12 text-center">
         Frequently Asked Questions

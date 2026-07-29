@@ -84,6 +84,10 @@
     @apply bg-white/80 backdrop-blur-md border border-white/20;
   }
 
+  .auth-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/80 rounded-[20px] shadow-[0_24px_60px_rgba(120,90,40,0.14)];
+  }
+
   .gradient-mesh {
     background: linear-gradient(135deg, rgba(47, 110, 204, 0.1) 0%, rgba(255, 215, 90, 0.1) 50%, rgba(255, 138, 52, 0.1) 100%);
     background-size: 200% 200%;

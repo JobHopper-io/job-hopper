@@ -191,7 +191,7 @@ const footerColumns = [
 
     <main>
       <!-- ── Hero ──────────────────────────────────────────────────────────── -->
-      <section class="min-h-screen flex items-center pt-24 pb-16 px-5 bg-neutral-bg">
+      <section class="min-h-screen flex items-center pt-24 pb-16 px-5 cta-light">
         <div class="max-w-6xl mx-auto w-full grid md:grid-cols-2 gap-12 items-center">
           <div>
             <div v-reveal class="w-10 h-1 rounded-full mb-5 amber-grad" />
@@ -321,7 +321,7 @@ const footerColumns = [
       </section>
 
       <!-- ── How It Works ──────────────────────────────────────────────────── -->
-      <section class="py-20 px-5 bg-neutral-bg">
+      <section class="py-20 px-5 section-warm">
         <div class="max-w-5xl mx-auto">
           <div v-reveal class="mb-12 text-center">
             <h2 class="font-heading font-semibold text-brand-charcoal section-title">How Job-Hopper works for you.</h2>
@@ -367,7 +367,7 @@ const footerColumns = [
       </section>
 
       <!-- ── Pricing ───────────────────────────────────────────────────────── -->
-      <section class="py-20 px-5 bg-neutral-bg">
+      <section class="py-20 px-5 section-warm">
         <div class="max-w-4xl mx-auto">
           <div v-reveal class="mb-12 text-center">
             <h2 class="font-heading font-semibold text-brand-charcoal section-title">Simple plans, real support.</h2>
@@ -553,8 +553,10 @@ const footerColumns = [
   transition: background 0.25s, border-color 0.25s;
   border-bottom: 1px solid transparent;
 }
+/* Matches the hero's .cta-light gradient (warm cream) rather than the old flat neutral-bg
+   tint, so the nav blends into the hero instead of showing a seam. */
 .nav-top {
-  background: rgba(249, 250, 251, 0.85);
+  background: rgba(255, 247, 237, 0.85);
 }
 .nav-scrolled {
   background: rgba(255, 255, 255, 0.96);
@@ -689,6 +691,12 @@ const footerColumns = [
    and copy stay clearly legible. */
 .cta-light {
   background: linear-gradient(135deg, #fff7ed 0%, #ffe9c7 100%);
+}
+/* Same warm cream as .cta-light's lighter stop, used flat (not gradient) for the
+   "off-white" alternating sections (How It Works, Pricing) so the whole page carries the
+   hero/CTA's warm tone instead of just bookending it with cool gray in between. */
+.section-warm {
+  background: #fff7ed;
 }
 .cta-noise {
   opacity: 0.04;

@@ -148,13 +148,14 @@ const scrolled = computed(() => scrollY.value > 8)
 </template>
 
 <style scoped>
-/* Warm glow anchored at the bottom-right corner, fading out slowly as it spreads toward the
-   rest of the page - by the top (where the nav/logo sits) its contribution is ~0, so that
-   area is pure #f9fafb, exactly Home.vue's hero color, not a tinted variant of it. */
+/* Base is Home.vue's .section-warm color (same #fff7ed used on its "How It Works"/"Pricing"
+   sections), with the same bottom-right glow anchored on top for a bit of depth - so the
+   whole page family (landing sections + these auth pages) now shares one warm base instead
+   of alternating between cool gray and warm cream. */
 .auth-hero {
   background:
     radial-gradient(140% 110% at 100% 100%, #fdf0dc 0%, rgba(253, 240, 220, 0.4) 35%, rgba(253, 240, 220, 0) 75%),
-    #f9fafb;
+    #fff7ed;
 }
 
 /* Home.vue's signature small accent motif (`.amber-grad`, used as an underline bar before
@@ -163,15 +164,15 @@ const scrolled = computed(() => scrollY.value > 8)
   background: linear-gradient(135deg, #ffd75a 0%, #ff8a34 100%);
 }
 
-/* Same values as Home.vue's .nav-shell/.nav-top/.nav-scrolled - identical hero color on both
-   pages now, so the same tint blends correctly on both without needing a warm variant. */
+/* Same values as Home.vue's .nav-shell/.nav-top/.nav-scrolled, with nav-top's tint matched
+   to the warm base above (same fix as Home.vue's own nav-top). */
 .auth-nav {
   backdrop-filter: blur(12px);
   transition: background 0.25s, border-color 0.25s;
   border-bottom: 1px solid transparent;
 }
 .auth-nav-top {
-  background: rgba(249, 250, 251, 0.85);
+  background: rgba(255, 247, 237, 0.85);
 }
 .auth-nav-scrolled {
   background: rgba(255, 255, 255, 0.96);
