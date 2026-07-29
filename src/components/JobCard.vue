@@ -502,7 +502,7 @@ async function runAdviceCheckout() {
       <!-- Title + save -->
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div class="min-w-0 flex-1 pr-11 sm:pr-0">
-          <h3 class="text-lg font-heading font-semibold leading-tight text-brand-charcoal sm:text-xl">
+          <h3 class="break-words text-lg font-heading font-semibold leading-tight text-brand-charcoal sm:text-xl">
             {{ job.title ?? 'Untitled role' }}
           </h3>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-body">
@@ -624,11 +624,21 @@ async function runAdviceCheckout() {
         </button>
         <!-- Free tier: locked upgrade teasers instead of the functional flows. -->
         <template v-if="isFree">
-          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+          <button
+            type="button"
+            :class="actionBtnLocked"
+            title="Get tailored feedback on how well your resume matches this role. Upgrade to unlock."
+            @click="goUpgrade"
+          >
             <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
             Get resume advice
           </button>
-          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+          <button
+            type="button"
+            :class="actionBtnLocked"
+            title="See hiring activity, sponsorship likelihood, and hiring-manager contacts for this role. Upgrade to unlock."
+            @click="goUpgrade"
+          >
             <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
             Premium Insights
           </button>

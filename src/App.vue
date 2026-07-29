@@ -36,11 +36,25 @@ const CHROME_FREE_FOOTER_ROUTES = ['/onboarding']
 const hideNav = computed(() => isLandingPage.value || CHROME_FREE_NAV_ROUTES.includes(route.path))
 const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUTES.includes(route.path))
 
-// These four marketing pages share the warm cream background used on the landing page's
-// "How It Works"/"Pricing" sections and the auth pages - the shared nav needs to pick up the
-// same tint here instead of its default white, or it'd read as a hard-edged bar again.
-const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq']
-const isWarmPage = computed(() => WARM_BG_ROUTES.includes(route.path))
+// These marketing pages (plus Dashboard, Profile, Billing, the job detail page, and
+// interview practice, which now share the same warm cream background as Login/Register)
+// share the warm cream background used on the landing page's "How It Works"/"Pricing"
+// sections and the auth pages - the shared nav needs to pick up the same tint here
+// instead of its default white, or it'd read as a hard-edged bar again. Job detail /
+// interview practice are matched by prefix since their routes carry a param
+// (/job/:id, /interview-practice/:id).
+const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/dashboard', '/profile', '/billing', '/billing/manage']
+const WARM_BG_PREFIXES = ['/job/', '/interview-practice/']
+const isWarmPage = computed(
+  () => WARM_BG_ROUTES.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
+)
+// Same "no seam" treatment as the auth routes below: the page's own background already
+// fades to the same cream tone the footer sits on, so the usual mt-16 gap would just
+// expose the app shell's gray bg-neutral-bg between the two.
+const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage']
+const noFooterGap = computed(
+  () => noFooterGapRoutes.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
+)
 
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
@@ -416,9 +430,10 @@ const handleSignOutAndCloseMenu = async () => {
       </main>
 
       <!-- Footer -->
-      <!-- No top margin on the auth routes: their hero already fades to white and must butt
-           straight into the footer with no visible seam. -->
-      <footer v-if="!hideFooter" class="bg-white border-t border-neutral-border" :class="hideNav ? '' : 'mt-16'">
+      <!-- No top margin on the auth routes (and Dashboard): their background already fades
+           to the same cream tone the footer sits on and must butt straight into it with no
+           visible seam. -->
+      <footer v-if="!hideFooter" class="bg-white border-t border-neutral-border" :class="noFooterGap ? '' : 'mt-16'">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">

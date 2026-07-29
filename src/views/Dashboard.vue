@@ -362,7 +362,7 @@ const filteredMatches = computed(() => {
 // --- Pagination for the job feed -------------------------------------------
 // Keeps the "Recent job matches" list a fixed height instead of growing the page
 // as more matches accumulate. Numbered pages below the grid.
-const PAGE_SIZE = 9
+const PAGE_SIZE = 5
 const currentPage = ref(1)
 
 const totalPages = computed(() =>
@@ -530,7 +530,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto">
       <div
         v-if="showDashboardBanner && dashboardBanner"
@@ -564,53 +564,45 @@ onMounted(() => {
 
       <PostCheckoutConfirmation />
 
-      <!-- Summary cards: Subscription, Add-ons, Matching stats, Profile strength -->
+      <!--
+        Summary cards: Subscription, Add-ons, Matching stats, Profile strength.
+        Free tier moves Subscription (-> Plan tile) and Matching stats (folded into the
+        Run-job-search tile) into the side rail instead, and drops Active add-ons entirely
+        (not a Free-tier concept - free users can't hold add-ons).
+      -->
       <div class="grid-auto-fill mb-8">
         <!-- Subscription status and tier -->
-        <div class="card p-5">
+        <div v-if="baseTier !== 'free'" class="card p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
             </span>
             <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Subscription</h3>
           </div>
-          <!-- Free tier: plain, low-pressure upgrade prompt (no urgency styling). -->
-          <template v-if="baseTier === 'free'">
-            <p class="font-heading font-semibold text-brand-charcoal">Free</p>
-            <p class="text-sm text-neutral-body mt-1">No card on file</p>
-            <router-link
-              :to="{ name: 'billing-purchase' }"
-              class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline"
-            >
-              Upgrade
-            </router-link>
-          </template>
-          <template v-else>
-            <div v-if="basePlan">
-              <p class="font-heading font-semibold text-brand-charcoal">
-                {{ baseTierLabel }}
-              </p>
-              <p class="text-sm text-neutral-body mt-1">
-                {{ subscriptionStatusLabel }}
-              </p>
-              <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
-                Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
-              </p>
-              <p class="text-sm text-neutral-body mt-1">
-                Next digest: {{ nextDigestLabel }}
-              </p>
-            </div>
-            <div v-else>
-              <p class="text-sm text-neutral-body">No active plan</p>
-            </div>
-            <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-              Manage plan →
-            </router-link>
-          </template>
+          <div v-if="basePlan">
+            <p class="font-heading font-semibold text-brand-charcoal">
+              {{ baseTierLabel }}
+            </p>
+            <p class="text-sm text-neutral-body mt-1">
+              {{ subscriptionStatusLabel }}
+            </p>
+            <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
+              Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+            </p>
+            <p class="text-sm text-neutral-body mt-1">
+              Next digest: {{ nextDigestLabel }}
+            </p>
+          </div>
+          <div v-else>
+            <p class="text-sm text-neutral-body">No active plan</p>
+          </div>
+          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Manage plan →
+          </router-link>
         </div>
 
-        <!-- Active add-ons -->
-        <div class="card p-5">
+        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons) -->
+        <div v-if="baseTier !== 'free'" class="card p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
@@ -628,8 +620,8 @@ onMounted(() => {
           </router-link>
         </div>
 
-        <!-- Matching statistics -->
-        <div class="card p-5">
+        <!-- Matching statistics (Core/Premium only - folded into the Free-tier rail tile instead) -->
+        <div v-if="baseTier !== 'free'" class="card p-5">
           <div class="mb-3 flex items-center gap-2.5">
             <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
               <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
@@ -709,17 +701,7 @@ onMounted(() => {
         Only the Free branch is built in this task.
       -->
       <template v-if="baseTier === 'free'">
-        <!-- Manual job search (freemium): below status cards, above Recent matches -->
-        <div v-if="showFreemiumJobSearchCta" class="mb-8">
-          <FreemiumManualJobSearchPanel
-            :can-run="freemiumCanRunManualJobSearch"
-            :used-searches="freemiumJobSearchesUsed"
-            :max-searches="freemiumMaxJobSearches"
-            :message="freemiumSearchMessage"
-            :loading="freemiumSearchLoading"
-            @run="runFreemiumJobSearch"
-          />
-        </div>
+        <!-- Manual job search + Plan tile now live in the side rail next to the job feed. -->
 
         <!-- Locked upgrade teasers for the paid-only feature depth. -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
@@ -827,6 +809,15 @@ onMounted(() => {
         </div>
       </template>
 
+      <!--
+        Free tier: job feed + side rail (Run job search, Plan). Stacks to one column
+        below ~1150px instead of squeezing the rail at laptop widths. Core/Premium keep
+        the existing full-width feed (no rail, no grid wrapper needed).
+      -->
+      <div
+        :class="baseTier === 'free' ? 'grid grid-cols-1 gap-6 min-[1150px]:grid-cols-[minmax(0,1fr)_320px] min-[1150px]:items-start' : ''"
+      >
+      <div class="min-w-0">
       <!-- Recent job matches -->
       <div
         v-if="matchesError"
@@ -841,7 +832,7 @@ onMounted(() => {
         </h2>
       </div>
 
-      <!-- Filter bar -->
+      <!-- Filter/sort row -->
       <div class="mb-4 flex flex-wrap items-center gap-2">
         <FilterDropdown :label="roleTypeLabel" :active="selectedRoleTypes.length > 0">
           <template #default="{ close }">
@@ -959,10 +950,10 @@ onMounted(() => {
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+          class="inline-flex items-center gap-2 rounded-[12px] border px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
           :class="showSavedOnly
-            ? 'bg-brand-primary text-white shadow-sm hover:opacity-90'
-            : 'border border-neutral-border bg-neutral-bg text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30'"
+            ? 'border-brand-primary bg-brand-primary text-white shadow-sm hover:opacity-90'
+            : 'border-neutral-border bg-white text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-bg'"
           :aria-pressed="showSavedOnly"
           @click="showSavedOnly = !showSavedOnly"
         >
@@ -973,7 +964,7 @@ onMounted(() => {
         <button
           v-if="hasActiveFilters"
           type="button"
-          class="text-sm font-medium text-neutral-body hover:text-brand-charcoal hover:underline"
+          class="text-xs font-medium text-neutral-body hover:text-brand-charcoal hover:underline"
           @click="clearAllFilters"
         >
           Clear filters
@@ -1152,6 +1143,40 @@ onMounted(() => {
           </button>
         </nav>
       </template>
+      </div>
+
+      <!-- Side rail: Run job search (pale-blue), Plan (pale-amber, the only shadow-lifted tile) -->
+      <aside v-if="baseTier === 'free'" class="flex flex-col gap-5">
+        <FreemiumManualJobSearchPanel
+          v-if="showFreemiumJobSearchCta"
+          :can-run="freemiumCanRunManualJobSearch"
+          :used-searches="freemiumJobSearchesUsed"
+          :max-searches="freemiumMaxJobSearches"
+          :message="freemiumSearchMessage"
+          :loading="freemiumSearchLoading"
+          :matches-this-week="matchingStats.thisWeek ?? 0"
+          :avg-match-score="matchingStats.avgMatchScore"
+          @run="runFreemiumJobSearch"
+        />
+
+        <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-5 shadow-md">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Plan</h3>
+          </div>
+          <p class="font-heading font-semibold text-brand-charcoal">Free</p>
+          <p class="text-sm text-neutral-body mt-1">No card on file</p>
+          <router-link
+            :to="{ name: 'billing-purchase' }"
+            class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline"
+          >
+            Upgrade
+          </router-link>
+        </div>
+      </aside>
+      </div>
     </div>
   </div>
 </template>

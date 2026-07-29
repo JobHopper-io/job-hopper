@@ -329,15 +329,16 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <PostCheckoutConfirmation />
     <div class="max-w-4xl mx-auto">
       <div class="mb-6">
         <router-link
           to="/billing"
-          class="text-sm text-brand-primary font-medium hover:underline"
+          class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:underline"
         >
-          ← Back to billing
+          <font-awesome-icon :icon="['fas', 'chevron-left']" class="text-xs" aria-hidden="true" />
+          Back to billing
         </router-link>
       </div>
       <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-2">
@@ -371,10 +372,13 @@ onMounted(async () => {
       </div>
 
       <div v-else class="space-y-6">
-        <div class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            Base plan
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Base plan</h2>
+          </div>
           <div class="space-y-2 mb-4">
             <p
               v-if="basePlan"
@@ -407,10 +411,10 @@ onMounted(async () => {
                 v-for="product in basePlanProducts"
                 :key="product.id"
                 :class="[
-                  'flex items-start cursor-pointer rounded-[12px] border-2 p-3 transition-colors',
+                  'flex items-start cursor-pointer rounded-[12px] border p-3 transition-colors',
                   selectedBasePlanId === product.id
-                    ? 'border-brand-primary bg-brand-primary/5'
-                    : 'border-transparent hover:border-neutral-border',
+                    ? 'border-brand-primary bg-[#EAF1FC]'
+                    : 'border-neutral-border hover:border-brand-primary/40 hover:bg-neutral-bg',
                 ]"
               >
                 <input
@@ -485,10 +489,13 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="card p-6" v-if="subscriptionAddonProducts.length || oneTimeAddonProducts.length">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            Current add-ons
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6" v-if="subscriptionAddonProducts.length || oneTimeAddonProducts.length">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'sliders']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Current add-ons</h2>
+          </div>
           <div class="space-y-4">
             <div v-if="subscriptionAddonProducts.length" class="space-y-3">
               <h3 class="text-sm font-semibold text-brand-charcoal">
@@ -497,7 +504,7 @@ onMounted(async () => {
               <div
                 v-for="product in subscriptionAddonProducts"
                 :key="product.id"
-                class="flex items-center justify-between"
+                class="flex items-center justify-between rounded-[12px] border border-neutral-border p-3"
               >
                 <div>
                   <span class="font-medium text-brand-charcoal">{{
@@ -540,7 +547,7 @@ onMounted(async () => {
               <div
                 v-for="product in oneTimeAddonProducts"
                 :key="product.id"
-                class="flex items-center justify-between"
+                class="flex items-center justify-between rounded-[12px] border border-neutral-border p-3"
               >
                 <div>
                   <span class="font-medium text-brand-charcoal">{{
@@ -562,18 +569,26 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="availableSubscriptionAddons.length" class="card p-6">
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            Available add-ons
-          </h2>
-          <p class="text-sm text-neutral-body mb-6">
+        <div v-if="availableSubscriptionAddons.length" class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-1 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Available add-ons</h2>
+          </div>
+          <p class="text-sm text-neutral-body mb-6 pl-[42px]">
             Select the add-ons you want to add to your subscription.
           </p>
           <div class="space-y-3 mb-8">
             <label
               v-for="product in availableSubscriptionAddons"
               :key="product.id"
-              class="flex items-start cursor-pointer"
+              :class="[
+                'flex items-start cursor-pointer rounded-[12px] border p-3 transition-colors',
+                selectedAddonIds.includes(product.id)
+                  ? 'border-brand-primary bg-[#EAF1FC]'
+                  : 'border-neutral-border hover:border-brand-primary/40 hover:bg-neutral-bg',
+              ]"
             >
               <input
                 :checked="selectedAddonIds.includes(product.id)"
@@ -630,12 +645,15 @@ onMounted(async () => {
 
         <div
           v-if="availableOneTimeAddons.length"
-          class="card p-6"
+          class="rounded-[16px] border border-neutral-border bg-white p-6"
         >
-          <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            One-time upgrades
-          </h2>
-          <p class="text-sm text-neutral-body mb-6">
+          <div class="mb-1 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'star']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">One-time upgrades</h2>
+          </div>
+          <p class="text-sm text-neutral-body mb-6 pl-[42px]">
             These upgrades are single-purchase items and do not change your monthly
             subscription price.
           </p>
@@ -644,7 +662,12 @@ onMounted(async () => {
             <label
               v-for="product in availableOneTimeAddons"
               :key="product.id"
-              class="flex items-start cursor-pointer"
+              :class="[
+                'flex items-start cursor-pointer rounded-[12px] border p-3 transition-colors',
+                selectedOneTimeIds.includes(product.id)
+                  ? 'border-brand-primary bg-[#EAF1FC]'
+                  : 'border-neutral-border hover:border-brand-primary/40 hover:bg-neutral-bg',
+              ]"
             >
               <input
                 :checked="selectedOneTimeIds.includes(product.id)"
@@ -717,7 +740,7 @@ onMounted(async () => {
         @click.self="closeRemoveConfirm"
       >
         <div
-          class="card p-6 max-w-md w-full shadow-xl"
+          class="rounded-[16px] border border-neutral-border bg-white p-6 max-w-md w-full shadow-xl"
           @click.stop
         >
           <h2

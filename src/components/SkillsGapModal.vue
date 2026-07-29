@@ -137,7 +137,7 @@ onUnmounted(() => {
                 <div
                   v-for="topic in result.learningTopics"
                   :key="topic"
-                  class="rounded-[12px] border border-neutral-border p-3"
+                  class="rounded-[12px] border border-[#D3E3F9] bg-[#EAF1FC] p-3"
                 >
                   <p class="mb-2 text-sm font-medium text-brand-charcoal">{{ topic }}</p>
                   <div class="flex flex-wrap gap-2">
