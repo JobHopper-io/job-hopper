@@ -565,55 +565,11 @@ onMounted(() => {
       <PostCheckoutConfirmation />
 
       <!--
-        Summary cards: Subscription, Add-ons, Matching stats, Profile strength.
-        Free tier moves Subscription (-> Plan tile) and Matching stats (folded into the
-        Run-job-search tile) into the side rail instead, and drops Active add-ons entirely
-        (not a Free-tier concept - free users can't hold add-ons).
+        Summary cards: only Profile strength lives up here now. Subscription (-> Plan
+        tile), Active add-ons, and Matching stats all moved into the side rail so the
+        top of the page isn't a mix of a 2-card grid next to full-width banners.
       -->
       <div class="grid-auto-fill mb-8">
-        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons; the plan
-             summary itself now lives in the side rail's Plan tile, all tiers). -->
-        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Active add-ons</h3>
-          </div>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ activeAddonsForDisplay.length }} active
-          </p>
-          <p class="text-sm text-neutral-body mt-1">
-            {{ activeAddonsForDisplay.length ? activeAddonsForDisplay.join(' + ') : 'No add-ons yet' }}
-          </p>
-          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Add-ons →
-          </router-link>
-        </div>
-
-        <!-- Matching statistics (Core/Premium only - folded into the Free-tier rail tile instead) -->
-        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Matching statistics</h3>
-          </div>
-          <template v-if="hasMatchingActivity">
-            <p class="font-heading font-semibold text-brand-charcoal">
-              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
-            </p>
-            <p class="text-sm text-neutral-body mt-1">This week</p>
-            <p class="text-xs text-neutral-body mt-2">
-              Total delivered: {{ matchingStats.totalDelivered }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
-            </p>
-          </template>
-          <template v-else>
-            <p class="font-heading font-semibold text-brand-charcoal">No matches yet</p>
-            <p class="text-sm text-neutral-body mt-1">Run a search below to get started</p>
-          </template>
-        </div>
-
         <!-- Profile strength (hidden when 100% or dismissed) -->
         <div v-if="showProfileCompletionCard" class="rounded-[16px] border border-neutral-border bg-white p-5">
           <div class="mb-3 flex items-center gap-2.5">
@@ -1165,6 +1121,48 @@ onMounted(() => {
             <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
               Manage plan →
             </router-link>
+          </template>
+        </div>
+
+        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons) -->
+        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Active add-ons</h3>
+          </div>
+          <p class="font-heading font-semibold text-brand-charcoal">
+            {{ activeAddonsForDisplay.length }} active
+          </p>
+          <p class="text-sm text-neutral-body mt-1">
+            {{ activeAddonsForDisplay.length ? activeAddonsForDisplay.join(' + ') : 'No add-ons yet' }}
+          </p>
+          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+            Add-ons →
+          </router-link>
+        </div>
+
+        <!-- Matching statistics (Core/Premium only) -->
+        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Matching statistics</h3>
+          </div>
+          <template v-if="hasMatchingActivity">
+            <p class="font-heading font-semibold text-brand-charcoal">
+              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
+            </p>
+            <p class="text-sm text-neutral-body mt-1">This week</p>
+            <p class="text-xs text-neutral-body mt-2">
+              Total delivered: {{ matchingStats.totalDelivered }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
+            </p>
+          </template>
+          <template v-else>
+            <p class="font-heading font-semibold text-brand-charcoal">No matches yet</p>
+            <p class="text-sm text-neutral-body mt-1">Run a search below to get started</p>
           </template>
         </div>
       </aside>
