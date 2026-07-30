@@ -7,10 +7,12 @@ import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPa
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import FilterDropdown from '@/components/FilterDropdown.vue'
+import WelcomeWalkthrough from '@/components/onboarding/WelcomeWalkthrough.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { applicationsAPI, type TrackedApplicationRow, type JobSnapshot } from '@/lib/applications'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { profileAPI } from '@/lib/profile'
 import { freemiumAPI } from '@/lib/freemium'
 import { getProductPrice } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -255,36 +257,28 @@ async function handleUpdateApplicationStatus(
   await loadApplications()
 }
 
-// Profile completion: key fields that improve matching, itemized so the card can point at
-// exactly what's missing instead of just a percentage.
+// Profile completion: only fields that directly affect match quality (target job title, role
+// categories, resume) - name/current title/salary are nice-to-have, not worth nagging about.
 interface ProfileCompletionItem {
   label: string
   done: boolean
 }
 
-const profileCompletionItems = computed<ProfileCompletionItem[]>(() => {
+const essentialProfileItems = computed<ProfileCompletionItem[]>(() => {
   const p = profile.value
   return [
-    { label: 'Add your name', done: !!p?.first_name?.trim() && !!p?.last_name?.trim() },
-    { label: 'Add your current job title', done: !!p?.current_job_title?.trim() },
     { label: 'Add your target job title', done: !!p?.target_job_title?.trim() },
     { label: 'Select target role categories', done: (p?.target_role_categories?.length ?? 0) > 0 },
-    {
-      label: 'Add salary expectations or preferred locations',
-      done: p?.desired_salary_min != null || p?.desired_salary_max != null || (p?.preferred_locations?.length ?? 0) > 0,
-    },
     { label: 'Upload your resume', done: !!p?.resume_bucket_key },
   ]
 })
 
-const profileCompletion = computed(() => {
-  const items = profileCompletionItems.value
-  const filled = items.filter((i) => i.done).length
-  return { filled, total: items.length, percent: items.length ? Math.round((filled / items.length) * 100) : 0 }
-})
+const missingEssentialProfileItems = computed(() =>
+  essentialProfileItems.value.filter((item) => !item.done),
+)
 
-const showProfileCompletionCard = computed(
-  () => profileCompletion.value.percent < 100 && !profileCompletionDismissed.value
+const showProfileCompletionNotice = computed(
+  () => missingEssentialProfileItems.value.length > 0 && !profileCompletionDismissed.value
 )
 
 const matchingStats = ref<MatchingStats>({
@@ -300,6 +294,26 @@ const matchesThisWeekLabel = computed(() => {
 })
 
 const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
+
+// Post-signup feature-tour modal, shown once after the mandatory profile/plan wizard
+// (onboarding_completed) is done. Gated on overallLoading rather than checked inline in
+// onMounted, since profile/baseTier only settle after the store's async refresh resolves.
+const showWalkthrough = ref(false)
+watch(
+  overallLoading,
+  (loading) => {
+    if (loading) return
+    if (profile.value?.onboarding_completed && profile.value?.has_seen_walkthrough === false) {
+      showWalkthrough.value = true
+    }
+  },
+  { immediate: true },
+)
+
+async function closeWalkthrough() {
+  showWalkthrough.value = false
+  await profileAPI.markWalkthroughSeen()
+}
 
 const savedCount = computed(() => matches.value.filter((m) => m.isSaved).length)
 
@@ -521,6 +535,12 @@ onMounted(() => {
 </script>
 
 <template>
+  <WelcomeWalkthrough
+    v-if="showWalkthrough"
+    :tier="baseTier"
+    @complete="closeWalkthrough"
+    @skip="closeWalkthrough"
+  />
   <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto">
       <div
@@ -560,59 +580,45 @@ onMounted(() => {
         tile), Active add-ons, and Matching stats all moved into the side rail so the
         top of the page isn't a mix of a 2-card grid next to full-width banners.
       -->
-      <div class="grid-auto-fill mb-8">
-        <!-- Profile strength (hidden when 100% or dismissed) -->
-        <div v-if="showProfileCompletionCard" class="rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Profile strength</h3>
-          </div>
-          <div class="mb-3">
-            <div class="mb-1 flex items-center justify-between text-xs text-neutral-body">
-              <span>{{ profileCompletion.filled }} of {{ profileCompletion.total }} complete</span>
-              <span class="font-semibold text-brand-charcoal">{{ profileCompletion.percent }}%</span>
+      <!-- Missing-essentials notice: compact, out of the main layout flow, only for fields
+      that actually affect match quality (not a full profile-completion checklist). -->
+      <Teleport to="body">
+        <div
+          v-if="showProfileCompletionNotice"
+          class="fixed bottom-6 right-6 z-40 w-full max-w-xs rounded-[16px] border border-neutral-border bg-white p-4 shadow-lg"
+          role="status"
+        >
+          <div class="mb-2 flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                <font-awesome-icon :icon="['fas', 'circle-info']" class="text-xs" aria-hidden="true" />
+              </span>
+              <h3 class="text-sm font-semibold text-brand-charcoal">Finish your profile</h3>
             </div>
-            <div class="h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg">
-              <div
-                class="h-full rounded-full bg-brand-primary transition-all"
-                :style="{ width: `${profileCompletion.percent}%` }"
-              />
-            </div>
-          </div>
-          <ul class="mb-3 space-y-1.5">
-            <li
-              v-for="item in profileCompletionItems"
-              :key="item.label"
-              class="flex items-center gap-2 text-sm"
-              :class="item.done ? 'text-neutral-body line-through decoration-neutral-border' : 'text-brand-charcoal'"
+            <button
+              type="button"
+              class="shrink-0 text-neutral-body hover:text-brand-charcoal focus:outline-none"
+              aria-label="Dismiss this notice"
+              @click="dismissProfileCompletion"
             >
-              <font-awesome-icon
-                v-if="item.done"
-                :icon="['fas', 'circle-check']"
-                class="shrink-0 text-green-600"
-                aria-hidden="true"
-              />
-              <span v-else class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-neutral-border" aria-hidden="true" />
+              <font-awesome-icon :icon="['fas', 'xmark']" class="text-xs" aria-hidden="true" />
+            </button>
+          </div>
+          <ul class="mb-3 space-y-1">
+            <li
+              v-for="item in missingEssentialProfileItems"
+              :key="item.label"
+              class="flex items-center gap-1.5 text-xs text-brand-charcoal"
+            >
+              <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary" aria-hidden="true" />
               {{ item.label }}
             </li>
           </ul>
-          <div class="flex flex-col items-start gap-0.5">
-            <router-link to="/profile" class="text-sm text-brand-primary font-medium hover:underline">
-              Complete profile →
-            </router-link>
-            <button
-              type="button"
-              class="text-xs text-neutral-body hover:text-brand-charcoal hover:underline transition-colors focus:outline-none"
-              aria-label="Dismiss this card"
-              @click="dismissProfileCompletion"
-            >
-              Dismiss
-            </button>
-          </div>
+          <router-link to="/profile" class="text-xs font-medium text-brand-primary hover:underline">
+            Complete profile →
+          </router-link>
         </div>
-      </div>
+      </Teleport>
 
       <!--
         Tier-specific main panel. Switched on baseTier so Core/Premium slot in cleanly.

@@ -822,6 +822,8 @@ export type Database = {
           job_id: string
           profile_id: string
           score: number | null
+          skills_gap: Json | null
+          skills_gap_generated_at: string | null
           why_fit_bullets: Json | null
           why_fit_generated_at: string | null
         }
@@ -831,6 +833,8 @@ export type Database = {
           job_id: string
           profile_id: string
           score?: number | null
+          skills_gap?: Json | null
+          skills_gap_generated_at?: string | null
           why_fit_bullets?: Json | null
           why_fit_generated_at?: string | null
         }
@@ -840,6 +844,8 @@ export type Database = {
           job_id?: string
           profile_id?: string
           score?: number | null
+          skills_gap?: Json | null
+          skills_gap_generated_at?: string | null
           why_fit_bullets?: Json | null
           why_fit_generated_at?: string | null
         }
@@ -1320,6 +1326,7 @@ export type Database = {
           desired_salary_min: number | null
           email: string
           first_name: string
+          has_seen_walkthrough: boolean
           id: string
           landing_path: string | null
           last_name: string
@@ -1349,6 +1356,7 @@ export type Database = {
           desired_salary_min?: number | null
           email: string
           first_name: string
+          has_seen_walkthrough?: boolean
           id?: string
           landing_path?: string | null
           last_name: string
@@ -1378,6 +1386,7 @@ export type Database = {
           desired_salary_min?: number | null
           email?: string
           first_name?: string
+          has_seen_walkthrough?: boolean
           id?: string
           landing_path?: string | null
           last_name?: string

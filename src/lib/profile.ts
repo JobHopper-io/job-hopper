@@ -100,6 +100,25 @@ export const profileAPI = {
     return { data: data.signedUrl, error: null }
   },
 
+  async markWalkthroughSeen() {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return { data: null, error: new Error('Not authenticated') }
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ has_seen_walkthrough: true } satisfies Pick<ProfileUpdate, 'has_seen_walkthrough'>)
+      .eq('auth_user_id', user.id)
+      .select()
+      .single<Profile>()
+
+    return { data, error }
+  },
+
   /** Lightweight check that uses the server-side helper to see if the current user has a role. */
   async hasRole(roleName: string): Promise<boolean> {
     const {

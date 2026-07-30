@@ -35,6 +35,10 @@ const CHROME_FREE_NAV_ROUTES = ['/login', '/register', '/onboarding', '/confirm-
 const CHROME_FREE_FOOTER_ROUTES = ['/onboarding']
 const hideNav = computed(() => isLandingPage.value || CHROME_FREE_NAV_ROUTES.includes(route.path))
 const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUTES.includes(route.path))
+// Ask Hopper is a distraction on the signup/onboarding funnel - keep it off /login, /register,
+// and /onboarding specifically (unlike hideNav/hideFooter, not tied to the full chrome-free list).
+const HIDE_CHAT_WIDGET_ROUTES = ['/login', '/register', '/onboarding']
+const hideChatWidget = computed(() => HIDE_CHAT_WIDGET_ROUTES.includes(route.path))
 
 // These marketing pages (plus Dashboard, Profile, Billing, the job detail page, and
 // interview practice, which now share the same warm cream background as Login/Register)
@@ -481,8 +485,9 @@ const handleSignOutAndCloseMenu = async () => {
         </div>
       </footer>
 
-      <!-- RAG support chat widget: available to everyone, including logged-out visitors -->
-      <ChatWidget />
+      <!-- RAG support chat widget: available to everyone, including logged-out visitors,
+      except the signup/onboarding funnel where it's a distraction. -->
+      <ChatWidget v-if="!hideChatWidget" />
   </div>
 </template>
 
