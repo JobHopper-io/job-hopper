@@ -5,6 +5,7 @@ import type { Product } from '@/types/database'
 import { subscriptionAPI, formatProductLineLabel, getProductPrice } from '@/lib/subscription'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import { useUserStore } from '@/stores/user'
+import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 const userStore = useUserStore()
 const {
@@ -239,6 +240,7 @@ const handleManageBilling = async () => {
             You can search for jobs manually with capped credits and preview limited insights.
             Upgrade to unlock unlimited automated matching, full resume advice, and full Hiring Intel.
           </p>
+          <CoreFreeMonthBadge class="mb-4" />
           <div class="flex flex-col sm:flex-row gap-3">
             <router-link
               to="/billing/manage"

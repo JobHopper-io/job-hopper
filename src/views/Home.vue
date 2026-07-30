@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useWindowScroll } from '@vueuse/core'
 import jobHopperLogo from '@/assets/job-hopper-logo.png'
+import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 // ── Scroll-reveal directive ───────────────────────────────────────────────────
 // Fade-up-on-scroll approximation of the design's framer-motion `FadeUp`.
@@ -396,6 +397,7 @@ const footerColumns = [
                     <span class="text-3xl font-bold font-heading" :class="p.primary ? 'text-white' : 'text-brand-charcoal'">{{ p.price }}</span>
                     <span class="text-sm mb-1" :class="p.primary ? 'text-white/70' : 'text-gray-400'">{{ p.period }}</span>
                   </div>
+                  <CoreFreeMonthBadge v-if="p.name === 'Core'" class="mb-3 self-start" />
                   <p v-if="p.note" class="text-xs mb-3" :class="p.primary ? 'text-white/60' : 'text-gray-400'">{{ p.note }}</p>
                   <p class="text-sm mb-6 flex-1 leading-relaxed" :class="p.primary ? 'text-white/90' : 'text-neutral-body'">{{ p.desc }}</p>
                   <router-link

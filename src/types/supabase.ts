@@ -1408,6 +1408,47 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_core_free_month: {
+        Row: {
+          claimed_count: number
+          id: number
+          max_claims: number
+        }
+        Insert: {
+          claimed_count?: number
+          id?: number
+          max_claims?: number
+        }
+        Update: {
+          claimed_count?: number
+          id?: number
+          max_claims?: number
+        }
+        Relationships: []
+      }
+      promo_core_free_month_claims: {
+        Row: {
+          claimed_at: string
+          profile_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          profile_id: string
+        }
+        Update: {
+          claimed_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_core_free_month_claims_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resume_advice_daily_usage: {
         Row: {
           count: number
@@ -2266,6 +2307,14 @@ export type Database = {
         Returns: {
           counted_positions: number
           employer_id: string
+        }[]
+      }
+      try_claim_core_free_month: {
+        Args: { p_profile_id: string }
+        Returns: {
+          claimed_count: number
+          max_claims: number
+          success: boolean
         }[]
       }
       try_consume_apollo_credits: {
