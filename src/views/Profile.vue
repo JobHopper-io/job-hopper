@@ -290,7 +290,7 @@ watch(
         <div>
           <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Your Profile</h1>
           <p class="mt-1 text-sm text-neutral-body">
-            Keep this up to date — your matches, resume advice, and Premium Insights all draw from it.
+            Keep this up to date — your matches, resume advice, and Hiring Intel all draw from it.
           </p>
         </div>
         <Transition

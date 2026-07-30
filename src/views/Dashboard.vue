@@ -186,7 +186,7 @@ const userName = computed(() => {
 })
 
 // Free-tier teaser copy: first items shown, the rest blurred behind an upgrade lock.
-// Illustrative only — real values come from the paid Resume Advice / Premium Insights flows.
+// Illustrative only — real values come from the paid Resume Advice / Hiring Intel flows.
 const resumeAdviceTeaser = {
   real: [
     '✓ Strong keyword match for your target title',
@@ -630,7 +630,7 @@ onMounted(() => {
             :blurred-fields="resumeAdviceTeaser.blurred"
           />
           <FeatureTeaserCard
-            title="Premium Insights"
+            title="Hiring Intel"
             :icon="['fas', 'user-tie']"
             :real-fields="premiumInsightsTeaser.real"
             :blurred-fields="premiumInsightsTeaser.blurred"
@@ -640,7 +640,7 @@ onMounted(() => {
 
       <!--
         Core and Premium share this branch: automated-matching status and fully unblurred
-        Resume Advice + Premium Insights (also serves the 6 legacy trial plans, which map to
+        Resume Advice + Hiring Intel (also serves the 6 legacy trial plans, which map to
         'core'). Application Tracker moved to its own /applications page (2026-07-27) so it's
         not competing with the job feed for space on the dashboard; both tiers get a link-out
         banner here instead of the full card inline. Premium additionally gets a banner linking

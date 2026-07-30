@@ -339,7 +339,7 @@ scheduled-jobs/email plumbing.
 
 ## 3. Key decisions
 
-1. **Contact-depth precedent (already shipped, related):** Premium Insights returns tier-driven
+1. **Contact-depth precedent (already shipped, related):** Hiring Intel returns tier-driven
    contact counts (free 1 / core 2 / premium 3). See `docs/` note; not part of this engine but
    confirms the baseTier gating pattern we'll reuse for exposing the Real Score to Premium only.
 2. **Entity resolution keys on EMPLOYER_FEIN when present; fuzzy/vector is the fallback** — see
@@ -557,7 +557,7 @@ scheduled-jobs/email plumbing.
      existing one reintroduces the exact "three Goldman badges" problem decision 5 eliminated —
      just at the free/premium seam instead of the entity seam — and invites the same "which one do
      I trust" confusion.
-   - **Matches the tier-depth precedent already shipped** (decision 1, Premium Insights: same UI,
+   - **Matches the tier-depth precedent already shipped** (decision 1, Hiring Intel: same UI,
      `baseTier`-gated depth — free 1 contact / core 2 / premium 3, not a separate premium-only
      panel). The Real Score follows the same shape: same surface, deeper detail behind the gate.
    - **The rationale/confidence tooltip *is* the Premium value**, not the badge itself. That's what

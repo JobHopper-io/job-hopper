@@ -237,7 +237,7 @@ const handleManageBilling = async () => {
           </div>
           <p class="text-sm text-neutral-body mb-4">
             You can search for jobs manually with capped credits and preview limited insights.
-            Upgrade to unlock unlimited automated matching, full resume advice, and full Premium Insights.
+            Upgrade to unlock unlimited automated matching, full resume advice, and full Hiring Intel.
           </p>
           <div class="flex flex-col sm:flex-row gap-3">
             <router-link

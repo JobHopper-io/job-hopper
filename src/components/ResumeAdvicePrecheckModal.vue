@@ -71,7 +71,7 @@ onUnmounted(() => {
           >
             <template v-if="variant === 'upload-required'">Upload your resume first</template>
             <template v-else-if="variant === 'confirm-free-credit'">Use a free resume advice credit?</template>
-            <template v-else>Use a free Premium Insights credit?</template>
+            <template v-else>Use a free Hiring Intel credit?</template>
           </h2>
         </div>
         <div class="px-6 py-4 text-sm text-neutral-body space-y-3">

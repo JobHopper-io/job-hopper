@@ -23,7 +23,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const { baseTier, freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice, hasPremiumInsightsAddon, freemiumPremiumInsightsRemaining, freemiumMaxPremiumInsights, canRequestPremiumInsights } = storeToRefs(userStore)
 
-/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are locked
+/** Free tier: Resume Advice, Hiring Intel, and the sponsorship signal are locked
  * upgrade teasers here too — same gating as JobCard on the dashboard. */
 const isFree = computed(() => baseTier.value === 'free')
 
@@ -571,7 +571,7 @@ async function runPremiumInsights() {
     void userStore.refreshFreemium()
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -619,7 +619,7 @@ async function onConfirmOrgDisambiguation(
     await reloadJobFromRoute()
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -822,7 +822,7 @@ async function executeTailoringCheckout() {
                     @click="goUpgrade"
                   >
                     <font-awesome-icon :icon="['fas', 'lock']" class="text-sm" aria-hidden="true" />
-                    Premium Insights
+                    Hiring Intel
                   </button>
                 </template>
                 <template v-else>
@@ -870,7 +870,7 @@ async function executeTailoringCheckout() {
                       class="opacity-80"
                       aria-hidden="true"
                     />
-                    {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+                    {{ insightsLoading ? 'Please wait…' : 'Hiring Intel' }}
                   </button>
                   <button
                     v-if="showPremiumInsightsOrgChoiceHint"

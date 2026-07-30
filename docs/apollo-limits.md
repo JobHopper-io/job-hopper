@@ -30,7 +30,7 @@ All consumers **must**:
    - On **success**, leave `usage` as-is (already incremented).
    - On **failure** for that step (HTTP error, credit error, or business abort before the credit was “used”), call `refund_apollo_credits(name, amount)` for the **same** `amount` that was consumed for that step.
 
-### Premium Insights (stepwise)
+### Hiring Intel (stepwise)
 
 To avoid charging for a `people/match` when org resolution never succeeded:
 
@@ -65,7 +65,7 @@ Before each `GET /organizations/enrich`, consume **1** credit. On credit/quota e
 - On the **10th of each month at 00:00 UTC**, pg_cron (when enabled and Vault secrets `project_url` + `cron_secret` are present) invokes the Edge Function **`reset-apollo-limits`**, which calls `reset_apollo_limits_usage()` and sets **`usage = 0`** for **all** rows.
 - If cron is not configured in an environment, run the reset function manually or schedule it via your ops tooling.
 
-## Frontend rule (Premium Insights)
+## Frontend rule (Hiring Intel)
 
 Hide “Get hiring contacts” / similar CTAs when the `premium_insights` row would reject the **minimum** next operation (e.g. `usage + 2 > credit_limit` for a cold path that needs org search + match), or when `credit_limit = 0`.
 
@@ -76,7 +76,7 @@ Hide “Get hiring contacts” / similar CTAs when the `premium_insights` row wo
 3. Document the row in the registry table above.
 4. If the process runs outside Supabase, use the **service role** REST client or RPC with the service key.
 
-## Debug logging (Premium Insights)
+## Debug logging (Hiring Intel)
 
 The `premium-insights` Edge Function and `_shared/apollo.ts` emit **structured JSON** lines via `console.log` (visible in Supabase **Edge Functions → Logs**).
 

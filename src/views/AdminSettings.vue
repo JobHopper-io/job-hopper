@@ -14,7 +14,7 @@
       <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">Freemium limits</h2>
       <p class="text-sm text-neutral-body mb-6">
         Set to <span class="font-medium text-brand-charcoal">0</span> to disable that feature for everyone without a
-        subscription (manual job search, free resume advice, or free Premium Insights redemptions).
+        subscription (manual job search, free resume advice, or free Hiring Intel redemptions).
       </p>
 
       <p v-if="isLoading" class="text-sm text-neutral-body mb-4">Loading current settings…</p>
@@ -63,7 +63,7 @@
 
         <div>
           <label for="max-premium-insights" class="block text-sm font-medium text-brand-charcoal mb-1">
-            Max free Premium Insights (per profile)
+            Max free Hiring Intel (per profile)
           </label>
           <input
             id="max-premium-insights"
@@ -75,7 +75,7 @@
             required
           />
           <p class="text-xs text-neutral-body mt-1">
-            Free hiring-contact lookups per profile for users without the Premium Insights subscription add-on.
+            Free hiring-contact lookups per profile for users without the Hiring Intel subscription add-on.
           </p>
         </div>
 
@@ -192,7 +192,7 @@ function validateFreemium(): boolean {
     return false
   }
   if (!Number.isInteger(form.maxPremiumInsights) || form.maxPremiumInsights < 0) {
-    formError.value = 'Max free Premium Insights must be a whole number ≥ 0.'
+    formError.value = 'Max free Hiring Intel must be a whole number ≥ 0.'
     return false
   }
   return true

@@ -215,10 +215,10 @@ export function premiumInsightsFreemiumReassurance(
 ): string | null {
   if (hasPremiumInsightsAddon || !meta) return null
   if (meta.freemiumCreditRefunded) {
-    return 'Your free Premium Insights credit has been restored.'
+    return 'Your free Hiring Intel credit has been restored.'
   }
   if (meta.freemiumCreditNeverConsumed) {
-    return 'Your free Premium Insights credit was not used.'
+    return 'Your free Hiring Intel credit was not used.'
   }
   return null
 }
@@ -232,7 +232,7 @@ export const premiumInsightsAPI = {
   },
 
   /**
-   * Continues Premium Insights after the user picks an Apollo org from a tie, or declines (`decline: true`).
+   * Continues Hiring Intel after the user picks an Apollo org from a tie, or declines (`decline: true`).
    */
   async resolveOrgDisambiguation(
     jobMatchId: string,

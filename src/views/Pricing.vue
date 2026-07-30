@@ -78,7 +78,7 @@ const sellableTiers = [
     features: [
       { label: 'Manual job search (capped)', included: true },
       { label: 'Sponsorship badge — teaser view only', included: true },
-      { label: 'Premium Insights — a few fields visible, rest blurred', included: true },
+      { label: 'Hiring Intel — a few fields visible, rest blurred', included: true },
       { label: 'Resume Advice — teaser', included: true },
       { label: 'Application tracker', included: false },
       { label: 'Automated matching & email digest', included: false },
@@ -93,7 +93,7 @@ const sellableTiers = [
     features: [
       { label: 'Unlimited, automated daily job search + email digest', included: true },
       { label: 'Full sponsorship badge (heuristic)', included: true },
-      { label: 'Full Premium Insights', included: true },
+      { label: 'Full Hiring Intel', included: true },
       { label: 'Full Resume Advice', included: true },
       { label: 'Application tracker included', included: true },
     ],
@@ -117,7 +117,7 @@ const comparisonRows = computed<{ feature: string; cells: (boolean | string)[] }
     { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
     { feature: 'Automated matching + email digest', cells: [false, true, true] },
     { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
-    { feature: 'Premium Insights', cells: ['Limited', 'Full', 'Full'] },
+    { feature: 'Hiring Intel', cells: ['Limited', 'Full', 'Full'] },
     { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
     { feature: 'Application tracker', cells: [false, true, true] },
     { feature: 'Real Sponsorship Score', cells: [false, false, premiumOnly] },
@@ -135,7 +135,7 @@ const pricingFaq = [
   },
   {
     q: 'Do higher tiers come with different features?',
-    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Premium Insights, full Resume Advice, and the application tracker. Premium adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
+    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the application tracker. Premium adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
   },
   {
     q: 'Can I change tiers later?',

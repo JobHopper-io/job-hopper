@@ -45,7 +45,7 @@ onMounted(() => {
       </div>
 
       <!-- Free: locked teaser, same "upgrade to unlock" pattern as the dashboard's Resume
-           Advice / Premium Insights cards - Core (not just Premium) already unlocks this. -->
+           Advice / Hiring Intel cards - Core (not just Premium) already unlocks this. -->
       <div v-if="baseTier === 'free'" class="card max-w-xl p-6">
         <div class="mb-4 flex items-center gap-2.5">
           <font-awesome-icon :icon="['fas', 'lock']" class="text-brand-primary" aria-hidden="true" />
