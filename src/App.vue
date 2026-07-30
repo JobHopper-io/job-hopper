@@ -43,7 +43,7 @@ const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUT
 // instead of its default white, or it'd read as a hard-edged bar again. Job detail /
 // interview practice are matched by prefix since their routes carry a param
 // (/job/:id, /interview-practice/:id).
-const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/dashboard', '/profile', '/billing', '/billing/manage']
+const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/premium-tools']
 const WARM_BG_PREFIXES = ['/job/', '/interview-practice/']
 const isWarmPage = computed(
   () => WARM_BG_ROUTES.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
@@ -51,7 +51,7 @@ const isWarmPage = computed(
 // Same "no seam" treatment as the auth routes below: the page's own background already
 // fades to the same cream tone the footer sits on, so the usual mt-16 gap would just
 // expose the app shell's gray bg-neutral-bg between the two.
-const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage']
+const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/premium-tools']
 const noFooterGap = computed(
   () => noFooterGapRoutes.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
 )

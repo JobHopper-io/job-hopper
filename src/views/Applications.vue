@@ -32,10 +32,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-5xl mx-auto">
       <div class="mb-8 flex items-center gap-3">
-        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
           <font-awesome-icon :icon="['fas', 'clipboard-list']" aria-hidden="true" />
         </span>
         <div>

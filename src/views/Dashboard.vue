@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { ApplicationStatus, Product, ResumeProduct } from '@/types/database'
+import type { ApplicationStatus, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
@@ -29,7 +29,6 @@ const {
   basePlan,
   baseTier,
   subscriptionStatusLabel,
-  subscriptionAddonProducts,
   showFreemiumJobSearchCta,
   freemiumCanRunManualJobSearch,
   freemiumJobSearchesRemaining,
@@ -186,10 +185,6 @@ const userName = computed(() => {
   return profile.value?.first_name || ''
 })
 
-const activeAddonsForDisplay = computed(() =>
-  subscriptionAddonProducts.value.map((p: Product) => p.display_name),
-)
-
 // Free-tier teaser copy: first items shown, the rest blurred behind an upgrade lock.
 // Illustrative only — real values come from the paid Resume Advice / Premium Insights flows.
 const resumeAdviceTeaser = {
@@ -303,10 +298,6 @@ const matchesThisWeekLabel = computed(() => {
   const n = matchingStats.value.thisWeek ?? 0
   return `${n} new match${n === 1 ? '' : 'es'} this week`
 })
-
-/** A brand-new account has thisWeek === totalDelivered === 0; the summary card reframes
- * that as a nudge to run a search instead of a flat "0 matches". */
-const hasMatchingActivity = computed(() => (matchingStats.value.totalDelivered ?? 0) > 0)
 
 const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
 
@@ -656,79 +647,47 @@ onMounted(() => {
         out to /premium-tools (Sponsor Watch management).
       -->
       <template v-else-if="baseTier === 'core' || baseTier === 'premium'">
-        <!-- Automated matching status (success-tinted; the only green surface on the page). -->
-        <div class="mb-8 rounded-[12px] border border-green-200 bg-green-50 px-5 py-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2.5">
-                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
-                  <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
-                </span>
-                <p class="font-heading font-semibold text-green-700">Automated matching active</p>
-              </div>
-              <p class="mt-1 pl-[42px] text-sm text-green-700">
-                Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
-              </p>
-            </div>
-            <!-- On-demand search so a fresh, no-history account isn't stuck waiting for the digest. -->
-            <button
-              type="button"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center gap-2"
-              :disabled="subscriberSearchLoading"
-              @click="runSubscriberJobSearch"
-            >
-              <font-awesome-icon
-                v-if="subscriberSearchLoading"
-                :icon="['fas', 'spinner']"
-                spin
-                aria-hidden="true"
-              />
-              {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
-            </button>
-          </div>
-          <p v-if="subscriberSearchMessage" class="mt-3 pl-[42px] text-sm text-green-700">
-            {{ subscriberSearchMessage }}
-          </p>
-        </div>
-
-        <!-- Application Tracker moved to its own page - link out instead of the full card. -->
-        <div class="mb-8 rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex items-center gap-2.5">
-              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+        <!--
+          Same card-grid language + bg as the Free branch's FeatureTeaserCard pair
+          (rounded-[16px], #EAF1FC, icon-circle header, md:grid-cols-2) instead of full-width
+          bars. Automated matching / "Run job search" moved to the side rail (see below),
+          same spot Free's manual-search panel lives, instead of a third card up here.
+        -->
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
+          <!-- Application Tracker moved to its own page - link out instead of the full card. -->
+          <div class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+            <div class="mb-3 flex items-center gap-2.5">
+              <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
                 <font-awesome-icon :icon="['fas', 'clipboard-list']" class="text-sm" aria-hidden="true" />
               </span>
-              <div class="min-w-0">
-                <p class="font-heading font-semibold text-brand-charcoal">Application Tracker</p>
-                <p v-if="trackedApplicationsCount > 0" class="text-sm text-neutral-body">
-                  {{ trackedApplicationsCount }} application{{ trackedApplicationsCount === 1 ? '' : 's' }} tracked
-                </p>
-                <p v-else class="text-sm text-neutral-body">Track every job you've applied to, all in one place.</p>
-              </div>
+              <p class="font-heading text-base font-semibold text-brand-charcoal">Application Tracker</p>
             </div>
+            <p v-if="trackedApplicationsCount > 0" class="text-sm text-neutral-body">
+              {{ trackedApplicationsCount }} application{{ trackedApplicationsCount === 1 ? '' : 's' }} tracked
+            </p>
+            <p v-else class="text-sm text-neutral-body">Track every job you've applied to, all in one place.</p>
             <router-link
               :to="{ name: 'applications' }"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+              class="btn-primary mt-4 text-sm inline-flex items-center justify-center"
             >
               Open Applications →
             </router-link>
           </div>
-        </div>
 
-        <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
-        <div v-if="baseTier === 'premium'" class="mb-8 rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex items-center gap-2.5">
-              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+          <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
+          <div v-if="baseTier === 'premium'" class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+            <div class="mb-3 flex items-center gap-2.5">
+              <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
                 <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
               </span>
-              <p class="font-heading font-semibold text-brand-charcoal">
-                Manage your Sponsor Watch alerts
-              </p>
+              <p class="font-heading text-base font-semibold text-brand-charcoal">Sponsor Watch</p>
             </div>
+            <p class="text-sm text-neutral-body">
+              Real-time alerts when a watched employer's H-1B filing volume changes.
+            </p>
             <router-link
               :to="{ name: 'premium-tools' }"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+              class="btn-primary mt-4 text-sm inline-flex items-center justify-center"
             >
               Open Sponsor Watch →
             </router-link>
@@ -1069,7 +1028,7 @@ onMounted(() => {
       </template>
       </div>
 
-      <!-- Side rail: Run job search on Free (pale-blue), Plan on every tier (pale-amber, the only shadow-lifted tile) -->
+      <!-- Side rail: Run job search on every tier (pale-blue), Plan on every tier (pale-amber, the only shadow-lifted tile) -->
       <aside class="flex flex-col gap-5">
         <FreemiumManualJobSearchPanel
           v-if="baseTier === 'free' && showFreemiumJobSearchCta"
@@ -1082,6 +1041,38 @@ onMounted(() => {
           :avg-match-score="matchingStats.avgMatchScore"
           @run="runFreemiumJobSearch"
         />
+
+        <!-- Core/Premium: same pale-blue action-panel slot Free's manual search sits in,
+             but unlimited (no usage bar) - automated matching status + on-demand search. -->
+        <div v-else-if="baseTier === 'core' || baseTier === 'premium'" class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+          <div class="mb-1.5 flex items-center gap-3">
+            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-green-700">
+              <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-base font-heading font-semibold text-brand-charcoal">Automated matching active</h2>
+          </div>
+          <p class="text-sm text-neutral-body">
+            Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
+          </p>
+          <p v-if="subscriberSearchMessage" class="mt-3 text-sm text-green-700">
+            {{ subscriberSearchMessage }}
+          </p>
+          <button
+            type="button"
+            class="btn-primary mt-4 inline-flex w-full items-center justify-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="subscriberSearchLoading"
+            @click="runSubscriberJobSearch"
+          >
+            <font-awesome-icon
+              v-if="subscriberSearchLoading"
+              :icon="['fas', 'spinner']"
+              spin
+              class="h-4 w-4"
+              aria-hidden="true"
+            />
+            {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
+          </button>
+        </div>
 
         <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-5 shadow-md">
           <div class="mb-3 flex items-center gap-2.5">
@@ -1121,48 +1112,6 @@ onMounted(() => {
             <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
               Manage plan →
             </router-link>
-          </template>
-        </div>
-
-        <!-- Active add-ons (Core/Premium only - free users can't hold add-ons) -->
-        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Active add-ons</h3>
-          </div>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ activeAddonsForDisplay.length }} active
-          </p>
-          <p class="text-sm text-neutral-body mt-1">
-            {{ activeAddonsForDisplay.length ? activeAddonsForDisplay.join(' + ') : 'No add-ons yet' }}
-          </p>
-          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Add-ons →
-          </router-link>
-        </div>
-
-        <!-- Matching statistics (Core/Premium only) -->
-        <div v-if="baseTier !== 'free'" class="rounded-[16px] border border-neutral-border bg-white p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Matching statistics</h3>
-          </div>
-          <template v-if="hasMatchingActivity">
-            <p class="font-heading font-semibold text-brand-charcoal">
-              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
-            </p>
-            <p class="text-sm text-neutral-body mt-1">This week</p>
-            <p class="text-xs text-neutral-body mt-2">
-              Total delivered: {{ matchingStats.totalDelivered }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
-            </p>
-          </template>
-          <template v-else>
-            <p class="font-heading font-semibold text-brand-charcoal">No matches yet</p>
-            <p class="text-sm text-neutral-body mt-1">Run a search below to get started</p>
           </template>
         </div>
       </aside>
