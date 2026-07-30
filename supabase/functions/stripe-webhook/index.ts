@@ -472,8 +472,10 @@ serve(async (req) => {
         await upsertFreemiumUsageForCheckout(supabaseAdmin, profileId)
 
         if (subscriptionCheckoutInsertSucceeded) {
-          // Schedule initial job matching for this profile ~45 minutes after subscription checkout.
-          const runAt = new Date(Date.now() + 45 * 60 * 1000).toISOString()
+          // Schedule initial job matching for this profile ~1 minute after subscription checkout
+          // (was 45 min - shortened so the dashboard isn't empty on first load; still goes
+          // through scheduled_jobs/run-scheduled-jobs rather than running inline in the webhook).
+          const runAt = new Date(Date.now() + 60 * 1000).toISOString()
           const { error: scheduleError } = await supabaseAdmin
             .from('scheduled_jobs')
             .insert({

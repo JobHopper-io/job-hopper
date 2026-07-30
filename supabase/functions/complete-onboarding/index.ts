@@ -138,6 +138,27 @@ serve(async (req) => {
       })
     }
 
+    // Run an initial match pass before responding so the dashboard isn't empty on first
+    // load - match-jobs is DB-only (no external calls), so this is fast. Best-effort: a
+    // failure here doesn't fail onboarding, it just leaves the manual "Find matches" button
+    // as the fallback (same as before this existed).
+    try {
+      const matchRes = await fetch(`${supabaseUrl}/functions/v1/match-jobs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({ profile_id: profile.id, limit: 15, subscription_tier_product_keys: [tier] }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      if (!matchRes.ok) {
+        console.error('complete-onboarding: initial match-jobs call failed', await matchRes.text())
+      }
+    } catch (matchErr) {
+      console.error('complete-onboarding: initial match-jobs call threw', matchErr)
+    }
+
     return new Response(JSON.stringify({ ok: true, profile_id: profile.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
