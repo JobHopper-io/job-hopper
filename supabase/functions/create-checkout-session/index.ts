@@ -15,6 +15,10 @@ const corsHeaders = {
 
 const defaultSiteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
 
+/** Standard trial for any base-plan checkout (Core or Premium). Separate from the "first 25
+ * Core subscribers" free-month promo, which overrides this with a longer trial instead. */
+const STANDARD_TRIAL_DAYS = 14
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -202,9 +206,9 @@ serve(async (req) => {
           console.error('try_claim_core_free_month failed:', claimError)
         }
         const claim = Array.isArray(claimRows) ? claimRows[0] : null
-        subscriptionData.trial_period_days = claim?.success ? 30 : 7
+        subscriptionData.trial_period_days = claim?.success ? 30 : STANDARD_TRIAL_DAYS
       } else if (hasBasePlan) {
-        subscriptionData.trial_period_days = 7
+        subscriptionData.trial_period_days = STANDARD_TRIAL_DAYS
       }
 
       const metadata: Record<string, string> = { profile_id: profile.id }

@@ -542,7 +542,7 @@ const handleProceedToCheckout = async () => {
           <div class="text-center">
             <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Choose how you want to start</h2>
             <p class="mt-1 text-sm text-neutral-body">
-              Start free, or subscribe with a 7-day trial for automated matching and email digests. Upgrade
+              Start free, or subscribe with a 2-week trial for automated matching and email digests. Upgrade
               anytime from billing.
             </p>
           </div>
