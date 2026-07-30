@@ -62,7 +62,7 @@
   - Only service_role (e.g. edge functions) writes; authenticated users can SELECT their own rows via RLS.
 
 ### freemium_settings
-- **Meaning**: Single-row table (`id = 1`) with platform-wide caps: `max_job_searches` (manual match runs for users without an active subscription), `max_resume_advice` (free per-job resume advice redemptions before Stripe checkout), and `max_premium_insights` (free Premium Insights / hiring-contact lookups per profile before requiring the subscription add-on or waiting for quota).
+- **Meaning**: Single-row table (`id = 1`) with platform-wide caps: `max_job_searches` (manual match runs for users without an active subscription), `max_resume_advice` (free per-job resume advice redemptions before Stripe checkout), and `max_premium_insights` (free Hiring Intel / hiring-contact lookups per profile before requiring the subscription add-on or waiting for quota).
 - **Non‑obvious rules**: Any authenticated user may read the row (for UI counts). Only `admin` or `super_admin` may update it (RLS). A cap of `0` disables that freemium feature. Defaults are `3` / `3` / `3` at install; admins change values in **Admin → System Settings**.
 
 ### freemium_usage
@@ -70,14 +70,14 @@
 - **Key columns**: `selected_tier_key` (`products.key` for a base plan tier), `job_searches_used`, `resume_advice_used`, `premium_insights_used`, timestamps.
 - **Non‑obvious rules**:
   - Row is created when a user completes onboarding (free `complete-onboarding` path or paid `checkout.session.completed` webhook) or by backfill for existing onboarded profiles. Counters are incremented only by backend (Edge Functions / SECURITY DEFINER RPCs); authenticated users may **SELECT** only their own row (RLS). There is no client `INSERT`/`UPDATE` on this table.
-  - Atomic consumption for job searches uses `try_consume_freemium_job_search(profile_id)` (service_role only). Free resume advice uses `redeem_freemium_resume_advice(profile_id, job_match_id, product_id)` which increments quota and inserts a `pending` `resume_products` row in one transaction. Premium Insights uses `redeem_freemium_premium_insights` / `refund_freemium_premium_insights` with `job_hiring_contacts` (see `docs/apollo-limits.md`).
+  - Atomic consumption for job searches uses `try_consume_freemium_job_search(profile_id)` (service_role only). Free resume advice uses `redeem_freemium_resume_advice(profile_id, job_match_id, product_id)` which increments quota and inserts a `pending` `resume_products` row in one transaction. Hiring Intel uses `redeem_freemium_premium_insights` / `refund_freemium_premium_insights` with `job_hiring_contacts` (see `docs/apollo-limits.md`).
 
 ### apollo_limits
 - **Meaning**: One row per backend **process** that calls paid Apollo APIs (`name` e.g. `premium_insights`, `job_processor`). Columns include `usage` (credits consumed in the current billing period) and `credit_limit` (monthly cap; `0` disables that process).
 - **Non‑obvious rules**: Authenticated users may **SELECT** all rows (for UI gating and admin display). Only admins may **UPDATE** `credit_limit` (RLS). `usage` is updated only via SECURITY DEFINER RPCs (`try_consume_apollo_credits`, `refund_apollo_credits`) and the monthly reset (`reset_apollo_limits_usage`, service role). See **`docs/apollo-limits.md`** for consume/refund semantics and cron reset.
 
 ### job_hiring_contacts
-- **Meaning**: Per profile and job match, stores Premium Insights pipeline status and results: `status` (`pending` | `complete` | `failed` | `cancelled`), `contacts` (JSON array of hiring contacts), optional `company_summary`, `error_code`, optional `org_disambiguation_options` (JSON array of Apollo org candidates when scores fall in the ambiguity band and the user must pick an employer), timestamps. At most one `pending` row per profile (partial unique index).
+- **Meaning**: Per profile and job match, stores Hiring Intel pipeline status and results: `status` (`pending` | `complete` | `failed` | `cancelled`), `contacts` (JSON array of hiring contacts), optional `company_summary`, `error_code`, optional `org_disambiguation_options` (JSON array of Apollo org candidates when scores fall in the ambiguity band and the user must pick an employer), timestamps. At most one `pending` row per profile (partial unique index).
 - **Non‑obvious rules**: Users may **SELECT** their own rows (RLS). Writes are performed by the `premium-insights` Edge Function (service role). Freemium redemption increments `freemium_usage.premium_insights_used` in the same transaction as creating or re-opening a row; `refund_freemium_premium_insights` deletes a still-`pending` row and decrements usage if the pipeline fails before completion. When `org_disambiguation_options` is set, the client should prompt the user to choose among those Apollo orgs (or decline); the list includes every candidate above the configured ambiguity floor (see `docs/apollo-limits.md`). The edge function clears it after selection, decline, or terminal failure.
 
 ### company_apollo_cache
@@ -85,7 +85,7 @@
 - **Non‑obvious rules**: Written only by service role (e.g. `premium-insights`). Not exposed to the client.
 
 ### company_apollo_search_miss
-- **Meaning**: Short-lived negative cache keyed by the **same** `cache_key` as `company_apollo_cache`. When org/contact resolution recently failed for that company/region, the row prevents repeat Premium Insights runs from redeeming freemium quota or spending Apollo credits until `expires_at` (typically about a week).
+- **Meaning**: Short-lived negative cache keyed by the **same** `cache_key` as `company_apollo_cache`. When org/contact resolution recently failed for that company/region, the row prevents repeat Hiring Intel runs from redeeming freemium quota or spending Apollo credits until `expires_at` (typically about a week).
 - **Non‑obvious rules**: Written only by service role (`premium-insights` on definitive resolution failures). Not exposed to the client. Rows are not a substitute for `company_apollo_cache` positive hits.
 
 ## Job and lead data (job_hopper_live, raw_jobs, bd_leads, exclusion_lists, enriched_lead)

@@ -74,17 +74,17 @@ export type RealSponsorshipTier = 'Low' | 'Medium' | 'High'
 export type SponsorWatchSubscription = Tables<'sponsor_watch_subscriptions'>
 export type SponsorWatchSubscriptionInsert = TablesInsert<'sponsor_watch_subscriptions'>
 
-/** Hiring contact (e.g. for Premium Insights); optional on MatchedJob when data is available */
+/** Hiring contact (e.g. for Hiring Intel); optional on MatchedJob when data is available */
 export interface JobContact {
   name: string
   title: string | null
   location: string | null
   note: string | null
-  /** Work email when Apollo match returns it (Premium Insights). */
+  /** Work email when Apollo match returns it (Hiring Intel). */
   email: string | null
 }
 
-/** Apollo org options when Premium Insights needs the user to pick the employer (ambiguity band, see apollo-limits). */
+/** Apollo org options when Hiring Intel needs the user to pick the employer (ambiguity band, see apollo-limits). */
 export interface PremiumInsightsOrgChoice {
   apollo_organization_id: string
   name: string
@@ -143,10 +143,10 @@ export interface MatchedJob {
    * this app's data proves early applications do better. */
   isRecentlyPosted: boolean
   contacts?: JobContact[]
-  /** Premium Insights pipeline row status for this match, if any */
+  /** Hiring Intel pipeline row status for this match, if any */
   premiumInsightsStatus?: JobHiringContactsStatus | null
   premiumInsightsErrorCode?: string | null
-  /** When Premium Insights needs the user to pick among tied Apollo organizations */
+  /** When Hiring Intel needs the user to pick among tied Apollo organizations */
   premiumInsightsOrgChoices?: PremiumInsightsOrgChoice[] | null
   /** LLM-generated "why this is a fit" bullets (job_matches.why_fit_bullets), cached after
    * first generation via the generate-why-fit edge function. Null until generated. */

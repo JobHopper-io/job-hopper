@@ -360,17 +360,17 @@ const handleProceedToCheckout = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: #fafaf8">
-    <!-- Header: logo, step badge, progress bar with rabbit marker -->
-    <div class="border-b border-neutral-border bg-white px-4 py-4 sm:px-6">
-      <div class="mx-auto flex max-w-3xl flex-col gap-5">
-        <div class="flex items-center justify-between">
-          <img :src="jobHopperLogo" alt="Job-Hopper" class="h-7 w-auto object-contain" />
-          <span class="rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
-            Step {{ currentStep }} of {{ totalSteps }} — {{ STEP_NAMES[currentStep - 1] }}
-          </span>
-        </div>
-        <div class="relative mx-auto w-full max-w-xl pb-1">
+  <div class="app-warm-bg min-h-screen">
+    <!-- Header: centered logo + step badge, progress bar with rabbit marker below (generous
+    clearance so the marker's floating bounce never reaches back up into the badge). No bg of
+    its own - sits directly on the page's app-warm-bg gradient instead of a stark white bar. -->
+    <div class="px-4 py-6 sm:px-6">
+      <div class="mx-auto flex max-w-3xl flex-col items-center gap-3">
+        <img :src="jobHopperLogo" alt="Job-Hopper" class="h-7 w-auto object-contain" />
+        <span class="rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
+          Step {{ currentStep }} of {{ totalSteps }} — {{ STEP_NAMES[currentStep - 1] }}
+        </span>
+        <div class="relative mt-14 w-full max-w-xl pb-1">
           <div
             class="pointer-events-none absolute -top-7 transition-all duration-500 ease-out"
             :style="{ left: `calc(${((currentStep - 1) / (totalSteps - 1)) * 100}% - 13px)` }"
@@ -437,9 +437,8 @@ const handleProceedToCheckout = async () => {
               />
             </div>
             <p class="mt-2 text-sm text-neutral-body">
-              If you select yes, Job-Hopper can surface a sponsorship-likelihood signal on postings (from
-              metadata analysis in the Hopper). It helps you focus your time—it does not guarantee an
-              employer will sponsor.
+              We'll flag sponsorship likelihood using government filing data — helpful for prioritizing,
+              not a guarantee.
             </p>
           </div>
         </div>

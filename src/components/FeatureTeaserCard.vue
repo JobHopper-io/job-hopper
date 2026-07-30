@@ -20,12 +20,12 @@ withDefaults(
 </script>
 
 <template>
-  <div class="card p-5">
+  <div class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
     <div class="mb-3 flex items-center gap-2.5">
-      <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+      <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
         <font-awesome-icon :icon="icon" class="text-sm" aria-hidden="true" />
       </span>
-      <p class="text-sm font-semibold text-brand-charcoal">{{ title }}</p>
+      <p class="font-heading text-base font-semibold text-brand-charcoal">{{ title }}</p>
     </div>
 
     <div class="space-y-1.5">

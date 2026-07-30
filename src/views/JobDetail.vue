@@ -23,7 +23,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const { baseTier, freemiumResumeAdviceRemaining, freemiumMaxResumeAdvice, hasPremiumInsightsAddon, freemiumPremiumInsightsRemaining, freemiumMaxPremiumInsights, canRequestPremiumInsights } = storeToRefs(userStore)
 
-/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are locked
+/** Free tier: Resume Advice, Hiring Intel, and the sponsorship signal are locked
  * upgrade teasers here too — same gating as JobCard on the dashboard. */
 const isFree = computed(() => baseTier.value === 'free')
 
@@ -274,6 +274,12 @@ const sponsorshipBadgeRationale = computed(() =>
 
 const tierTagLabel = computed(() => {
   return job.value?.subscriptionTierDisplayName ?? null
+})
+
+const remoteLabel = computed(() => {
+  if (job.value?.isRemote === true) return 'Remote'
+  if (job.value?.isRemote === false) return 'Onsite'
+  return null
 })
 
 function formatPayRange(
@@ -565,7 +571,7 @@ async function runPremiumInsights() {
     void userStore.refreshFreemium()
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -613,7 +619,7 @@ async function onConfirmOrgDisambiguation(
     await reloadJobFromRoute()
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -657,8 +663,8 @@ async function executeTailoringCheckout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl mx-auto">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl mx-auto">
       <!-- Back Button -->
       <button
         @click="router.push('/dashboard')"
@@ -712,6 +718,26 @@ async function executeTailoringCheckout() {
                   <span v-if="job.location" class="inline-flex items-center gap-1.5">
                     <font-awesome-icon :icon="['fas', 'location-dot']" class="shrink-0 opacity-70" aria-hidden="true" />
                     {{ job.location }}
+                  </span>
+                  <span
+                    v-if="remoteLabel"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body"
+                  >
+                    <font-awesome-icon :icon="['fas', 'globe-americas']" class="shrink-0 opacity-70" aria-hidden="true" />
+                    {{ remoteLabel }}
+                  </span>
+                  <span
+                    v-if="payRangeText"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium text-neutral-body"
+                  >
+                    <font-awesome-icon :icon="['fas', 'sack-dollar']" class="shrink-0 opacity-70" aria-hidden="true" />
+                    {{ payRangeText }}
+                  </span>
+                  <span
+                    v-if="employmentTypeText"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium capitalize text-neutral-body"
+                  >
+                    {{ employmentTypeText }}
                   </span>
                   <span
                     v-if="job.isRecentlyPosted"
@@ -796,7 +822,7 @@ async function executeTailoringCheckout() {
                     @click="goUpgrade"
                   >
                     <font-awesome-icon :icon="['fas', 'lock']" class="text-sm" aria-hidden="true" />
-                    Premium Insights
+                    Hiring Intel
                   </button>
                 </template>
                 <template v-else>
@@ -844,7 +870,7 @@ async function executeTailoringCheckout() {
                       class="opacity-80"
                       aria-hidden="true"
                     />
-                    {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+                    {{ insightsLoading ? 'Please wait…' : 'Hiring Intel' }}
                   </button>
                   <button
                     v-if="showPremiumInsightsOrgChoiceHint"
@@ -958,7 +984,7 @@ async function executeTailoringCheckout() {
         <!-- Get ready for this job: practice interview + skills gap. Pulled out of the action
              row and given their own prominent section right under the hero, since these two
              tools are easy to miss buried among the smaller secondary buttons. -->
-        <div v-if="job" class="card p-6">
+        <div v-if="job" class="rounded-[16px] border border-neutral-border bg-white p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-1">Get ready for this job</h2>
           <p class="text-sm text-neutral-body mb-4">Two quick ways to walk in prepared.</p>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -968,7 +994,7 @@ async function executeTailoringCheckout() {
                 params: { jobMatchId: job.matchId },
                 query: { jobTitle: job.title, companyName: job.company },
               }"
-              class="group flex flex-col gap-3 rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-5 transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/10"
+              class="group flex flex-col gap-3 rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5 transition-colors hover:border-brand-primary/40"
             >
               <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white">
                 <font-awesome-icon :icon="['fas', 'comments']" aria-hidden="true" />
@@ -987,7 +1013,7 @@ async function executeTailoringCheckout() {
 
             <button
               type="button"
-              class="group flex flex-col gap-3 rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-5 text-left transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/10"
+              class="group flex flex-col gap-3 rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5 text-left transition-colors hover:border-brand-primary/40"
               @click="handleSkillsGapClick"
             >
               <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white">
@@ -1008,7 +1034,7 @@ async function executeTailoringCheckout() {
         </div>
 
         <!-- Overview -->
-        <div class="card p-6">
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Overview</h2>
           <div
             class="text-neutral-body leading-relaxed prose prose-sm max-w-none"
@@ -1016,30 +1042,28 @@ async function executeTailoringCheckout() {
           />
         </div>
 
-        <!-- Key details -->
-        <div class="card p-6">
+        <!-- Key details: quick-skim tag grid (pay/employment type already surfaced as hero
+             tags above - this covers what isn't). -->
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Key details</h2>
-          <ul class="list-disc pl-5 space-y-2 text-neutral-body">
-            <li v-if="scheduleText">
-              <span class="font-medium text-brand-charcoal">Shift or schedule:</span> {{ scheduleText }}
-            </li>
-            <li v-if="payRangeText">
-              <span class="font-medium text-brand-charcoal">Estimated salary or wage range:</span> {{ payRangeText }}
-            </li>
-            <li>
-              <span class="font-medium text-brand-charcoal">Company size:</span> {{ companySizeText }}
-            </li>
-            <li v-if="employmentTypeText">
-              <span class="font-medium text-brand-charcoal">Employment type:</span> {{ employmentTypeText }}
-            </li>
-            <li v-if="postedDateText">
-              <span class="font-medium text-brand-charcoal">Posted on:</span> {{ postedDateText }}
-            </li>
-          </ul>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div v-if="scheduleText" class="rounded-[12px] border border-neutral-border bg-neutral-bg p-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-neutral-body">Shift or schedule</p>
+              <p class="mt-1 text-sm font-medium text-brand-charcoal">{{ scheduleText }}</p>
+            </div>
+            <div class="rounded-[12px] border border-neutral-border bg-neutral-bg p-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-neutral-body">Company size</p>
+              <p class="mt-1 text-sm font-medium text-brand-charcoal">{{ companySizeText }}</p>
+            </div>
+            <div v-if="postedDateText" class="rounded-[12px] border border-neutral-border bg-neutral-bg p-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-neutral-body">Posted on</p>
+              <p class="mt-1 text-sm font-medium text-brand-charcoal">{{ postedDateText }}</p>
+            </div>
+          </div>
         </div>
 
         <!-- Why this might be a fit -->
-        <div class="card p-6">
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Why this might be a fit</h2>
           <div v-if="whyFitLoading" class="flex items-center gap-2 text-neutral-body text-sm">
             <font-awesome-icon :icon="['fas', 'spinner']" spin aria-hidden="true" />
@@ -1059,7 +1083,7 @@ async function executeTailoringCheckout() {
         </div>
 
         <!-- How to apply -->
-        <div class="card p-6">
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">How to apply</h2>
           <p class="text-neutral-body leading-relaxed mb-4">
             Apply directly on the company’s chosen platform using the button below. Use the insights above to tailor your resume and responses so you stand out from generic applicants.
@@ -1078,7 +1102,7 @@ async function executeTailoringCheckout() {
         <!-- Full description -->
         <div
           v-if="job.description?.trim()"
-          class="card p-6"
+          class="rounded-[16px] border border-neutral-border bg-white p-6"
         >
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal mb-4">Full description</h2>
           <div

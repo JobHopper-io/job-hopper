@@ -23,6 +23,7 @@ const label = computed(() => props.value ?? 'N/A')
     v-if="locked"
     class="relative inline-flex items-center gap-1.5 rounded-full border border-neutral-border bg-neutral-bg px-2.5 py-0.5 text-xs font-medium"
     aria-label="Sponsorship likelihood — upgrade to unlock"
+    title="Sponsorship likelihood: how likely this employer is to sponsor a visa. Upgrade to unlock."
   >
     <span class="pointer-events-none select-none blur-[3px]" aria-hidden="true">
       <font-awesome-icon :icon="['fas', 'globe-americas']" class="shrink-0" />

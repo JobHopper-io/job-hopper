@@ -1,9 +1,22 @@
 /**
- * Apollo.io REST helpers for Premium Insights (org resolve → people search → match).
+ * Apollo.io REST helpers for Hiring Intel (org resolve → people search → match).
  * Paid steps: mixed_companies/search (1), people/match (1). mixed_people/api_search is free.
  */
 
 const APOLLO_BASE = 'https://api.apollo.io/api/v1'
+
+/** Thrown instead of a plain Error when Apollo's response indicates our account is out of
+ * lead credits (as opposed to a generic upstream failure) - lets callers show a distinct,
+ * more honest message instead of "try again in a few minutes" for something a retry can't fix. */
+export class ApolloCreditError extends Error {}
+
+/** Same heuristic matchPersonById already used for people/match: some credit-exhaustion
+ * responses come back with a plain 4xx status, others as 200-adjacent statuses with "credit"
+ * in the body - check both. */
+function isCreditResponse(status: number, bodyText: string): boolean {
+  if (status === 401 || status === 402 || status === 403 || status === 429) return true
+  return bodyText.toLowerCase().includes('credit')
+}
 
 export type ApolloOrgCandidate = {
   id: string
@@ -349,6 +362,9 @@ export async function searchOrganizationsByName(
   const res = await fetch(url, { method: 'POST', headers: apolloHeaders(apiKey), body: '{}' })
   if (!res.ok) {
     const text = await res.text()
+    if (isCreditResponse(res.status, text)) {
+      throw new ApolloCreditError(`Apollo org search ${res.status}: ${text.slice(0, 500)}`)
+    }
     throw new Error(`Apollo org search ${res.status}: ${text.slice(0, 500)}`)
   }
   const json = (await res.json()) as Record<string, unknown>
@@ -389,6 +405,9 @@ export async function searchPeopleAtOrganization(
   const res = await fetch(url, { method: 'POST', headers: apolloHeaders(apiKey), body: '{}' })
   if (!res.ok) {
     const text = await res.text()
+    if (isCreditResponse(res.status, text)) {
+      throw new ApolloCreditError(`Apollo people search ${res.status}: ${text.slice(0, 500)}`)
+    }
     throw new Error(`Apollo people search ${res.status}: ${text.slice(0, 500)}`)
   }
   const json = (await res.json()) as Record<string, unknown>

@@ -33,15 +33,17 @@ async function joinWaitlist() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-7xl mx-auto">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="flex items-center gap-3 text-3xl font-heading font-bold text-brand-charcoal mb-2">
-          <font-awesome-icon :icon="['fas', 'crown']" class="text-brand-primary" aria-hidden="true" />
-          Sponsor Watch
-        </h1>
-        <p class="text-neutral-body">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl mx-auto">
+      <!-- Header: centered hero block (icon on top) instead of Applications' left-aligned row -
+           this is a single focused settings page, not a data list, so the whole column reads
+           as one centered unit. -->
+      <div class="mb-8 flex flex-col items-center text-center">
+        <span class="mb-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+          <font-awesome-icon :icon="['fas', 'crown']" aria-hidden="true" />
+        </span>
+        <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Sponsor Watch</h1>
+        <p class="mt-1 text-neutral-body">
           Real-time alerts when a watched employer's H-1B filing volume changes, built on real DOL/USCIS filing data.
         </p>
       </div>
@@ -52,8 +54,8 @@ async function joinWaitlist() {
 
       <!-- Free/Core: Premium isn't purchasable yet, so this is a waitlist capture, not an upsell CTA. -->
       <template v-else>
-        <div class="card max-w-xl p-6">
-          <div class="mb-4 flex items-center gap-2.5">
+        <div class="card p-6 text-center">
+          <div class="mb-4 flex flex-col items-center gap-2">
             <font-awesome-icon :icon="['fas', 'lock']" class="text-brand-primary" aria-hidden="true" />
             <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch is coming soon</h3>
           </div>

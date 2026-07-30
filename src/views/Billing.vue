@@ -75,9 +75,12 @@ const handleManageBilling = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
-      <h1 class="text-3xl font-heading font-bold text-brand-charcoal mb-8">Your Subscription</h1>
+      <div class="mb-8">
+        <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Your Subscription</h1>
+        <p class="mt-1 text-sm text-neutral-body">Manage your plan, add-ons, and payment details.</p>
+      </div>
 
       <div v-if="isLoading" class="text-center py-12">
         <font-awesome-icon
@@ -91,14 +94,16 @@ const handleManageBilling = async () => {
 
       <div v-else-if="basePlan" class="space-y-6">
         <!-- Current Plan -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'crown']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Current Plan
-          </h2>
+        <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-6 shadow-md">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Current Plan</h2>
+          </div>
           <div class="flex items-center gap-3 mb-3">
             <span class="text-lg font-semibold text-brand-charcoal">{{ basePlan.display_name }}</span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-semibold">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/70 text-brand-primary text-xs font-semibold">
               {{ subscriptionStatusLabel }}
             </span>
           </div>
@@ -110,7 +115,7 @@ const handleManageBilling = async () => {
           </div>
           <div
             v-if="trialEndsAt"
-            class="mt-4 flex items-start gap-2 rounded-[12px] border border-brand-primary/20 bg-brand-primary/5 p-3 text-sm text-brand-charcoal"
+            class="mt-4 flex items-start gap-2 rounded-[12px] border border-white/70 bg-white/50 p-3 text-sm text-brand-charcoal"
           >
             <font-awesome-icon :icon="['fas', 'circle-info']" class="h-4 w-4 mt-0.5 text-brand-primary shrink-0" aria-hidden="true" />
             <span>You're on a free trial. Billing starts on {{ new Date(trialEndsAt).toLocaleDateString() }}.</span>
@@ -118,54 +123,58 @@ const handleManageBilling = async () => {
         </div>
 
         <!-- Active Add-ons -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'sliders']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Active Add-ons
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'sliders']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Active Add-ons</h2>
+          </div>
           <div class="space-y-4">
             <div>
               <h3 class="text-sm font-semibold text-brand-charcoal mb-2">
                 Subscription add-ons
               </h3>
-              <div v-if="subscriptionAddonProducts.length" class="space-y-2">
-                <p
+              <div v-if="subscriptionAddonProducts.length" class="flex flex-wrap gap-2">
+                <span
                   v-for="product in subscriptionAddonProducts"
                   :key="product.id"
-                  class="flex items-center gap-2 text-neutral-body"
+                  class="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-800"
                 >
-                  <font-awesome-icon :icon="['fas', 'check']" class="h-3.5 w-3.5 text-brand-success shrink-0" aria-hidden="true" />
+                  <font-awesome-icon :icon="['fas', 'check']" class="h-3 w-3 shrink-0" aria-hidden="true" />
                   {{ formatProductLineLabel(product) }}
-                </p>
+                </span>
               </div>
-              <p v-else class="text-neutral-body">No active subscription add-ons</p>
+              <p v-else class="text-sm text-neutral-body">No active subscription add-ons</p>
             </div>
 
             <div>
               <h3 class="text-sm font-semibold text-brand-charcoal mb-2">
                 One-time purchases
               </h3>
-              <div v-if="oneTimePurchaseProducts.length" class="space-y-2">
-                <p
+              <div v-if="oneTimePurchaseProducts.length" class="flex flex-wrap gap-2">
+                <span
                   v-for="product in oneTimePurchaseProducts"
                   :key="product.id"
-                  class="flex items-center gap-2 text-neutral-body"
+                  class="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-800"
                 >
-                  <font-awesome-icon :icon="['fas', 'check']" class="h-3.5 w-3.5 text-brand-success shrink-0" aria-hidden="true" />
+                  <font-awesome-icon :icon="['fas', 'check']" class="h-3 w-3 shrink-0" aria-hidden="true" />
                   {{ formatOneTimeLine(product, purchaseCount) }}
-                </p>
+                </span>
               </div>
-              <p v-else class="text-neutral-body">No one-time purchases</p>
+              <p v-else class="text-sm text-neutral-body">No one-time purchases</p>
             </div>
           </div>
         </div>
 
         <!-- Actions -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'arrow-right-arrow-left']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Manage Subscription
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'arrow-right-arrow-left']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Manage Subscription</h2>
+          </div>
           <div class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-neutral-border">
               <div>
@@ -213,20 +222,22 @@ const handleManageBilling = async () => {
         </div>
       </div>
       <div v-else class="space-y-6">
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'crown']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Current Plan
-          </h2>
+        <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-6 shadow-md">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Current Plan</h2>
+          </div>
           <div class="flex items-center gap-3 mb-4">
             <span class="text-lg font-semibold text-brand-charcoal">Free</span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-bg border border-neutral-border text-neutral-body text-xs font-semibold">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/70 text-neutral-body text-xs font-semibold">
               No active subscription
             </span>
           </div>
           <p class="text-sm text-neutral-body mb-4">
             You can search for jobs manually with capped credits and preview limited insights.
-            Upgrade to unlock unlimited automated matching, full resume advice, and full Premium Insights.
+            Upgrade to unlock unlimited automated matching, full resume advice, and full Hiring Intel.
           </p>
           <div class="flex flex-col sm:flex-row gap-3">
             <router-link

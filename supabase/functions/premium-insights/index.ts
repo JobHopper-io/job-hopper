@@ -2,6 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import {
+  ApolloCreditError,
   buildCompanyCacheKey,
   employerNamePlausible,
   hiringTitlePhrases,
@@ -666,18 +667,19 @@ serve(async (req) => {
       try {
         orgs = await searchOrganizationsByName(apolloKey, companyName, location)
       } catch (e) {
+        const code = e instanceof ApolloCreditError ? 'apollo_credit_error' : 'org_search_error'
         console.log(
           JSON.stringify({
             fn: 'premium-insights',
             phase: 'failure',
             job_match_id: jobMatchId,
             profile_id: profileId,
-            code: 'org_search_error',
+            code,
             message: e instanceof Error ? e.message : String(e),
           }),
         )
         await refundApolloCredits(admin, PROCESS, 1)
-        return await respondFailure('org_search_error', 502)
+        return await respondFailure(code, code === 'apollo_credit_error' ? 403 : 502)
       }
 
       const scored = scoreOrganizationCandidates(companyName, location, orgs)
@@ -812,18 +814,19 @@ serve(async (req) => {
     try {
       people = await searchPeopleAtOrganization(apolloKey, organizationId!, phrases)
     } catch (e) {
+      const code = e instanceof ApolloCreditError ? 'apollo_credit_error' : 'people_search_error'
       console.log(
         JSON.stringify({
           fn: 'premium-insights',
           phase: 'failure',
           job_match_id: jobMatchId,
           profile_id: profileId,
-          code: 'people_search_error',
+          code,
           message: e instanceof Error ? e.message : String(e),
         }),
       )
       await refundApolloCredits(admin, PROCESS, 1)
-      return await respondFailure('people_search_error', 502)
+      return await respondFailure(code, code === 'apollo_credit_error' ? 403 : 502)
     }
 
     const filtered = people.filter((p) =>

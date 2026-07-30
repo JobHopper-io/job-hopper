@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { ApplicationStatus, Product, ResumeProduct } from '@/types/database'
+import type { ApplicationStatus, ResumeProduct } from '@/types/database'
 import JobCard from '@/components/JobCard.vue'
 import FreemiumManualJobSearchPanel from '@/components/FreemiumManualJobSearchPanel.vue'
 import FeatureTeaserCard from '@/components/FeatureTeaserCard.vue'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
 import FilterDropdown from '@/components/FilterDropdown.vue'
+import WelcomeWalkthrough from '@/components/onboarding/WelcomeWalkthrough.vue'
 import { useUserStore } from '@/stores/user'
 import { jobsAPI, type MatchedJob, type MatchingStats } from '@/lib/jobs'
 import { applicationsAPI, type TrackedApplicationRow, type JobSnapshot } from '@/lib/applications'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
+import { profileAPI } from '@/lib/profile'
 import { freemiumAPI } from '@/lib/freemium'
 import { getProductPrice } from '@/lib/subscription'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -29,7 +31,6 @@ const {
   basePlan,
   baseTier,
   subscriptionStatusLabel,
-  subscriptionAddonProducts,
   showFreemiumJobSearchCta,
   freemiumCanRunManualJobSearch,
   freemiumJobSearchesRemaining,
@@ -186,12 +187,8 @@ const userName = computed(() => {
   return profile.value?.first_name || ''
 })
 
-const activeAddonsForDisplay = computed(() =>
-  subscriptionAddonProducts.value.map((p: Product) => p.display_name),
-)
-
 // Free-tier teaser copy: first items shown, the rest blurred behind an upgrade lock.
-// Illustrative only — real values come from the paid Resume Advice / Premium Insights flows.
+// Illustrative only — real values come from the paid Resume Advice / Hiring Intel flows.
 const resumeAdviceTeaser = {
   real: [
     '✓ Strong keyword match for your target title',
@@ -260,36 +257,28 @@ async function handleUpdateApplicationStatus(
   await loadApplications()
 }
 
-// Profile completion: key fields that improve matching, itemized so the card can point at
-// exactly what's missing instead of just a percentage.
+// Profile completion: only fields that directly affect match quality (target job title, role
+// categories, resume) - name/current title/salary are nice-to-have, not worth nagging about.
 interface ProfileCompletionItem {
   label: string
   done: boolean
 }
 
-const profileCompletionItems = computed<ProfileCompletionItem[]>(() => {
+const essentialProfileItems = computed<ProfileCompletionItem[]>(() => {
   const p = profile.value
   return [
-    { label: 'Add your name', done: !!p?.first_name?.trim() && !!p?.last_name?.trim() },
-    { label: 'Add your current job title', done: !!p?.current_job_title?.trim() },
     { label: 'Add your target job title', done: !!p?.target_job_title?.trim() },
     { label: 'Select target role categories', done: (p?.target_role_categories?.length ?? 0) > 0 },
-    {
-      label: 'Add salary expectations or preferred locations',
-      done: p?.desired_salary_min != null || p?.desired_salary_max != null || (p?.preferred_locations?.length ?? 0) > 0,
-    },
     { label: 'Upload your resume', done: !!p?.resume_bucket_key },
   ]
 })
 
-const profileCompletion = computed(() => {
-  const items = profileCompletionItems.value
-  const filled = items.filter((i) => i.done).length
-  return { filled, total: items.length, percent: items.length ? Math.round((filled / items.length) * 100) : 0 }
-})
+const missingEssentialProfileItems = computed(() =>
+  essentialProfileItems.value.filter((item) => !item.done),
+)
 
-const showProfileCompletionCard = computed(
-  () => profileCompletion.value.percent < 100 && !profileCompletionDismissed.value
+const showProfileCompletionNotice = computed(
+  () => missingEssentialProfileItems.value.length > 0 && !profileCompletionDismissed.value
 )
 
 const matchingStats = ref<MatchingStats>({
@@ -304,11 +293,27 @@ const matchesThisWeekLabel = computed(() => {
   return `${n} new match${n === 1 ? '' : 'es'} this week`
 })
 
-/** A brand-new account has thisWeek === totalDelivered === 0; the summary card reframes
- * that as a nudge to run a search instead of a flat "0 matches". */
-const hasMatchingActivity = computed(() => (matchingStats.value.totalDelivered ?? 0) > 0)
-
 const overallLoading = computed(() => isLoading.value || isLoadingMatches.value)
+
+// Post-signup feature-tour modal, shown once after the mandatory profile/plan wizard
+// (onboarding_completed) is done. Gated on overallLoading rather than checked inline in
+// onMounted, since profile/baseTier only settle after the store's async refresh resolves.
+const showWalkthrough = ref(false)
+watch(
+  overallLoading,
+  (loading) => {
+    if (loading) return
+    if (profile.value?.onboarding_completed && profile.value?.has_seen_walkthrough === false) {
+      showWalkthrough.value = true
+    }
+  },
+  { immediate: true },
+)
+
+async function closeWalkthrough() {
+  showWalkthrough.value = false
+  await profileAPI.markWalkthroughSeen()
+}
 
 const savedCount = computed(() => matches.value.filter((m) => m.isSaved).length)
 
@@ -362,7 +367,7 @@ const filteredMatches = computed(() => {
 // --- Pagination for the job feed -------------------------------------------
 // Keeps the "Recent job matches" list a fixed height instead of growing the page
 // as more matches accumulate. Numbered pages below the grid.
-const PAGE_SIZE = 9
+const PAGE_SIZE = 5
 const currentPage = ref(1)
 
 const totalPages = computed(() =>
@@ -530,7 +535,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <WelcomeWalkthrough
+    v-if="showWalkthrough"
+    :tier="baseTier"
+    @complete="closeWalkthrough"
+    @skip="closeWalkthrough"
+  />
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto">
       <div
         v-if="showDashboardBanner && dashboardBanner"
@@ -564,162 +575,57 @@ onMounted(() => {
 
       <PostCheckoutConfirmation />
 
-      <!-- Summary cards: Subscription, Add-ons, Matching stats, Profile strength -->
-      <div class="grid-auto-fill mb-8">
-        <!-- Subscription status and tier -->
-        <div class="card p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Subscription</h3>
-          </div>
-          <!-- Free tier: plain, low-pressure upgrade prompt (no urgency styling). -->
-          <template v-if="baseTier === 'free'">
-            <p class="font-heading font-semibold text-brand-charcoal">Free</p>
-            <p class="text-sm text-neutral-body mt-1">No card on file</p>
-            <router-link
-              :to="{ name: 'billing-purchase' }"
-              class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline"
+      <!--
+        Summary cards: only Profile strength lives up here now. Subscription (-> Plan
+        tile), Active add-ons, and Matching stats all moved into the side rail so the
+        top of the page isn't a mix of a 2-card grid next to full-width banners.
+      -->
+      <!-- Missing-essentials notice: compact, out of the main layout flow, only for fields
+      that actually affect match quality (not a full profile-completion checklist). -->
+      <Teleport to="body">
+        <div
+          v-if="showProfileCompletionNotice"
+          class="fixed bottom-6 right-6 z-40 w-full max-w-xs rounded-[16px] border border-neutral-border bg-white p-4 shadow-lg"
+          role="status"
+        >
+          <div class="mb-2 flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                <font-awesome-icon :icon="['fas', 'circle-info']" class="text-xs" aria-hidden="true" />
+              </span>
+              <h3 class="text-sm font-semibold text-brand-charcoal">Finish your profile</h3>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 text-neutral-body hover:text-brand-charcoal focus:outline-none"
+              aria-label="Dismiss this notice"
+              @click="dismissProfileCompletion"
             >
-              Upgrade
-            </router-link>
-          </template>
-          <template v-else>
-            <div v-if="basePlan">
-              <p class="font-heading font-semibold text-brand-charcoal">
-                {{ baseTierLabel }}
-              </p>
-              <p class="text-sm text-neutral-body mt-1">
-                {{ subscriptionStatusLabel }}
-              </p>
-              <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
-                Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
-              </p>
-              <p class="text-sm text-neutral-body mt-1">
-                Next digest: {{ nextDigestLabel }}
-              </p>
-            </div>
-            <div v-else>
-              <p class="text-sm text-neutral-body">No active plan</p>
-            </div>
-            <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-              Manage plan →
-            </router-link>
-          </template>
-        </div>
-
-        <!-- Active add-ons -->
-        <div class="card p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'plus']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Active add-ons</h3>
+              <font-awesome-icon :icon="['fas', 'xmark']" class="text-xs" aria-hidden="true" />
+            </button>
           </div>
-          <p class="font-heading font-semibold text-brand-charcoal">
-            {{ activeAddonsForDisplay.length }} active
-          </p>
-          <p class="text-sm text-neutral-body mt-1">
-            {{ activeAddonsForDisplay.length ? activeAddonsForDisplay.join(' + ') : 'No add-ons yet' }}
-          </p>
-          <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
-            Add-ons →
-          </router-link>
-        </div>
-
-        <!-- Matching statistics -->
-        <div class="card p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Matching statistics</h3>
-          </div>
-          <template v-if="hasMatchingActivity">
-            <p class="font-heading font-semibold text-brand-charcoal">
-              {{ matchingStats.thisWeek != null ? matchingStats.thisWeek : '—' }} matches
-            </p>
-            <p class="text-sm text-neutral-body mt-1">This week</p>
-            <p class="text-xs text-neutral-body mt-2">
-              Total delivered: {{ matchingStats.totalDelivered }} · Avg. match score: {{ matchingStats.avgMatchScore != null ? matchingStats.avgMatchScore : '—' }}
-            </p>
-          </template>
-          <template v-else>
-            <p class="font-heading font-semibold text-brand-charcoal">No matches yet</p>
-            <p class="text-sm text-neutral-body mt-1">Run a search below to get started</p>
-          </template>
-        </div>
-
-        <!-- Profile strength (hidden when 100% or dismissed) -->
-        <div v-if="showProfileCompletionCard" class="card p-5">
-          <div class="mb-3 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Profile strength</h3>
-          </div>
-          <div class="mb-3">
-            <div class="mb-1 flex items-center justify-between text-xs text-neutral-body">
-              <span>{{ profileCompletion.filled }} of {{ profileCompletion.total }} complete</span>
-              <span class="font-semibold text-brand-charcoal">{{ profileCompletion.percent }}%</span>
-            </div>
-            <div class="h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg">
-              <div
-                class="h-full rounded-full bg-brand-primary transition-all"
-                :style="{ width: `${profileCompletion.percent}%` }"
-              />
-            </div>
-          </div>
-          <ul class="mb-3 space-y-1.5">
+          <ul class="mb-3 space-y-1">
             <li
-              v-for="item in profileCompletionItems"
+              v-for="item in missingEssentialProfileItems"
               :key="item.label"
-              class="flex items-center gap-2 text-sm"
-              :class="item.done ? 'text-neutral-body line-through decoration-neutral-border' : 'text-brand-charcoal'"
+              class="flex items-center gap-1.5 text-xs text-brand-charcoal"
             >
-              <font-awesome-icon
-                v-if="item.done"
-                :icon="['fas', 'circle-check']"
-                class="shrink-0 text-green-600"
-                aria-hidden="true"
-              />
-              <span v-else class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-neutral-border" aria-hidden="true" />
+              <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary" aria-hidden="true" />
               {{ item.label }}
             </li>
           </ul>
-          <div class="flex flex-col items-start gap-0.5">
-            <router-link to="/profile" class="text-sm text-brand-primary font-medium hover:underline">
-              Complete profile →
-            </router-link>
-            <button
-              type="button"
-              class="text-xs text-neutral-body hover:text-brand-charcoal hover:underline transition-colors focus:outline-none"
-              aria-label="Dismiss this card"
-              @click="dismissProfileCompletion"
-            >
-              Dismiss
-            </button>
-          </div>
+          <router-link to="/profile" class="text-xs font-medium text-brand-primary hover:underline">
+            Complete profile →
+          </router-link>
         </div>
-      </div>
+      </Teleport>
 
       <!--
         Tier-specific main panel. Switched on baseTier so Core/Premium slot in cleanly.
         Only the Free branch is built in this task.
       -->
       <template v-if="baseTier === 'free'">
-        <!-- Manual job search (freemium): below status cards, above Recent matches -->
-        <div v-if="showFreemiumJobSearchCta" class="mb-8">
-          <FreemiumManualJobSearchPanel
-            :can-run="freemiumCanRunManualJobSearch"
-            :used-searches="freemiumJobSearchesUsed"
-            :max-searches="freemiumMaxJobSearches"
-            :message="freemiumSearchMessage"
-            :loading="freemiumSearchLoading"
-            @run="runFreemiumJobSearch"
-          />
-        </div>
+        <!-- Manual job search + Plan tile now live in the side rail next to the job feed. -->
 
         <!-- Locked upgrade teasers for the paid-only feature depth. -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
@@ -730,7 +636,7 @@ onMounted(() => {
             :blurred-fields="resumeAdviceTeaser.blurred"
           />
           <FeatureTeaserCard
-            title="Premium Insights"
+            title="Hiring Intel"
             :icon="['fas', 'user-tie']"
             :real-fields="premiumInsightsTeaser.real"
             :blurred-fields="premiumInsightsTeaser.blurred"
@@ -740,86 +646,54 @@ onMounted(() => {
 
       <!--
         Core and Premium share this branch: automated-matching status and fully unblurred
-        Resume Advice + Premium Insights (also serves the 6 legacy trial plans, which map to
+        Resume Advice + Hiring Intel (also serves the 6 legacy trial plans, which map to
         'core'). Application Tracker moved to its own /applications page (2026-07-27) so it's
         not competing with the job feed for space on the dashboard; both tiers get a link-out
         banner here instead of the full card inline. Premium additionally gets a banner linking
         out to /premium-tools (Sponsor Watch management).
       -->
       <template v-else-if="baseTier === 'core' || baseTier === 'premium'">
-        <!-- Automated matching status (success-tinted; the only green surface on the page). -->
-        <div class="mb-8 rounded-[12px] border border-green-200 bg-green-50 px-5 py-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2.5">
-                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
-                  <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
-                </span>
-                <p class="font-heading font-semibold text-green-700">Automated matching active</p>
-              </div>
-              <p class="mt-1 pl-[42px] text-sm text-green-700">
-                Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
-              </p>
-            </div>
-            <!-- On-demand search so a fresh, no-history account isn't stuck waiting for the digest. -->
-            <button
-              type="button"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center gap-2"
-              :disabled="subscriberSearchLoading"
-              @click="runSubscriberJobSearch"
-            >
-              <font-awesome-icon
-                v-if="subscriberSearchLoading"
-                :icon="['fas', 'spinner']"
-                spin
-                aria-hidden="true"
-              />
-              {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
-            </button>
-          </div>
-          <p v-if="subscriberSearchMessage" class="mt-3 pl-[42px] text-sm text-green-700">
-            {{ subscriberSearchMessage }}
-          </p>
-        </div>
-
-        <!-- Application Tracker moved to its own page - link out instead of the full card. -->
-        <div class="mb-8 card p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex items-center gap-2.5">
-              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+        <!--
+          Same card-grid language + bg as the Free branch's FeatureTeaserCard pair
+          (rounded-[16px], #EAF1FC, icon-circle header, md:grid-cols-2) instead of full-width
+          bars. Automated matching / "Run job search" moved to the side rail (see below),
+          same spot Free's manual-search panel lives, instead of a third card up here.
+        -->
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 mb-8">
+          <!-- Application Tracker moved to its own page - link out instead of the full card. -->
+          <div class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+            <div class="mb-3 flex items-center gap-2.5">
+              <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
                 <font-awesome-icon :icon="['fas', 'clipboard-list']" class="text-sm" aria-hidden="true" />
               </span>
-              <div class="min-w-0">
-                <p class="font-heading font-semibold text-brand-charcoal">Application Tracker</p>
-                <p v-if="trackedApplicationsCount > 0" class="text-sm text-neutral-body">
-                  {{ trackedApplicationsCount }} application{{ trackedApplicationsCount === 1 ? '' : 's' }} tracked
-                </p>
-                <p v-else class="text-sm text-neutral-body">Track every job you've applied to, all in one place.</p>
-              </div>
+              <p class="font-heading text-base font-semibold text-brand-charcoal">Application Tracker</p>
             </div>
+            <p v-if="trackedApplicationsCount > 0" class="text-sm text-neutral-body">
+              {{ trackedApplicationsCount }} application{{ trackedApplicationsCount === 1 ? '' : 's' }} tracked
+            </p>
+            <p v-else class="text-sm text-neutral-body">Track every job you've applied to, all in one place.</p>
             <router-link
               :to="{ name: 'applications' }"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+              class="btn-primary mt-4 text-sm inline-flex items-center justify-center"
             >
               Open Applications →
             </router-link>
           </div>
-        </div>
 
-        <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
-        <div v-if="baseTier === 'premium'" class="mb-8 card p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex items-center gap-2.5">
-              <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+          <!-- Premium only: link out to the dedicated Sponsor Watch surface. -->
+          <div v-if="baseTier === 'premium'" class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+            <div class="mb-3 flex items-center gap-2.5">
+              <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
                 <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
               </span>
-              <p class="font-heading font-semibold text-brand-charcoal">
-                Manage your Sponsor Watch alerts
-              </p>
+              <p class="font-heading text-base font-semibold text-brand-charcoal">Sponsor Watch</p>
             </div>
+            <p class="text-sm text-neutral-body">
+              Real-time alerts when a watched employer's H-1B filing volume changes.
+            </p>
             <router-link
               :to="{ name: 'premium-tools' }"
-              class="btn-primary shrink-0 text-sm inline-flex items-center justify-center"
+              class="btn-primary mt-4 text-sm inline-flex items-center justify-center"
             >
               Open Sponsor Watch →
             </router-link>
@@ -827,6 +701,12 @@ onMounted(() => {
         </div>
       </template>
 
+      <!--
+        Job feed + side rail (Run job search on Free, Plan on every tier). Stacks to one
+        column below ~1150px instead of squeezing the rail at laptop widths.
+      -->
+      <div class="grid grid-cols-1 gap-6 min-[1150px]:grid-cols-[minmax(0,1fr)_320px] min-[1150px]:items-start">
+      <div class="min-w-0">
       <!-- Recent job matches -->
       <div
         v-if="matchesError"
@@ -841,7 +721,7 @@ onMounted(() => {
         </h2>
       </div>
 
-      <!-- Filter bar -->
+      <!-- Filter/sort row -->
       <div class="mb-4 flex flex-wrap items-center gap-2">
         <FilterDropdown :label="roleTypeLabel" :active="selectedRoleTypes.length > 0">
           <template #default="{ close }">
@@ -959,10 +839,10 @@ onMounted(() => {
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+          class="inline-flex items-center gap-2 rounded-[12px] border px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
           :class="showSavedOnly
-            ? 'bg-brand-primary text-white shadow-sm hover:opacity-90'
-            : 'border border-neutral-border bg-neutral-bg text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-border/30'"
+            ? 'border-brand-primary bg-brand-primary text-white shadow-sm hover:opacity-90'
+            : 'border-neutral-border bg-white text-neutral-body hover:border-neutral-body/40 hover:bg-neutral-bg'"
           :aria-pressed="showSavedOnly"
           @click="showSavedOnly = !showSavedOnly"
         >
@@ -973,7 +853,7 @@ onMounted(() => {
         <button
           v-if="hasActiveFilters"
           type="button"
-          class="text-sm font-medium text-neutral-body hover:text-brand-charcoal hover:underline"
+          class="text-xs font-medium text-neutral-body hover:text-brand-charcoal hover:underline"
           @click="clearAllFilters"
         >
           Clear filters
@@ -1152,6 +1032,96 @@ onMounted(() => {
           </button>
         </nav>
       </template>
+      </div>
+
+      <!-- Side rail: Run job search on every tier (pale-blue), Plan on every tier (pale-amber, the only shadow-lifted tile) -->
+      <aside class="flex flex-col gap-5">
+        <FreemiumManualJobSearchPanel
+          v-if="baseTier === 'free' && showFreemiumJobSearchCta"
+          :can-run="freemiumCanRunManualJobSearch"
+          :used-searches="freemiumJobSearchesUsed"
+          :max-searches="freemiumMaxJobSearches"
+          :message="freemiumSearchMessage"
+          :loading="freemiumSearchLoading"
+          :matches-this-week="matchingStats.thisWeek ?? 0"
+          :avg-match-score="matchingStats.avgMatchScore"
+          @run="runFreemiumJobSearch"
+        />
+
+        <!-- Core/Premium: same pale-blue action-panel slot Free's manual search sits in,
+             but unlimited (no usage bar) - automated matching status + on-demand search. -->
+        <div v-else-if="baseTier === 'core' || baseTier === 'premium'" class="rounded-[16px] border border-[#D3E3F9] bg-[#EAF1FC] p-5">
+          <div class="mb-1.5 flex items-center gap-3">
+            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-green-700">
+              <font-awesome-icon :icon="['fas', 'circle-check']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-base font-heading font-semibold text-brand-charcoal">Automated matching active</h2>
+          </div>
+          <p class="text-sm text-neutral-body">
+            Next digest: {{ nextDigestLabel }} · {{ matchesThisWeekLabel }}
+          </p>
+          <p v-if="subscriberSearchMessage" class="mt-3 text-sm text-green-700">
+            {{ subscriberSearchMessage }}
+          </p>
+          <button
+            type="button"
+            class="btn-primary mt-4 inline-flex w-full items-center justify-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="subscriberSearchLoading"
+            @click="runSubscriberJobSearch"
+          >
+            <font-awesome-icon
+              v-if="subscriberSearchLoading"
+              :icon="['fas', 'spinner']"
+              spin
+              class="h-4 w-4"
+              aria-hidden="true"
+            />
+            {{ subscriberSearchLoading ? 'Searching…' : 'Run job search' }}
+          </button>
+        </div>
+
+        <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-5 shadow-md">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'tag']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h3 class="text-sm font-semibold text-brand-charcoal uppercase tracking-wide">Plan</h3>
+          </div>
+          <template v-if="baseTier === 'free'">
+          <p class="font-heading font-semibold text-brand-charcoal">Free</p>
+          <p class="text-sm text-neutral-body mt-1">No card on file</p>
+          <router-link
+            :to="{ name: 'billing-purchase' }"
+            class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline"
+          >
+            Upgrade
+          </router-link>
+          </template>
+          <template v-else>
+            <div v-if="basePlan">
+              <p class="font-heading font-semibold text-brand-charcoal">
+                {{ baseTierLabel }}
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                {{ subscriptionStatusLabel }}
+              </p>
+              <p v-if="trialEndsAt" class="text-sm text-neutral-body mt-1">
+                Billing begins {{ trialChargeDateLabel }} · {{ trialAmountLabel }}/mo
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Next digest: {{ nextDigestLabel }}
+              </p>
+            </div>
+            <div v-else>
+              <p class="text-sm text-neutral-body">No active plan</p>
+            </div>
+            <router-link to="/billing" class="text-sm text-brand-primary font-medium mt-2 inline-block hover:underline">
+              Manage plan →
+            </router-link>
+          </template>
+        </div>
+      </aside>
+      </div>
     </div>
   </div>
 </template>

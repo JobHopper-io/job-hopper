@@ -90,7 +90,7 @@ const faqs = [
   },
   {
     q: "What's the real difference between Free and Core?",
-    a: "Free lets you look around: manual search with a cap, a teaser of the sponsorship badge, a few visible Premium Insights fields, and a preview of Resume Advice. Core removes the ceiling—unlimited automated daily search with an email digest, the full sponsorship badge on every match, full Premium Insights, full Resume Advice, and the application tracker to keep track of where you've applied. If you're serious about your search, Core is where Job-Hopper actually starts working for you instead of you working it."
+    a: "Free lets you look around: manual search with a cap, a teaser of the sponsorship badge, a few visible Hiring Intel fields, and a preview of Resume Advice. Core removes the ceiling—unlimited automated daily search with an email digest, the full sponsorship badge on every match, full Hiring Intel, full Resume Advice, and the application tracker to keep track of where you've applied. If you're serious about your search, Core is where Job-Hopper actually starts working for you instead of you working it."
   },
   {
     q: "How do I upgrade from Free to Core?",

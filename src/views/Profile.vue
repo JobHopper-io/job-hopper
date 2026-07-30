@@ -284,10 +284,15 @@ watch(
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="app-warm-bg min-h-screen py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
-      <div class="sticky top-4 z-10 mb-8 flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Your Profile</h1>
+      <div class="sticky top-4 z-10 mb-8 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Your Profile</h1>
+          <p class="mt-1 text-sm text-neutral-body">
+            Keep this up to date — your matches, resume advice, and Hiring Intel all draw from it.
+          </p>
+        </div>
         <Transition
           enter-active-class="transition-opacity duration-150"
           leave-active-class="transition-opacity duration-300"
@@ -335,11 +340,13 @@ watch(
         </div>
 
         <!-- Subscription Info -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'crown']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Current Subscription
-          </h2>
+        <div class="rounded-[16px] border border-[#FBE3B0] bg-[#FFF4E0] p-6 shadow-md">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crown']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Current Subscription</h2>
+          </div>
           <div v-if="basePlan">
             <p class="text-neutral-body">
               <span class="font-semibold">Plan:</span> {{ basePlan?.display_name }}
@@ -354,38 +361,44 @@ watch(
         </div>
 
         <!-- About You -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'user-tie']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            About You
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'user-tie']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">About You</h2>
+          </div>
           <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Current job title</label>
-              <input v-model="currentJobTitle" type="text" class="input" />
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label class="block text-sm font-medium text-brand-charcoal mb-2">Current job title</label>
+                <input v-model="currentJobTitle" type="text" class="input" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>
+                <input v-model.number="yearsOfExperience" type="number" min="0" class="input" />
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Years of experience</label>
-              <input v-model.number="yearsOfExperience" type="number" min="0" class="input" />
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label for="profile-career-level" class="block text-sm font-medium text-brand-charcoal mb-2">
+                  Career level
+                </label>
+                <select id="profile-career-level" v-model="careerLevel" class="input">
+                  <option disabled value="">Select a level</option>
+                  <option v-for="opt in CAREER_LEVEL_OPTIONS" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-brand-charcoal mb-2">Current industry</label>
+                <input v-model="currentIndustry" type="text" class="input" />
+              </div>
             </div>
-            <div>
-              <label for="profile-career-level" class="block text-sm font-medium text-brand-charcoal mb-2">
-                Career level
-              </label>
-              <p class="text-sm text-neutral-body mb-2">
-                This determines which jobs we match you with, on any plan.
-              </p>
-              <select id="profile-career-level" v-model="careerLevel" class="input">
-                <option disabled value="">Select a level</option>
-                <option v-for="opt in CAREER_LEVEL_OPTIONS" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-brand-charcoal mb-2">Current industry</label>
-              <input v-model="currentIndustry" type="text" class="input" />
-            </div>
+            <p class="text-xs text-neutral-body -mt-2">
+              Career level determines which jobs we match you with, on any plan.
+            </p>
             <div>
               <p class="block text-sm font-medium text-brand-charcoal mb-2">
                 Do you require sponsorship to work in the United States?
@@ -415,11 +428,13 @@ watch(
         </div>
 
         <!-- Resume -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'clipboard-list']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Resume
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'clipboard-list']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Resume</h2>
+          </div>
           <p class="text-sm text-neutral-body mb-4">
             A resume helps our matching engine understand your skills and experience. You can view your current resume or upload a new one.
           </p>
@@ -456,11 +471,13 @@ watch(
         </div>
 
         <!-- Target Preferences -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'crosshairs']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Target Preferences
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'crosshairs']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Target Preferences</h2>
+          </div>
           <div class="space-y-6">
             <div>
               <TagInput
@@ -475,19 +492,26 @@ watch(
             </div>
             <div>
               <label class="block text-sm font-medium text-brand-charcoal mb-3">Role categories</label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   v-for="opt in ROLE_CATEGORIES"
                   :key="opt.value"
                   type="button"
                   @click="toggleRoleCategory(opt.value)"
                   :class="[
-                    'p-3 rounded-[12px] border-2 text-left transition-colors',
+                    'flex items-center gap-2 rounded-[12px] border px-3 py-2.5 text-left text-sm font-medium transition-colors',
                     targetRoleCategories.includes(opt.value)
-                      ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                      : 'border-neutral-border hover:border-brand-primary/50'
+                      ? 'border-brand-primary bg-[#EAF1FC] text-brand-primary'
+                      : 'border-neutral-border text-neutral-body hover:border-brand-primary/40 hover:bg-neutral-bg'
                   ]"
                 >
+                  <font-awesome-icon
+                    v-if="targetRoleCategories.includes(opt.value)"
+                    :icon="['fas', 'circle-check']"
+                    class="shrink-0 text-brand-primary"
+                    aria-hidden="true"
+                  />
+                  <span v-else class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-neutral-border" aria-hidden="true" />
                   {{ opt.label }}
                 </button>
               </div>
@@ -530,11 +554,13 @@ watch(
         </div>
 
         <!-- Email / Notification Preferences -->
-        <div class="card p-6">
-          <h2 class="flex items-center gap-2 text-xl font-heading font-semibold text-brand-charcoal mb-4">
-            <font-awesome-icon :icon="['fas', 'bell']" class="h-4 w-4 text-brand-primary" aria-hidden="true" />
-            Email preferences
-          </h2>
+        <div class="rounded-[16px] border border-neutral-border bg-white p-6">
+          <div class="mb-4 flex items-center gap-2.5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+              <font-awesome-icon :icon="['fas', 'bell']" class="text-sm" aria-hidden="true" />
+            </span>
+            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Email preferences</h2>
+          </div>
           <p class="text-sm text-neutral-body mb-4">
             Choose which emails you receive. You can change these anytime.
           </p>

@@ -58,7 +58,7 @@ export const chatbotKnowledge = [
   // ---------- FREE TO PAID / CONVERSION ----------
   {
     q: "I've been on Free for a while — what am I actually missing?",
-    a: "The biggest gap is automation: on Free you're manually re-running a capped number of searches, while Core runs your search automatically every day and emails you a digest. You're also seeing teaser versions of the sponsorship badge, Premium Insights, and Resume Advice on Free — Core unlocks all three fully, plus the application tracker."
+    a: "The biggest gap is automation: on Free you're manually re-running a capped number of searches, while Core runs your search automatically every day and emails you a digest. You're also seeing teaser versions of the sponsorship badge, Hiring Intel, and Resume Advice on Free — Core unlocks all three fully, plus the application tracker."
   },
   {
     q: "Is it worth upgrading if I'm only casually looking?",

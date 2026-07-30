@@ -1,26 +1,36 @@
 <template>
+  <div class="app-warm-bg min-h-screen">
   <main class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <button
+      type="button"
+      class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:underline mb-6"
+      @click="router.back()"
+    >
+      <font-awesome-icon :icon="['fas', 'chevron-left']" class="text-xs" aria-hidden="true" />
+      Back
+    </button>
+
     <header class="mb-6 flex items-start justify-between gap-4">
       <div class="flex items-start gap-3">
-        <span class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white">
+        <span class="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white">
           <font-awesome-icon :icon="['fas', 'comments']" aria-hidden="true" />
         </span>
         <div>
-          <div class="flex flex-wrap items-center gap-2 mb-1">
-            <h1 class="text-2xl sm:text-3xl font-heading font-semibold text-brand-charcoal">
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <h1 class="text-2xl sm:text-3xl font-heading font-bold text-brand-charcoal">
               Mock Interview Practice
             </h1>
             <span
               v-if="questionNumber > 0"
-              class="inline-flex items-center rounded-full bg-neutral-bg px-2.5 py-0.5 text-xs font-semibold text-brand-charcoal"
+              class="inline-flex items-center rounded-full bg-brand-primary/10 px-2.5 py-0.5 text-xs font-semibold text-brand-primary"
             >
               Question {{ questionNumber }}
             </span>
           </div>
-          <p class="text-sm text-neutral-body">
-            Practicing for <span class="font-medium text-brand-charcoal">{{ jobTitle }}</span>
+          <p class="inline-block rounded-[12px] border border-[#D3E3F9] bg-[#EAF1FC] px-3 py-2 text-sm leading-snug text-neutral-body">
+            Practicing for <span class="font-semibold text-brand-charcoal">{{ jobTitle }}</span>
             <template v-if="companyName">
-              at <span class="font-medium text-brand-charcoal">{{ companyName }}</span>
+              at <span class="font-semibold text-brand-charcoal">{{ companyName }}</span>
             </template>
           </p>
         </div>
@@ -34,7 +44,7 @@
       {{ loadError }}
     </p>
 
-    <section v-else class="card flex flex-col overflow-hidden">
+    <section v-else class="flex flex-col overflow-hidden rounded-[16px] border border-neutral-border bg-white shadow-sm">
       <div ref="transcriptEl" class="p-5 sm:p-6 flex flex-col gap-4 max-h-[32rem] overflow-y-auto">
         <template v-for="(item, i) in renderItems" :key="i">
           <div v-if="item.kind === 'question'" class="flex gap-2.5 max-w-[88%]">
@@ -132,6 +142,7 @@
       </div>
     </section>
   </main>
+  </div>
 </template>
 
 <script setup lang="ts">

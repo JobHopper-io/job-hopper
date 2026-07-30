@@ -89,7 +89,7 @@ async function sendMessage() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Chat-Auth': CHAT_AUTH
+        'X-Api-Key': CHAT_AUTH
       },
       body: JSON.stringify({ message: text })
     })

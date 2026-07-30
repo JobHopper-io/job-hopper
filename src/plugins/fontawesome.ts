@@ -47,6 +47,13 @@ import {
   faEyeSlash,
   faUser,
   faBriefcase,
+  faCompass,
+  faArrowsRotate,
+  faArrowUpRightDots,
+  faShieldHalved,
+  faCertificate,
+  faSatelliteDish,
+  faCommentDots,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram, faYoutube, faLinkedin, faFreeCodeCamp } from '@fortawesome/free-brands-svg-icons'
 
@@ -96,6 +103,13 @@ library.add(
   faEyeSlash,
   faUser,
   faBriefcase,
+  faCompass,
+  faArrowsRotate,
+  faArrowUpRightDots,
+  faShieldHalved,
+  faCertificate,
+  faSatelliteDish,
+  faCommentDots,
   faTiktok,
   faInstagram,
   faYoutube,

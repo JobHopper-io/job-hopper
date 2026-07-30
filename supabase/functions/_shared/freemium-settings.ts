@@ -15,7 +15,7 @@ export interface FreemiumSettingsRow {
   core_daily_resume_advice: number
   /** Per-UTC-day resume-advice cap for Premium-tier subscribers. */
   premium_daily_resume_advice: number
-  /** Per-UTC-day Premium Insights cap for the unlimited path (Premium tier + add-on). */
+  /** Per-UTC-day Hiring Intel cap for the unlimited path (Premium tier + add-on). */
   premium_daily_insights: number
 }
 

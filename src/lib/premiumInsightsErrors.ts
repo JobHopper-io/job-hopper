@@ -11,17 +11,17 @@ function isGenericEdgeFunctionInvokeError(message: string): boolean {
   )
 }
 
-/** User-facing copy for Premium Insights edge / RPC error codes. */
+/** User-facing copy for Hiring Intel edge / RPC error codes. */
 export function mapPremiumInsightsClientError(raw: string): string {
   const t = raw.trim()
   if (!t || isGenericEdgeFunctionInvokeError(t)) {
     return PREMIUM_INSIGHTS_NO_CONTACT_MESSAGE
   }
-  if (t === 'apollo_exhausted') {
+  if (t === 'apollo_exhausted' || t === 'apollo_credit_error') {
     return 'Contact lookups are temporarily unavailable. Please try again later.'
   }
   if (t === 'quota_exceeded' || t === 'disabled') {
-    return 'You have used all free Premium Insights credits for now.'
+    return 'You have used all free Hiring Intel credits for now.'
   }
   if (t === 'Another job is already processing' || t.includes('Another job')) {
     return 'Another hiring contact lookup is already running. Wait for it to finish or try again in a few minutes.'

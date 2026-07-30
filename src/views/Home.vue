@@ -647,7 +647,7 @@ const footerColumns = [
   color: #ea580c;
 }
 .hero-blob {
-  background: linear-gradient(135deg, #ffd75a 0%, #ff8a34 40%, #2f6ecc 100%);
+  background: #ff8a34;
 }
 
 /* ── Pricing primary tier ─────────────────────────────────────────────────── */
@@ -690,7 +690,7 @@ const footerColumns = [
 /* Subtle warm amber wash (not the full-strength gradient) so the brand logo
    and copy stay clearly legible. */
 .cta-light {
-  background: linear-gradient(135deg, #fff7ed 0%, #ffe9c7 100%);
+  background: #fff7ed;
 }
 /* Same warm cream as .cta-light's lighter stop, used flat (not gradient) for the
    "off-white" alternating sections (How It Works, Pricing) so the whole page carries the

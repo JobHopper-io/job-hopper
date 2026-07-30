@@ -47,7 +47,7 @@ const {
   canRequestPremiumInsights,
 } = storeToRefs(userStore)
 
-/** Free tier: Resume Advice, Premium Insights, and the sponsorship signal are shown
+/** Free tier: Resume Advice, Hiring Intel, and the sponsorship signal are shown
  * as locked upgrade teasers instead of functional controls. Core/Premium are unaffected. */
 const isFree = computed(() => baseTier.value === 'free')
 
@@ -265,7 +265,7 @@ function openOrgChoiceModal() {
 
 function handlePremiumInsightsClick() {
   // Reachable only on Core/Premium (Free shows a locked upgrade teaser instead). Both
-  // get full, unlimited Premium Insights — run directly, no popup, no credit check.
+  // get full, unlimited Hiring Intel — run directly, no popup, no credit check.
   void runPremiumInsights()
 }
 
@@ -336,7 +336,7 @@ async function runPremiumInsights() {
     void userStore.refreshFreemium()
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -383,7 +383,7 @@ async function onConfirmOrgDisambiguation(
     emit('refresh-job-matches')
   } catch (err) {
     insightsModalLoading.value = false
-    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Premium Insights'
+    const raw = err instanceof Error ? err.message : 'Unexpected error requesting Hiring Intel'
     const friendly = mapPremiumInsightsClientError(raw)
     insightsModalError.value = friendly
   } finally {
@@ -502,7 +502,7 @@ async function runAdviceCheckout() {
       <!-- Title + save -->
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div class="min-w-0 flex-1 pr-11 sm:pr-0">
-          <h3 class="text-lg font-heading font-semibold leading-tight text-brand-charcoal sm:text-xl">
+          <h3 class="break-words text-lg font-heading font-semibold leading-tight text-brand-charcoal sm:text-xl">
             {{ job.title ?? 'Untitled role' }}
           </h3>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-body">
@@ -624,13 +624,23 @@ async function runAdviceCheckout() {
         </button>
         <!-- Free tier: locked upgrade teasers instead of the functional flows. -->
         <template v-if="isFree">
-          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+          <button
+            type="button"
+            :class="actionBtnLocked"
+            title="Get tailored feedback on how well your resume matches this role. Upgrade to unlock."
+            @click="goUpgrade"
+          >
             <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
             Get resume advice
           </button>
-          <button type="button" :class="actionBtnLocked" @click="goUpgrade">
+          <button
+            type="button"
+            :class="actionBtnLocked"
+            title="See hiring activity, sponsorship likelihood, and hiring-manager contacts for this role. Upgrade to unlock."
+            @click="goUpgrade"
+          >
             <font-awesome-icon :icon="['fas', 'lock']" class="text-xs" aria-hidden="true" />
-            Premium Insights
+            Hiring Intel
           </button>
         </template>
         <template v-else>
@@ -759,7 +769,7 @@ async function runAdviceCheckout() {
                   class="opacity-80"
                   aria-hidden="true"
                 />
-                {{ insightsLoading ? 'Please wait…' : 'Premium Insights' }}
+                {{ insightsLoading ? 'Please wait…' : 'Hiring Intel' }}
               </button>
               <InfoHint
                 tooltip="See hiring activity, sponsorship likelihood, and hiring-manager contacts for this role."

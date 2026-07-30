@@ -88,6 +88,16 @@
     @apply bg-white/70 backdrop-blur-xl border border-white/80 rounded-[20px] shadow-[0_24px_60px_rgba(120,90,40,0.14)];
   }
 
+  /* Same warm gradient as the Login/Register/Onboarding auth pages (.auth-hero in
+     AuthSplitPanel.vue), shared by every logged-in page that adopts that look
+     (Dashboard, job detail) so they read as one visual family instead of duplicating
+     the same background declaration per view. */
+  .app-warm-bg {
+    background:
+      radial-gradient(140% 110% at 100% 100%, #fdf0dc 0%, rgba(253, 240, 220, 0.4) 35%, rgba(253, 240, 220, 0) 75%),
+      #fff7ed;
+  }
+
   .gradient-mesh {
     background: linear-gradient(135deg, rgba(47, 110, 204, 0.1) 0%, rgba(255, 215, 90, 0.1) 50%, rgba(255, 138, 52, 0.1) 100%);
     background-size: 200% 200%;
