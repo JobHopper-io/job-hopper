@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { jobsAPI, type WatchedEmployer } from '@/lib/jobs'
+import type { RealSponsorshipTier } from '@/types/database'
 import SponsorshipTierBadge from '@/components/SponsorshipTierBadge.vue'
+
+const TIER_RANK: Record<RealSponsorshipTier, number> = { Low: 0, Medium: 1, High: 2 }
+
+/** Alert-fired proxy: a Low/Medium/High bucket change between the last check and now. Catches
+ * one of the two real alert triggers (crossedBucket in sponsor-watch-check); a >=25% position
+ * swing that stays within the same bucket won't show here - sponsor_watch_events (the source of
+ * truth for that) is deliberately not exposed to the frontend, see 20260718130000_sponsor_watch_rls.sql.
+ * Email remains the source of truth for that narrower case, same as originally designed. */
+function scoreDirection(employer: WatchedEmployer): 'increased' | 'decreased' {
+  const prev = employer.lastCheckedScore ? TIER_RANK[employer.lastCheckedScore] : 0
+  const curr = employer.score ? TIER_RANK[employer.score] : 0
+  return curr >= prev ? 'increased' : 'decreased'
+}
 
 const employers = ref<WatchedEmployer[]>([])
 const isLoading = ref(true)
@@ -127,19 +141,20 @@ const lastOverallCheck = computed(() => {
             <div class="mt-1.5 text-xs">
               <span v-if="!employer.lastCheckedAt" class="text-neutral-body/70">
                 <font-awesome-icon :icon="['fas', 'hourglass-half']" class="mr-1" aria-hidden="true" />
-                Not checked yet — new watches are picked up on the next quarterly run
+                Watching — we'll set a baseline on our next data check and email you if
+                {{ employer.name }}'s H-1B filing activity changes after that (usually every few months)
               </span>
               <span
                 v-else-if="employer.lastCheckedScore && employer.lastCheckedScore !== employer.score"
                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary/10 px-2 py-1 font-medium text-brand-primary"
               >
                 <font-awesome-icon :icon="['fas', 'arrow-right-arrow-left']" aria-hidden="true" />
-                Changed from {{ employer.lastCheckedScore }} to {{ employer.score }} ·
-                checked {{ formatRelative(employer.lastCheckedAt) }}
+                Last checked {{ formatRelative(employer.lastCheckedAt) }} — filing activity
+                {{ scoreDirection(employer) }}, see email for details
               </span>
               <span v-else class="text-neutral-body/70">
                 <font-awesome-icon :icon="['fas', 'circle-check']" class="mr-1" aria-hidden="true" />
-                No change · checked {{ formatRelative(employer.lastCheckedAt) }}
+                Last checked {{ formatRelative(employer.lastCheckedAt) }} — no significant change
               </span>
             </div>
           </div>

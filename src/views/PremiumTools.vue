@@ -1,35 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
-import { subscriptionAPI } from '@/lib/subscription'
 import SponsorWatchManagementCard from '@/components/SponsorWatchManagementCard.vue'
 
 const userStore = useUserStore()
-const { profile, baseTier } = storeToRefs(userStore)
+const { baseTier } = storeToRefs(userStore)
 
 const isPremium = computed(() => baseTier.value === 'premium')
-
-// Premium is not sellable yet (products.premium.available_for_purchase = false): Free/Core
-// see the same "join the waitlist" capture used on /pricing and onboarding, not a redirect -
-// same in-place-teaser philosophy as the rest of the app (FeatureTeaserCard, Dashboard's Free
-// branch) rather than bouncing the user away from a route they navigated to on purpose.
-const waitlistEmail = ref(profile.value?.email ?? '')
-const waitlistState = ref<'idle' | 'loading' | 'done' | 'error'>('idle')
-const waitlistError = ref('')
-
-async function joinWaitlist() {
-  if (!waitlistEmail.value.trim()) return
-  waitlistState.value = 'loading'
-  waitlistError.value = ''
-  const { error } = await subscriptionAPI.joinPremiumWaitlist(waitlistEmail.value.trim())
-  if (error) {
-    waitlistState.value = 'error'
-    waitlistError.value = 'Could not join the waitlist. Please try again.'
-    return
-  }
-  waitlistState.value = 'done'
-}
 </script>
 
 <template>
@@ -44,7 +22,11 @@ async function joinWaitlist() {
         </span>
         <h1 class="text-3xl font-heading font-bold text-brand-charcoal">Sponsor Watch</h1>
         <p class="mt-1 text-neutral-body">
-          Real-time alerts when a watched employer's H-1B filing volume changes, built on real DOL/USCIS filing data.
+          Alerts when a watched employer's H-1B filing volume changes, built on real DOL/USCIS filing data.
+        </p>
+        <p class="mt-2 text-xs text-neutral-body/70">
+          Government filing data updates quarterly, not daily, so watch checks and alerts run on that same
+          schedule — usually every few months.
         </p>
       </div>
 
@@ -52,40 +34,21 @@ async function joinWaitlist() {
         <SponsorWatchManagementCard />
       </template>
 
-      <!-- Free/Core: Premium isn't purchasable yet, so this is a waitlist capture, not an upsell CTA. -->
+      <!-- Free/Core: upgrade CTA, same "Upgrade to unlock" pattern as FeatureTeaserCard's
+      blurred-field lock. -->
       <template v-else>
         <div class="card p-6 text-center">
           <div class="mb-4 flex flex-col items-center gap-2">
             <font-awesome-icon :icon="['fas', 'lock']" class="text-brand-primary" aria-hidden="true" />
-            <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch is coming soon</h3>
+            <h3 class="font-heading font-semibold text-brand-charcoal">Sponsor Watch is a Premium feature</h3>
           </div>
           <p class="text-sm text-neutral-body mb-4">
-            Premium unlocks Sponsor Watch — real-time alerts when an employer's H-1B filing
-            volume changes, built on real DOL/USCIS data. Premium isn't purchasable yet; leave
-            your email and we'll notify you the moment it launches.
+            Premium unlocks Sponsor Watch — alerts when an employer's H-1B filing volume
+            changes, built on real DOL/USCIS data (checked quarterly, not real-time).
           </p>
-
-          <template v-if="waitlistState !== 'done'">
-            <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="joinWaitlist">
-              <input
-                v-model="waitlistEmail"
-                type="email"
-                required
-                placeholder="you@example.com"
-                class="input flex-1"
-              >
-              <button type="submit" class="btn-primary shrink-0" :disabled="waitlistState === 'loading'">
-                {{ waitlistState === 'loading' ? 'Joining…' : 'Join the waitlist' }}
-              </button>
-            </form>
-            <p v-if="waitlistState === 'error'" class="mt-2 text-sm text-red-600">{{ waitlistError }}</p>
-          </template>
-          <p v-else class="text-sm text-neutral-body">
-            <font-awesome-icon :icon="['fas', 'circle-check']" class="text-green-700" aria-hidden="true" />
-            You're on the waitlist — we'll email you at
-            <span class="font-semibold text-brand-charcoal">{{ waitlistEmail }}</span>
-            when Premium launches.
-          </p>
+          <router-link :to="{ name: 'billing-purchase' }" class="btn-primary inline-block">
+            Upgrade to Premium
+          </router-link>
         </div>
       </template>
     </div>

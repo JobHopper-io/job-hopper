@@ -1,50 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
-import { authAPI } from '@/lib/auth'
 import type { Product } from '@/types/database'
+import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 const faqOpen = ref<number | null>(null)
 const resumeUpgradeProduct = ref<Product | null>(null)
 const resumeTailoringProduct = ref<Product | null>(null)
 const premiumProduct = ref<Product | null>(null)
 
-// Premium is not sellable yet. This modal captures interest (email + profile id if
-// signed in, resolved server-side) via the premium-waitlist edge function.
-const waitlistOpen = ref(false)
-const waitlistEmail = ref('')
-const waitlistSubmitted = ref(false)
-const waitlistLoading = ref(false)
-const waitlistError = ref('')
-const currentUserId = ref<string | null>(null)
-
-const openWaitlist = () => {
-  waitlistSubmitted.value = false
-  waitlistError.value = ''
-  waitlistOpen.value = true
-}
-const closeWaitlist = () => {
-  waitlistOpen.value = false
-}
-const submitWaitlist = async () => {
-  if (!waitlistEmail.value.trim()) return
-  waitlistLoading.value = true
-  waitlistError.value = ''
-  const { error } = await subscriptionAPI.joinPremiumWaitlist(waitlistEmail.value.trim())
-  waitlistLoading.value = false
-  if (error) {
-    waitlistError.value = 'Could not join the waitlist. Please try again.'
-    return
-  }
-  waitlistSubmitted.value = true
-}
-
 onMounted(async () => {
-  const [addonRes, adviceRes, userRes, premiumRes] = await Promise.all([
+  const [addonRes, adviceRes, premiumRes] = await Promise.all([
     subscriptionAPI.getAddonProducts(),
     resumeProductsAPI.getResumeAdviceProduct(),
-    authAPI.getCurrentUser(),
     subscriptionAPI.getBasePlanByKey('premium'),
   ])
   if (addonRes.data) {
@@ -52,11 +21,6 @@ onMounted(async () => {
   }
   if (!adviceRes.error) {
     resumeTailoringProduct.value = adviceRes.data
-  }
-  const user = userRes?.user
-  if (user) {
-    currentUserId.value = user.id
-    if (user.email) waitlistEmail.value = user.email
   }
   if (premiumRes.data) {
     premiumProduct.value = premiumRes.data
@@ -110,23 +74,19 @@ const premiumFeatures = [
 
 // ── Feature comparison. Cell values: true = included, false = not included, string = label. ──
 const comparisonColumns = ['Free', 'Core', 'Premium']
-const comparisonRows = computed<{ feature: string; cells: (boolean | string)[] }[]>(() => {
-  const premiumLive = premiumProduct.value?.available_for_purchase === true
-  const premiumOnly = premiumLive ? true : 'Coming soon'
-  return [
-    { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
-    { feature: 'Automated matching + email digest', cells: [false, true, true] },
-    { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
-    { feature: 'Hiring Intel', cells: ['Limited', 'Full', 'Full'] },
-    { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
-    { feature: 'Application tracker', cells: [false, true, true] },
-    { feature: 'Real Sponsorship Score', cells: [false, false, premiumOnly] },
-    { feature: 'Sponsor Watch', cells: [false, false, premiumOnly] },
-    { feature: 'Apply Intelligence', cells: [false, false, premiumOnly] },
-    { feature: 'Hiring manager contact', cells: [false, false, premiumOnly] },
-    { feature: 'Ghost Listing Detector', cells: [false, false, premiumOnly] },
-  ]
-})
+const comparisonRows: { feature: string; cells: (boolean | string)[] }[] = [
+  { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
+  { feature: 'Automated matching + email digest', cells: [false, true, true] },
+  { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
+  { feature: 'Hiring Intel', cells: ['Limited', 'Full', 'Full'] },
+  { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
+  { feature: 'Application tracker', cells: [false, true, true] },
+  { feature: 'Real Sponsorship Score', cells: [false, false, true] },
+  { feature: 'Sponsor Watch', cells: [false, false, true] },
+  { feature: 'Apply Intelligence', cells: [false, false, true] },
+  { feature: 'Hiring manager contact', cells: [false, false, true] },
+  { feature: 'Ghost Listing Detector', cells: [false, false, true] },
+]
 
 const pricingFaq = [
   {
@@ -194,6 +154,7 @@ const pricingFaq = [
             <p class="text-3xl font-bold text-brand-primary mb-1">
               {{ tier.price }}<span class="text-lg font-normal text-neutral-body">/month</span>
             </p>
+            <CoreFreeMonthBadge v-if="tier.name === 'Core'" class="mb-2" />
             <p class="text-sm text-neutral-body mb-6">{{ tier.note }}</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
               <li v-for="f in tier.features" :key="f.label" class="flex items-start">
@@ -209,11 +170,8 @@ const pricingFaq = [
             </router-link>
           </div>
 
-          <!-- Premium: sellable once available_for_purchase is true, locked/waitlist otherwise -->
-          <div
-            v-if="premiumProduct?.available_for_purchase"
-            class="card p-8 text-left flex flex-col border-2 border-brand-primary"
-          >
+          <!-- Premium: always sellable now, same as Free/Core above. -->
+          <div class="card p-8 text-left flex flex-col border-2 border-brand-primary">
             <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
             <p class="text-3xl font-bold text-brand-primary mb-1">
               ${{ getProductPrice(premiumProduct) }}<span class="text-lg font-normal text-neutral-body">/month</span>
@@ -229,33 +187,6 @@ const pricingFaq = [
             <router-link to="/register" class="btn-primary w-full text-center block">
               Start with Premium
             </router-link>
-          </div>
-          <div v-else class="card p-8 text-left flex flex-col border-2 border-dashed border-neutral-border bg-neutral-bg">
-            <div class="inline-flex items-center gap-1.5 self-start bg-neutral-border text-brand-charcoal text-xs font-semibold px-3 py-1 rounded-full mb-4">
-              <font-awesome-icon :icon="['fas', 'lock']" /> Coming soon
-            </div>
-            <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">
-              $49<span class="text-lg font-normal text-neutral-body">/month</span>
-            </p>
-            <p class="text-sm text-neutral-body mb-6">Not purchasable yet — join the waitlist for early access.</p>
-            <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
-            <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
-              <li v-for="f in premiumFeatures" :key="f" class="flex items-start">
-                <font-awesome-icon :icon="['fas', 'lock']" class="mr-2 mt-1 flex-shrink-0 text-neutral-body/40" />
-                <span>{{ f }}</span>
-              </li>
-            </ul>
-            <p class="text-xs text-neutral-body mb-4">
-              These features are in active development. Join the waitlist to get early access and be notified the moment they launch.
-            </p>
-            <button
-              type="button"
-              class="btn-secondary w-full flex items-center justify-center gap-2"
-              @click="openWaitlist"
-            >
-              <font-awesome-icon :icon="['fas', 'envelope']" /> Join the waitlist
-            </button>
           </div>
         </div>
       </section>
@@ -274,10 +205,6 @@ const pricingFaq = [
                   class="text-center font-semibold text-brand-charcoal py-3 px-4"
                 >
                   {{ col }}
-                  <span
-                    v-if="col === 'Premium' && !premiumProduct?.available_for_purchase"
-                    class="block text-xs font-normal text-neutral-body"
-                  >Coming soon</span>
                 </th>
               </tr>
             </thead>
@@ -291,12 +218,7 @@ const pricingFaq = [
                     class="text-brand-success"
                   />
                   <span v-else-if="cell === false" class="text-neutral-body/30">—</span>
-                  <span
-                    v-else
-                    :class="cell === 'Coming soon' ? 'text-xs font-medium text-brand-primary' : 'text-neutral-body'"
-                  >
-                    {{ cell }}
-                  </span>
+                  <span v-else class="text-neutral-body">{{ cell }}</span>
                 </td>
               </tr>
             </tbody>
@@ -416,51 +338,6 @@ const pricingFaq = [
           <router-link to="/how-it-works" class="text-brand-primary hover:underline">Still deciding? Visit How It Works.</router-link>
         </p>
       </section>
-    </div>
-
-    <!-- Premium waitlist modal -->
-    <div
-      v-if="waitlistOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Join the Premium waitlist"
-      @click.self="closeWaitlist"
-    >
-      <div class="bg-white rounded-[12px] shadow-lg max-w-md w-full p-6">
-        <div class="flex items-start justify-between mb-4">
-          <h3 class="text-lg font-heading font-semibold text-brand-charcoal">Join the Premium waitlist</h3>
-          <button type="button" aria-label="Close" @click="closeWaitlist">
-            <font-awesome-icon :icon="['fas', 'xmark']" class="text-neutral-body" />
-          </button>
-        </div>
-        <template v-if="!waitlistSubmitted">
-          <p class="text-sm text-neutral-body mb-4">
-            Premium's deeper sponsorship intelligence is in active development. Leave your email and we'll notify you the moment it launches.
-          </p>
-          <form @submit.prevent="submitWaitlist">
-            <input
-              v-model="waitlistEmail"
-              type="email"
-              required
-              placeholder="you@example.com"
-              class="input mb-4"
-            >
-            <p v-if="waitlistError" class="text-sm text-red-600 mb-4">{{ waitlistError }}</p>
-            <button type="submit" class="btn-primary w-full" :disabled="waitlistLoading">
-              {{ waitlistLoading ? 'Joining…' : 'Notify me' }}
-            </button>
-          </form>
-        </template>
-        <template v-else>
-          <p class="text-sm text-neutral-body">
-            Thanks—you're on the list. We'll email you at
-            <span class="font-semibold text-brand-charcoal">{{ waitlistEmail }}</span>
-            when Premium launches.
-          </p>
-          <button type="button" class="btn-primary w-full mt-4" @click="closeWaitlist">Done</button>
-        </template>
-      </div>
     </div>
   </div>
 </template>

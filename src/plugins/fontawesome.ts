@@ -54,6 +54,7 @@ import {
   faCertificate,
   faSatelliteDish,
   faCommentDots,
+  faGift,
 } from '@fortawesome/free-solid-svg-icons'
 import { faTiktok, faInstagram, faYoutube, faLinkedin, faFreeCodeCamp } from '@fortawesome/free-brands-svg-icons'
 
@@ -110,6 +111,7 @@ library.add(
   faCertificate,
   faSatelliteDish,
   faCommentDots,
+  faGift,
   faTiktok,
   faInstagram,
   faYoutube,

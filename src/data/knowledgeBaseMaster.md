@@ -2236,8 +2236,9 @@ Purpose
 Define the sponsorship signal in operational terms.
 
 Summary
-A sponsorship-likelihood signal summarizes available evidence that may help a user prioritize an
-employer or role.
+A sponsorship-likelihood signal is built by extracting and scoring real evidence, not by guessing:
+job posting language, employer size, and industry (Free/Core), or actual DOL and USCIS H-1B filing
+records for that employer (Premium). It helps a user prioritize an employer or role.
 
 Detailed Explanation
 Free and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.

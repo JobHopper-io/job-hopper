@@ -151,6 +151,26 @@ export const subscriptionAPI = {
   },
 
   /**
+   * "First 25 Core subscribers get a free month" promo status - remaining spots, readable by
+   * anyone (including logged-out visitors on /pricing). Claiming happens server-side only, in
+   * create-checkout-session's try_claim_core_free_month RPC call.
+   */
+  async getCoreFreeMonthPromoStatus(): Promise<{
+    data: { remaining: number; active: boolean } | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase
+      .from('promo_core_free_month')
+      .select('claimed_count, max_claims')
+      .eq('id', 1)
+      .maybeSingle()
+    if (error) return { data: null, error: new Error(error.message) }
+    if (!data) return { data: null, error: null }
+    const remaining = Math.max(0, data.max_claims - data.claimed_count)
+    return { data: { remaining, active: remaining > 0 }, error: null }
+  },
+
+  /**
    * All `products.key` values for base plans (including not currently for sale), for admin UI and matching hints.
    */
   async listBasePlanProductKeys(): Promise<{ data: string[]; error: Error | null }> {
@@ -297,20 +317,4 @@ export const subscriptionAPI = {
     return { data: profile?.career_level ? [profile.career_level] : [], error: null }
   },
 
-  /**
-   * Capture interest in the (not-yet-sellable) Premium tier from the /pricing waitlist
-   * CTA. Works for logged-out visitors too; the edge function attaches profile_id from
-   * the JWT when the caller is signed in.
-   */
-  async joinPremiumWaitlist(
-    email: string,
-  ): Promise<{ data: { success: true } | null; error: Error | null }> {
-    const { data, error } = await supabase.functions.invoke('premium-waitlist', {
-      body: { email },
-    })
-    if (error) {
-      return { data: null, error }
-    }
-    return { data, error: null }
-  },
 }

@@ -14,6 +14,7 @@ import TagInput from '@/components/TagInput.vue'
 import FormField from '@/components/auth/FormField.vue'
 import OnboardingStepHeader from '@/components/onboarding/OnboardingStepHeader.vue'
 import OnboardingChip from '@/components/onboarding/OnboardingChip.vue'
+import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 import jobHopperLogo from '@/assets/job-hopper-logo.png'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 import { splitTagsField, joinTagsField } from '@/lib/tags'
@@ -59,10 +60,6 @@ const resumeFile = ref<File | null>(null)
 // Step 5: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
 const addonProducts = ref<Product[]>([])
-// Premium is not sellable yet: shown as a locked "coming soon" tier with a waitlist CTA.
-const premiumPlan = ref<Product | null>(null)
-const waitlistState = ref<'idle' | 'loading' | 'done' | 'error'>('idle')
-const waitlistError = ref('')
 const selectedBasePlanId = ref<string | null>(null)
 const selectedAddonIds = ref<string[]>([])
 const startFreePlan = ref(false)
@@ -71,15 +68,6 @@ const startFreePlan = ref(false)
 const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 
 const careerLevelOptions = CAREER_LEVEL_OPTIONS
-
-// Show Premium as a locked tier only while it isn't purchasable. When it ships and
-// available_for_purchase flips to true, it drops out of here and getBasePlanProducts()
-// renders it as a normal selectable plan instead.
-const premiumComingSoon = computed<Product | null>(() =>
-  premiumPlan.value && premiumPlan.value.available_for_purchase === false
-    ? premiumPlan.value
-    : null,
-)
 
 // Presentational only — mirrors the "Most popular" badge Pricing.vue already puts on Core.
 const isCorePlan = (product: Product) => product.key === 'core'
@@ -172,14 +160,12 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  const [baseRes, addonRes, premiumRes] = await Promise.all([
+  const [baseRes, addonRes] = await Promise.all([
     subscriptionAPI.getBasePlanProducts(),
     subscriptionAPI.getAddonProducts(),
-    subscriptionAPI.getBasePlanByKey('premium'),
   ])
   if (baseRes.data) basePlanProducts.value = baseRes.data
   if (addonRes.data) addonProducts.value = addonRes.data
-  if (premiumRes.data) premiumPlan.value = premiumRes.data
 })
 
 watch(
@@ -226,24 +212,6 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 function selectPaidPlan(productId: string) {
   startFreePlan.value = false
   selectedBasePlanId.value = productId
-}
-
-async function handleJoinWaitlist() {
-  const email = userStore.profile?.email
-  if (!email) {
-    waitlistState.value = 'error'
-    waitlistError.value = 'We couldn’t find your email. Try again from the pricing page.'
-    return
-  }
-  waitlistState.value = 'loading'
-  waitlistError.value = ''
-  const { error: waitlistErr } = await subscriptionAPI.joinPremiumWaitlist(email)
-  if (waitlistErr) {
-    waitlistState.value = 'error'
-    waitlistError.value = 'Could not join the waitlist. Please try again.'
-    return
-  }
-  waitlistState.value = 'done'
 }
 
 function selectFreePlan() {
@@ -620,6 +588,7 @@ const handleProceedToCheckout = async () => {
                 <p class="text-3xl font-heading font-bold text-brand-primary">
                   ${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span>
                 </p>
+                <CoreFreeMonthBadge v-if="isCorePlan(product)" class="self-start" />
                 <p class="flex-1 text-sm text-neutral-body">{{ product.description || '' }}</p>
                 <button type="button" class="btn-primary w-full" @click="selectPaidPlan(product.id)">
                   {{ !startFreePlan && selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}
@@ -627,36 +596,6 @@ const handleProceedToCheckout = async () => {
               </div>
             </div>
 
-            <div v-if="premiumComingSoon" class="relative flex flex-col">
-              <div
-                class="flex h-full flex-col gap-4 rounded-2xl border-2 border-dashed p-6"
-                style="border-color: #e5e7eb; background: #f9fafb"
-              >
-                <div class="flex items-center justify-between">
-                  <p class="font-heading font-bold text-brand-charcoal">{{ premiumComingSoon.display_name }}</p>
-                  <span class="rounded-full bg-brand-primary/10 px-2 py-0.5 text-xs font-semibold text-brand-primary">
-                    Coming soon
-                  </span>
-                </div>
-                <p class="text-3xl font-heading font-bold text-brand-primary">
-                  ${{ getProductPrice(premiumComingSoon) }}<span class="text-sm font-normal text-neutral-body">/month</span>
-                </p>
-                <p class="flex-1 text-sm text-neutral-body">{{ premiumComingSoon.description || '' }}</p>
-                <button
-                  v-if="waitlistState !== 'done'"
-                  type="button"
-                  class="btn-secondary w-full"
-                  :disabled="waitlistState === 'loading'"
-                  @click="handleJoinWaitlist"
-                >
-                  {{ waitlistState === 'loading' ? 'Joining…' : 'Join the waitlist' }}
-                </button>
-                <p v-else class="text-sm font-medium text-brand-primary">
-                  You're on the waitlist — we'll email you when Premium launches.
-                </p>
-                <p v-if="waitlistState === 'error'" class="text-sm text-red-600">{{ waitlistError }}</p>
-              </div>
-            </div>
           </div>
 
           <div v-if="!startFreePlan" class="w-full border-t border-neutral-border pt-6">
