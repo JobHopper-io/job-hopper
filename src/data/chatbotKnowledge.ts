@@ -52,7 +52,7 @@ export const chatbotKnowledge = [
   },
   {
     q: "Why can't you just guarantee sponsorship-friendly jobs only?",
-    a: "Because sponsorship willingness isn't fully knowable in advance from public data — even employers who've sponsored before don't always do so for every role or every year. What we can do honestly is estimate likelihood and let you filter and prioritize accordingly, which is exactly what the sponsorship signal is for."
+    a: "Because sponsorship willingness isn't fully knowable in advance — even employers who've sponsored before don't always do so for every role or every year. Instead we extract and score real signal: on Free/Core that's the job posting text, employer size, and industry; on Premium it's actual DOL and USCIS H-1B filing records for that employer (petitions filed, approved, denied). Neither is a promise, but it's real extracted data, not a guess — use it to prioritize where you apply."
   },
 
   // ---------- FREE TO PAID / CONVERSION ----------
