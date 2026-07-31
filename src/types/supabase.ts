@@ -2312,8 +2312,8 @@ export type Database = {
       try_claim_core_free_month: {
         Args: { p_profile_id: string }
         Returns: {
-          claimed_count: number
-          max_claims: number
+          new_claimed_count: number
+          new_max_claims: number
           success: boolean
         }[]
       }

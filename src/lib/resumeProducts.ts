@@ -4,7 +4,6 @@
 
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
-import { subscriptionAPI } from '@/lib/subscription'
 import type { Product, ResumeProduct } from '@/types/database'
 
 const productColumns =
@@ -163,10 +162,9 @@ export const resumeProductsAPI = {
 
   async startAdviceCheckout(
     matchId: string,
-    returnPath?: string,
     opts?: { forceFree?: boolean },
   ): Promise<{
-    data: { url: string } | { freemium: true } | null
+    data: { freemium: true } | null
     error: Error | null
   }> {
     const { data: existing, error: existingError } =
@@ -214,33 +212,24 @@ export const resumeProductsAPI = {
       freeRemaining = maxAdvice > 0 ? Math.max(0, maxAdvice - usedAdvice) : 0
     }
 
-    if (freeRemaining > 0) {
-      const { data: fnData, error: fnError } = await supabase.functions.invoke<{
-        resumeProductId?: string
-        error?: string
-      }>('freemium-resume-advice', { body: { job_match_id: matchId } })
-
-      if (fnError) {
-        return { data: null, error: new Error(await extractFunctionErrorMessage(fnError)) }
+    if (freeRemaining <= 0) {
+      return {
+        data: null,
+        error: new Error("You've used all your free resume advice. Upgrade to Core for unlimited access."),
       }
-      if (fnData && typeof fnData === 'object' && 'error' in fnData && fnData.error) {
-        return { data: null, error: new Error(String(fnData.error)) }
-      }
-      return { data: { freemium: true }, error: null }
     }
 
-    const base = window.location.origin
-    const path = returnPath ?? '/dashboard'
-    const successUrl = `${base}${path}${path.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${base}${path}`
-    const { data, error } = await subscriptionAPI.createCheckoutSession(
-      [product.id],
-      successUrl,
-      cancelUrl,
-      { jobMatchId: matchId },
-    )
-    if (error) return { data: null, error }
-    if (!data?.url) return { data: null, error: new Error('No checkout URL returned') }
-    return { data: { url: data.url }, error: null }
+    const { data: fnData, error: fnError } = await supabase.functions.invoke<{
+      resumeProductId?: string
+      error?: string
+    }>('freemium-resume-advice', { body: { job_match_id: matchId } })
+
+    if (fnError) {
+      return { data: null, error: new Error(await extractFunctionErrorMessage(fnError)) }
+    }
+    if (fnData && typeof fnData === 'object' && 'error' in fnData && fnData.error) {
+      return { data: null, error: new Error(String(fnData.error)) }
+    }
+    return { data: { freemium: true }, error: null }
   },
 }

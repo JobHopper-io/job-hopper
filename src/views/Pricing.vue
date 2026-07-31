@@ -1,29 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
-import { resumeProductsAPI } from '@/lib/resumeProducts'
 import type { Product } from '@/types/database'
 import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 const faqOpen = ref<number | null>(null)
-const resumeUpgradeProduct = ref<Product | null>(null)
-const resumeTailoringProduct = ref<Product | null>(null)
 const premiumProduct = ref<Product | null>(null)
 
 onMounted(async () => {
-  const [addonRes, adviceRes, premiumRes] = await Promise.all([
-    subscriptionAPI.getAddonProducts(),
-    resumeProductsAPI.getResumeAdviceProduct(),
-    subscriptionAPI.getBasePlanByKey('premium'),
-  ])
-  if (addonRes.data) {
-    resumeUpgradeProduct.value = addonRes.data.find((p) => p.key === 'resume_upgrade') ?? null
-  }
-  if (!adviceRes.error) {
-    resumeTailoringProduct.value = adviceRes.data
-  }
-  if (premiumRes.data) {
-    premiumProduct.value = premiumRes.data
+  const { data } = await subscriptionAPI.getBasePlanByKey('premium')
+  if (data) {
+    premiumProduct.value = data
   }
 })
 
@@ -102,16 +89,12 @@ const pricingFaq = [
     a: 'Yes. You can upgrade or downgrade your plan from your dashboard at any time as your needs change.',
   },
   {
-    q: 'Do I have to buy add-ons to get value?',
-    a: "No. Core stands on its own. The resume add-ons — a one-time resume upgrade and per-job resume tailoring — are there only if you want extra help, and they're unaffected by your plan tier.",
-  },
-  {
     q: 'Is there a free trial?',
     a: "Yes — Core and Premium both start with a free trial, so you can see the quality and relevance of your matches before you commit.",
   },
   {
     q: 'How do billing and cancellation work?',
-    a: 'Core and Premium are billed monthly and you can cancel at any time in a couple of clicks from your account settings. Resume add-ons are one-time purchases billed at checkout, not recurring subscription charges.',
+    a: 'Core and Premium are billed monthly and you can cancel at any time in a couple of clicks from your account settings.',
   },
 ]
 </script>
@@ -223,48 +206,6 @@ const pricingFaq = [
               </tr>
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <!-- Resume add-ons (unchanged — unaffected by the tier restructure) -->
-      <section class="mb-16">
-        <h2 class="text-brand-charcoal mb-4 text-center">
-          Optional resume services you can add to any plan.
-        </h2>
-        <p class="text-neutral-body mb-8 text-center">
-          Keep it simple with the base service, or add a one-time resume upgrade or per-job tailoring when you need it.
-        </p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          <div class="card p-6">
-            <h3 class="text-lg font-heading font-semibold mb-2">
-              {{ resumeUpgradeProduct?.display_name ?? 'Resume upgrade' }}
-            </h3>
-            <p class="text-xl font-bold text-brand-primary mb-4">
-              <template v-if="resumeUpgradeProduct">
-                ${{ getProductPrice(resumeUpgradeProduct).toFixed(2) }}<span class="text-sm font-normal text-neutral-body"> one-time</span>
-              </template>
-              <template v-else>—</template>
-            </p>
-            <p class="text-sm text-neutral-body mb-4">
-              {{ resumeUpgradeProduct?.description ?? 'Have your resume professionally refreshed and aligned to the types of roles you are targeting through Job-Hopper.' }}
-            </p>
-            <p class="text-sm text-neutral-body">One-time purchase at checkout—no ongoing charges.</p>
-          </div>
-          <div class="card p-6">
-            <h3 class="text-lg font-heading font-semibold mb-2">
-              {{ resumeTailoringProduct?.display_name ?? 'Per-job resume advice' }}
-            </h3>
-            <p class="text-xl font-bold text-brand-primary mb-4">
-              <template v-if="resumeTailoringProduct">
-                ${{ getProductPrice(resumeTailoringProduct).toFixed(2) }}<span class="text-sm font-normal text-neutral-body"> per job</span>
-              </template>
-              <template v-else>—</template>
-            </p>
-            <p class="text-sm text-neutral-body mb-4">
-              {{ resumeTailoringProduct?.description ?? 'Purchase advice for a specific matched role from your dashboard or job detail view.' }}
-            </p>
-            <p class="text-sm text-neutral-body">Billed per job when you choose to tailor—great for roles you are seriously pursuing.</p>
-          </div>
         </div>
       </section>
 
