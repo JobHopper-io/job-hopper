@@ -15,6 +15,10 @@ const corsHeaders = {
 
 const defaultSiteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
 
+/** Standard trial for any base-plan checkout (Core or Premium). Separate from the "first 25
+ * Core subscribers" free-month promo, which overrides this with a longer trial instead. */
+const STANDARD_TRIAL_DAYS = 14
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -83,7 +87,7 @@ serve(async (req) => {
       }
     }
 
-    const { productIds = [], successUrl, cancelUrl, trialEnd, jobMatchId } = await req.json()
+    const { productIds = [], successUrl, cancelUrl, trialEnd } = await req.json()
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       throw new Error('productIds must be a non-empty array')
@@ -108,25 +112,6 @@ serve(async (req) => {
       throw new Error('One or more selected products are not available for purchase.')
     }
 
-    const resumeAdviceProduct = products.find((p) => p.key === 'per_job_resume_advice')
-    if (
-      typeof jobMatchId === 'string' &&
-      jobMatchId &&
-      resumeAdviceProduct
-    ) {
-      const { data: existingPerJob } = await supabaseAdmin
-        .from('resume_products')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .eq('job_match_id', jobMatchId)
-        .eq('product_id', resumeAdviceProduct.id)
-        .neq('status', 'cancelled')
-        .maybeSingle()
-      if (existingPerJob) {
-        throw new Error('You have already purchased resume advice for this job.')
-      }
-    }
-
     const basePlans = products.filter((p) => p.category === 'base_plan')
     const addons = products.filter((p) => p.category !== 'base_plan')
     if (basePlans.length > 1) {
@@ -134,8 +119,7 @@ serve(async (req) => {
     }
 
     const hasBasePlan = basePlans.length === 1
-    const hasAddonsOnly = basePlans.length === 0 && addons.length > 0
-    if (!hasBasePlan && !hasAddonsOnly) {
+    if (!hasBasePlan && addons.length === 0) {
       throw new Error('Must include at least one base plan or at least one addon.')
     }
 
@@ -175,67 +159,44 @@ serve(async (req) => {
         }
       })
 
-    const hasRecurringProduct = orderedProducts.some(
-      (p) => p.category === 'base_plan' || p.category === 'subscription_addon',
-    )
-
-    let session: Stripe.Checkout.Session
-
-    if (hasRecurringProduct) {
-      const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] =
-        {
-          metadata: {
-            profile_id: profile.id,
-          },
-        }
-      if (typeof trialEnd === 'number' && trialEnd > 0) {
-        subscriptionData.trial_end = trialEnd
-      } else if (hasBasePlan && basePlans[0].key === 'core') {
-        // "First 25 Core subscribers get a free month" promo. Eligibility is decided
-        // here, server-side, via an atomic RPC - never trust a client-supplied trial
-        // length for this, or anyone could ask for a free month.
-        const { data: claimRows, error: claimError } = await supabaseAdmin.rpc(
-          'try_claim_core_free_month',
-          { p_profile_id: profile.id },
-        )
-        if (claimError) {
-          console.error('try_claim_core_free_month failed:', claimError)
-        }
-        const claim = Array.isArray(claimRows) ? claimRows[0] : null
-        subscriptionData.trial_period_days = claim?.success ? 30 : 7
-      } else if (hasBasePlan) {
-        subscriptionData.trial_period_days = 7
-      }
-
-      const metadata: Record<string, string> = { profile_id: profile.id }
-      if (typeof jobMatchId === 'string' && jobMatchId) metadata.job_match_id = jobMatchId
-      session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: lineItems,
-        mode: 'subscription',
-        allow_promotion_codes: true,
-        success_url:
-          successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
-        metadata,
-        subscription_data: subscriptionData,
-      })
-    } else {
-      const metadata: Record<string, string> = { profile_id: profile.id }
-      if (typeof jobMatchId === 'string' && jobMatchId) metadata.job_match_id = jobMatchId
-      session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: lineItems,
-        mode: 'payment',
-        allow_promotion_codes: true,
-        success_url:
-          successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
-        metadata,
-      })
+    // Every remaining checkout is recurring: only base_plan/subscription_addon products are
+    // ever selectable now (one-time products are gone), so this is always mode: 'subscription'.
+    const subscriptionData: Stripe.Checkout.SessionCreateParams['subscription_data'] = {
+      metadata: {
+        profile_id: profile.id,
+      },
     }
+    if (typeof trialEnd === 'number' && trialEnd > 0) {
+      subscriptionData.trial_end = trialEnd
+    } else if (hasBasePlan && basePlans[0].key === 'core') {
+      // "First 25 Core subscribers get a free month" promo. Eligibility is decided
+      // here, server-side, via an atomic RPC - never trust a client-supplied trial
+      // length for this, or anyone could ask for a free month.
+      const { data: claimRows, error: claimError } = await supabaseAdmin.rpc(
+        'try_claim_core_free_month',
+        { p_profile_id: profile.id },
+      )
+      if (claimError) {
+        console.error('try_claim_core_free_month failed:', claimError)
+      }
+      const claim = Array.isArray(claimRows) ? claimRows[0] : null
+      subscriptionData.trial_period_days = claim?.success ? 30 : STANDARD_TRIAL_DAYS
+    } else if (hasBasePlan) {
+      subscriptionData.trial_period_days = STANDARD_TRIAL_DAYS
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'subscription',
+      allow_promotion_codes: true,
+      success_url:
+        successUrl || `${defaultSiteUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${defaultSiteUrl}/billing`,
+      metadata: { profile_id: profile.id },
+      subscription_data: subscriptionData,
+    })
 
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),

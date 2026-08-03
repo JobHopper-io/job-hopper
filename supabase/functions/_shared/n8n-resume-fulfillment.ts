@@ -7,7 +7,6 @@ type AdminClient = SupabaseClient
 const LOG = '[resume-n8n]'
 
 const TAILORING_URL = () => Deno.env.get('N8N_RESUME_ADVICE_WEBHOOK_URL') ?? ''
-const UPGRADE_URL = () => Deno.env.get('N8N_RESUME_UPGRADE_WEBHOOK_URL') ?? ''
 const API_KEY = () => Deno.env.get('N8N_WEBHOOK_API_KEY') ?? ''
 
 const FETCH_TIMEOUT_MS = 120_000
@@ -16,16 +15,12 @@ function isPerJobResumeProduct(key: string): boolean {
   return key === 'per_job_resume_advice'
 }
 
+// per_job_resume_advice is the only product still fulfilled through this path - resume_upgrade
+// no longer has a purchase flow (billing was reduced to subscriptions-only + the Core promo).
 function webhookUrlForProductKey(key: string): string | null {
-  if (isPerJobResumeProduct(key)) {
-    const u = TAILORING_URL()
-    return u || null
-  }
-  if (key === 'resume_upgrade') {
-    const u = UPGRADE_URL()
-    return u || null
-  }
-  return null
+  if (!isPerJobResumeProduct(key)) return null
+  const u = TAILORING_URL()
+  return u || null
 }
 
 async function loadJobDescriptionForMatch(
@@ -271,10 +266,7 @@ export async function fulfillResumeProductViaN8n(params: FulfillResumeN8nParams)
       productKey,
       hasUrl: Boolean(url),
       hasKey: Boolean(apiKey),
-      webhookEnv:
-        productKey === 'resume_upgrade'
-          ? 'N8N_RESUME_UPGRADE_WEBHOOK_URL'
-          : 'N8N_RESUME_ADVICE_WEBHOOK_URL',
+      webhookEnv: 'N8N_RESUME_ADVICE_WEBHOOK_URL',
     })
     await markResumeProductFailed(
       supabaseAdmin,

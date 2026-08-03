@@ -462,8 +462,7 @@ async function runAdviceCheckout() {
   try {
     const { data, error } = await resumeProductsAPI.startAdviceCheckout(
       props.job.matchId,
-      '/dashboard',
-      // Subscribers (Core/Premium) never hit the paid checkout — always the free path.
+      // Subscribers (Core/Premium) always get the free generation path.
       { forceFree: !isFree.value },
     )
     if (error) {
@@ -477,10 +476,6 @@ async function runAdviceCheckout() {
       await pollAdviceUntilTerminal(props.job.matchId)
       void userStore.refreshFreemium()
       adviceLoading.value = false
-      return
-    }
-    if (data && 'url' in data && typeof data.url === 'string') {
-      window.location.href = data.url
       return
     }
     adviceLoading.value = false

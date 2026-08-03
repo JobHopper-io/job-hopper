@@ -2,7 +2,6 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
-import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
 import { sendEmail } from '../_shared/email.ts'
 import {
   renderSubscriptionStarted,
@@ -23,8 +22,6 @@ const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
 /** Grep-friendly prefix for all webhook logs. */
 const LOG_PREFIX = '[stripe-webhook]'
-/** Grep-friendly prefix for resume_products + n8n path inside checkout.session.completed. */
-const RESUME_LOG = `${LOG_PREFIX}[resume]`
 
 function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'past_due' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
@@ -310,163 +307,6 @@ serve(async (req) => {
             sessionId: session.id,
             profileId,
           })
-        }
-
-        const lineItems = await stripe.checkout.sessions.listLineItems(
-          session.id,
-          {
-            expand: ['data.price.product'],
-          },
-        )
-
-        const oneTimeStripeProductIds = new Set<string>()
-        for (const line of lineItems.data) {
-          const price = line.price
-          if (!price) continue
-          if (price.recurring != null) continue
-          const product = price.product
-          if (typeof product === 'string') {
-            oneTimeStripeProductIds.add(product)
-          } else if (product && typeof product.id === 'string') {
-            oneTimeStripeProductIds.add(product.id)
-          }
-        }
-
-        const oneTimeStripeProductIdArray = Array.from(oneTimeStripeProductIds)
-        if (oneTimeStripeProductIdArray.length === 0) {
-          console.log(`${LOG_PREFIX} checkout.session.completed: no one-time (non-recurring) line items`, {
-            sessionId: session.id,
-            profileId,
-            lineItemCount: lineItems.data.length,
-          })
-        }
-        if (oneTimeStripeProductIdArray.length > 0) {
-          const jobMatchId = session.metadata?.job_match_id ?? null
-          console.log(`${RESUME_LOG} one-time line items`, {
-            checkoutSessionId: session.id,
-            profileId,
-            stripeOneTimeProductIdCount: oneTimeStripeProductIdArray.length,
-            jobMatchIdFromMetadata: jobMatchId,
-          })
-
-          const { data: oneTimeProducts, error: oneTimeProductsError } =
-            await supabaseAdmin
-              .from('products')
-              .select('id, key, stripe_product_id')
-              .in('stripe_product_id', oneTimeStripeProductIdArray)
-
-          if (oneTimeProductsError) {
-            console.error(
-              'checkout.session.completed: failed to load products for one-time items',
-              oneTimeProductsError,
-            )
-          }
-
-          const oneTimeProductIdByStripeProductId = new Map<string, { id: string; key: string }>()
-          for (const row of oneTimeProducts ?? []) {
-            if (row.stripe_product_id) {
-              oneTimeProductIdByStripeProductId.set(row.stripe_product_id, { id: row.id, key: row.key })
-            }
-          }
-
-          console.log(`${RESUME_LOG} resolved Supabase products for Stripe one-time IDs`, {
-            checkoutSessionId: session.id,
-            mappedKeys: [...(oneTimeProducts ?? [])].map((r) => r.key),
-          })
-
-          for (const line of lineItems.data) {
-            const price = line.price
-            if (!price) continue
-            if (price.recurring != null) continue
-            const product = price.product
-            const stripeProductId =
-              typeof product === 'string' ? product : product?.id
-            if (!stripeProductId) {
-              console.error(
-                'checkout.session.completed: one-time line missing Stripe product id, skipping',
-              )
-              continue
-            }
-
-            const resolved = oneTimeProductIdByStripeProductId.get(stripeProductId)
-            if (!resolved) {
-              console.error(
-                'checkout.session.completed: no matching Supabase product for one-time Stripe product id, skipping',
-                stripeProductId,
-              )
-              continue
-            }
-
-            const isPerJobResume = resolved.key === 'per_job_resume_advice'
-            if (resolved.key !== 'resume_upgrade' && !isPerJobResume) {
-              continue
-            }
-
-            console.log(`${RESUME_LOG} handling resume product line`, {
-              checkoutSessionId: session.id,
-              profileId,
-              productKey: resolved.key,
-              supabaseProductId: resolved.id,
-              stripeProductId,
-              isPerJobResume,
-              jobMatchId: isPerJobResume ? jobMatchId : null,
-            })
-
-            const { data: resumeRow, error: resumeProductError } = await supabaseAdmin
-              .from('resume_products')
-              .upsert(
-                {
-                  profile_id: profileId,
-                  product_id: resolved.id,
-                  job_match_id: isPerJobResume ? (jobMatchId || null) : null,
-                },
-                { onConflict: 'profile_id,job_match_id,product_id' },
-              )
-              .select('id')
-              .maybeSingle()
-            if (resumeProductError) {
-              console.error(
-                `${RESUME_LOG} failed to upsert resume_products`,
-                {
-                  checkoutSessionId: session.id,
-                  productKey: resolved.key,
-                  error: resumeProductError,
-                },
-              )
-            } else if (!resumeRow?.id) {
-              console.warn(`${RESUME_LOG} upsert returned no row id`, {
-                checkoutSessionId: session.id,
-                productKey: resolved.key,
-              })
-            } else {
-              console.log(`${RESUME_LOG} resume_products row ready`, {
-                checkoutSessionId: session.id,
-                resumeProductId: resumeRow.id,
-                productKey: resolved.key,
-              })
-              console.log(`${RESUME_LOG} scheduling n8n fulfillment (EdgeRuntime.waitUntil)`, {
-                checkoutSessionId: session.id,
-                resumeProductId: resumeRow.id,
-                productKey: resolved.key,
-              })
-              EdgeRuntime.waitUntil(
-                fulfillResumeProductViaN8n({
-                  supabaseAdmin,
-                  resumeProductId: resumeRow.id,
-                  productKey: resolved.key,
-                  profileId,
-                  jobMatchId: isPerJobResume ? (jobMatchId ?? null) : null,
-                }).catch((err) =>
-                  console.error(`${RESUME_LOG} n8n fulfillment rejected`, {
-                    checkoutSessionId: session.id,
-                    resumeProductId: resumeRow.id,
-                    productKey: resolved.key,
-                    message: err instanceof Error ? err.message : String(err),
-                  }),
-                ),
-              )
-            }
-          }
         }
 
         await upsertFreemiumUsageForCheckout(supabaseAdmin, profileId)

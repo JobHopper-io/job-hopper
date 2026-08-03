@@ -632,12 +632,9 @@ async function executeTailoringCheckout() {
   if (!job.value) return
   adviceCheckoutLoading.value = true
   tailoringError.value = null
-  const returnPath = route.path
-  // Core/Premium get Resume Advice via the free generation path — never the paid Stripe
-  // checkout, even once freemium credits are spent. The edge function still enforces its
-  // own server-side guardrails (per-tier daily quota). Free keeps the credit-then-purchase
-  // flow. Matches JobCard.
-  const { data, error } = await resumeProductsAPI.startAdviceCheckout(job.value.matchId, returnPath, {
+  // Core/Premium get Resume Advice via the free generation path, unlimited. Free keeps the
+  // lifetime-credit path. Matches JobCard.
+  const { data, error } = await resumeProductsAPI.startAdviceCheckout(job.value.matchId, {
     forceFree: !isFree.value,
   })
   if (error) {
@@ -651,10 +648,6 @@ async function executeTailoringCheckout() {
     await pollAdviceUntilTerminal(job.value.matchId)
     void userStore.refreshFreemium()
     adviceCheckoutLoading.value = false
-    return
-  }
-  if (data && 'url' in data && typeof data.url === 'string') {
-    window.location.href = data.url
     return
   }
   adviceCheckoutLoading.value = false

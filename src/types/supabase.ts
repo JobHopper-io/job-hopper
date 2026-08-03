@@ -1320,6 +1320,7 @@ export type Database = {
           auth_user_id: string | null
           career_level: Database["public"]["Enums"]["career_level"] | null
           created_at: string | null
+          current_employer: string | null
           current_industry: string | null
           current_job_title: string | null
           desired_salary_max: number | null
@@ -1336,6 +1337,7 @@ export type Database = {
           open_to_remote: boolean | null
           phone_number: string | null
           preferred_locations: string[] | null
+          recruiter_visible: boolean
           referrer_host: string | null
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
@@ -1350,6 +1352,7 @@ export type Database = {
           auth_user_id?: string | null
           career_level?: Database["public"]["Enums"]["career_level"] | null
           created_at?: string | null
+          current_employer?: string | null
           current_industry?: string | null
           current_job_title?: string | null
           desired_salary_max?: number | null
@@ -1366,6 +1369,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          recruiter_visible?: boolean
           referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
@@ -1380,6 +1384,7 @@ export type Database = {
           auth_user_id?: string | null
           career_level?: Database["public"]["Enums"]["career_level"] | null
           created_at?: string | null
+          current_employer?: string | null
           current_industry?: string | null
           current_job_title?: string | null
           desired_salary_max?: number | null
@@ -1396,6 +1401,7 @@ export type Database = {
           open_to_remote?: boolean | null
           phone_number?: string | null
           preferred_locations?: string[] | null
+          recruiter_visible?: boolean
           referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
@@ -2312,8 +2318,8 @@ export type Database = {
       try_claim_core_free_month: {
         Args: { p_profile_id: string }
         Returns: {
-          claimed_count: number
-          max_claims: number
+          new_claimed_count: number
+          new_max_claims: number
           success: boolean
         }[]
       }

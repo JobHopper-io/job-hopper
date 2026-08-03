@@ -23,14 +23,11 @@ const {
 const allAddonProducts = ref<Product[]>([])
 const basePlanProducts = ref<Product[]>([])
 const selectedAddonIds = ref<string[]>([])
-const selectedOneTimeIds = ref<string[]>([])
 const selectedBasePlanId = ref<string | null>(null)
 const isLoadingProducts = ref(true)
 const checkoutLoading = ref(false)
-const oneTimeCheckoutLoading = ref(false)
 const changePlanLoading = ref(false)
 const error = ref('')
-const oneTimeError = ref('')
 const removeError = ref('')
 const changePlanError = ref('')
 const removingAddonIds = ref<string[]>([])
@@ -42,12 +39,6 @@ const ownedAddonIds = computed(() => new Set(addonProducts.value.map((p) => p.id
 const availableSubscriptionAddons = computed(() =>
   allAddonProducts.value.filter(
     (p) => p.category === 'subscription_addon' && !ownedAddonIds.value.has(p.id),
-  ),
-)
-
-const availableOneTimeAddons = computed(() =>
-  allAddonProducts.value.filter(
-    (p) => p.category === 'one_time_addon' && !ownedAddonIds.value.has(p.id),
   ),
 )
 
@@ -97,10 +88,6 @@ const canCheckout = computed(
   () => selectedAddonIds.value.length > 0 && !checkoutLoading.value,
 )
 
-const canPurchaseOneTime = computed(
-  () => selectedOneTimeIds.value.length > 0 && !oneTimeCheckoutLoading.value,
-)
-
 const formattedTrialEnd = computed<string | null>(() => {
   if (!trialEndsAt.value) return null
   try {
@@ -115,14 +102,6 @@ function toggleAddon(productId: string, checked: boolean) {
     selectedAddonIds.value = [...selectedAddonIds.value, productId]
   } else {
     selectedAddonIds.value = selectedAddonIds.value.filter((id) => id !== productId)
-  }
-}
-
-function toggleOneTimeAddon(productId: string, checked: boolean) {
-  if (checked) {
-    selectedOneTimeIds.value = [...selectedOneTimeIds.value, productId]
-  } else {
-    selectedOneTimeIds.value = selectedOneTimeIds.value.filter((id) => id !== productId)
   }
 }
 
@@ -160,43 +139,6 @@ async function handleContinueToCheckout() {
     console.error('Add-on update error:', err)
     error.value = 'An unexpected error occurred. Please try again.'
     checkoutLoading.value = false
-  }
-}
-
-async function handlePurchaseOneTimeUpgrades() {
-  if (!canPurchaseOneTime.value) return
-
-  oneTimeError.value = ''
-  oneTimeCheckoutLoading.value = true
-
-  const productIds = [...selectedOneTimeIds.value]
-
-  try {
-    const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
-      productIds,
-      `${window.location.origin}/billing/manage?session_id={CHECKOUT_SESSION_ID}`,
-      `${window.location.origin}/billing/manage`,
-    )
-
-    if (checkoutError) {
-      console.error('One-time checkout error:', checkoutError)
-      oneTimeError.value =
-        'Unable to start checkout for one-time upgrades. Please try again.'
-      oneTimeCheckoutLoading.value = false
-      return
-    }
-
-    if (data?.url) {
-      window.location.href = data.url
-      return
-    }
-
-    oneTimeCheckoutLoading.value = false
-    oneTimeError.value = 'Unexpected response from checkout. Please try again.'
-  } catch (err) {
-    console.error('One-time checkout error:', err)
-    oneTimeError.value = 'An unexpected error occurred. Please try again.'
-    oneTimeCheckoutLoading.value = false
   }
 }
 
@@ -645,88 +587,6 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div
-          v-if="availableOneTimeAddons.length"
-          class="rounded-[16px] border border-neutral-border bg-white p-6"
-        >
-          <div class="mb-1 flex items-center gap-2.5">
-            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <font-awesome-icon :icon="['fas', 'star']" class="text-sm" aria-hidden="true" />
-            </span>
-            <h2 class="text-xl font-heading font-semibold text-brand-charcoal">One-time upgrades</h2>
-          </div>
-          <p class="text-sm text-neutral-body mb-6 pl-[42px]">
-            These upgrades are single-purchase items and do not change your monthly
-            subscription price.
-          </p>
-
-          <div class="space-y-3 mb-6">
-            <label
-              v-for="product in availableOneTimeAddons"
-              :key="product.id"
-              :class="[
-                'flex items-start cursor-pointer rounded-[12px] border p-3 transition-colors',
-                selectedOneTimeIds.includes(product.id)
-                  ? 'border-brand-primary bg-[#EAF1FC]'
-                  : 'border-neutral-border hover:border-brand-primary/40 hover:bg-neutral-bg',
-              ]"
-            >
-              <input
-                :checked="selectedOneTimeIds.includes(product.id)"
-                type="checkbox"
-                class="mr-3 mt-1 w-4 h-4"
-                @change="
-                  (e) =>
-                    toggleOneTimeAddon(product.id, (e.target as HTMLInputElement).checked)
-                "
-              />
-              <div>
-                <span class="font-medium text-brand-charcoal">{{
-                  product.display_name
-                }}</span>
-                <span class="text-sm text-neutral-body block">
-                  {{ formatProductLineLabel(product) }}
-                  <span v-if="product.description"> — {{ product.description }}</span>
-                </span>
-              </div>
-            </label>
-          </div>
-
-          <div
-            v-if="oneTimeError"
-            class="mb-4 p-4 bg-red-50 border border-red-200 rounded-[12px]"
-          >
-            <p class="text-red-800 text-sm">{{ oneTimeError }}</p>
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-4">
-            <button
-              type="button"
-              :disabled="!canPurchaseOneTime"
-              class="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              @click="handlePurchaseOneTimeUpgrades"
-            >
-              <font-awesome-icon
-                v-if="oneTimeCheckoutLoading"
-                :icon="['fas', 'spinner']"
-                spin
-                class="h-5 w-5"
-                aria-hidden="true"
-              />
-              {{
-                oneTimeCheckoutLoading
-                  ? 'Starting checkout...'
-                  : 'Purchase selected upgrades'
-              }}
-            </button>
-            <router-link
-              to="/billing"
-              class="btn-secondary inline-flex items-center justify-center"
-            >
-              Cancel
-            </router-link>
-          </div>
-        </div>
       </div>
     </div>
 

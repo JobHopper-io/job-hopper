@@ -59,9 +59,7 @@ const resumeFile = ref<File | null>(null)
 
 // Step 5: Plan Selection (product ids from DB) or free tier
 const basePlanProducts = ref<Product[]>([])
-const addonProducts = ref<Product[]>([])
 const selectedBasePlanId = ref<string | null>(null)
-const selectedAddonIds = ref<string[]>([])
 const startFreePlan = ref(false)
 // Career level is required for everyone (free and paid). It is the job-matching tier and
 // is stored on profiles.career_level -- never derived from the plan/product the user picks.
@@ -160,12 +158,8 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  const [baseRes, addonRes] = await Promise.all([
-    subscriptionAPI.getBasePlanProducts(),
-    subscriptionAPI.getAddonProducts(),
-  ])
-  if (baseRes.data) basePlanProducts.value = baseRes.data
-  if (addonRes.data) addonProducts.value = addonRes.data
+  const { data } = await subscriptionAPI.getBasePlanProducts()
+  if (data) basePlanProducts.value = data
 })
 
 watch(
@@ -178,14 +172,6 @@ watch(
 
 const handleResumeFileSelected = (file: File) => {
   resumeFile.value = file
-}
-
-function toggleAddon(productId: string, checked: boolean) {
-  if (checked) {
-    selectedAddonIds.value = [...selectedAddonIds.value, productId]
-  } else {
-    selectedAddonIds.value = selectedAddonIds.value.filter((id) => id !== productId)
-  }
 }
 
 const nextStep = () => {
@@ -217,7 +203,6 @@ function selectPaidPlan(productId: string) {
 function selectFreePlan() {
   startFreePlan.value = true
   selectedBasePlanId.value = null
-  selectedAddonIds.value = []
 }
 
 async function persistProfileAndResume(): Promise<boolean> {
@@ -299,7 +284,7 @@ const handleProceedToCheckout = async () => {
 
     const successUrl = `${window.location.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${window.location.origin}/onboarding`
-    const productIds = [selectedBasePlanId.value, ...selectedAddonIds.value]
+    const productIds = [selectedBasePlanId.value]
 
     const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
       productIds,
@@ -542,7 +527,7 @@ const handleProceedToCheckout = async () => {
           <div class="text-center">
             <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Choose how you want to start</h2>
             <p class="mt-1 text-sm text-neutral-body">
-              Start free, or subscribe with a 7-day trial for automated matching and email digests. Upgrade
+              Start free, or subscribe with a 2-week trial for automated matching and email digests. Upgrade
               anytime from billing.
             </p>
           </div>
@@ -596,32 +581,6 @@ const handleProceedToCheckout = async () => {
               </div>
             </div>
 
-          </div>
-
-          <div v-if="!startFreePlan" class="w-full border-t border-neutral-border pt-6">
-            <h3 class="mb-1 font-heading font-semibold text-brand-charcoal">Optional add-ons</h3>
-            <p class="mb-4 text-sm text-neutral-body">Separately priced; add any you'd like.</p>
-            <div class="space-y-3">
-              <label v-for="product in addonProducts" :key="product.id" class="flex items-start gap-3">
-                <input
-                  :checked="selectedAddonIds.includes(product.id)"
-                  type="checkbox"
-                  class="mt-1 h-5 w-5 rounded-md border-neutral-border accent-brand-primary"
-                  @change="(e) => toggleAddon(product.id, (e.target as HTMLInputElement).checked)"
-                />
-                <div>
-                  <span class="font-medium text-brand-charcoal">{{ product.display_name }}</span>
-                  <span class="block text-sm text-neutral-body">
-                    {{
-                      product.category === 'one_time_addon' || product.category === 'one_time_item'
-                        ? `$${getProductPrice(product).toFixed(2)} one-time`
-                        : `+$${getProductPrice(product)}/month`
-                    }}
-                    — {{ product.description || '' }}
-                  </span>
-                </div>
-              </label>
-            </div>
           </div>
         </div>
 
