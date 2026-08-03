@@ -184,6 +184,44 @@ export type Database = {
           },
         ]
       }
+      employer_accounts: {
+        Row: {
+          auth_user_id: string
+          company_name: string
+          created_at: string
+          id: string
+          matched_employer_id: string | null
+          verification_status: string
+          work_email: string
+        }
+        Insert: {
+          auth_user_id: string
+          company_name: string
+          created_at?: string
+          id?: string
+          matched_employer_id?: string | null
+          verification_status?: string
+          work_email: string
+        }
+        Update: {
+          auth_user_id?: string
+          company_name?: string
+          created_at?: string
+          id?: string
+          matched_employer_id?: string | null
+          verification_status?: string
+          work_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_accounts_matched_employer_id_fkey"
+            columns: ["matched_employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employer_name_aliases: {
         Row: {
           created_at: string

@@ -27,6 +27,7 @@ export const publicPaths = [
   '/confirm-email',
   '/email-verified',
   '/unsubscribe-success',
+  '/employer/register',
 ]
 
 /** Routes that require the user to be an admin. */
@@ -105,6 +106,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+    },
+    {
+      path: '/employer/register',
+      name: 'employer-register',
+      component: () => import('../views/EmployerRegister.vue'),
     },
     {
       path: '/forgot-password',
