@@ -32,6 +32,8 @@ export type ProfileUserEditable = Pick<
   | 'open_to_remote'
   | 'location_radius_miles'
   | 'requires_us_sponsorship'
+  | 'recruiter_visible'
+  | 'current_employer'
 >
 
 // Subscription and product types from DB schema

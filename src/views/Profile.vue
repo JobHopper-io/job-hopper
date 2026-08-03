@@ -75,6 +75,8 @@ const openToRelocation = ref(false)
 const openToRemote = ref(false)
 const locationRadiusMiles = ref<number | null>(null)
 const requiresUsSponsorship = ref<boolean | null>(null)
+const recruiterVisible = ref(false)
+const currentEmployer = ref('')
 
 const resumeUpgradePurchase = ref<ResumeProduct | null>(null)
 const resumeUpgradeModalOpen = ref(false)
@@ -114,6 +116,8 @@ function syncFormFromProfile() {
       : null
   requiresUsSponsorship.value =
     typeof p.requires_us_sponsorship === 'boolean' ? p.requires_us_sponsorship : null
+  recruiterVisible.value = p.recruiter_visible || false
+  currentEmployer.value = p.current_employer || ''
 }
 
 // Sync from store only when the profile row first appears or the user id changes.
@@ -235,6 +239,8 @@ const saveProfile = async () => {
       location_radius_miles: locationRadiusMiles.value ?? undefined,
       requires_us_sponsorship:
         requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
+      recruiter_visible: recruiterVisible.value,
+      current_employer: currentEmployer.value,
     })
     if (error) throw error
 
@@ -275,6 +281,8 @@ watch(
     openToRemote: openToRemote.value,
     locationRadiusMiles: locationRadiusMiles.value,
     requiresUsSponsorship: requiresUsSponsorship.value,
+    recruiterVisible: recruiterVisible.value,
+    currentEmployer: currentEmployer.value,
   }),
   () => {
     if (initialLoadDone.value && !isSyncingFromProfile.value) debouncedSave()
@@ -422,6 +430,24 @@ watch(
                   />
                   <span class="text-sm text-neutral-body">No, I do not require sponsorship</span>
                 </label>
+              </div>
+            </div>
+            <div>
+              <label class="inline-flex items-center gap-2">
+                <input v-model="recruiterVisible" type="checkbox" class="w-4 h-4" />
+                <span class="text-sm font-medium text-brand-charcoal">Make me visible to recruiters</span>
+              </label>
+              <p class="text-xs text-neutral-body mt-1">
+                Employers browsing Job Hopper can see your title, skills, and general location — never your name or resume up front. Your current employer will never see this.
+              </p>
+              <div v-if="recruiterVisible" class="mt-3">
+                <label class="block text-sm font-medium text-brand-charcoal mb-2">Current employer</label>
+                <input
+                  v-model="currentEmployer"
+                  type="text"
+                  class="input"
+                  placeholder="So we know who to exclude from seeing you"
+                />
               </div>
             </div>
           </div>
