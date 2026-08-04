@@ -6,6 +6,7 @@ import EmailVerifiedView from '../views/EmailVerified.vue'
 import OnboardingView from '../views/Onboarding.vue'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
+import { employerAPI } from '@/lib/employer'
 import type { Profile } from '@/types/database'
 
 /** Single source of truth for routes that don't require authentication. */
@@ -28,6 +29,7 @@ export const publicPaths = [
   '/email-verified',
   '/unsubscribe-success',
   '/employer/register',
+  '/employer/login',
 ]
 
 /** Routes that require the user to be an admin. */
@@ -43,6 +45,14 @@ const adminPaths = [
   '/admin/seo-performance',
   '/admin/acquisition-channels',
 ]
+
+/** Routes gated on an employer_accounts row instead of a profiles row - employers never
+ * go through seeker onboarding, so these are handled separately from the seeker guard
+ * logic below rather than folded into the generic protected-path branch. */
+const employerPaths = ['/employer/dashboard']
+
+/** Employer auth pages an already-signed-in employer shouldn't see again. */
+const employerPublicRedirectPaths = ['/employer/login', '/employer/register']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -111,6 +121,16 @@ const router = createRouter({
       path: '/employer/register',
       name: 'employer-register',
       component: () => import('../views/EmployerRegister.vue'),
+    },
+    {
+      path: '/employer/login',
+      name: 'employer-login',
+      component: () => import('../views/EmployerLogin.vue'),
+    },
+    {
+      path: '/employer/dashboard',
+      name: 'employer-dashboard',
+      component: () => import('../views/EmployerDashboard.vue'),
     },
     {
       path: '/forgot-password',
@@ -299,7 +319,11 @@ router.beforeEach(async (to) => {
   // Only attempt Supabase auth lookup when it's actually needed:
   // - for protected paths, or
   // - for login/register redirect logic.
-  if (!isPublicPath || publicRedirectPaths.includes(targetPath)) {
+  if (
+    !isPublicPath ||
+    publicRedirectPaths.includes(targetPath) ||
+    employerPublicRedirectPaths.includes(targetPath)
+  ) {
     user = await getUserWithTimeout()
   }
 
@@ -324,6 +348,15 @@ router.beforeEach(async (to) => {
     return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
   }
 
+  // Authenticated employers shouldn't see their own login/register pages again. A seeker
+  // session (no employer_accounts row) falls through and just sees the page normally.
+  if (user && employerPublicRedirectPaths.includes(targetPath)) {
+    const { data: employerAccount } = await employerAPI.getCurrentEmployerAccount()
+    if (employerAccount) {
+      return '/employer/dashboard'
+    }
+  }
+
   // PWA: last-opened URL can be /install-app; send users to the app instead of the install guide.
   if (targetPath === '/install-app' && isPwaDisplayMode()) {
     user = user ?? (await getUserWithTimeout())
@@ -341,7 +374,15 @@ router.beforeEach(async (to) => {
 
   // Protected paths require authentication; if we couldn't confirm a user (including timeout), send to login.
   if (!user) {
-    return '/login'
+    return employerPaths.includes(targetPath) ? '/employer/login' : '/login'
+  }
+
+  // Employer routes are gated on an employer_accounts row, not a profiles row - employers
+  // never go through seeker onboarding, so this is handled entirely separately from the
+  // seeker profile/onboarding logic below.
+  if (employerPaths.includes(targetPath)) {
+    const { data: employerAccount } = await employerAPI.getCurrentEmployerAccount()
+    return employerAccount ? true : '/employer/login'
   }
 
   const userProfile = await getProfile()
