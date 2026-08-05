@@ -88,7 +88,17 @@ const handleCreateAccount = async () => {
 </script>
 
 <template>
-  <AuthSplitPanel hide-login-link hide-register-link>
+  <AuthSplitPanel
+    headline="Get your company in front of the right candidates."
+    sub="Verify your company, search anonymized profiles, and request intros — no cold résumés, no forced reveals."
+    :stats="[
+      { value: 'Quick Verification', label: 'Apollo-backed check, most approved instantly' },
+      { value: 'Anonymized Search', label: 'Browse candidates without exposing anyone' },
+      { value: 'Consent-Based Reveal', label: 'Contact info shared only after they approve' },
+    ]"
+    hide-login-link
+    hide-register-link
+  >
     <div v-if="submitted" class="text-center">
       <div class="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary/10">
         <font-awesome-icon :icon="['fas', 'envelope']" class="text-2xl text-brand-primary" aria-hidden="true" />
@@ -149,15 +159,21 @@ const handleCreateAccount = async () => {
         {{ error }}
       </div>
 
-      <button
-        type="submit"
-        :disabled="!canSubmit || isLoading"
-        class="btn-primary flex h-12 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
-        <span>{{ isLoading ? 'Creating account…' : 'Create account' }}</span>
-        <font-awesome-icon v-if="!isLoading" :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
-      </button>
+      <div class="flex flex-col gap-3">
+        <button
+          type="submit"
+          :disabled="!canSubmit || isLoading"
+          class="btn-primary flex h-12 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+          <span>{{ isLoading ? 'Creating account…' : 'Create account' }}</span>
+          <font-awesome-icon v-if="!isLoading" :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
+        </button>
+        <p class="text-center text-[13px] text-neutral-body">
+          Already have an employer account?
+          <router-link to="/employer/login" class="font-bold text-brand-primary hover:underline">Sign in</router-link>
+        </p>
+      </div>
     </form>
   </AuthSplitPanel>
 </template>

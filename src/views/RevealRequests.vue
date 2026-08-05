@@ -125,7 +125,7 @@ onMounted(loadRequests)
               <button
                 type="button"
                 :disabled="respondingId === req.id"
-                class="btn-primary h-9 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                class="btn-primary flex h-9 items-center justify-center gap-1.5 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 @click="respond(req.id, 'approved')"
               >
                 <font-awesome-icon :icon="['fas', 'check']" aria-hidden="true" />
@@ -134,7 +134,7 @@ onMounted(loadRequests)
               <button
                 type="button"
                 :disabled="respondingId === req.id"
-                class="h-9 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg disabled:cursor-not-allowed disabled:opacity-50"
                 @click="respond(req.id, 'declined')"
               >
                 <font-awesome-icon :icon="['fas', 'xmark']" aria-hidden="true" />

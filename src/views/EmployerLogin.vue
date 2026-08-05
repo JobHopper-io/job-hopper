@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI } from '@/lib/auth'
 import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
@@ -8,6 +8,18 @@ import FormField from '@/components/auth/FormField.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 
 const router = useRouter()
+const route = useRoute()
+
+// Only honor a redirect back to a same-app path - reject anything that isn't a plain internal
+// path to avoid an open redirect. Mirrors Login.vue's seeker-side fix.
+function safeRedirectTarget(): string | null {
+  const redirect = route.query.redirect
+  const target = Array.isArray(redirect) ? redirect[0] : redirect
+  if (typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')) {
+    return target
+  }
+  return null
+}
 
 const email = ref('')
 const password = ref('')
@@ -44,7 +56,7 @@ const handleLogin = async () => {
       return
     }
 
-    router.push('/employer/dashboard')
+    router.push(safeRedirectTarget() ?? '/employer/dashboard')
   } catch (err) {
     error.value = 'An unexpected error occurred'
     console.error('Employer login error:', err)
@@ -59,7 +71,17 @@ const goToRegister = () => {
 </script>
 
 <template>
-  <AuthSplitPanel hide-login-link hide-register-link>
+  <AuthSplitPanel
+    headline="Find your next hire, without cold outreach."
+    sub="Search visa-ready candidates who've opted in, and request an introduction — they choose whether to share their contact info."
+    :stats="[
+      { value: 'Anonymized Search', label: 'Browse candidates without exposing anyone' },
+      { value: 'Verified Companies', label: 'Apollo-backed employer verification' },
+      { value: 'Consent-Based Reveal', label: 'Contact info shared only after they approve' },
+    ]"
+    hide-login-link
+    hide-register-link
+  >
     <form class="flex flex-col gap-7" novalidate @submit.prevent="handleLogin">
       <div>
         <h2 class="text-[26px] font-heading font-bold text-brand-charcoal">Employer sign in</h2>

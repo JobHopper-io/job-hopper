@@ -350,7 +350,16 @@ router.beforeEach(async (to) => {
   // Authenticated users should not see login/register; gracefully skip if Supabase is unavailable.
   if (user && publicRedirectPaths.includes(targetPath)) {
     const userProfile = await getProfile()
-    return userProfile?.onboarding_completed ? '/dashboard' : '/onboarding'
+    if (userProfile) {
+      return userProfile.onboarding_completed ? '/dashboard' : '/onboarding'
+    }
+    // No seeker profile - this may be an employer account (employers have no profiles row)
+    // rather than an incomplete seeker signup, so check before defaulting to /onboarding.
+    const { data: employerAccount } = await employerAPI.getCurrentEmployerAccount()
+    if (employerAccount) {
+      return '/employer/dashboard'
+    }
+    return '/onboarding'
   }
 
   // Authenticated employers shouldn't see their own login/register pages again. A seeker
@@ -381,7 +390,9 @@ router.beforeEach(async (to) => {
   // Preserve the intended destination so login can return the user there afterward (e.g. an
   // emailed deep link like /reveal-requests, opened while signed out).
   if (!user) {
-    if (employerPaths.includes(targetPath)) return '/employer/login'
+    if (employerPaths.includes(targetPath)) {
+      return { path: '/employer/login', query: { redirect: to.fullPath } }
+    }
     return { path: '/login', query: { redirect: to.fullPath } }
   }
 

@@ -266,7 +266,7 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                   v-if="req.status === 'pending'"
                   type="button"
                   :disabled="cancellingId === req.id"
-                  class="mt-4 h-9 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg disabled:cursor-not-allowed disabled:opacity-50"
+                  class="mt-4 flex h-9 items-center justify-center rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg disabled:cursor-not-allowed disabled:opacity-50"
                   @click="handleCancelRequest(req)"
                 >
                   Cancel request
@@ -372,7 +372,7 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                   v-if="openRequestFormId !== candidate.id"
                   type="button"
                   :disabled="requestedIds.has(candidate.id)"
-                  class="btn-primary mt-4 h-9 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  class="btn-primary mt-4 flex h-9 items-center justify-center px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   @click="openRequestForm(candidate.id)"
                 >
                   {{ requestedIds.has(candidate.id) ? 'Requested' : 'Request intro' }}
@@ -386,14 +386,14 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                     <input
                       v-model="requestRoleTitle"
                       type="text"
-                      class="input h-9 text-sm"
+                      class="input"
                       placeholder="Role title (e.g. Senior Backend Engineer)"
                     />
                   </div>
                   <div class="mt-2 grid grid-cols-3 gap-2">
-                    <input v-model="requestPayMin" type="number" min="0" class="input h-9 text-sm" placeholder="Pay min" />
-                    <input v-model="requestPayMax" type="number" min="0" class="input h-9 text-sm" placeholder="Pay max" />
-                    <select v-model="requestPayType" class="input h-9 text-sm">
+                    <input v-model="requestPayMin" type="number" min="0" class="input" placeholder="Pay min" />
+                    <input v-model="requestPayMax" type="number" min="0" class="input" placeholder="Pay max" />
+                    <select v-model="requestPayType" class="input">
                       <option v-for="opt in PAY_TYPE_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                   </div>
@@ -402,7 +402,7 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                     <button
                       type="button"
                       :disabled="sendingRequest"
-                      class="btn-primary h-9 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      class="btn-primary flex h-9 items-center justify-center gap-1.5 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       @click="submitRevealRequest(candidate.id)"
                     >
                       <font-awesome-icon v-if="sendingRequest" :icon="['fas', 'spinner']" spin aria-hidden="true" />
@@ -411,7 +411,7 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                     <button
                       type="button"
                       :disabled="sendingRequest"
-                      class="h-9 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                      class="flex h-9 items-center justify-center rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                       @click="closeRequestForm"
                     >
                       Cancel
