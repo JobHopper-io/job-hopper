@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
@@ -9,6 +9,18 @@ import FormField from '@/components/auth/FormField.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 
 const router = useRouter()
+const route = useRoute()
+
+// Only honor a redirect back to a same-app path (e.g. an emailed deep link like
+// /reveal-requests) - reject anything that isn't a plain internal path to avoid an open redirect.
+function safeRedirectTarget(): string | null {
+  const redirect = route.query.redirect
+  const target = Array.isArray(redirect) ? redirect[0] : redirect
+  if (typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')) {
+    return target
+  }
+  return null
+}
 
 const email = ref('')
 const password = ref('')
@@ -52,9 +64,15 @@ const handleLogin = async () => {
       return
     }
 
-    // Immediately redirect based on onboarding status to avoid dashboard flash
+    // Immediately redirect based on onboarding status to avoid dashboard flash. Incomplete
+    // onboarding always wins - the router guard would bounce a redirect target back to
+    // /onboarding anyway.
     const { data: profile } = await profileAPI.getCurrentUserProfile()
-    router.push(profile?.onboarding_completed ? '/dashboard' : '/onboarding')
+    if (!profile?.onboarding_completed) {
+      router.push('/onboarding')
+      return
+    }
+    router.push(safeRedirectTarget() ?? '/dashboard')
   } catch (err) {
     error.value = 'An unexpected error occurred'
     console.error('Login error:', err)

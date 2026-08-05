@@ -368,6 +368,55 @@ export function renderSponsorWatchAlert(params: {
 }
 
 /**
+ * Reveal request received: an employer wants to learn more about a seeker's (anonymized-to-them)
+ * candidate profile. Never mentions what happens on decline - the seeker just doesn't respond,
+ * or responds and nothing more is said either way.
+ */
+export function renderRevealRequestReceived(params: {
+  recipientName: string
+  employerCompanyName: string
+  requestsUrl: string
+  footer?: Partial<TemplateFooterOptions>
+}): { html: string; text: string } {
+  const { recipientName, employerCompanyName, requestsUrl, footer } = params
+  const prefsUrl = footer?.preferencesUrl ?? DEFAULT_FOOTER_OPTIONS.preferencesUrl
+  const unsubUrl = footer?.unsubscribeUrl ?? DEFAULT_FOOTER_OPTIONS.unsubscribeUrl
+
+  const summary = `${employerCompanyName} found your anonymized profile through recruiter search on Job-Hopper and would like to learn more about you.`
+  const reassurance =
+    "Nothing about you is shared unless you approve. You can review the request and approve or decline it any time."
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>An employer wants to learn more about you</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 1rem;">
+  <h1 style="font-size: 1.5rem;">Hi ${escapeHtml(recipientName)},</h1>
+  <div style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+    <p style="margin: 0;">${escapeHtml(summary)}</p>
+  </div>
+  <p style="font-size: 0.85rem; color: #666;">${escapeHtml(reassurance)}</p>
+  <p><a href="${escapeHtml(requestsUrl)}">Review the request</a></p>
+  ${footerHtml({ preferencesUrl: prefsUrl, unsubscribeUrl: unsubUrl })}
+</body>
+</html>`
+
+  const text = [
+    `Hi ${recipientName},`,
+    "",
+    summary,
+    reassurance,
+    "",
+    `Review the request: ${requestsUrl}`,
+    "",
+    "Manage preferences: " + prefsUrl,
+    "Unsubscribe: " + unsubUrl,
+  ].join("\n")
+
+  return { html, text }
+}
+
+/**
  * System announcement: body is pre-rendered HTML from system_announcements.email_body_html.
  * We only wrap with footer.
  */

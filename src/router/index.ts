@@ -198,6 +198,11 @@ const router = createRouter({
       component: () => import('../views/Applications.vue'),
     },
     {
+      path: '/reveal-requests',
+      name: 'reveal-requests',
+      component: () => import('../views/RevealRequests.vue'),
+    },
+    {
       path: '/billing/manage',
       name: 'billing-purchase',
       component: () => import('../views/ManageSubscription.vue'),
@@ -373,8 +378,11 @@ router.beforeEach(async (to) => {
   }
 
   // Protected paths require authentication; if we couldn't confirm a user (including timeout), send to login.
+  // Preserve the intended destination so login can return the user there afterward (e.g. an
+  // emailed deep link like /reveal-requests, opened while signed out).
   if (!user) {
-    return employerPaths.includes(targetPath) ? '/employer/login' : '/login'
+    if (employerPaths.includes(targetPath)) return '/employer/login'
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   // Employer routes are gated on an employer_accounts row, not a profiles row - employers

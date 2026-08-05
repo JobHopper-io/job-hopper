@@ -17,7 +17,7 @@ export const profileAPI = {
       .from('profiles')
       .select('*')
       .eq('auth_user_id', user.id)
-      .single<Profile>()
+      .maybeSingle<Profile>()
 
     return { data: data ?? null, error }
   },

@@ -115,6 +115,7 @@ async function sendMessage() {
 }
 </script>
 
+
 <style scoped>
 .rag-chat-widget {
   position: fixed;
