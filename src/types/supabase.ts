@@ -279,11 +279,15 @@ export type Database = {
           employer_account_id: string
           employer_company_name: string
           id: string
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
           responded_at: string | null
           revealed_email: string | null
           revealed_first_name: string | null
           revealed_last_name: string | null
           revealed_phone_number: string | null
+          role_title: string | null
           status: string
         }
         Insert: {
@@ -298,11 +302,15 @@ export type Database = {
           employer_account_id: string
           employer_company_name: string
           id?: string
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
           responded_at?: string | null
           revealed_email?: string | null
           revealed_first_name?: string | null
           revealed_last_name?: string | null
           revealed_phone_number?: string | null
+          role_title?: string | null
           status?: string
         }
         Update: {
@@ -317,11 +325,15 @@ export type Database = {
           employer_account_id?: string
           employer_company_name?: string
           id?: string
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
           responded_at?: string | null
           revealed_email?: string | null
           revealed_first_name?: string | null
           revealed_last_name?: string | null
           revealed_phone_number?: string | null
+          role_title?: string | null
           status?: string
         }
         Relationships: [

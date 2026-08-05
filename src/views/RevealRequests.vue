@@ -4,6 +4,7 @@ import { revealRequestsAPI } from '@/lib/revealRequests'
 import type { EmployerRevealRequest } from '@/types/database'
 import { CAREER_LEVEL_OPTIONS } from '@/lib/freemium'
 import { getRoleCategoryLabel } from '@/lib/roleCategories'
+import { formatPayRange } from '@/lib/formatJob'
 
 const requests = ref<EmployerRevealRequest[]>([])
 const isLoading = ref(true)
@@ -75,7 +76,9 @@ onMounted(loadRequests)
           class="rounded-[16px] border border-neutral-border bg-white p-5"
         >
           <div class="flex items-start justify-between gap-2">
-            <p class="font-heading font-semibold text-brand-charcoal">{{ req.employer_company_name }}</p>
+            <p class="font-heading font-semibold text-brand-charcoal">
+              {{ req.role_title || 'Untitled role' }}
+            </p>
             <span
               class="inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-xs font-semibold"
               :class="statusMeta(req.status).className"
@@ -83,7 +86,11 @@ onMounted(loadRequests)
               {{ statusMeta(req.status).label }}
             </span>
           </div>
-          <p class="mt-1 text-sm text-neutral-body">
+          <p class="text-sm text-neutral-body">at {{ req.employer_company_name }}</p>
+          <p v-if="formatPayRange(req.pay_min, req.pay_max, req.pay_type)" class="mt-1 text-sm font-medium text-brand-primary">
+            {{ formatPayRange(req.pay_min, req.pay_max, req.pay_type) }}
+          </p>
+          <p class="mt-2 text-xs text-neutral-body">
             Saw your profile as {{ req.candidate_job_title || 'a candidate' }} ·
             {{ careerLevelLabel(req.candidate_career_level) }}
             <span v-if="req.candidate_years_of_experience != null">

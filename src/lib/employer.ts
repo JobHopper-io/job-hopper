@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
-import type { EmployerAccount, EmployerRevealRequest } from '@/types/database'
+import type { EmployerAccount, EmployerRevealRequest, PayType } from '@/types/database'
+
+export type RevealRequestDetails = {
+  roleTitle: string
+  payMin?: number | null
+  payMax?: number | null
+  payType?: PayType | null
+}
 
 export type CandidateSearchFilters = {
   roleCategory?: string
@@ -79,11 +86,23 @@ export const employerAPI = {
     return { data: data?.candidates ?? [], error: null }
   },
 
-  /** Send a reveal request for a specific candidate found via searchCandidates. */
-  async sendRevealRequest(candidateProfileId: string): Promise<{ error: Error | null }> {
+  /** Send a reveal request for a specific candidate found via searchCandidates. Requires the
+   * actual role and pay range on offer - the seeker shouldn't have to approve blind. */
+  async sendRevealRequest(
+    candidateProfileId: string,
+    details: RevealRequestDetails,
+  ): Promise<{ error: Error | null }> {
     const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
       'employer-request-reveal',
-      { body: { candidate_profile_id: candidateProfileId } },
+      {
+        body: {
+          candidate_profile_id: candidateProfileId,
+          role_title: details.roleTitle,
+          pay_min: details.payMin ?? undefined,
+          pay_max: details.payMax ?? undefined,
+          pay_type: details.payType ?? undefined,
+        },
+      },
     )
 
     if (error) return { error: new Error(await parseFunctionsInvokeError(error)) }

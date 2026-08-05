@@ -372,17 +372,36 @@ export function renderSponsorWatchAlert(params: {
  * candidate profile. Never mentions what happens on decline - the seeker just doesn't respond,
  * or responds and nothing more is said either way.
  */
+function formatPayRangeForEmail(
+  payMin: number | null | undefined,
+  payMax: number | null | undefined,
+  payType: string | null | undefined,
+): string | null {
+  if ((payMin == null && payMax == null) || !payType) return null
+  const fmt = (n: number) => (payType === "year" ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`)
+  const suffix =
+    payType === "hour" ? "hr" : payType === "month" ? "mo" : payType === "week" ? "wk" : payType === "day" ? "day" : "yr"
+  if (payMin != null && payMax != null) return `${fmt(payMin)}–${fmt(payMax)}/${suffix}`
+  if (payMin != null) return `${fmt(payMin)}+/${suffix}`
+  return `Up to ${fmt(payMax as number)}/${suffix}`
+}
+
 export function renderRevealRequestReceived(params: {
   recipientName: string
   employerCompanyName: string
+  roleTitle: string
+  payMin?: number | null
+  payMax?: number | null
+  payType?: string | null
   requestsUrl: string
   footer?: Partial<TemplateFooterOptions>
 }): { html: string; text: string } {
-  const { recipientName, employerCompanyName, requestsUrl, footer } = params
+  const { recipientName, employerCompanyName, roleTitle, payMin, payMax, payType, requestsUrl, footer } = params
   const prefsUrl = footer?.preferencesUrl ?? DEFAULT_FOOTER_OPTIONS.preferencesUrl
   const unsubUrl = footer?.unsubscribeUrl ?? DEFAULT_FOOTER_OPTIONS.unsubscribeUrl
 
-  const summary = `${employerCompanyName} found your anonymized profile through recruiter search on Job-Hopper and would like to learn more about you.`
+  const payRange = formatPayRangeForEmail(payMin, payMax, payType)
+  const summary = `${employerCompanyName} found your anonymized profile through recruiter search on Job-Hopper and would like to learn more about you for their ${roleTitle} role${payRange ? ` (${payRange})` : ""}.`
   const reassurance =
     "Nothing about you is shared unless you approve. You can review the request and approve or decline it any time."
 

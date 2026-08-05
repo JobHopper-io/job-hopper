@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { employerAPI } from '@/lib/employer'
-import type { EmployerAccount, EmployerRevealRequest } from '@/types/database'
+import type { EmployerAccount, EmployerRevealRequest, PayType } from '@/types/database'
 import type { CandidateSearchResult } from '@/lib/employer'
 import { ROLE_CATEGORIES, getRoleCategoryLabel } from '@/lib/roleCategories'
 import { CAREER_LEVEL_OPTIONS } from '@/lib/freemium'
+import { formatPayRange } from '@/lib/formatJob'
+
+const PAY_TYPE_OPTIONS: { value: PayType; label: string }[] = [
+  { value: 'year', label: '/ year' },
+  { value: 'month', label: '/ month' },
+  { value: 'week', label: '/ week' },
+  { value: 'day', label: '/ day' },
+  { value: 'hour', label: '/ hour' },
+]
 
 const account = ref<EmployerAccount | null>(null)
 const isLoading = ref(true)
@@ -62,12 +71,51 @@ const handleSearch = async () => {
   }
 }
 
-async function handleRequestReveal(candidateId: string) {
-  const { error } = await employerAPI.sendRevealRequest(candidateId)
-  // already_requested still means the employer can't request again - treat it the same as
-  // success so the button reflects reality either way.
-  if (!error || error.message === 'already_requested') {
-    requestedIds.value.add(candidateId)
+const openRequestFormId = ref<string | null>(null)
+const requestRoleTitle = ref('')
+const requestPayMin = ref('')
+const requestPayMax = ref('')
+const requestPayType = ref<PayType>('year')
+const sendingRequest = ref(false)
+const sendRequestError = ref('')
+
+function openRequestForm(candidateId: string) {
+  openRequestFormId.value = candidateId
+  requestRoleTitle.value = ''
+  requestPayMin.value = ''
+  requestPayMax.value = ''
+  requestPayType.value = 'year'
+  sendRequestError.value = ''
+}
+
+function closeRequestForm() {
+  openRequestFormId.value = null
+}
+
+async function submitRevealRequest(candidateId: string) {
+  if (!requestRoleTitle.value.trim()) {
+    sendRequestError.value = 'Role title is required.'
+    return
+  }
+  sendingRequest.value = true
+  sendRequestError.value = ''
+  try {
+    const { error } = await employerAPI.sendRevealRequest(candidateId, {
+      roleTitle: requestRoleTitle.value.trim(),
+      payMin: requestPayMin.value ? Number(requestPayMin.value) : null,
+      payMax: requestPayMax.value ? Number(requestPayMax.value) : null,
+      payType: requestPayType.value,
+    })
+    // already_requested still means the employer can't request again - treat it the same as
+    // success so the button reflects reality either way.
+    if (!error || error.message === 'already_requested') {
+      requestedIds.value.add(candidateId)
+      openRequestFormId.value = null
+    } else {
+      sendRequestError.value = error.message
+    }
+  } finally {
+    sendingRequest.value = false
   }
 }
 
@@ -188,7 +236,7 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
               >
                 <div class="flex items-start justify-between gap-2">
                   <p class="font-heading font-semibold text-brand-charcoal">
-                    {{ req.candidate_job_title || 'Untitled role' }}
+                    {{ req.role_title || 'Untitled role' }}
                   </p>
                   <span
                     class="inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-xs font-semibold"
@@ -197,7 +245,11 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                     {{ requestStatusMeta(req.status).label }}
                   </span>
                 </div>
+                <p v-if="formatPayRange(req.pay_min, req.pay_max, req.pay_type)" class="mt-1 text-sm font-medium text-brand-primary">
+                  {{ formatPayRange(req.pay_min, req.pay_max, req.pay_type) }}
+                </p>
                 <p class="mt-1 text-sm text-neutral-body">
+                  Candidate: {{ req.candidate_job_title || 'Unspecified' }} ·
                   {{ careerLevelLabel(req.candidate_career_level) }}
                   <span v-if="req.candidate_years_of_experience != null">
                     · {{ req.candidate_years_of_experience }} yrs experience
@@ -317,13 +369,55 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                   </span>
                 </div>
                 <button
+                  v-if="openRequestFormId !== candidate.id"
                   type="button"
                   :disabled="requestedIds.has(candidate.id)"
                   class="btn-primary mt-4 h-9 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                  @click="handleRequestReveal(candidate.id)"
+                  @click="openRequestForm(candidate.id)"
                 >
                   {{ requestedIds.has(candidate.id) ? 'Requested' : 'Request intro' }}
                 </button>
+
+                <div v-else class="mt-4 rounded-[12px] bg-neutral-bg p-3">
+                  <p class="text-xs text-neutral-body">
+                    Tell them what role and pay you're offering — they'll see this before deciding whether to share their contact info.
+                  </p>
+                  <div class="mt-2">
+                    <input
+                      v-model="requestRoleTitle"
+                      type="text"
+                      class="input h-9 text-sm"
+                      placeholder="Role title (e.g. Senior Backend Engineer)"
+                    />
+                  </div>
+                  <div class="mt-2 grid grid-cols-3 gap-2">
+                    <input v-model="requestPayMin" type="number" min="0" class="input h-9 text-sm" placeholder="Pay min" />
+                    <input v-model="requestPayMax" type="number" min="0" class="input h-9 text-sm" placeholder="Pay max" />
+                    <select v-model="requestPayType" class="input h-9 text-sm">
+                      <option v-for="opt in PAY_TYPE_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </div>
+                  <p v-if="sendRequestError" class="mt-2 text-xs text-red-700">{{ sendRequestError }}</p>
+                  <div class="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      :disabled="sendingRequest"
+                      class="btn-primary h-9 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      @click="submitRevealRequest(candidate.id)"
+                    >
+                      <font-awesome-icon v-if="sendingRequest" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+                      <span>{{ sendingRequest ? 'Sending…' : 'Send request' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="sendingRequest"
+                      class="h-9 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                      @click="closeRequestForm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -17,8 +17,14 @@ function jsonResponse(body: Record<string, unknown>, status: number) {
   })
 }
 
+const VALID_PAY_TYPES = new Set(['hour', 'day', 'week', 'month', 'year'])
+
 type RequestBody = {
   candidate_profile_id?: string
+  role_title?: string
+  pay_min?: number
+  pay_max?: number
+  pay_type?: string
 }
 
 type CandidateRow = {
@@ -90,6 +96,22 @@ serve(async (req) => {
     return jsonResponse({ error: 'missing_candidate_profile_id' }, 400)
   }
 
+  // The seeker should never have to approve blind - a request must name the actual role and
+  // pay range on offer, not just "we want to know more about you".
+  const roleTitle = body.role_title?.trim()
+  if (!roleTitle) {
+    return jsonResponse({ error: 'missing_role_title' }, 400)
+  }
+  const payMin = typeof body.pay_min === 'number' && Number.isFinite(body.pay_min) ? body.pay_min : null
+  const payMax = typeof body.pay_max === 'number' && Number.isFinite(body.pay_max) ? body.pay_max : null
+  if ((payMin != null || payMax != null) && !VALID_PAY_TYPES.has(body.pay_type ?? '')) {
+    return jsonResponse({ error: 'missing_pay_type' }, 400)
+  }
+  if (payMin != null && payMax != null && payMin > payMax) {
+    return jsonResponse({ error: 'invalid_pay_range' }, 400)
+  }
+  const payType = payMin != null || payMax != null ? (body.pay_type as string) : null
+
   const { data: candidate, error: candidateError } = await supabaseAdmin
     .from('profiles')
     .select(
@@ -123,6 +145,10 @@ serve(async (req) => {
     candidate_years_of_experience: candidate.years_of_experience,
     candidate_target_role_categories: candidate.target_role_categories,
     candidate_preferred_locations: candidate.preferred_locations,
+    role_title: roleTitle,
+    pay_min: payMin,
+    pay_max: payMax,
+    pay_type: payType,
   })
 
   if (insertError) {
@@ -146,6 +172,10 @@ serve(async (req) => {
       const { html, text } = renderRevealRequestReceived({
         recipientName: candidate.first_name || 'there',
         employerCompanyName: employerAccount.company_name,
+        roleTitle,
+        payMin,
+        payMax,
+        payType,
         requestsUrl: `${footer.siteUrl}/reveal-requests`,
         footer,
       })
