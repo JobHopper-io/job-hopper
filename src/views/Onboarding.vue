@@ -41,6 +41,8 @@ const lastName = ref('')
 const currentJobTitle = ref('')
 const currentIndustry = ref('')
 const requiresUsSponsorship = ref<boolean | null>(null)
+const recruiterVisible = ref(false)
+const currentEmployer = ref('')
 
 // Step 2: Role & Level
 const targetJobTitles = ref<string[]>([])
@@ -154,6 +156,9 @@ function populateFromProfile() {
   requiresUsSponsorship.value =
     typeof p.requires_us_sponsorship === 'boolean' ? p.requires_us_sponsorship : null
 
+  recruiterVisible.value = p.recruiter_visible || false
+  currentEmployer.value = p.current_employer || ''
+
   currentStep.value = getFirstIncompleteStep()
 }
 
@@ -222,6 +227,8 @@ async function persistProfileAndResume(): Promise<boolean> {
     location_radius_miles: locationRadius.value ?? undefined,
     requires_us_sponsorship:
       requiresUsSponsorship.value === null ? undefined : requiresUsSponsorship.value,
+    recruiter_visible: recruiterVisible.value,
+    current_employer: currentEmployer.value,
   })
 
   if (updateError) {
@@ -393,6 +400,25 @@ const handleProceedToCheckout = async () => {
               We'll flag sponsorship likelihood using government filing data — helpful for prioritizing,
               not a guarantee.
             </p>
+          </div>
+          <div>
+            <label class="inline-flex items-center gap-2">
+              <input v-model="recruiterVisible" type="checkbox" class="h-4 w-4" />
+              <span class="text-sm font-medium text-brand-charcoal">Make me visible to recruiters</span>
+            </label>
+            <p class="mt-1 text-xs text-neutral-body">
+              Employers browsing Job Hopper can see your title, skills, and general location — never your
+              name or resume up front. Your current employer will never see this.
+            </p>
+            <div v-if="recruiterVisible" class="mt-3">
+              <label class="mb-2 block text-sm font-medium text-brand-charcoal">Current employer</label>
+              <input
+                v-model="currentEmployer"
+                type="text"
+                class="input"
+                placeholder="So we know who to exclude from seeing you"
+              />
+            </div>
           </div>
         </div>
 
