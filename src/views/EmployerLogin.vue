@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI } from '@/lib/auth'
-import { profileAPI } from '@/lib/profile'
 import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
 import FormField from '@/components/auth/FormField.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
@@ -11,8 +10,8 @@ import PasswordField from '@/components/auth/PasswordField.vue'
 const router = useRouter()
 const route = useRoute()
 
-// Only honor a redirect back to a same-app path (e.g. an emailed deep link like
-// /reveal-requests) - reject anything that isn't a plain internal path to avoid an open redirect.
+// Only honor a redirect back to a same-app path - reject anything that isn't a plain internal
+// path to avoid an open redirect. Mirrors Login.vue's seeker-side fix.
 function safeRedirectTarget(): string | null {
   const redirect = route.query.redirect
   const target = Array.isArray(redirect) ? redirect[0] : redirect
@@ -40,74 +39,60 @@ const handleLogin = async () => {
       const code = authErr.code
       const message = authErr.message || ''
 
-      // Unconfirmed email: prefer structured code over message text
       if (code === 'email_not_confirmed' || message.toLowerCase().includes('email not confirmed')) {
-        router.push('/confirm-email')
+        error.value = 'Please confirm your email before signing in — check your inbox for the link.'
         return
       }
-
-      // Network / connectivity issues: Supabase never got a valid HTTP response
       if (typeof status !== 'number' || status === 0) {
         error.value =
           'We couldn’t reach our servers. Please check your internet connection and try again in a moment.'
         return
       }
-
-      // Invalid credentials / bad input
       if (status === 400 || status === 401) {
         error.value = 'The email or password you entered is incorrect.'
         return
       }
-
-      // Fallback for other cases
       error.value = message || 'Unable to sign in right now. Please try again, or contact support if this continues.'
       return
     }
 
-    // Immediately redirect based on onboarding status to avoid dashboard flash. Incomplete
-    // onboarding always wins - the router guard would bounce a redirect target back to
-    // /onboarding anyway.
-    const { data: profile } = await profileAPI.getCurrentUserProfile()
-    if (!profile?.onboarding_completed) {
-      router.push('/onboarding')
-      return
-    }
-    router.push(safeRedirectTarget() ?? '/dashboard')
+    router.push(safeRedirectTarget() ?? '/employer/dashboard')
   } catch (err) {
     error.value = 'An unexpected error occurred'
-    console.error('Login error:', err)
+    console.error('Employer login error:', err)
   } finally {
     isLoading.value = false
   }
 }
 
 const goToRegister = () => {
-  router.push('/register')
+  router.push('/employer/register')
 }
 </script>
 
 <template>
   <AuthSplitPanel
-    headline="Your next role is out there. Let's find it."
-    sub="Visa-sponsored positions matched to your status — updated every day."
+    headline="Find your next hire, without cold outreach."
+    sub="Search visa-ready candidates who've opted in, and request an introduction — they choose whether to share their contact info."
     :stats="[
-      { value: 'Daily Matches', label: 'AI-curated to your role & pay' },
-      { value: 'Sponsorship Signal', label: 'See who\'s likely to sponsor' },
-      { value: 'Application Tracker', label: 'Every application, one place' },
+      { value: 'Anonymized Search', label: 'Browse candidates without exposing anyone' },
+      { value: 'Verified Companies', label: 'Apollo-backed employer verification' },
+      { value: 'Consent-Based Reveal', label: 'Contact info shared only after they approve' },
     ]"
     hide-login-link
+    hide-register-link
   >
     <form class="flex flex-col gap-7" novalidate @submit.prevent="handleLogin">
       <div>
-        <h2 class="text-[26px] font-heading font-bold text-brand-charcoal">Welcome back</h2>
-        <p class="mt-1 text-sm text-neutral-body">Sign in to continue your search</p>
+        <h2 class="text-[26px] font-heading font-bold text-brand-charcoal">Employer sign in</h2>
+        <p class="mt-1 text-sm text-neutral-body">Find candidates on Job Hopper</p>
       </div>
 
       <div class="flex flex-col gap-4">
         <FormField
           id="email"
           v-model="email"
-          label="Email"
+          label="Work email"
           type="email"
           autocomplete="email"
           required
@@ -145,9 +130,9 @@ const goToRegister = () => {
           <font-awesome-icon v-if="!isLoading" :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
         </button>
         <p class="text-center text-[13px] text-neutral-body">
-          Don't have an account?
+          Don't have an employer account?
           <button type="button" class="font-bold text-brand-primary hover:underline" @click="goToRegister">
-            Sign up free
+            Sign up
           </button>
         </p>
       </div>

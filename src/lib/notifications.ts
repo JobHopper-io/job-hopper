@@ -16,7 +16,7 @@ async function getProfileId(): Promise<string | null> {
     .from('profiles')
     .select('id')
     .eq('auth_user_id', user.id)
-    .single()
+    .maybeSingle()
   return data?.id ?? null
 }
 

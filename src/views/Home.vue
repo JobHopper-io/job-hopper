@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useWindowScroll } from '@vueuse/core'
+import { useWindowScroll, onClickOutside } from '@vueuse/core'
 import jobHopperLogo from '@/assets/job-hopper-logo.png'
 import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
@@ -33,6 +33,14 @@ const vReveal = {
 const { y: scrollY } = useWindowScroll()
 const scrolled = computed(() => scrollY.value > 8)
 const mobileOpen = ref(false)
+
+// Desktop nav's Login/Get Started split into a job-seeker-vs-employer choice - the employer
+// side has no other discoverable entry point from the marketing site.
+const authMenuOpen = ref<'login' | 'register' | null>(null)
+const authMenuRef = ref<HTMLElement | null>(null)
+onClickOutside(authMenuRef, () => {
+  authMenuOpen.value = null
+})
 
 const navLinks = [
   { label: 'How It Works', to: '/how-it-works' },
@@ -152,13 +160,49 @@ const footerColumns = [
           </router-link>
         </nav>
 
-        <div class="hidden md:flex items-center gap-3">
-          <router-link to="/login" class="text-sm font-medium text-neutral-body nav-link">
-            Login
-          </router-link>
-          <router-link to="/register" class="btn-hop-primary">
-            Get Started
-          </router-link>
+        <div ref="authMenuRef" class="hidden md:flex items-center gap-3">
+          <div class="relative">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm font-medium text-neutral-body nav-link"
+              @click="authMenuOpen = authMenuOpen === 'login' ? null : 'login'"
+            >
+              Login
+              <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
+            </button>
+            <div
+              v-if="authMenuOpen === 'login'"
+              class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
+            >
+              <router-link to="/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                Job seeker
+              </router-link>
+              <router-link to="/employer/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                Employer
+              </router-link>
+            </div>
+          </div>
+          <div class="relative">
+            <button
+              type="button"
+              class="btn-hop-primary flex items-center gap-1.5"
+              @click="authMenuOpen = authMenuOpen === 'register' ? null : 'register'"
+            >
+              Get Started
+              <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
+            </button>
+            <div
+              v-if="authMenuOpen === 'register'"
+              class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
+            >
+              <router-link to="/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                Job seeker
+              </router-link>
+              <router-link to="/employer/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                Employer
+              </router-link>
+            </div>
+          </div>
         </div>
 
         <button class="md:hidden p-2 text-brand-charcoal" aria-label="Toggle menu" @click="mobileOpen = !mobileOpen">
@@ -185,6 +229,16 @@ const footerColumns = [
           </router-link>
           <router-link to="/register" class="btn-hop-primary justify-center" @click="mobileOpen = false">
             Get Started
+          </router-link>
+        </div>
+        <div class="flex items-center gap-2 pt-2 border-t border-neutral-border text-sm">
+          <span class="text-neutral-body">Hiring?</span>
+          <router-link to="/employer/login" class="font-semibold text-brand-primary" @click="mobileOpen = false">
+            Employer login
+          </router-link>
+          <span class="text-neutral-body">·</span>
+          <router-link to="/employer/register" class="font-semibold text-brand-primary" @click="mobileOpen = false">
+            Sign up
           </router-link>
         </div>
       </div>

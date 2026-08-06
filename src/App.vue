@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
@@ -31,13 +32,17 @@ const isLandingPage = computed(() => route.path === '/')
 // merged into the gradient on Login/Register, step progress on Onboarding) - the shared
 // sticky white nav would double up on top of it. The shared footer is still used on
 // Login/Register (matches the rest of the app); Onboarding's step flow has none.
-const CHROME_FREE_NAV_ROUTES = ['/login', '/register', '/onboarding', '/confirm-email', '/email-verified']
+// Employer login/register use the exact same AuthSplitPanel hero, so they need the same
+// treatment - this was missed when Phase 2 added them, causing the shared nav to render on
+// top of AuthSplitPanel's own blurred header (the "double nav" look) and the footer gap
+// below not to close.
+const CHROME_FREE_NAV_ROUTES = ['/login', '/register', '/onboarding', '/confirm-email', '/email-verified', '/employer/login', '/employer/register']
 const CHROME_FREE_FOOTER_ROUTES = ['/onboarding']
 const hideNav = computed(() => isLandingPage.value || CHROME_FREE_NAV_ROUTES.includes(route.path))
 const hideFooter = computed(() => isLandingPage.value || CHROME_FREE_FOOTER_ROUTES.includes(route.path))
 // Ask Hopper is a distraction on the signup/onboarding funnel - keep it off /login, /register,
 // and /onboarding specifically (unlike hideNav/hideFooter, not tied to the full chrome-free list).
-const HIDE_CHAT_WIDGET_ROUTES = ['/login', '/register', '/onboarding']
+const HIDE_CHAT_WIDGET_ROUTES = ['/login', '/register', '/onboarding', '/employer/login', '/employer/register']
 const hideChatWidget = computed(() => HIDE_CHAT_WIDGET_ROUTES.includes(route.path))
 
 // These marketing pages (plus Dashboard, Profile, Billing, the job detail page, and
@@ -46,8 +51,9 @@ const hideChatWidget = computed(() => HIDE_CHAT_WIDGET_ROUTES.includes(route.pat
 // sections and the auth pages - the shared nav needs to pick up the same tint here
 // instead of its default white, or it'd read as a hard-edged bar again. Job detail /
 // interview practice are matched by prefix since their routes carry a param
-// (/job/:id, /interview-practice/:id).
-const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/premium-tools']
+// (/job/:id, /interview-practice/:id). employer/dashboard uses the same app-warm-bg class
+// as Dashboard.vue and was missed the same way as the employer auth routes above.
+const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard']
 const WARM_BG_PREFIXES = ['/job/', '/interview-practice/']
 const isWarmPage = computed(
   () => WARM_BG_ROUTES.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
@@ -55,13 +61,21 @@ const isWarmPage = computed(
 // Same "no seam" treatment as the auth routes below: the page's own background already
 // fades to the same cream tone the footer sits on, so the usual mt-16 gap would just
 // expose the app shell's gray bg-neutral-bg between the two.
-const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/premium-tools']
+const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard']
 const noFooterGap = computed(
   () => noFooterGapRoutes.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
 )
 
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
+
+// Shared nav's Login/Get Started split into a job-seeker-vs-employer choice - the employer
+// side has no other discoverable entry point from these pages.
+const authMenuOpen = ref<'login' | 'register' | null>(null)
+const authMenuRef = ref<HTMLElement | null>(null)
+onClickOutside(authMenuRef, () => {
+  authMenuOpen.value = null
+})
 const isAdmin = ref(false)
 const isSuperAdmin = ref(false)
 
@@ -250,6 +264,13 @@ const handleSignOutAndCloseMenu = async () => {
                   Applications
                 </router-link>
                 <router-link
+                  v-if="userStore.profile?.recruiter_visible"
+                  to="/reveal-requests"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                >
+                  Recruiter Requests
+                </router-link>
+                <router-link
                   to="/profile"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
                 >
@@ -281,15 +302,50 @@ const handleSignOutAndCloseMenu = async () => {
             <!-- Desktop actions (right, matching the landing nav) -->
             <div class="hidden md:flex items-center gap-3">
               <template v-if="!isAuthenticated">
-                <router-link
-                  to="/login"
-                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
-                >
-                  Login
-                </router-link>
-                <router-link to="/register" class="btn-primary text-sm">
-                  Get Started
-                </router-link>
+                <div ref="authMenuRef" class="flex items-center gap-3">
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1 text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                      @click="authMenuOpen = authMenuOpen === 'login' ? null : 'login'"
+                    >
+                      Login
+                      <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
+                    </button>
+                    <div
+                      v-if="authMenuOpen === 'login'"
+                      class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
+                    >
+                      <router-link to="/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                        Job seeker
+                      </router-link>
+                      <router-link to="/employer/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                        Employer
+                      </router-link>
+                    </div>
+                  </div>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="btn-primary flex items-center gap-1.5 text-sm"
+                      @click="authMenuOpen = authMenuOpen === 'register' ? null : 'register'"
+                    >
+                      Get Started
+                      <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
+                    </button>
+                    <div
+                      v-if="authMenuOpen === 'register'"
+                      class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
+                    >
+                      <router-link to="/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                        Job seeker
+                      </router-link>
+                      <router-link to="/employer/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
+                        Employer
+                      </router-link>
+                    </div>
+                  </div>
+                </div>
               </template>
               <template v-else>
                 <button
@@ -361,6 +417,16 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Get Started
                 </router-link>
+                <div class="flex items-center gap-2 px-3 pt-2 mt-1 border-t border-neutral-border text-sm">
+                  <span class="text-neutral-body">Hiring?</span>
+                  <router-link to="/employer/login" class="font-semibold text-brand-primary" @click="mobileMenuOpen = false">
+                    Employer login
+                  </router-link>
+                  <span class="text-neutral-body">·</span>
+                  <router-link to="/employer/register" class="font-semibold text-brand-primary" @click="mobileMenuOpen = false">
+                    Sign up
+                  </router-link>
+                </div>
               </template>
               <template v-else-if="isOnboarded">
                 <router-link
@@ -377,6 +443,14 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Applications
+                </router-link>
+                <router-link
+                  v-if="userStore.profile?.recruiter_visible"
+                  to="/reveal-requests"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Recruiter Requests
                 </router-link>
                 <router-link
                   to="/profile"

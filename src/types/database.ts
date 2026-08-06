@@ -6,6 +6,8 @@ export type JobHiringContactsStatus = Enums<'job_hiring_contacts_status'>
 export type ApolloLimitsRow = Tables<'apollo_limits'>
 
 export type Profile = Tables<'profiles'>
+export type EmployerAccount = Tables<'employer_accounts'>
+export type EmployerRevealRequest = Tables<'employer_reveal_requests'>
 /** Career level: single source of truth for job-matching tier (decoupled from plan/product). */
 export type CareerLevel = Enums<'career_level'>
 

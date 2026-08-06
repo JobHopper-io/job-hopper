@@ -224,7 +224,7 @@ export const subscriptionAPI = {
       .from('profiles')
       .select('id')
       .eq('auth_user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (profileError || !profile) {
       return { data: null, error: profileError ? new Error(profileError.message) : null }

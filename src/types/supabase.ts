@@ -184,6 +184,44 @@ export type Database = {
           },
         ]
       }
+      employer_accounts: {
+        Row: {
+          auth_user_id: string
+          company_name: string
+          created_at: string
+          id: string
+          matched_employer_id: string | null
+          verification_status: string
+          work_email: string
+        }
+        Insert: {
+          auth_user_id: string
+          company_name: string
+          created_at?: string
+          id?: string
+          matched_employer_id?: string | null
+          verification_status?: string
+          work_email: string
+        }
+        Update: {
+          auth_user_id?: string
+          company_name?: string
+          created_at?: string
+          id?: string
+          matched_employer_id?: string | null
+          verification_status?: string
+          work_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_accounts_matched_employer_id_fkey"
+            columns: ["matched_employer_id"]
+            isOneToOne: false
+            referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employer_name_aliases: {
         Row: {
           created_at: string
@@ -224,6 +262,93 @@ export type Database = {
             columns: ["employer_id"]
             isOneToOne: false
             referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employer_reveal_requests: {
+        Row: {
+          cancelled_at: string | null
+          candidate_career_level: string | null
+          candidate_job_title: string | null
+          candidate_preferred_locations: string[] | null
+          candidate_profile_id: string
+          candidate_target_role_categories: string[] | null
+          candidate_years_of_experience: number | null
+          created_at: string
+          employer_account_id: string
+          employer_company_name: string
+          id: string
+          pay_max: number | null
+          pay_min: number | null
+          pay_type: Database["public"]["Enums"]["pay_type"] | null
+          responded_at: string | null
+          revealed_email: string | null
+          revealed_first_name: string | null
+          revealed_last_name: string | null
+          revealed_phone_number: string | null
+          role_title: string | null
+          status: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          candidate_career_level?: string | null
+          candidate_job_title?: string | null
+          candidate_preferred_locations?: string[] | null
+          candidate_profile_id: string
+          candidate_target_role_categories?: string[] | null
+          candidate_years_of_experience?: number | null
+          created_at?: string
+          employer_account_id: string
+          employer_company_name: string
+          id?: string
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          responded_at?: string | null
+          revealed_email?: string | null
+          revealed_first_name?: string | null
+          revealed_last_name?: string | null
+          revealed_phone_number?: string | null
+          role_title?: string | null
+          status?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          candidate_career_level?: string | null
+          candidate_job_title?: string | null
+          candidate_preferred_locations?: string[] | null
+          candidate_profile_id?: string
+          candidate_target_role_categories?: string[] | null
+          candidate_years_of_experience?: number | null
+          created_at?: string
+          employer_account_id?: string
+          employer_company_name?: string
+          id?: string
+          pay_max?: number | null
+          pay_min?: number | null
+          pay_type?: Database["public"]["Enums"]["pay_type"] | null
+          responded_at?: string | null
+          revealed_email?: string | null
+          revealed_first_name?: string | null
+          revealed_last_name?: string | null
+          revealed_phone_number?: string | null
+          role_title?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_reveal_requests_candidate_profile_id_fkey"
+            columns: ["candidate_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employer_reveal_requests_employer_account_id_fkey"
+            columns: ["employer_account_id"]
+            isOneToOne: false
+            referencedRelation: "employer_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -2369,6 +2494,7 @@ export type Database = {
         | "subscription_update"
         | "system_announcement"
         | "sponsor_watch_alert"
+        | "reveal_request_received"
       job_hiring_contacts_status:
         | "pending"
         | "complete"
@@ -2544,6 +2670,7 @@ export const Constants = {
         "subscription_update",
         "system_announcement",
         "sponsor_watch_alert",
+        "reveal_request_received",
       ],
       job_hiring_contacts_status: [
         "pending",
