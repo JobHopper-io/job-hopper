@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
-import type { EmployerAccount, EmployerRevealRequest, PayType } from '@/types/database'
+import type { EmployerAccount, EmployerRevealRequestWithDraft, PayType } from '@/types/database'
 
 export type RevealRequestDetails = {
   roleTitle: string
@@ -111,13 +111,16 @@ export const employerAPI = {
   },
 
   /** Requests this employer has sent, newest first - RLS scopes rows to their own employer_account_id. */
-  async getSentRevealRequests(): Promise<{ data: EmployerRevealRequest[] | null; error: Error | null }> {
+  async getSentRevealRequests(): Promise<{ data: EmployerRevealRequestWithDraft[] | null; error: Error | null }> {
     const { data, error } = await supabase
       .from('employer_reveal_requests')
       .select('*')
       .order('created_at', { ascending: false })
 
-    return { data: data ?? null, error }
+    // Cast: outreach_draft_* columns exist in the DB (migration
+    // 20260806120000_employer_reveal_requests_outreach_draft.sql) but aren't in the generated
+    // Row type yet - see EmployerRevealRequestWithDraft.
+    return { data: (data as EmployerRevealRequestWithDraft[] | null) ?? null, error }
   },
 
   /** Withdraw a still-pending reveal request. Once approved or declined it's final. */
@@ -130,5 +133,23 @@ export const employerAPI = {
     if (error) return { error: new Error(await parseFunctionsInvokeError(error)) }
     if (data?.error) return { error: new Error(data.error) }
     return { error: null }
+  },
+
+  /** LLM-drafted first outreach message for an approved reveal request. Cached server-side on
+   * employer_reveal_requests after first generation - safe to call again, a cache hit costs one
+   * DB read and no LLM call. */
+  async generateOutreachDraft(
+    requestId: string,
+  ): Promise<{ data: { subject: string; body: string } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      subject?: string
+      body?: string
+      error?: string
+    }>('generate-outreach-draft', { body: { request_id: requestId } })
+
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    if (data?.error) return { data: null, error: new Error(data.error) }
+    if (!data?.subject || !data?.body) return { data: null, error: new Error('Unexpected response') }
+    return { data: { subject: data.subject, body: data.body }, error: null }
   },
 }
