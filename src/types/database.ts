@@ -8,15 +8,6 @@ export type ApolloLimitsRow = Tables<'apollo_limits'>
 export type Profile = Tables<'profiles'>
 export type EmployerAccount = Tables<'employer_accounts'>
 export type EmployerRevealRequest = Tables<'employer_reveal_requests'>
-/** EmployerRevealRequest + outreach_draft_* columns (migration
- * 20260806120000_employer_reveal_requests_outreach_draft.sql). Not yet folded into
- * EmployerRevealRequest because that migration hasn't been pushed to the remote schema /
- * regenerated via `npm run db:types` yet - fold this back in and delete it once it has. */
-export type EmployerRevealRequestWithDraft = EmployerRevealRequest & {
-  outreach_draft_subject: string | null
-  outreach_draft_body: string | null
-  outreach_draft_generated_at: string | null
-}
 /** Career level: single source of truth for job-matching tier (decoupled from plan/product). */
 export type CareerLevel = Enums<'career_level'>
 

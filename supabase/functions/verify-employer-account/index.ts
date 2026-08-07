@@ -131,10 +131,13 @@ serve(async (req) => {
   // downgrade to pending for human review rather than leaving a false "verified" in place.
   const newStatus = apolloDomain === workDomain ? 'verified' : 'pending'
 
+  // Only clobber 'pending' - an admin's manual rejected/suspended (Phase 6) may have already
+  // landed between this job being scheduled and running; never race it back to a worse state.
   const { error: updateError } = await supabase
     .from('employer_accounts')
     .update({ verification_status: newStatus })
     .eq('id', employerAccountId)
+    .eq('verification_status', 'pending')
 
   if (updateError) {
     console.error('Failed to update employer_accounts verification_status', updateError.message)

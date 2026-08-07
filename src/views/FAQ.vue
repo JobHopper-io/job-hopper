@@ -118,11 +118,11 @@ const faqs = [
   },
   {
     q: "Do employers see my profile?",
-    a: "No. Job-Hopper is not a public candidate database, and we do not give employers access to browse or search your profile. We use your information internally to power matching and recommendations. If we ever introduce features that allow selective visibility to employers, they will be strictly opt-in and under your control."
+    a: "Only if you opt in, and only in anonymized form. Job-Hopper is not a public candidate database—your profile is invisible to employers by default. If you turn on Recruiter-Visible Mode, verified employers can find an anonymized version of your profile (role, career level, experience, and location—never your name, email, phone, resume, or current employer) in search. Your current employer is automatically excluded from ever seeing you in their results. An employer who wants to reach out has to send a reveal request naming the specific role and pay range; nothing identifying is shared until you personally approve that request."
   },
   {
     q: "Do you share my data with employers or third parties?",
-    a: "No. We do not share your personal profile data with employers or sell it to third-party advertisers. Any information an employer receives about you comes directly from you—through the applications you choose to submit and any outreach you decide to send. Our role is to help you find and prioritize opportunities, not to trade on your data."
+    a: "Not without your say-so. We do not sell your personal profile data to third-party advertisers. If you've opted into Recruiter-Visible Mode, employers only ever see the anonymized search fields described above—no identifying details are shared until you approve a specific employer's reveal request, at which point that one employer gets your name and contact info so they can reach out. Any other information an employer receives about you comes directly from you—through applications you choose to submit or outreach you decide to send."
   },
   {
     q: "How do you protect my data?",

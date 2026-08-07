@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { employerAPI } from '@/lib/employer'
-import type { EmployerAccount, EmployerRevealRequestWithDraft, PayType } from '@/types/database'
+import type { EmployerAccount, EmployerRevealRequest, PayType } from '@/types/database'
 import type { CandidateSearchResult } from '@/lib/employer'
 import { ROLE_CATEGORIES, getRoleCategoryLabel } from '@/lib/roleCategories'
 import { CAREER_LEVEL_OPTIONS } from '@/lib/freemium'
@@ -119,7 +119,7 @@ async function submitRevealRequest(candidateId: string) {
   }
 }
 
-const sentRequests = ref<EmployerRevealRequestWithDraft[]>([])
+const sentRequests = ref<EmployerRevealRequest[]>([])
 const isLoadingRequests = ref(false)
 const requestsError = ref('')
 let hasLoadedRequests = false
@@ -158,7 +158,7 @@ const draftingId = ref<string | null>(null)
 const draftErrorId = ref<string | null>(null)
 const draftError = ref('')
 
-async function handleDraftOutreach(req: EmployerRevealRequestWithDraft) {
+async function handleDraftOutreach(req: EmployerRevealRequest) {
   draftingId.value = req.id
   draftErrorId.value = null
   draftError.value = ''
@@ -178,7 +178,7 @@ async function handleDraftOutreach(req: EmployerRevealRequestWithDraft) {
   }
 }
 
-function mailtoHref(req: EmployerRevealRequestWithDraft): string {
+function mailtoHref(req: EmployerRevealRequest): string {
   const params = new URLSearchParams({
     subject: req.outreach_draft_subject ?? '',
     body: req.outreach_draft_body ?? '',
@@ -188,7 +188,7 @@ function mailtoHref(req: EmployerRevealRequestWithDraft): string {
 
 const copiedId = ref<string | null>(null)
 
-async function copyDraft(req: EmployerRevealRequestWithDraft) {
+async function copyDraft(req: EmployerRevealRequest) {
   const text = `Subject: ${req.outreach_draft_subject}\n\n${req.outreach_draft_body}`
   await navigator.clipboard.writeText(text)
   copiedId.value = req.id
@@ -197,7 +197,7 @@ async function copyDraft(req: EmployerRevealRequestWithDraft) {
   }, 2000)
 }
 
-async function handleCancelRequest(req: EmployerRevealRequestWithDraft) {
+async function handleCancelRequest(req: EmployerRevealRequest) {
   cancellingId.value = req.id
   try {
     const { error } = await employerAPI.cancelRevealRequest(req.id)
