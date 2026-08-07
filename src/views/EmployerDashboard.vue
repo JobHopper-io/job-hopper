@@ -154,6 +154,49 @@ function requestStatusMeta(status: string) {
 
 const cancellingId = ref<string | null>(null)
 
+const draftingId = ref<string | null>(null)
+const draftErrorId = ref<string | null>(null)
+const draftError = ref('')
+
+async function handleDraftOutreach(req: EmployerRevealRequest) {
+  draftingId.value = req.id
+  draftErrorId.value = null
+  draftError.value = ''
+  try {
+    const { data, error } = await employerAPI.generateOutreachDraft(req.id)
+    if (error) {
+      draftErrorId.value = req.id
+      draftError.value = error.message
+      return
+    }
+    if (data) {
+      req.outreach_draft_subject = data.subject
+      req.outreach_draft_body = data.body
+    }
+  } finally {
+    draftingId.value = null
+  }
+}
+
+function mailtoHref(req: EmployerRevealRequest): string {
+  const params = new URLSearchParams({
+    subject: req.outreach_draft_subject ?? '',
+    body: req.outreach_draft_body ?? '',
+  })
+  return `mailto:${req.revealed_email}?${params.toString()}`
+}
+
+const copiedId = ref<string | null>(null)
+
+async function copyDraft(req: EmployerRevealRequest) {
+  const text = `Subject: ${req.outreach_draft_subject}\n\n${req.outreach_draft_body}`
+  await navigator.clipboard.writeText(text)
+  copiedId.value = req.id
+  setTimeout(() => {
+    if (copiedId.value === req.id) copiedId.value = null
+  }, 2000)
+}
+
 async function handleCancelRequest(req: EmployerRevealRequest) {
   cancellingId.value = req.id
   try {
@@ -261,6 +304,46 @@ async function handleCancelRequest(req: EmployerRevealRequest) {
                   </p>
                   <p class="text-neutral-body">{{ req.revealed_email }}</p>
                   <p v-if="req.revealed_phone_number" class="text-neutral-body">{{ req.revealed_phone_number }}</p>
+                </div>
+                <div v-if="req.status === 'approved'" class="mt-3">
+                  <div v-if="req.outreach_draft_subject && req.outreach_draft_body" class="overflow-hidden rounded-[12px] border border-neutral-border">
+                    <div class="flex items-center gap-2 border-b border-neutral-border bg-neutral-bg px-3 py-2">
+                      <font-awesome-icon :icon="['fas', 'envelope']" class="text-xs text-neutral-body" aria-hidden="true" />
+                      <span class="text-xs font-semibold uppercase tracking-wide text-neutral-body">Outreach draft</span>
+                    </div>
+                    <div class="p-3 text-sm">
+                      <p class="font-medium text-brand-charcoal">{{ req.outreach_draft_subject }}</p>
+                      <p class="mt-2 whitespace-pre-wrap text-neutral-body">{{ req.outreach_draft_body }}</p>
+                    </div>
+                    <div class="flex gap-2 border-t border-neutral-border p-3">
+                      <a
+                        :href="mailtoHref(req)"
+                        class="btn-primary flex h-9 items-center justify-center gap-1.5 px-4 text-sm"
+                      >
+                        <font-awesome-icon :icon="['fas', 'paper-plane']" aria-hidden="true" />
+                        <span>Open in email</span>
+                      </a>
+                      <button
+                        type="button"
+                        class="flex h-9 items-center justify-center gap-1.5 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg"
+                        @click="copyDraft(req)"
+                      >
+                        <font-awesome-icon :icon="['fas', copiedId === req.id ? 'check' : 'copy']" aria-hidden="true" />
+                        <span>{{ copiedId === req.id ? 'Copied' : 'Copy' }}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    :disabled="draftingId === req.id"
+                    class="flex h-9 items-center justify-center gap-1.5 rounded-full border border-neutral-border px-4 text-sm font-medium text-neutral-body hover:bg-neutral-bg disabled:cursor-not-allowed disabled:opacity-50"
+                    @click="handleDraftOutreach(req)"
+                  >
+                    <font-awesome-icon :icon="draftingId === req.id ? ['fas', 'spinner'] : ['fas', 'envelope']" :spin="draftingId === req.id" aria-hidden="true" />
+                    <span>{{ draftingId === req.id ? 'Drafting…' : 'Draft outreach message' }}</span>
+                  </button>
+                  <p v-if="draftErrorId === req.id" class="mt-2 text-xs text-red-700">{{ draftError }}</p>
                 </div>
                 <button
                   v-if="req.status === 'pending'"

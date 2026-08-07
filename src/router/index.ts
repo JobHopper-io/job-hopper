@@ -36,6 +36,7 @@ export const publicPaths = [
 const adminPaths = [
   '/admin',
   '/admin/dashboard',
+  '/admin/employer-review',
   '/admin/admin-management',
   '/admin/job-matching-algorithm',
   '/admin/test-emails',
@@ -220,6 +221,11 @@ const router = createRouter({
       path: '/admin/admin-management',
       name: 'admin-management',
       component: () => import('../views/AdminAdmins.vue'),
+    },
+    {
+      path: '/admin/employer-review',
+      name: 'admin-employer-review',
+      component: () => import('../views/AdminEmployerReview.vue'),
     },
     {
       path: '/admin/job-processor',

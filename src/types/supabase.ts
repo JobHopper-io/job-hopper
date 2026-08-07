@@ -191,6 +191,9 @@ export type Database = {
           created_at: string
           id: string
           matched_employer_id: string | null
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           verification_status: string
           work_email: string
         }
@@ -200,6 +203,9 @@ export type Database = {
           created_at?: string
           id?: string
           matched_employer_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           verification_status?: string
           work_email: string
         }
@@ -209,6 +215,9 @@ export type Database = {
           created_at?: string
           id?: string
           matched_employer_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           verification_status?: string
           work_email?: string
         }
@@ -218,6 +227,42 @@ export type Database = {
             columns: ["matched_employer_id"]
             isOneToOne: false
             referencedRelation: "employers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employer_accounts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employer_daily_usage: {
+        Row: {
+          employer_account_id: string
+          reveal_count: number
+          search_count: number
+          usage_date: string
+        }
+        Insert: {
+          employer_account_id: string
+          reveal_count?: number
+          search_count?: number
+          usage_date: string
+        }
+        Update: {
+          employer_account_id?: string
+          reveal_count?: number
+          search_count?: number
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_daily_usage_employer_account_id_fkey"
+            columns: ["employer_account_id"]
+            isOneToOne: false
+            referencedRelation: "employer_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -279,6 +324,9 @@ export type Database = {
           employer_account_id: string
           employer_company_name: string
           id: string
+          outreach_draft_body: string | null
+          outreach_draft_generated_at: string | null
+          outreach_draft_subject: string | null
           pay_max: number | null
           pay_min: number | null
           pay_type: Database["public"]["Enums"]["pay_type"] | null
@@ -302,6 +350,9 @@ export type Database = {
           employer_account_id: string
           employer_company_name: string
           id?: string
+          outreach_draft_body?: string | null
+          outreach_draft_generated_at?: string | null
+          outreach_draft_subject?: string | null
           pay_max?: number | null
           pay_min?: number | null
           pay_type?: Database["public"]["Enums"]["pay_type"] | null
@@ -325,6 +376,9 @@ export type Database = {
           employer_account_id?: string
           employer_company_name?: string
           id?: string
+          outreach_draft_body?: string | null
+          outreach_draft_generated_at?: string | null
+          outreach_draft_subject?: string | null
           pay_max?: number | null
           pay_min?: number | null
           pay_type?: Database["public"]["Enums"]["pay_type"] | null
@@ -346,6 +400,45 @@ export type Database = {
           },
           {
             foreignKeyName: "employer_reveal_requests_employer_account_id_fkey"
+            columns: ["employer_account_id"]
+            isOneToOne: false
+            referencedRelation: "employer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employer_search_exclusion_events: {
+        Row: {
+          candidate_profile_id: string
+          employer_account_id: string
+          id: string
+          occurred_at: string
+          source: string
+        }
+        Insert: {
+          candidate_profile_id: string
+          employer_account_id: string
+          id?: string
+          occurred_at?: string
+          source: string
+        }
+        Update: {
+          candidate_profile_id?: string
+          employer_account_id?: string
+          id?: string
+          occurred_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_search_exclusion_events_candidate_profile_id_fkey"
+            columns: ["candidate_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employer_search_exclusion_events_employer_account_id_fkey"
             columns: ["employer_account_id"]
             isOneToOne: false
             referencedRelation: "employer_accounts"
@@ -541,6 +634,8 @@ export type Database = {
       freemium_settings: {
         Row: {
           core_daily_resume_advice: number
+          employer_daily_reveal_requests: number
+          employer_daily_searches: number
           id: number
           max_job_searches: number
           max_premium_insights: number
@@ -551,6 +646,8 @@ export type Database = {
         }
         Insert: {
           core_daily_resume_advice?: number
+          employer_daily_reveal_requests?: number
+          employer_daily_searches?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
@@ -561,6 +658,8 @@ export type Database = {
         }
         Update: {
           core_daily_resume_advice?: number
+          employer_daily_reveal_requests?: number
+          employer_daily_searches?: number
           id?: number
           max_job_searches?: number
           max_premium_insights?: number
@@ -2291,6 +2390,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bump_employer_daily_reveal_count: {
+        Args: { p_daily_limit: number; p_employer_account_id: string }
+        Returns: number
+      }
+      bump_employer_daily_search_count: {
+        Args: { p_daily_limit: number; p_employer_account_id: string }
+        Returns: number
+      }
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
       claim_premium_insights_for_addon: {
         Args: {

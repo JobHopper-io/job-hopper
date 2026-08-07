@@ -79,6 +79,42 @@
           </p>
         </div>
 
+        <div>
+          <label for="employer-daily-searches" class="block text-sm font-medium text-brand-charcoal mb-1">
+            Max employer candidate searches (per day)
+          </label>
+          <input
+            id="employer-daily-searches"
+            v-model.number="form.employerDailySearches"
+            type="number"
+            min="0"
+            step="1"
+            class="w-full max-w-xs rounded-lg border border-neutral-border px-3 py-2 text-sm"
+            required
+          />
+          <p class="text-xs text-neutral-body mt-1">
+            How many candidate searches a single employer account can run per UTC day.
+          </p>
+        </div>
+
+        <div>
+          <label for="employer-daily-reveals" class="block text-sm font-medium text-brand-charcoal mb-1">
+            Max employer reveal requests (per day)
+          </label>
+          <input
+            id="employer-daily-reveals"
+            v-model.number="form.employerDailyRevealRequests"
+            type="number"
+            min="0"
+            step="1"
+            class="w-full max-w-xs rounded-lg border border-neutral-border px-3 py-2 text-sm"
+            required
+          />
+          <p class="text-xs text-neutral-body mt-1">
+            How many reveal requests a single employer account can send per UTC day.
+          </p>
+        </div>
+
         <p v-if="formError" class="text-sm text-red-600">{{ formError }}</p>
         <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
         <p v-if="saveSuccess" class="text-sm text-green-700">Saved.</p>
@@ -163,6 +199,8 @@ const form = reactive({
   maxJobSearches: 3,
   maxResumeAdvice: 3,
   maxPremiumInsights: 3,
+  employerDailySearches: 20,
+  employerDailyRevealRequests: 10,
 })
 
 const isLoading = ref(true)
@@ -195,6 +233,14 @@ function validateFreemium(): boolean {
     formError.value = 'Max free Hiring Intel must be a whole number ≥ 0.'
     return false
   }
+  if (!Number.isInteger(form.employerDailySearches) || form.employerDailySearches < 0) {
+    formError.value = 'Max employer candidate searches must be a whole number ≥ 0.'
+    return false
+  }
+  if (!Number.isInteger(form.employerDailyRevealRequests) || form.employerDailyRevealRequests < 0) {
+    formError.value = 'Max employer reveal requests must be a whole number ≥ 0.'
+    return false
+  }
   return true
 }
 
@@ -211,6 +257,8 @@ async function loadFreemium() {
     form.maxJobSearches = data.max_job_searches
     form.maxResumeAdvice = data.max_resume_advice
     form.maxPremiumInsights = data.max_premium_insights
+    form.employerDailySearches = data.employer_daily_searches
+    form.employerDailyRevealRequests = data.employer_daily_reveal_requests
   }
 }
 
@@ -240,6 +288,8 @@ async function onSaveFreemium() {
     max_job_searches: form.maxJobSearches,
     max_resume_advice: form.maxResumeAdvice,
     max_premium_insights: form.maxPremiumInsights,
+    employer_daily_searches: form.employerDailySearches,
+    employer_daily_reveal_requests: form.employerDailyRevealRequests,
   })
   isSaving.value = false
   if (error) {

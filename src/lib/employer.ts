@@ -117,7 +117,7 @@ export const employerAPI = {
       .select('*')
       .order('created_at', { ascending: false })
 
-    return { data: data ?? null, error }
+    return { data, error }
   },
 
   /** Withdraw a still-pending reveal request. Once approved or declined it's final. */
@@ -130,5 +130,23 @@ export const employerAPI = {
     if (error) return { error: new Error(await parseFunctionsInvokeError(error)) }
     if (data?.error) return { error: new Error(data.error) }
     return { error: null }
+  },
+
+  /** LLM-drafted first outreach message for an approved reveal request. Cached server-side on
+   * employer_reveal_requests after first generation - safe to call again, a cache hit costs one
+   * DB read and no LLM call. */
+  async generateOutreachDraft(
+    requestId: string,
+  ): Promise<{ data: { subject: string; body: string } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke<{
+      subject?: string
+      body?: string
+      error?: string
+    }>('generate-outreach-draft', { body: { request_id: requestId } })
+
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    if (data?.error) return { data: null, error: new Error(data.error) }
+    if (!data?.subject || !data?.body) return { data: null, error: new Error('Unexpected response') }
+    return { data: { subject: data.subject, body: data.body }, error: null }
   },
 }

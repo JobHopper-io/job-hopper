@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
+import type { EmployerAccount } from '@/types/database'
 
 export interface SeoPerformanceRow {
   urlPath: string
@@ -82,6 +83,20 @@ interface SetUserRolesPayload {
   roles: string[]
 }
 
+type AdminEmployerRow = Pick<
+  EmployerAccount,
+  'id' | 'company_name' | 'work_email' | 'verification_status' | 'created_at' | 'reviewed_by' | 'reviewed_at' | 'review_reason'
+>
+
+interface ListEmployersResult {
+  employers: AdminEmployerRow[]
+  total: number
+}
+
+interface ReviewEmployerResult {
+  employer: AdminEmployerRow
+}
+
 export const adminAPI = {
   async setUserRoles(email: string, roles: string[]): Promise<{ data: SetUserRolesPayload | null; error: Error | null }> {
     const { data, error } = await supabase.functions.invoke('assign-role', {
@@ -112,6 +127,39 @@ export const adminAPI = {
     }
 
     return { data: data as ListUsersResult, error: null }
+  },
+
+  async listEmployers(params: {
+    search?: string
+    status?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ data: ListEmployersResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-list-employers', {
+      body: params,
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as ListEmployersResult, error: null }
+  },
+
+  async reviewEmployer(
+    employerAccountId: string,
+    status: 'verified' | 'rejected' | 'suspended',
+    reason?: string,
+  ): Promise<{ data: ReviewEmployerResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-review-employer', {
+      body: { employer_account_id: employerAccountId, status, reason },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as ReviewEmployerResult, error: null }
   },
 
   async sendTestEmail(

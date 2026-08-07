@@ -96,12 +96,14 @@
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
             4. Employer Access
           </h2>
-          <p>Employers do NOT:</p>
+          <p>By default, employers cannot browse or access your profile at all. You may optionally turn on Recruiter-Visible Mode, which works like this:</p>
           <ul class="list-disc pl-6 space-y-1">
-            <li>Browse your profile</li>
-            <li>Access your data</li>
+            <li>Verified employers can search an anonymized version of your profile (role, career level, experience, location) — never your name, email, phone, resume, or current employer</li>
+            <li>Your current employer is automatically excluded from your search results</li>
+            <li>An employer must send a reveal request naming a specific role and pay range before requesting to contact you</li>
+            <li>Your name and contact details are only shared with an employer after you personally approve that request</li>
           </ul>
-          <p>You control when you apply.</p>
+          <p>You control whether Recruiter-Visible Mode is on, and you approve every reveal individually. You also control when you apply.</p>
         </section>
 
         <section class="space-y-3">

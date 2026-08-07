@@ -68,17 +68,36 @@ serve(async (req) => {
 
   const { data: employerAccount, error: employerError } = await supabaseAdmin
     .from('employer_accounts')
-    .select('company_name, verification_status')
+    .select('id, company_name, verification_status')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
   if (employerError || !employerAccount) {
     return jsonResponse({ error: 'no_employer_account' }, 403)
   }
-  // Pending/rejected accounts can't search yet - manual review (Phase 6) isn't built, but
-  // the gate belongs here regardless so an unreviewed signup can't already browse candidates.
+  // Pending/rejected/suspended accounts can't search - verified is required, and Phase 6's
+  // admin review can move a previously-verified account back to suspended.
   if (employerAccount.verification_status !== 'verified') {
     return jsonResponse({ error: 'not_verified' }, 403)
+  }
+
+  const { data: freemiumSettings } = await supabaseAdmin
+    .from('freemium_settings')
+    .select('employer_daily_searches')
+    .eq('id', 1)
+    .maybeSingle()
+  const dailySearchLimit = freemiumSettings?.employer_daily_searches ?? 20
+
+  const { data: searchCount, error: capError } = await supabaseAdmin.rpc('bump_employer_daily_search_count', {
+    p_employer_account_id: employerAccount.id,
+    p_daily_limit: dailySearchLimit,
+  })
+  if (capError) {
+    console.error('employer-candidate-search cap check failed', capError.message)
+    return jsonResponse({ error: 'search_failed' }, 500)
+  }
+  if (searchCount === null) {
+    return jsonResponse({ error: 'search_limit_reached' }, 429)
   }
 
   let body: SearchBody
@@ -114,9 +133,12 @@ serve(async (req) => {
   // either side ("Acme" vs "Acme Inc") can slip through undetected.
   const employerNameNormalized = normalizeCompanyName(employerAccount.company_name)
 
+  const excludedCandidateIds: string[] = []
+
   const results = (rows ?? [])
     .filter((c) => {
       if (c.current_employer && normalizeCompanyName(c.current_employer) === employerNameNormalized) {
+        excludedCandidateIds.push(c.id)
         return false
       }
       if (roleCategory && !(c.target_role_categories ?? []).includes(roleCategory)) {
@@ -139,6 +161,20 @@ serve(async (req) => {
       // Deliberately excluded: name, email, phone, resume, current_employer - never leaves
       // this function for a candidate row, per the plan's anonymized-results requirement.
     }))
+
+  if (excludedCandidateIds.length > 0) {
+    try {
+      await supabaseAdmin.from('employer_search_exclusion_events').insert(
+        excludedCandidateIds.map((candidateProfileId) => ({
+          employer_account_id: employerAccount.id,
+          candidate_profile_id: candidateProfileId,
+          source: 'search',
+        })),
+      )
+    } catch (err) {
+      console.error('employer-candidate-search exclusion log failed', err instanceof Error ? err.message : err)
+    }
+  }
 
   return jsonResponse({ candidates: results }, 200)
 })

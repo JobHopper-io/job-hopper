@@ -84,6 +84,27 @@ serve(async (req) => {
     return jsonResponse({ error: 'not_verified' }, 403)
   }
 
+  const { data: freemiumSettings } = await supabaseAdmin
+    .from('freemium_settings')
+    .select('employer_daily_reveal_requests')
+    .eq('id', 1)
+    .maybeSingle()
+  const dailyRevealLimit = freemiumSettings?.employer_daily_reveal_requests ?? 10
+
+  // Counts every attempt, not just successful inserts - a caller can't game the cap by
+  // repeatedly hitting a validation error (missing role title, etc.) for free.
+  const { data: revealCount, error: capError } = await supabaseAdmin.rpc('bump_employer_daily_reveal_count', {
+    p_employer_account_id: employerAccount.id,
+    p_daily_limit: dailyRevealLimit,
+  })
+  if (capError) {
+    console.error('employer-request-reveal cap check failed', capError.message)
+    return jsonResponse({ error: 'request_failed' }, 500)
+  }
+  if (revealCount === null) {
+    return jsonResponse({ error: 'reveal_limit_reached' }, 429)
+  }
+
   let body: RequestBody
   try {
     body = (await req.json()) as RequestBody
@@ -133,6 +154,15 @@ serve(async (req) => {
     candidate.current_employer &&
     normalizeCompanyName(candidate.current_employer) === normalizeCompanyName(employerAccount.company_name)
   ) {
+    try {
+      await supabaseAdmin.from('employer_search_exclusion_events').insert({
+        employer_account_id: employerAccount.id,
+        candidate_profile_id: candidate.id,
+        source: 'reveal_request',
+      })
+    } catch (err) {
+      console.error('employer-request-reveal exclusion log failed', err instanceof Error ? err.message : err)
+    }
     return jsonResponse({ error: 'candidate_not_found' }, 404)
   }
 

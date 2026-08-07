@@ -1,6 +1,18 @@
-Job-Hopper Chatbot Knowledge Base — Master v1.3
+Job-Hopper Chatbot Knowledge Base — Master v1.4
 Consolidated from JHIL v1.0 (KB-0001–KB-0050) + University/Partnership & Internal Ops extension (KB-0051–KB-0055)
-Compiled July 16, 2026. Corrected July 16, 2026. Updated July 28, 2026.
++ Recruiter-Visible Mode (KB-0056)
+Compiled July 16, 2026. Corrected July 16, 2026. Updated July 28, 2026. Updated August 7, 2026.
+
+v1.4 CHANGE NOTE
+Added KB-0056 (Recruiter-Visible Mode) covering the opt-in employer-search and reveal-request
+feature that shipped across Phases 1-6 (build plan: docs/recruiter-visible-mode-build-plan.md),
+completed 2026-08-07 with admin review, daily rate caps, and exclusion-event logging (Phase 6).
+Cross-linked from KB-0047 (Privacy and Personal Data). This addition also corrects two articles
+that were actively wrong, not just missing: FAQ.vue's "Do employers see my profile?" and "Do you
+share my data with employers or third parties?" entries, and Privacy.vue's "Employer Access"
+section, all of which previously stated employers have no access to candidate profiles at all -
+contradicting the live feature. Both were rewritten to describe the actual opt-in,
+anonymized-search, exclusion, and reveal-approval mechanics.
 
 v1.3 CHANGE NOTE
 Premium launched as a purchasable plan on 2026-07-22 (available_for_purchase flipped true, migration
@@ -30,13 +42,15 @@ any corrected fact and the live product ever disagree going forward, the live pr
 this file, not the other way around.
 
 WHAT THIS FILE IS
-This is the single, complete knowledge base for the Job-Hopper chatbot: 55 articles, one format,
+This is the single, complete knowledge base for the Job-Hopper chatbot: 56 articles, one format,
 one numbering scheme. It merges:
   - KB-0001 to KB-0050: the already-completed JHIL v1.0 core library (public product, account,
     search, matching, sponsorship, plans/billing, devices, privacy, support, and chatbot policy).
   - KB-0051 to KB-0055: new articles covering university/campus partnerships and an internal
     product-status reference, which existed only in the Operating Manual and had no JHIL-format
     article yet.
+  - KB-0056: Recruiter-Visible Mode, the live opt-in employer-search and reveal-request feature
+    (Phases 1-6 of docs/recruiter-visible-mode-build-plan.md).
 
 HOW TO USE
 Load every article below as one retrieval chunk per KB ID. Only articles with AI Approved: Yes
@@ -3230,13 +3244,14 @@ Is my resume used to train AI?
 This must be answered from the approved Privacy Policy and technical practice, not assumed.
 
 Related Articles
-KB-0010; KB-0048; KB-0050
+KB-0010; KB-0048; KB-0050; KB-0056
 
 Training AI
 Canonical Response
 Job-Hopper uses information such as your profile, resume, and preferences to provide matching and
 account services. For formal details about use, sharing, retention, and rights, review the current Privacy
-Policy or contact support.
+Policy or contact support. If asked specifically about employer visibility, see KB-0056 (Recruiter-Visible
+Mode) — it is opt-in and off by default.
 
 Related Intents
 privacy
@@ -3973,3 +3988,122 @@ confirmation.
 Internal Notes
 Source: Job-Hopper Operating Manual v1.0, Section 2 (Product Truth Register) and Section 14 (Release
 Checklist). This article should be re-reviewed whenever the Product Truth Register is updated.
+
+KB-0056 - Recruiter-Visible Mode (Employer Search & Reveal Requests)
+
+Article ID: KB-0056
+Title: Recruiter-Visible Mode (Employer Search & Reveal Requests)
+Category: Product Features
+Department: Product
+Audience: Public
+Owner: Product owner
+Status: Approved
+Version: 1.0
+AI Approved: Yes
+Last Updated: 2026-08-07
+Review Cycle: Quarterly
+Risk Level: Medium
+Live State: Live
+Keywords: recruiter visible mode, employer search, candidate search, reveal request, anonymized profile, opt-in visibility, employer verification, current employer exclusion
+Related Articles: KB-0047; KB-0050; KB-0055
+Source of Truth: docs/recruiter-visible-mode-build-plan.md; supabase/migrations (recruiter visibility fields, employer_accounts, employer_reveal_requests)
+
+Purpose
+Explain Recruiter-Visible Mode accurately: an opt-in feature that lets verified employers search
+anonymized candidate profiles and request to reveal a seeker's identity, subject to the seeker's
+approval.
+
+Summary
+Recruiter-Visible Mode is off by default. A user who opts in during onboarding (or later from their
+profile) becomes discoverable to verified employers through an anonymized search: employers see
+role, career level, years of experience, and location, but never name, email, phone, resume, or
+current employer. A user's own current employer is automatically excluded from ever seeing them
+in search results. An employer who wants to contact a candidate must submit a reveal request naming
+a specific role title and pay range; the candidate sees that request and can approve or decline it.
+Only on approval does the employer receive the candidate's name and contact information.
+
+Detailed Explanation
+Employer accounts go through verification (automatic domain/heuristic checks, backed up by an
+Apollo organization lookup) before they can search or send reveal requests at all; unverified,
+rejected, or suspended employer accounts are blocked. Employer search and reveal requests are each
+capped per employer per day (admin-tunable, generous default ceilings) to prevent mass-searching or
+reveal-request spam. Every candidate excluded from an employer's results for being a same-company
+match is logged, so a seeker's "was my employer actually excluded" question is answerable from data.
+Admins can review, approve, reject, or suspend employer accounts from the admin dashboard.
+
+Key Benefits
+Gives seekers passive visibility to employers without giving up control of their identity
+Anonymizes every candidate field an employer can see until the seeker explicitly approves a reveal
+Automatically excludes a seeker's current employer from ever finding them
+Rate-limited and admin-reviewable, so employer accounts can't be abused
+
+Examples
+A user opts into Recruiter-Visible Mode from onboarding. A verified employer searches for candidates
+matching a role category and location and sees an anonymized result (job title, career level, years
+of experience, preferred locations) with no name or contact info. The employer sends a reveal
+request naming the role and pay range; the user reviews it in their Reveal Requests page and
+approves it, after which the employer receives the user's name and email so they can reach out.
+
+FAQs
+Is Recruiter-Visible Mode on by default?
+No. It is strictly opt-in, chosen during onboarding or later from the user's profile settings.
+
+What can an employer see before I approve a reveal request?
+Only anonymized fields: current job title, career level, years of experience, target role
+categories, and preferred locations. Never name, email, phone, resume, or current employer.
+
+Can my current employer see me in Recruiter-Visible Mode?
+No. A candidate's current employer is automatically excluded from that employer's search results
+and reveal requests.
+
+What happens if I decline a reveal request?
+The employer does not receive any of your identifying information.
+
+Related Articles
+KB-0047; KB-0050; KB-0055
+
+Training AI
+Canonical Response
+Recruiter-Visible Mode is a live, opt-in feature. If a user asks whether employers can see their
+profile, explain that visibility is off by default, that opted-in candidates are shown to employers
+only in anonymized form, that their current employer is automatically excluded, and that an
+employer only receives identifying contact information after the candidate approves a specific
+reveal request.
+
+Related Intents
+do employers see my profile
+recruiter visible mode
+employer search
+reveal request
+anonymized profile
+opt out of employer visibility
+
+AI Do Rules
+State clearly that Recruiter-Visible Mode is opt-in and off by default.
+Describe the anonymized fields accurately; never claim an employer sees name, email, phone, resume,
+or current employer before a reveal is approved.
+Mention the current-employer exclusion when relevant.
+
+AI Don't Rules
+Never describe employer visibility as hypothetical or future — it is live.
+Never claim reveal requests are automatically approved or that approval is optional once sent by
+mistake; only the candidate approves or declines.
+Do not disclose whether a specific employer has searched for or requested a specific candidate
+outside the candidate's own Reveal Requests page.
+
+Sales Opportunity
+Not a sales trigger on its own; if a user asks how to increase visibility to employers, point them to
+enabling Recruiter-Visible Mode in profile settings.
+
+Escalation Rules
+Escalate any report of an employer account behaving abusively (excessive search/reveal attempts, a
+seeker's current employer appearing despite exclusion) to support for admin review.
+
+Required Ticket Payload
+Article ID, user email if voluntarily provided, whether Recruiter-Visible Mode is enabled, employer
+company name involved (if known), timestamp, screenshot if available.
+
+Internal Notes
+Source: docs/recruiter-visible-mode-build-plan.md, Phases 1-6. Admin review, daily rate caps, and
+exclusion-event logging (Phase 6) shipped 2026-08-07. Re-verify this article if reveal-request
+mechanics, anonymized fields, or verification requirements change.
