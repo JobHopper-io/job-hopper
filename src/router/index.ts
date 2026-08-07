@@ -37,6 +37,7 @@ const adminPaths = [
   '/admin',
   '/admin/dashboard',
   '/admin/employer-review',
+  '/admin/announcements',
   '/admin/admin-management',
   '/admin/job-matching-algorithm',
   '/admin/test-emails',
@@ -250,6 +251,11 @@ const router = createRouter({
       path: '/admin/dashboard-banner',
       name: 'admin-dashboard-banner',
       component: () => import('../views/AdminDashboardBanner.vue'),
+    },
+    {
+      path: '/admin/announcements',
+      name: 'admin-announcements',
+      component: () => import('../views/AdminAnnouncements.vue'),
     },
     {
       path: '/admin/user-lifecycle',
