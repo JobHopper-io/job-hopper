@@ -78,3 +78,62 @@ This keeps the SEO landing pages crawlable (the Vue SPA is client-rendered).
 
 A row whose `page_type` is unknown/unsupported is warned about and skipped; it never
 fails the build. The generator prints a summary of pages generated vs. skipped.
+
+### College Scorecard lead connector (run manually)
+
+`scripts/college-scorecard-connector.mjs` pulls U.S. university data from the College
+Scorecard public API, scores each school as an institutional sales opportunity, and
+upserts into `institutional_leads` (keyed on `organization_name, source`). Run it
+locally, one state at a time:
+
+```bash
+COLLEGE_SCORECARD_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/college-scorecard-connector.mjs TX
+```
+
+- `COLLEGE_SCORECARD_API_KEY`: free key from https://api.data.gov/signup/.
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: the project `institutional_leads` lives in.
+- State argument defaults to `TX` if omitted.
+
+Not wired into any scheduled job — deliberately manual per state until the first run's
+output has been spot-checked.
+
+### WARN layoff-notice connector (run manually)
+
+`scripts/warn-connector.mjs` pulls WARN Act mass-layoff notices from warnfirehose.com
+(a third-party aggregator of the 50-state public filings) and upserts each employer into
+`institutional_leads` (source='warn', category='employer'), keyed on
+`organization_name, source`. Also prints a notices-by-state+industry count to the
+console as the B2C geo-targeting signal — not written to a table yet.
+
+```bash
+WARN_FIREHOSE_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/warn-connector.mjs TX
+```
+
+- `WARN_FIREHOSE_API_KEY`: free key from warnfirehose.com/account.
+- Free tier is 25 calls/day, 25 records/call — this script makes one call, no
+  pagination, by design. Revisit if/when the $49/mo Starter tier is approved.
+- State argument defaults to `TX`; an optional second argument sets `date_from`
+  (`YYYY-MM-DD`).
+
+### Outbound dry-run + contact enrichment (run manually)
+
+`scripts/outbound-dry-run.mjs` pulls the top 20 `institutional_leads` (university/employer,
+`opportunity_score >= 50`, `status = 'new'`), checks `exclusion_lists` suppression, enriches
+any lead missing `contact_email` via Apollo (real write to
+`institutional_leads.decision_maker_name/title/contact_email` — capped to
+`ENRICHMENT_DRY_RUN_CAP` leads per run, currently 5, to verify results before scaling),
+renders the matching persona template, and logs every render to `outbound_dry_run_log`.
+**No email is ever actually sent** — `sendEmail` is not called by this script.
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... APOLLO_API_KEY=... \
+  node scripts/outbound-dry-run.mjs
+```
+
+- `APOLLO_API_KEY`: same Apollo account used by `premium-insights`; credits are metered
+  separately under the `institutional_lead_enrichment` row in `apollo_limits` (200
+  credits, see `docs/apollo-limits.md`) so this can't eat into that budget.
+- A lead whose enrichment doesn't resolve to a real, emailed contact is skipped for that
+  run — nothing is fabricated, and `institutional_leads` is left untouched for it.

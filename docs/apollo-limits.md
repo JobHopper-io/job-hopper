@@ -17,6 +17,7 @@ Column `credit_limit` in the database maps to the product concept “limit” (t
 |--------|-------------|-------------------|
 | `premium_insights` | User-triggered hiring-contact flow (`premium-insights` Edge Function) | 1 credit: `mixed_companies/search`; 1 credit: `people/match` (stepwise; see below) |
 | `job_processor` | FastAPI raw-job pipeline (`job_processor` service) | 1 credit per `organizations/enrich` attempt |
+| `institutional_lead_enrichment` | On-demand decision-maker enrichment for `institutional_leads` rows about to be sent to (`scripts/outbound-dry-run.mjs`), not a bulk pass | 1 credit: `mixed_companies/search`; 1 credit: `people/match` (stepwise, single contact — same contract as `premium_insights` steps 1-2, no multi-contact loop) |
 
 ## Consume / refund contract
 
