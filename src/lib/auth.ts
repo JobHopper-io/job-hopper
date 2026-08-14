@@ -95,6 +95,8 @@ export const authAPI = {
     landingPath?: string,
     utmSource?: string,
     referrerHost?: string,
+    utmCampaign?: string,
+    utmMedium?: string,
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -108,6 +110,8 @@ export const authAPI = {
           landing_path: landingPath || null,
           utm_source: utmSource || null,
           referrer_host: referrerHost || null,
+          utm_campaign: utmCampaign || null,
+          utm_medium: utmMedium || null,
         },
       },
     })

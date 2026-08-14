@@ -137,8 +137,13 @@ onMounted(async () => {
     // SPA (e.g. an ad link), mirroring landing_path's capture on static SEO pages
     // (scripts/generate-seo-pages.mjs). Read once per app load; never overwritten.
     try {
-      const utmSource = new URLSearchParams(window.location.search).get('utm_source')
+      const params = new URLSearchParams(window.location.search)
+      const utmSource = params.get('utm_source')
+      const utmCampaign = params.get('utm_campaign')
+      const utmMedium = params.get('utm_medium')
       if (utmSource) sessionStorage.setItem('utm_source', utmSource)
+      if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign)
+      if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium)
     } catch {
       // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
     }
