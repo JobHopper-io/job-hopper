@@ -1,20 +1,26 @@
 #!/usr/bin/env node
-// Pulls top-scored institutional_leads (university/employer), checks exclusion_lists
-// suppression, enriches leads missing contact_email via Apollo (real: writes
-// decision_maker_name/title/contact_email back to institutional_leads, capped to a
-// small dry-run batch — see ENRICHMENT_DRY_RUN_CAP), renders the matching persona
+// Pulls top-scored institutional_leads (university/employer by default), checks
+// exclusion_lists suppression, enriches leads missing contact_email via Apollo (real:
+// writes decision_maker_name/title/contact_email back to institutional_leads, capped
+// to whatever batch size was requested — see --limit), renders the matching persona
 // template from persona-campaign-copy.md with real field substitution, and logs every
 // render to outbound_dry_run_log. Never calls sendEmail — no real outbound sends happen
 // here; only the enrichment writes and the dry-run log are real.
 //
 // Usage: node scripts/outbound-dry-run.mjs
+//        node scripts/outbound-dry-run.mjs --limit=100 --all-sources
+//        node scripts/outbound-dry-run.mjs --only="Name1,Name2"
 
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 
 const BATCH_LIMIT = 20;
-const CANDIDATE_CATEGORIES = ['university', 'employer'];
-const MIN_OPPORTUNITY_SCORE = 50;
+export const CANDIDATE_CATEGORIES = ['university', 'employer'];
+export const MIN_OPPORTUNITY_SCORE = 50;
+
+// Sign-off name for [Your Name] in every template. Env-overridable so a real send
+// batch can swap it without a code change.
+export const SENDER_NAME = process.env.SENDER_NAME || 'Job Hopper Team';
 
 // Real copy from persona-campaign-copy.md. Only university/employer are wired —
 // the other three personas (Career Coach, Immigration Attorney, Workforce Center)
@@ -35,7 +41,7 @@ attached, just numbers.
 What's the best way to get this in front of whoever handles vendor decisions for career
 services?
 
-[Name]
+[Your Name]
 Job-Hopper`,
   },
   employer: {
@@ -49,12 +55,53 @@ visa who's also racing a clock most people don't have to think about.
 We put together transition packages for situations like this, [seat range], no cost to
 the affected employees. Can send specifics if useful.
 
-[Name]
+[Your Name]
 Job-Hopper`,
   },
 };
 
-function requireEnv(name) {
+// Used instead of TEMPLATES when the same contact_email resolves for more than one lead
+// this run (e.g. one person listed as the decision-maker for several satellite campuses,
+// or the same HR contact across multiple WARN filings for one employer). Sending the
+// per-lead template once per duplicate would either spam the same inbox or pick one
+// lead's specific numbers/location arbitrarily — instead this drops every claim that's
+// true of only one of the merged leads (student count, worker count, single campus name)
+// and keeps only what's true of the group as a whole.
+const GENERIC_TEMPLATES = {
+  university: {
+    subject: 'Job-Hopper for your campus career services team',
+    body: `Hi [Name],
+
+I run product at Job-Hopper. We help international students and visa-seeking grads find
+employers that actually sponsor, backed by real DOL and USCIS filing data instead of
+guesswork.
+
+Given the size of your student population, you'd likely be in range for a campus license.
+Happy to send over what that could look like, no pitch attached, just numbers.
+
+What's the best way to get this in front of whoever handles vendor decisions for career
+services?
+
+[Your Name]
+Job-Hopper`,
+  },
+  employer: {
+    subject: 'Career transition support for your team',
+    body: `Hi [Name],
+
+Saw your organization's recent WARN notice. Job-Hopper helps laid-off professionals find
+their next role faster, particularly useful for anyone on a visa who's also racing a clock
+most people don't have to think about.
+
+We put together transition packages for situations like this, custom-sized to the group
+affected, no cost to the affected employees. Can send specifics if useful.
+
+[Your Name]
+Job-Hopper`,
+  },
+};
+
+export function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -111,22 +158,56 @@ function scoreOrgs(companyName, orgs) {
   return orgs.map((o) => ({ org: o, score: orgNameScore(companyName, o.name) })).sort((a, b) => b.score - a.score);
 }
 
+// True when every token of companyName appears in orgName — the shape that makes a
+// Foundation/sub-org/affiliated-club name score identically to its parent institution,
+// since orgNameScore only measures how many query tokens are present, not how many
+// extra tokens the candidate adds on top.
+function containsAllQueryTokens(companyName, orgName) {
+  const ta = tokenSet(normalizeCompanyName(companyName));
+  if (ta.size === 0) return false;
+  const tb = tokenSet(normalizeCompanyName(orgName));
+  for (const x of ta) if (!tb.has(x)) return false;
+  return true;
+}
+
+function orgTokenCount(orgName) {
+  return tokenSet(normalizeCompanyName(orgName)).size;
+}
+
 // Below threshold, or ambiguous (two close candidates) -> null. No UI to ask a human
 // which org was meant here, so an uncertain match is treated the same as no match:
 // skip the lead rather than guess (same "don't fabricate" rule as the build spec §3.4).
 //
-// One narrow exception: candidates tied at the exact same top score, where exactly one
-// has a real primary_domain and the rest don't. That specific shape (seen on "Meta" —
-// two orgs both literally named "Meta", one with domain meta.com, one with domain null)
-// looks like a stale/duplicate Apollo record, not a genuine ambiguity, so the
-// domain-bearing one wins. Two-or-more real domains tied at top is still a real
-// ambiguity and still refuses, same as before.
-function pickBestOrgFromScored(scored) {
+// Two narrow exceptions, tried in order, before falling back to refusal:
+//
+// 1. All candidates tied at the top score already contain every query token (e.g.
+//    "California State University, Fresno" tied with "...FRESNO FOUNDATION" — both
+//    contain the full query, so they score the same even though one is a strict
+//    superset of the other's name). Among those, the fewest-tokens candidate is the
+//    closer match — a superset always has equal-or-more tokens than the name it
+//    contains, so this can never pick the wrong one when the shapes genuinely differ.
+//    If the token counts also tie (e.g. two literally-identical-length names), this
+//    doesn't resolve anything and falls through — real ambiguity, not this pattern.
+//
+// 2. Candidates tied at the exact same top score, where exactly one has a real
+//    primary_domain and the rest don't. That specific shape (seen on "Meta" — two orgs
+//    both literally named "Meta", one with domain meta.com, one with domain null) looks
+//    like a stale/duplicate Apollo record, not a genuine ambiguity, so the
+//    domain-bearing one wins. Two-or-more real domains tied at top is still a real
+//    ambiguity and still refuses, same as before.
+function pickBestOrgFromScored(scored, companyName) {
   const top = scored[0];
   if (!top || top.score < MIN_ORG_SCORE) return null;
 
   const tiedAtTop = scored.filter((row) => row.score === top.score);
   if (tiedAtTop.length > 1) {
+    if (companyName && tiedAtTop.every((row) => containsAllQueryTokens(companyName, row.org.name))) {
+      const withCounts = tiedAtTop.map((row) => ({ row, count: orgTokenCount(row.org.name) }));
+      const minCount = Math.min(...withCounts.map((t) => t.count));
+      const fewest = withCounts.filter((t) => t.count === minCount);
+      if (fewest.length === 1) return fewest[0].row.org;
+    }
+
     const withDomain = tiedAtTop.filter((row) => row.org.primary_domain);
     return withDomain.length === 1 ? withDomain[0].org : null;
   }
@@ -152,6 +233,32 @@ function stripHyphenatedSuffix(name) {
   return idx === -1 ? name : name.slice(0, idx).trim();
 }
 
+// "University of California-San Diego" / "California State University-Fresno" ->
+// common-name forms people (and Apollo's org records) actually use: "UC San Diego",
+// "Fresno State University". Scoped to their own prefix only — cross-applying would
+// produce wrong-institution queries (e.g. "San Diego State University" is a real,
+// different school from "UC San Diego").
+function ucCommonName(name) {
+  const m = name.match(/^University of California-(.+)$/i);
+  return m ? `UC ${m[1].trim()}` : null;
+}
+
+function csuCommonName(name) {
+  const m = name.match(/^California State University-(.+)$/i);
+  return m ? `${m[1].trim()} State University` : null;
+}
+
+// "El Camino Community College District" -> "El Camino": Scorecard's school.name
+// carries the governing district's legal name, but Apollo's org record is usually for
+// the college itself, under whatever name remains once "Community College District" is
+// stripped out.
+function stripCommunityCollegeDistrict(name) {
+  const phrase = 'Community College District';
+  const idx = name.indexOf(phrase);
+  if (idx === -1) return name;
+  return (name.slice(0, idx) + name.slice(idx + phrase.length)).replace(/\s+/g, ' ').trim();
+}
+
 // College Scorecard names are the raw official institution name, which Apollo's org
 // search sometimes doesn't resolve on its own. Retry with progressively cleaned-up
 // query variants — *search query only*, institutional_leads.organization_name itself
@@ -162,10 +269,16 @@ function orgSearchQueriesFor(lead) {
 
   const atStripped = stripCampusQualifier(base);
   const hyphenStripped = stripHyphenatedSuffix(base);
+  const uc = ucCommonName(base);
+  const csu = csuCommonName(base);
+  const ccdStripped = stripCommunityCollegeDistrict(base);
 
   const queries = [base];
   if (atStripped !== base) queries.push(atStripped);
   if (hyphenStripped !== base && hyphenStripped !== atStripped) queries.push(hyphenStripped);
+  if (uc) queries.push(uc);
+  if (csu) queries.push(csu);
+  if (ccdStripped !== base) queries.push(ccdStripped);
   queries.push(`${base} University`, `${base} College`);
 
   return [...new Set(queries)];
@@ -349,7 +462,7 @@ async function resolveOrganization(supabase, apolloKey, lead) {
       }),
     );
 
-    const org = pickBestOrgFromScored(scored);
+    const org = pickBestOrgFromScored(scored, lead.organization_name);
     if (org) return { outcome: 'picked', org };
 
     await refundCredits(supabase, 1);
@@ -361,10 +474,35 @@ async function resolveOrganization(supabase, apolloKey, lead) {
 // simplified to a single target contact (institutional_leads has one decision-maker
 // slot, not a tiered contact list). On any failure short of a matched person, leaves
 // the row untouched — no placeholder is ever written.
-async function enrichLead(supabase, apolloKey, lead) {
+//
+// orgCache is keyed by the ACTUAL resolved org.id (falling back to primary_domain),
+// never by a guessed name string. A first version of this cache keyed by a stripped
+// base name (e.g. "california state university") and skipped org-search entirely on a
+// hit — that's unsafe: Apollo's own search results prove "California State
+// University-Fullerton" and "-Long Beach" are genuinely separate orgs with different
+// IDs, not campuses of one institution the way ASU's satellite centers are. A blind
+// name-based hit merged 5 distinct CSU campuses onto Fullerton's real director before
+// this was caught and reverted. Org-search always runs for every row now (1 credit —
+// the only way to actually learn *this* row's real org identity); the cache only skips
+// the two more expensive downstream steps (people-search + people/match, 2 credits),
+// and only once the freshly-resolved org.id/domain has been checked against the cache.
+async function enrichLead(supabase, apolloKey, lead, orgCache) {
   const orgResult = await resolveOrganization(supabase, apolloKey, lead);
   if (orgResult.outcome !== 'picked') return { outcome: orgResult.outcome, error: orgResult.error };
   const org = orgResult.org;
+
+  const cacheKey = org.id || org.primary_domain || null;
+  const cached = cacheKey ? orgCache.get(cacheKey) : undefined;
+  if (cached) {
+    return {
+      outcome: 'free_copy',
+      name: cached.name,
+      title: cached.title,
+      email: cached.email,
+      orgId: org.id,
+      orgDomain: org.primary_domain ?? null,
+    };
+  }
 
   const c2ok = await tryConsumeCredits(supabase, 1);
   if (!c2ok) return { outcome: 'credit_exhausted' };
@@ -427,9 +565,10 @@ async function enrichLead(supabase, apolloKey, lead) {
   // Apollo returned a real, paid-for person — that credit spend stands even if this
   // particular person has no email on file. Not refunded (same as premium_insights:
   // a matched-but-emailless person is a legitimate result, just not a usable one here).
-  if (!email) return { outcome: 'no_email', name, title };
+  if (!email) return { outcome: 'no_email', name, title, orgId: org.id, orgDomain: org.primary_domain ?? null };
 
-  return { outcome: 'success', name, title, email };
+  if (cacheKey) orgCache.set(cacheKey, { name, title, email });
+  return { outcome: 'success', name, title, email, orgId: org.id, orgDomain: org.primary_domain ?? null };
 }
 
 function fill(text, replacements) {
@@ -440,21 +579,33 @@ function fill(text, replacements) {
   return out;
 }
 
-// [Name] (sender/recipient name) is never mapped — decision_maker_name isn't populated
-// for any lead yet (same Apollo-enrichment gap the build spec flags for contact_email).
+// [Name] is the recipient's greeting name, filled from decision_maker_name (first name
+// only — "Hi John," not "Hi John Smith,"). It's a distinct token from [Your Name] in the
+// signature: the template originally reused the same [Name] token for both the recipient
+// greeting and the sender sign-off, which meant filling it from decision_maker_name would
+// have signed the email with the recipient's own name. Split into two tokens instead;
+// [Your Name] is filled from SENDER_NAME (env-overridable, defaults to "Job Hopper Team").
 // [seat range] is mapped straight from recommended_package, which already carries its
 // own unit ("25 seats", "500+ seat custom cohort") — the templates don't append a
 // trailing "seats" or a separate duration placeholder, so the field's wording stands as-is.
+function firstName(fullName) {
+  return typeof fullName === 'string' && fullName.trim() ? fullName.trim().split(/\s+/)[0] : null;
+}
+
 function renderTemplate(category, lead) {
   const template = TEMPLATES[category];
   const replacements =
     category === 'university'
       ? {
+          '[Name]': firstName(lead.decision_maker_name) || '[Name]',
+          '[Your Name]': SENDER_NAME,
           '[School Name]': lead.organization_name,
           '[X,XXX]': lead.student_size != null ? lead.student_size.toLocaleString('en-US') : '[X,XXX]',
           '[seat range]': lead.recommended_package || '[seat range]',
         }
       : {
+          '[Name]': firstName(lead.decision_maker_name) || '[Name]',
+          '[Your Name]': SENDER_NAME,
           '[Company]': lead.organization_name,
           '[X]':
             lead.signals?.workers_affected != null
@@ -466,13 +617,59 @@ function renderTemplate(category, lead) {
 
   const subject = fill(template.subject, replacements);
   const body = fill(template.body, replacements);
-  const unfilled = [...new Set([...subject.matchAll(/\[[^\]]+\]/g), ...body.matchAll(/\[[^\]]+\]/g)].map((m) => m[0]))];
-  return { subject, body, unfilled };
+  return { subject, body, unfilled: unfilledPlaceholders(subject, body) };
 }
 
-// Was capped to 5 for the initial small-batch verification (build spec §5); raised to
-// cover the full top-20 batch now that the 3-lead re-test confirmed the fixes work.
-const ENRICHMENT_DRY_RUN_CAP = BATCH_LIMIT;
+function unfilledPlaceholders(subject, body) {
+  return [...new Set([...subject.matchAll(/\[[^\]]+\]/g), ...body.matchAll(/\[[^\]]+\]/g)].map((m) => m[0]))];
+}
+
+// Groups candidates (each { lead, category, contact_email }) by contact_email and
+// produces exactly one send per unique email. Single-lead groups keep the normal
+// per-lead template; multi-lead groups (the same person resolved for several leads)
+// use the category-generic template instead, since no single lead's specific
+// numbers/location are true of the whole group. Input order is assumed to already be
+// priority order (highest opportunity_score first) — the first lead in a group becomes
+// "primary" and its category picks the template when a group spans categories.
+export function buildDedupedSends(candidateRenders) {
+  const groupsByEmail = new Map();
+  for (const c of candidateRenders) {
+    if (!groupsByEmail.has(c.contact_email)) groupsByEmail.set(c.contact_email, []);
+    groupsByEmail.get(c.contact_email).push(c);
+  }
+
+  let dedupedGroupCount = 0;
+  const sends = [];
+  for (const group of groupsByEmail.values()) {
+    const primary = group[0].lead;
+    const orgNames = group.map((c) => c.lead.organization_name);
+
+    if (group.length === 1) {
+      const { subject, body, unfilled } = renderTemplate(primary.category, primary);
+      sends.push({ merged: false, category: primary.category, contact_email: group[0].contact_email, orgNames, subject, body, unfilled });
+      continue;
+    }
+
+    dedupedGroupCount += 1;
+    const categories = [...new Set(group.map((c) => c.category))];
+    const template = GENERIC_TEMPLATES[primary.category];
+    const nameReplacement = { '[Name]': firstName(primary.decision_maker_name) || '[Name]', '[Your Name]': SENDER_NAME };
+    const subject = fill(template.subject, nameReplacement);
+    const body = fill(template.body, nameReplacement);
+    sends.push({
+      merged: true,
+      mixedCategories: categories.length > 1 ? categories : null,
+      category: primary.category,
+      contact_email: group[0].contact_email,
+      orgNames,
+      subject,
+      body,
+      unfilled: unfilledPlaceholders(subject, body),
+    });
+  }
+
+  return { sends, dedupedGroupCount };
+}
 
 async function main() {
   const supabaseUrl = requireEnv('SUPABASE_URL');
@@ -481,26 +678,60 @@ async function main() {
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
   // --only="Name1,Name2" restricts the candidate set to exact organization_name matches
-  // (e.g. re-testing specific prior misses) without touching the rest of the top-20 or
+  // (e.g. re-testing specific prior misses) without touching the rest of the batch or
   // spending enrichment-cap slots on leads that weren't asked for.
   const onlyArg = process.argv.find((a) => a.startsWith('--only='));
   const onlyNames = onlyArg ? onlyArg.slice('--only='.length).split(',').map((s) => s.trim()) : null;
 
+  // --limit=100 overrides the default batch size (still 20 unless passed).
+  const limitArg = process.argv.find((a) => a.startsWith('--limit='));
+  const batchLimit = limitArg ? Number(limitArg.slice('--limit='.length)) : BATCH_LIMIT;
+
+  // --all-sources drops the category/min-score restriction entirely, ranking across
+  // every source (college_scorecard, warn, apollo_career_partner) by opportunity_score
+  // alone. Without it, behavior is unchanged from every previous run tonight
+  // (university/employer only, score >= 50) — this flag only widens scope, never
+  // narrows the default.
+  const allSources = process.argv.includes('--all-sources');
+
+  // The enrichment cap always matches whatever batch size was actually requested this
+  // run — it exists to gate spend to "however many leads we said we'd touch," not as a
+  // separate, smaller number to additionally worry about.
+  const enrichmentCapLimit = batchLimit;
+
   console.log(
     onlyNames
       ? `Fetching only: ${onlyNames.join(', ')}`
-      : `Fetching top ${BATCH_LIMIT} candidate leads (status=new, category in [${CANDIDATE_CATEGORIES.join(', ')}], opportunity_score >= ${MIN_OPPORTUNITY_SCORE})...`,
+      : allSources
+        ? `Fetching top ${batchLimit} candidate leads across all sources (status=new, ordered by opportunity_score desc)...`
+        : `Fetching top ${batchLimit} candidate leads (status=new, category in [${CANDIDATE_CATEGORIES.join(', ')}], opportunity_score >= ${MIN_OPPORTUNITY_SCORE})...`,
   );
   let query = supabase
     .from('institutional_leads')
     .select(
-      'id, organization_name, category, contact_email, opportunity_score, website, signals, city, state, student_size, recommended_package, source',
+      'id, organization_name, category, contact_email, decision_maker_name, opportunity_score, website, signals, city, state, student_size, recommended_package, source',
     )
     .eq('status', 'new')
-    .in('category', CANDIDATE_CATEGORIES)
-    .gte('opportunity_score', MIN_OPPORTUNITY_SCORE)
+    // Every connector's own scoring rule treats a null opportunity_score as "flag for
+    // manual review," never as a candidate for outbound — so it's excluded from
+    // candidacy outright, not just sorted after real scores. This also sidesteps
+    // Postgres's default DESC null ordering (NULLS FIRST, not last — confirmed the hard
+    // way: a run without this filter returned 100/100 null-score rows ahead of every
+    // real-scored lead, since the previous .gte(50) floor had been silently absorbing
+    // this the whole time by excluding nulls as a side effect, not by design).
+    .not('opportunity_score', 'is', null);
+  if (!allSources) {
+    query = query.in('category', CANDIDATE_CATEGORIES).gte('opportunity_score', MIN_OPPORTUNITY_SCORE);
+  }
+  // Secondary sort makes batches reproducible run to run — opportunity_score alone ties
+  // constantly (many leads share the same bucket score), so without a tiebreaker
+  // Postgres doesn't guarantee stable ordering among tied rows across separate calls
+  // (observed directly: Kent State/Cincinnati dropped out of an earlier top-20 window
+  // between two runs with identical filters).
+  query = query
     .order('opportunity_score', { ascending: false })
-    .limit(BATCH_LIMIT);
+    .order('organization_name', { ascending: true })
+    .limit(batchLimit);
   if (onlyNames) query = query.in('organization_name', onlyNames);
   const { data: leads, error: leadsError } = await query;
   if (leadsError) throw new Error(`Failed to query institutional_leads: ${leadsError.message}`);
@@ -512,12 +743,26 @@ async function main() {
   if (exclusionsError) throw new Error(`Failed to query exclusion_lists: ${exclusionsError.message}`);
   const suppressedNames = new Set(exclusions.map((r) => r.company_name));
 
+  const { data: creditsBefore } = await supabase
+    .from('apollo_limits')
+    .select('usage')
+    .eq('name', 'institutional_lead_enrichment')
+    .single();
+
   const logRows = [];
   const rendered = [];
+  const candidateRenders = []; // pre-dedup: one entry per lead with a usable contact_email
   const enrichmentAttempts = [];
   let suppressedCount = 0;
-  let enrichmentCap = ENRICHMENT_DRY_RUN_CAP;
+  let enrichmentCap = enrichmentCapLimit;
   let skippedNoContactCount = 0;
+  let freeCopyCount = 0;
+  let freshLookupSuccessCount = 0;
+
+  // Apollo org.id (falling back to primary_domain) -> resolved contact, populated only
+  // from real successful lookups this run. Keyed and checked inside enrichLead itself,
+  // after org-search actually resolves this row's org — never before, and never by name.
+  const resolvedOrgCache = new Map();
 
   for (const lead of leads) {
     if (suppressedNames.has(lead.organization_name)) {
@@ -536,19 +781,22 @@ async function main() {
     if (!lead.contact_email) {
       if (enrichmentCap <= 0) {
         skippedNoContactCount += 1;
-        console.log(`SKIPPED (missing email, enrichment dry-run cap reached): ${lead.organization_name}`);
+        console.log(`SKIPPED (missing email, enrichment cap reached): ${lead.organization_name}`);
         continue;
       }
       enrichmentCap -= 1;
       console.log(`Enriching (${lead.category}): ${lead.organization_name}...`);
-      const result = await enrichLead(supabase, apolloKey, lead);
+      const result = await enrichLead(supabase, apolloKey, lead, resolvedOrgCache);
       enrichmentAttempts.push({ organization_name: lead.organization_name, category: lead.category, ...result });
 
-      if (result.outcome !== 'success') {
+      if (result.outcome !== 'success' && result.outcome !== 'free_copy') {
         skippedNoContactCount += 1;
         console.log(`  -> ${result.outcome}${result.error ? `: ${result.error}` : ''} — lead skipped this round.`);
         continue;
       }
+
+      if (result.outcome === 'free_copy') freeCopyCount += 1;
+      else freshLookupSuccessCount += 1;
 
       const { error: updateError } = await supabase
         .from('institutional_leads')
@@ -560,26 +808,53 @@ async function main() {
         .eq('id', lead.id);
       if (updateError) throw new Error(`Failed to update institutional_leads ${lead.id}: ${updateError.message}`);
 
-      console.log(`  -> found: ${result.name} (${result.title ?? 'no title'}) <${result.email}>`);
+      console.log(
+        `  -> ${result.outcome}: ${result.name} (${result.title ?? 'no title'}) <${result.email}> ` +
+          `(resolved org domain=${result.orgDomain ?? 'null'}, id=${result.orgId ?? 'null'})`,
+      );
       lead.contact_email = result.email;
+      lead.decision_maker_name = result.name;
     }
 
-    const { subject, body, unfilled } = renderTemplate(lead.category, lead);
+    // No template exists for this category (e.g. career_partner) — enrichment above
+    // still ran and its write still stands, just nothing to render/log here. In
+    // practice this shouldn't trigger today: apollo_career_partner leads all have a
+    // null opportunity_score (verified — that connector's search mode doesn't return
+    // employee count), so they sort last and don't make it into a real top-N batch
+    // ranked by opportunity_score. Guarded anyway rather than assuming that holds forever.
+    if (!TEMPLATES[lead.category]) {
+      console.log(`  (no template for category "${lead.category}" — enrichment result kept, not rendered/logged)`);
+      continue;
+    }
 
+    candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
+  }
+
+  const { sends, dedupedGroupCount } = buildDedupedSends(candidateRenders);
+  for (const s of sends) {
+    if (s.merged) {
+      if (s.mixedCategories) {
+        console.log(
+          `  NOTE: contact_email ${s.contact_email} shared across mixed categories ` +
+            `(${s.mixedCategories.join(', ')}) — using ${s.category}'s generic template.`,
+        );
+      }
+      console.log(`  Deduped ${s.orgNames.length} leads to one send (${s.contact_email}): ${s.orgNames.join(', ')}`);
+    }
     logRows.push({
-      lead_organization_name: lead.organization_name,
-      category: lead.category,
-      rendered_subject: subject,
-      rendered_body: body,
+      lead_organization_name: s.orgNames.join('; '),
+      category: s.category,
+      rendered_subject: s.subject,
+      rendered_body: s.body,
       suppressed: false,
     });
     rendered.push({
-      organization_name: lead.organization_name,
-      category: lead.category,
-      contact_email: lead.contact_email,
-      subject,
-      body,
-      unfilled,
+      organization_name: s.orgNames.join('; '),
+      category: s.category,
+      contact_email: s.contact_email,
+      subject: s.subject,
+      body: s.body,
+      unfilled: s.unfilled,
     });
   }
 
@@ -588,22 +863,45 @@ async function main() {
     if (insertError) throw new Error(`Failed to write outbound_dry_run_log: ${insertError.message}`);
   }
 
+  const { data: creditsAfter } = await supabase
+    .from('apollo_limits')
+    .select('usage')
+    .eq('name', 'institutional_lead_enrichment')
+    .single();
+  const creditsUsedThisRun = (creditsAfter?.usage ?? 0) - (creditsBefore?.usage ?? 0);
+
   if (enrichmentAttempts.length) {
-    console.log(`\n--- Enrichment results (${enrichmentAttempts.length} attempted, dry-run cap ${ENRICHMENT_DRY_RUN_CAP}) ---`);
+    const succeeded = enrichmentAttempts.filter((a) => a.outcome === 'success' || a.outcome === 'free_copy');
+    const refused = enrichmentAttempts.filter((a) => a.outcome !== 'success' && a.outcome !== 'free_copy');
+    const byReason = new Map();
+    for (const a of refused) byReason.set(a.outcome, (byReason.get(a.outcome) ?? 0) + 1);
+
+    console.log(`\n--- Enrichment summary (${enrichmentAttempts.length} attempted) ---`);
+    console.log(
+      `  ${succeeded.length} got real contacts (${freshLookupSuccessCount} fresh lookup (2 credits each), ${freeCopyCount} free copy — same resolved org as an earlier row this run, verified by org ID/domain, 1 credit for org-search only, people-lookup skipped)`,
+    );
+    console.log(`  ${refused.length} principled refusals:`);
+    for (const [reason, count] of byReason) console.log(`    ${count} x ${reason}`);
+    console.log(`  ${creditsUsedThisRun} Apollo credits used this run (institutional_lead_enrichment)`);
+
+    console.log(`\n--- Detail ---`);
     for (const a of enrichmentAttempts) {
       console.log(
         `[${a.category}] ${a.organization_name}: ${a.outcome}` +
-          (a.outcome === 'success' || a.outcome === 'no_email'
+          (a.outcome === 'success' || a.outcome === 'free_copy' || a.outcome === 'no_email'
             ? `  name=${a.name ?? 'null'}  title=${a.title ?? 'null'}  email=${a.email ?? 'null'}`
-            : ''),
+            : a.error
+              ? `  (${a.error})`
+              : ''),
       );
     }
   }
 
   console.log(
-    `\nDry run complete: ${rendered.length} rendered, ${suppressedCount} suppressed, ` +
+    `\nDry run complete: ${rendered.length} sends rendered (${candidateRenders.length} leads had a usable ` +
+      `contact, ${dedupedGroupCount} email(s) deduped down from multiple leads), ${suppressedCount} suppressed, ` +
       `${skippedNoContactCount} skipped (no usable contact — either enrichment failed or the ` +
-      `${ENRICHMENT_DRY_RUN_CAP}-lead dry-run cap was already spent).`,
+      `${enrichmentCapLimit}-lead cap was already spent).`,
   );
 
   console.log(`\n--- Sample rendered output (${Math.min(5, rendered.length)} of ${rendered.length}) ---`);
@@ -615,11 +913,117 @@ async function main() {
   }
 }
 
+function selfTestDedup() {
+  const uniLead = (name, email, dmName) => ({ organization_name: name, category: 'university', student_size: 1000, recommended_package: '25 seats', contact_email: email, decision_maker_name: dmName });
+  const empLead = (name, email, dmName) => ({ organization_name: name, category: 'employer', signals: { workers_affected: 10 }, city: 'X', state: 'Y', recommended_package: '25 seats', contact_email: email, decision_maker_name: dmName });
+
+  // Greeting/signature token split: [Name] (recipient) fills from decision_maker_name;
+  // [Your Name] (sender) fills from SENDER_NAME — must never reuse the recipient's name.
+  const solo0 = uniLead('Named U', 'named@u.edu', 'Jane Smith');
+  const { subject: s0, body: b0, unfilled: u0 } = renderTemplate('university', solo0);
+  console.assert(s0.includes('Named U') && b0.includes('Hi Jane,'), 'greeting should fill from decision_maker_name first name');
+  console.assert(b0.includes(SENDER_NAME) && !u0.includes('[Your Name]'), 'signature should fill from SENDER_NAME, not stay unfilled');
+  console.assert(!b0.includes('Jane Smith') && !b0.includes('Hi ' + SENDER_NAME), 'greeting and signature must not cross-contaminate');
+
+  // Same-category duplicate: two campuses, one contact -> one generic send, no campus-specific claim.
+  const a = uniLead('ASU - Broadway', 'shared@asu.edu', 'Sam Ali');
+  const b = uniLead('ASU - Grand', 'shared@asu.edu', 'Sam Ali');
+  const c = uniLead('Solo U', 'solo@solo.edu', null);
+  const r1 = buildDedupedSends([
+    { lead: a, category: 'university', contact_email: 'shared@asu.edu' },
+    { lead: b, category: 'university', contact_email: 'shared@asu.edu' },
+    { lead: c, category: 'university', contact_email: 'solo@solo.edu' },
+  ]);
+  console.assert(r1.dedupedGroupCount === 1, 'expected exactly one deduped group');
+  console.assert(r1.sends.length === 2, 'expected 2 sends total (1 merged + 1 solo)');
+  const merged1 = r1.sends.find((s) => s.contact_email === 'shared@asu.edu');
+  console.assert(merged1.merged === true && merged1.orgNames.length === 2, 'merged send should list both orgs');
+  console.assert(!merged1.body.includes('1000') && !merged1.body.includes('Broadway'), 'generic send must not leak one lead\'s specifics');
+  console.assert(merged1.body.includes('Hi Sam,'), 'merged send should still greet by the shared contact\'s first name');
+  const solo1 = r1.sends.find((s) => s.contact_email === 'solo@solo.edu');
+  console.assert(solo1.merged === false && solo1.body.includes('Solo U'), 'non-duplicate lead keeps its specific template');
+
+  // Cross-category duplicate: flagged, falls back to primary (first/highest-scored) lead's template.
+  const d = empLead('Acme Corp', 'shared2@x.com', 'Pat Lee');
+  const e = uniLead('Acme U', 'shared2@x.com', 'Pat Lee');
+  const r2 = buildDedupedSends([
+    { lead: d, category: 'employer', contact_email: 'shared2@x.com' },
+    { lead: e, category: 'university', contact_email: 'shared2@x.com' },
+  ]);
+  console.assert(r2.sends.length === 1 && r2.sends[0].mixedCategories?.length === 2, 'mixed-category group should be flagged');
+  console.assert(r2.sends[0].category === 'employer', 'mixed group uses first/highest-scored lead\'s category');
+
+  console.log('selfTestDedup: all assertions passed');
+}
+
+function selfTestOrgQueries() {
+  console.assert(
+    orgSearchQueriesFor({ organization_name: 'University of California-San Diego', source: 'college_scorecard' }).includes('UC San Diego'),
+    'UC common-name variant should fire for "University of California-X"',
+  );
+  console.assert(
+    orgSearchQueriesFor({ organization_name: 'California State University-Fresno', source: 'college_scorecard' }).includes('Fresno State University'),
+    'CSU common-name variant should fire for "California State University-X"',
+  );
+  console.assert(
+    !orgSearchQueriesFor({ organization_name: 'University of California-San Diego', source: 'college_scorecard' }).some((q) => q.includes('State University')),
+    'CSU variant must not cross-apply to a UC name',
+  );
+  console.assert(
+    !orgSearchQueriesFor({ organization_name: 'California State University-Fresno', source: 'college_scorecard' }).some((q) => q.startsWith('UC ')),
+    'UC variant must not cross-apply to a CSU name',
+  );
+  console.assert(
+    orgSearchQueriesFor({ organization_name: 'El Camino Community College District', source: 'college_scorecard' }).includes('El Camino'),
+    'Community College District should strip down to the bare college name',
+  );
+  console.assert(
+    orgSearchQueriesFor({ organization_name: 'Regular University', source: 'college_scorecard' }).length === 3,
+    'a name matching no special pattern should only get the base + University/College suffix queries',
+  );
+  console.log('selfTestOrgQueries: all assertions passed');
+}
+
+function selfTestOrgTieBreak() {
+  const companyName = 'California State University-Fresno';
+  const flagship = { id: '1', name: 'California State University, Fresno', primary_domain: 'fresnostate.edu' };
+  const foundation = { id: '2', name: 'CALIFORNIA STATE UNIVERSITY, FRESNO FOUNDATION', primary_domain: null };
+
+  // Foundation/sub-org superset tie: fewest-tokens candidate (the flagship) should win.
+  const scored1 = scoreOrgs(companyName, [foundation, flagship]);
+  console.assert(scored1[0].score === scored1[1].score, 'fixture should actually tie in score (sanity check)');
+  const picked1 = pickBestOrgFromScored(scored1, companyName);
+  console.assert(picked1?.id === flagship.id, 'tied Foundation/flagship names should resolve to the flagship (fewest tokens)');
+
+  // Genuine ambiguity: same token count on both sides -> still refuses, doesn't force a guess.
+  const twin1 = { id: '3', name: 'Example State University East', primary_domain: null };
+  const twin2 = { id: '4', name: 'Example State University West', primary_domain: null };
+  const scored2 = scoreOrgs('Example State University', [twin1, twin2]);
+  const picked2 = pickBestOrgFromScored(scored2, 'Example State University');
+  console.assert(picked2 === null, 'equal-token-count ties must still refuse rather than guess');
+
+  // Existing domain tiebreak (Meta case) must still work — this fix runs first but must
+  // fall through cleanly when the token-count check doesn't resolve anything.
+  const metaWithDomain = { id: '5', name: 'Meta', primary_domain: 'meta.com' };
+  const metaNoDomain = { id: '6', name: 'Meta', primary_domain: null };
+  const scored3 = scoreOrgs('Meta', [metaNoDomain, metaWithDomain]);
+  const picked3 = pickBestOrgFromScored(scored3, 'Meta');
+  console.assert(picked3?.id === metaWithDomain.id, 'exact-name tie should still fall through to the domain tiebreak');
+
+  console.log('selfTestOrgTieBreak: all assertions passed');
+}
+
 const invokedDirectly =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  main().catch((err) => {
-    console.error(err.message);
-    process.exit(1);
-  });
+  if (process.argv.includes('--self-test')) {
+    selfTestDedup();
+    selfTestOrgQueries();
+    selfTestOrgTieBreak();
+  } else {
+    main().catch((err) => {
+      console.error(err.message);
+      process.exit(1);
+    });
+  }
 }
