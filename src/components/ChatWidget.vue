@@ -275,8 +275,7 @@ async function sendMessage() {
   background-color: #fff;
   box-shadow: 0 0 0 1px var(--color-neutral-border);
 }
-
-.rag-chat-message {
+g-chat-message {
   max-width: 78%;
   padding: 9px 13px;
   border-radius: 14px;

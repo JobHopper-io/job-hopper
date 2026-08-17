@@ -78,3 +78,95 @@ This keeps the SEO landing pages crawlable (the Vue SPA is client-rendered).
 
 A row whose `page_type` is unknown/unsupported is warned about and skipped; it never
 fails the build. The generator prints a summary of pages generated vs. skipped.
+
+### College Scorecard lead connector (run manually)
+
+`scripts/college-scorecard-connector.mjs` pulls U.S. university data from the College
+Scorecard public API, scores each school as an institutional sales opportunity, and
+upserts into `institutional_leads` (keyed on `organization_name, source`). Run it
+locally, one state at a time:
+
+```bash
+COLLEGE_SCORECARD_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/college-scorecard-connector.mjs TX
+```
+
+- `COLLEGE_SCORECARD_API_KEY`: free key from https://api.data.gov/signup/.
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: the project `institutional_leads` lives in.
+- State argument defaults to `TX` if omitted.
+
+Not wired into any scheduled job — deliberately manual per state until the first run's
+output has been spot-checked.
+
+### WARN layoff-notice connector (run manually)
+
+`scripts/warn-connector.mjs` pulls WARN Act mass-layoff notices from warnfirehose.com
+(a third-party aggregator of the 50-state public filings) and upserts each employer into
+`institutional_leads` (source='warn', category='employer'), keyed on
+`organization_name, source`. Also prints a notices-by-state+industry count to the
+console as the B2C geo-targeting signal — not written to a table yet.
+
+```bash
+WARN_FIREHOSE_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/warn-connector.mjs TX
+```
+
+- `WARN_FIREHOSE_API_KEY`: free key from warnfirehose.com/account.
+- Free tier is 25 calls/day, 25 records/call — this script makes one call, no
+  pagination, by design. Revisit if/when the $49/mo Starter tier is approved.
+- State argument defaults to `TX`; an optional second argument sets `date_from`
+  (`YYYY-MM-DD`).
+
+### Outbound dry-run + contact enrichment (run manually)
+
+`scripts/outbound-dry-run.mjs` pulls the top 20 `institutional_leads` (university/employer,
+`opportunity_score >= 50`, `status = 'new'`), checks `exclusion_lists` suppression, enriches
+any lead missing `contact_email` via Apollo (real write to
+`institutional_leads.decision_maker_name/title/contact_email` — capped to
+`ENRICHMENT_DRY_RUN_CAP` leads per run, currently `BATCH_LIMIT` (20), raised from an
+initial cap of 5 once the first small batch was verified), renders the matching persona
+template, and logs every render to `outbound_dry_run_log`. **No email is ever actually
+sent** — `sendEmail` is not called by this script. Pass `--only="Name1,Name2"` to
+restrict a run to specific `organization_name`s (e.g. re-testing a prior miss without
+touching the rest of the batch).
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... APOLLO_API_KEY=... \
+  node scripts/outbound-dry-run.mjs
+```
+
+- `APOLLO_API_KEY`: same Apollo account used by `premium-insights`; credits are metered
+  separately under the `institutional_lead_enrichment` row in `apollo_limits` (200
+  credits, see `docs/apollo-limits.md`) so this can't eat into that budget.
+- A lead whose enrichment doesn't resolve to a real, emailed contact is skipped for that
+  run — nothing is fabricated, and `institutional_leads` is left untouched for it.
+
+### Career partner discovery connector (run manually)
+
+`scripts/career-partner-connector.mjs` searches Apollo's `mixed_companies/search` by
+keyword tag + metro (career coaches, immigration professionals, training providers,
+outplacement firms) and upserts results into `institutional_leads`
+(source='apollo_career_partner', category='career_partner'), keyed on
+`organization_name, source`. Apollo-based per v2 of the build spec — the original
+Google Places design was blocked on billing infra unrelated to the task.
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... APOLLO_API_KEY=... \
+  node scripts/career-partner-connector.mjs
+```
+
+- Metros and categories are hardcoded consts at the top of the file (`METROS`,
+  `CATEGORY_KEYWORDS`) — edit directly to change scope, same pattern as the other
+  connectors' state/limit constants.
+- Credits are metered under the `career_partner_discovery` row in `apollo_limits` (200
+  credits) — one `mixed_companies/search` call per category/metro combo, no per-org
+  people lookup (this connector only discovers organizations, not contacts).
+- **`opportunity_score` is currently always `null`.** Verified against a live call:
+  this search mode doesn't return `city`, `state`, `industry`, or employee count at
+  all — only name/website/domain/revenue fields. Scoring needs a product decision
+  (score off `organization_revenue` instead, or spend a second per-org
+  `organizations/enrich` call) before it can work; see the comment above
+  `OPPORTUNITY_BUCKETS` in the script.
+- **No pagination yet.** Every category/metro combo in the first test run returned
+  exactly `per_page` (25) results, which likely means more exist — revisit before
+  trusting a metro/category pair as fully covered.

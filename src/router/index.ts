@@ -16,6 +16,11 @@ export const publicPaths = [
   '/pricing',
   '/install-app',
   '/faq',
+  '/universities',
+  '/international-students',
+  '/career-coaches',
+  '/outplacement',
+  '/workforce',
   '/about',
   '/support',
   '/contact',
@@ -37,6 +42,7 @@ const adminPaths = [
   '/admin',
   '/admin/dashboard',
   '/admin/employer-review',
+  '/admin/announcements',
   '/admin/admin-management',
   '/admin/job-matching-algorithm',
   '/admin/test-emails',
@@ -83,6 +89,31 @@ const router = createRouter({
       path: '/faq',
       name: 'faq',
       component: () => import('../views/FAQ.vue'),
+    },
+    {
+      path: '/universities',
+      name: 'universities',
+      component: () => import('../views/Universities.vue'),
+    },
+    {
+      path: '/international-students',
+      name: 'international-students',
+      component: () => import('../views/InternationalStudents.vue'),
+    },
+    {
+      path: '/career-coaches',
+      name: 'career-coaches',
+      component: () => import('../views/CareerCoaches.vue'),
+    },
+    {
+      path: '/outplacement',
+      name: 'outplacement',
+      component: () => import('../views/Outplacement.vue'),
+    },
+    {
+      path: '/workforce',
+      name: 'workforce',
+      component: () => import('../views/Workforce.vue'),
     },
     {
       path: '/about',
@@ -250,6 +281,11 @@ const router = createRouter({
       path: '/admin/dashboard-banner',
       name: 'admin-dashboard-banner',
       component: () => import('../views/AdminDashboardBanner.vue'),
+    },
+    {
+      path: '/admin/announcements',
+      name: 'admin-announcements',
+      component: () => import('../views/AdminAnnouncements.vue'),
     },
     {
       path: '/admin/user-lifecycle',

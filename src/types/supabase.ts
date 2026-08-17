@@ -708,6 +708,90 @@ export type Database = {
           },
         ]
       }
+      institutional_leads: {
+        Row: {
+          campaign: string | null
+          category: string
+          city: string | null
+          contact_email: string | null
+          created_at: string
+          decision_maker_name: string | null
+          decision_maker_title: string | null
+          estimated_seats: number | null
+          id: string
+          lead_score: number | null
+          next_action: string | null
+          opportunity_score: number | null
+          opportunity_value: number | null
+          organization_name: string
+          ownership: string | null
+          recommended_package: string | null
+          reply_class: string | null
+          scorecard_id: string | null
+          signals: Json | null
+          source: string
+          state: string | null
+          status: string
+          student_size: number | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          campaign?: string | null
+          category?: string
+          city?: string | null
+          contact_email?: string | null
+          created_at?: string
+          decision_maker_name?: string | null
+          decision_maker_title?: string | null
+          estimated_seats?: number | null
+          id?: string
+          lead_score?: number | null
+          next_action?: string | null
+          opportunity_score?: number | null
+          opportunity_value?: number | null
+          organization_name: string
+          ownership?: string | null
+          recommended_package?: string | null
+          reply_class?: string | null
+          scorecard_id?: string | null
+          signals?: Json | null
+          source?: string
+          state?: string | null
+          status?: string
+          student_size?: number | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          campaign?: string | null
+          category?: string
+          city?: string | null
+          contact_email?: string | null
+          created_at?: string
+          decision_maker_name?: string | null
+          decision_maker_title?: string | null
+          estimated_seats?: number | null
+          id?: string
+          lead_score?: number | null
+          next_action?: string | null
+          opportunity_score?: number | null
+          opportunity_value?: number | null
+          organization_name?: string
+          ownership?: string | null
+          recommended_package?: string | null
+          reply_class?: string | null
+          scorecard_id?: string | null
+          signals?: Json | null
+          source?: string
+          state?: string | null
+          status?: string
+          student_size?: number | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       interview_practice_daily_usage: {
         Row: {
           count: number
@@ -1418,6 +1502,72 @@ export type Database = {
           },
         ]
       }
+      outbound_dry_run_log: {
+        Row: {
+          category: string
+          id: string
+          lead_organization_name: string
+          rendered_body: string | null
+          rendered_subject: string | null
+          run_at: string
+          suppressed: boolean
+        }
+        Insert: {
+          category: string
+          id?: string
+          lead_organization_name: string
+          rendered_body?: string | null
+          rendered_subject?: string | null
+          run_at?: string
+          suppressed?: boolean
+        }
+        Update: {
+          category?: string
+          id?: string
+          lead_organization_name?: string
+          rendered_body?: string | null
+          rendered_subject?: string | null
+          run_at?: string
+          suppressed?: boolean
+        }
+        Relationships: []
+      }
+      outreach_leads: {
+        Row: {
+          created_at: string
+          found_at: string
+          id: string
+          post_snippet: string | null
+          post_url: string
+          poster_name: string | null
+          signal_type: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          found_at?: string
+          id?: string
+          post_snippet?: string | null
+          post_url: string
+          poster_name?: string | null
+          signal_type?: string | null
+          source: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          found_at?: string
+          id?: string
+          post_snippet?: string | null
+          post_url?: string
+          poster_name?: string | null
+          signal_type?: string | null
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
       premium_insights_daily_usage: {
         Row: {
           count: number
@@ -1562,6 +1712,7 @@ export type Database = {
           phone_number: string | null
           preferred_locations: string[] | null
           recruiter_visible: boolean
+          referred_by_institutional_lead_id: string | null
           referrer_host: string | null
           requires_us_sponsorship: boolean | null
           resume_bucket_key: string | null
@@ -1569,6 +1720,8 @@ export type Database = {
           target_job_title: string | null
           target_role_categories: string[] | null
           updated_at: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
           utm_source: string | null
           years_of_experience: number | null
         }
@@ -1594,6 +1747,7 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
+          referred_by_institutional_lead_id?: string | null
           referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
@@ -1601,6 +1755,8 @@ export type Database = {
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
           utm_source?: string | null
           years_of_experience?: number | null
         }
@@ -1626,6 +1782,7 @@ export type Database = {
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
+          referred_by_institutional_lead_id?: string | null
           referrer_host?: string | null
           requires_us_sponsorship?: boolean | null
           resume_bucket_key?: string | null
@@ -1633,10 +1790,20 @@ export type Database = {
           target_job_title?: string | null
           target_role_categories?: string[] | null
           updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
           utm_source?: string | null
           years_of_experience?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_institutional_lead_id_fkey"
+            columns: ["referred_by_institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       promo_core_free_month: {
         Row: {
