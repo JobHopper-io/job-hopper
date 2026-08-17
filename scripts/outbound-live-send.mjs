@@ -33,11 +33,11 @@ import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, require
 const DEFAULT_DELAY_MS = 2000;
 const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
 
-async function sendEmailViaMailtrap({ apiToken, from, to, subject, text }) {
+async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html }) {
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: { email: from, name: 'Job-Hopper' }, to: [{ email: to.trim() }], subject, text }),
+    body: JSON.stringify({ from: { email: from, name: 'Job-Hopper' }, to: [{ email: to.trim() }], subject, text, html }),
   });
   const bodyText = await res.text();
   if (!res.ok) {
@@ -152,6 +152,7 @@ async function main() {
       to: s.contact_email,
       subject: s.subject,
       text: s.body,
+      html: s.html,
     });
 
     if (!result.success) {

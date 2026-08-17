@@ -642,6 +642,35 @@ function fill(text, replacements) {
   return out;
 }
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Plain-text emails paste the raw tracked URL into the "More info: <url>" line, which
+// is exactly what looks unclickable and messy in a client that doesn't auto-linkify
+// (or shows the full UTM-laden URL even when it does). The HTML companion body swaps
+// that one occurrence for a real <a> tag with clean anchor text instead; everything
+// else just gets paragraph/line-break formatting. `link` is the same value already
+// substituted into `body` for [Link] — when it's still the unfilled '[Link]'
+// placeholder (no page for this category), nothing matches and the text renders as-is.
+function renderHtmlBody(body, link) {
+  const paragraphs = escapeHtml(body)
+    .split('\n\n')
+    .map((para) => `<p style="margin:0 0 1em;">${para.replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+  if (!link) return paragraphs;
+  const escapedLink = escapeHtml(link);
+  return paragraphs.replace(
+    `More info: ${escapedLink}`,
+    `More info: <a href="${escapedLink}">Learn more</a>`,
+  );
+}
+
 // [Name] is the recipient's greeting name, filled from decision_maker_name (first name
 // only — "Hi John," not "Hi John Smith,"). It's a distinct token from [Your Name] in the
 // signature: the template originally reused the same [Name] token for both the recipient
@@ -690,7 +719,8 @@ function renderTemplate(category, lead, campaign) {
 
   const subject = fill(template.subject, replacements);
   const body = fill(template.body, replacements);
-  return { subject, body, unfilled: unfilledPlaceholders(subject, body) };
+  const link = replacements['[Link]'] !== '[Link]' ? replacements['[Link]'] : null;
+  return { subject, body, html: renderHtmlBody(body, link), unfilled: unfilledPlaceholders(subject, body) };
 }
 
 function unfilledPlaceholders(subject, body) {
@@ -718,18 +748,19 @@ export function buildDedupedSends(candidateRenders, campaign) {
     const orgNames = group.map((c) => c.lead.organization_name);
 
     if (group.length === 1) {
-      const { subject, body, unfilled } = renderTemplate(primary.category, primary, campaign);
-      sends.push({ merged: false, category: primary.category, contact_email: group[0].contact_email, orgNames, subject, body, unfilled });
+      const { subject, body, html, unfilled } = renderTemplate(primary.category, primary, campaign);
+      sends.push({ merged: false, category: primary.category, contact_email: group[0].contact_email, orgNames, subject, body, html, unfilled });
       continue;
     }
 
     dedupedGroupCount += 1;
     const categories = [...new Set(group.map((c) => c.category))];
     const template = GENERIC_TEMPLATES[primary.category];
+    const link = partnerLeadUrl(primary.category, campaign);
     const nameReplacement = {
       '[Name]': firstName(primary.decision_maker_name) || '[Name]',
       '[Your Name]': SENDER_NAME,
-      '[Link]': partnerLeadUrl(primary.category, campaign) || '[Link]',
+      '[Link]': link || '[Link]',
     };
     const subject = fill(template.subject, nameReplacement);
     const body = fill(template.body, nameReplacement);
@@ -741,6 +772,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
       orgNames,
       subject,
       body,
+      html: renderHtmlBody(body, link),
       unfilled: unfilledPlaceholders(subject, body),
     });
   }
@@ -1011,7 +1043,7 @@ function selfTestDedup() {
   // Greeting/signature token split: [Name] (recipient) fills from decision_maker_name;
   // [Your Name] (sender) fills from SENDER_NAME — must never reuse the recipient's name.
   const solo0 = uniLead('Named U', 'named@u.edu', 'Jane Smith');
-  const { subject: s0, body: b0, unfilled: u0 } = renderTemplate('university', solo0, TEST_CAMPAIGN);
+  const { subject: s0, body: b0, html: h0, unfilled: u0 } = renderTemplate('university', solo0, TEST_CAMPAIGN);
   console.assert(s0.includes('Named U') && b0.includes('Hi Jane,'), 'greeting should fill from decision_maker_name first name');
   console.assert(b0.includes(SENDER_NAME) && !u0.includes('[Your Name]'), 'signature should fill from SENDER_NAME, not stay unfilled');
   console.assert(!b0.includes('Jane Smith') && !b0.includes('Hi ' + SENDER_NAME), 'greeting and signature must not cross-contaminate');
@@ -1027,6 +1059,16 @@ function selfTestDedup() {
     fill(linklessTemplate.body, { '[Link]': partnerLeadUrl(noPageLead.category, TEST_CAMPAIGN) || '[Link]' }) === '[Link]',
     'a category with no partner page must leave [Link] unfilled, not emit a broken URL',
   );
+
+  // HTML companion body: the raw tracked URL must become a real, clickable <a> tag
+  // rather than sitting in the email as plain pasted text.
+  console.assert(
+    h0.includes('<a href="https://job-hopper.io/universities?') && h0.includes('>Learn more</a>'),
+    'html body should linkify the More info URL as a clickable anchor',
+  );
+  console.assert(!h0.includes('[Link]'), 'html body should not leak an unfilled [Link] token when a real link exists');
+  const linklessHtml = renderHtmlBody('More info: [Link]', null);
+  console.assert(!linklessHtml.includes('<a href'), 'html body must not fabricate a link when none was filled');
 
   // Same-category duplicate: two campuses, one contact -> one generic send, no campus-specific claim.
   const a = uniLead('ASU - Broadway', 'shared@asu.edu', 'Sam Ali');
