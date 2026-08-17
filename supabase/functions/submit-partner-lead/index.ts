@@ -8,6 +8,7 @@
 // premium_waitlist), so this write can only happen server-side with the service role.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +90,36 @@ serve(async (req) => {
         JSON.stringify({ error: "Could not submit your request. Please try again." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
       )
+    }
+
+    // Real-time admin alert — a form-fill is the highest-intent signal in the pipeline,
+    // worth surfacing immediately instead of only via manual institutional_leads queries.
+    // Never let a notification failure block the user-facing success response below.
+    const alertRecipients = (Deno.env.get("PARTNER_LEAD_ALERT_EMAIL") ?? "")
+      .split(",")
+      .map((addr) => addr.trim())
+      .filter(Boolean)
+
+    if (alertRecipients.length > 0) {
+      const summary = [
+        `Organization: ${organizationName}`,
+        `Category: ${category}`,
+        `Contact: ${name || "(not provided)"} <${email}>${title ? ` — ${title}` : ""}`,
+        `Submitted: ${new Date().toISOString()}`,
+        `Row: institutional_leads, source = landing_page_form, organization_name = ${organizationName}`,
+      ].join("\n")
+
+      try {
+        await Promise.all(
+          alertRecipients.map((to) =>
+            sendEmail({ to, subject: `New partner lead: ${organizationName}`, text: summary, category: "partner_lead_alert" }),
+          ),
+        )
+      } catch (err) {
+        console.error("submit-partner-lead: alert notification failed", err)
+      }
+    } else {
+      console.warn("submit-partner-lead: PARTNER_LEAD_ALERT_EMAIL not set, skipping alert")
     }
 
     return new Response(
