@@ -7,9 +7,9 @@
 // render to outbound_dry_run_log. Never calls sendEmail — no real outbound sends happen
 // here; only the enrichment writes and the dry-run log are real.
 //
-// Usage: node scripts/outbound-dry-run.mjs
-//        node scripts/outbound-dry-run.mjs --limit=100 --all-sources
-//        node scripts/outbound-dry-run.mjs --only="Name1,Name2"
+// Usage: node scripts/outbound-dry-run.mjs --campaign=first-batch-2026-08-14
+//        node scripts/outbound-dry-run.mjs --campaign=... --limit=100 --all-sources
+//        node scripts/outbound-dry-run.mjs --campaign=... --only="Name1,Name2"
 
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
@@ -22,9 +22,33 @@ export const MIN_OPPORTUNITY_SCORE = 50;
 // batch can swap it without a code change.
 export const SENDER_NAME = process.env.SENDER_NAME || 'Job Hopper Team';
 
-// Real copy from persona-campaign-copy.md. Only university/employer are wired —
-// the other three personas (Career Coach, Immigration Attorney, Workforce Center)
-// have no real leads yet, per the doc's own note.
+// Where each outbound category's CTA link lands — the partner landing pages (see
+// src/views/*.vue), UTM-tagged so App.vue's existing capture attributes the resulting
+// signup back to this exact campaign. immigration_professional/workforce_org have no
+// outbound template (no connector produces those leads), so no path is needed for them.
+const PARTNER_PAGE_BASE = 'https://job-hopper.io';
+const PARTNER_PAGE_PATHS = {
+  university: '/universities',
+  employer: '/outplacement',
+  career_partner: '/career-coaches',
+};
+
+function partnerLeadUrl(category, campaign) {
+  const path = PARTNER_PAGE_PATHS[category];
+  if (!path) return null;
+  const params = new URLSearchParams({
+    utm_source: 'email_outbound',
+    utm_campaign: campaign,
+    utm_medium: 'email',
+  });
+  return `${PARTNER_PAGE_BASE}${path}?${params}`;
+}
+
+// Real copy from persona-campaign-copy.md, plus a career_partner template (new — the
+// doc's original note said that persona had no real leads yet; the career-partner
+// connector has since discovered real ones, see docs/apollo-limits.md). Grounded in the
+// same real, reviewed copy as src/views/CareerCoaches.vue, not invented separately.
+// immigration_professional/workforce_center still have no real leads or template.
 const TEMPLATES = {
   university: {
     subject: 'Job-Hopper for [School Name] career services',
@@ -41,6 +65,8 @@ attached, just numbers.
 What's the best way to get this in front of whoever handles vendor decisions for career
 services?
 
+More info: [Link]
+
 [Your Name]
 Job-Hopper`,
   },
@@ -54,6 +80,24 @@ visa who's also racing a clock most people don't have to think about.
 
 We put together transition packages for situations like this, [seat range], no cost to
 the affected employees. Can send specifics if useful.
+
+More info: [Link]
+
+[Your Name]
+Job-Hopper`,
+  },
+  career_partner: {
+    subject: 'Job-Hopper partnership for [Organization]',
+    body: `Hi [Name],
+
+I run product at Job-Hopper. We match visa-seeking job seekers to employers verified
+against real DOL and USCIS filing history, not a guessed "sponsors visas" tag — plus
+resume advice and interview prep built in.
+
+Thought this could be useful alongside what you already do at [Organization]. Happy to
+set up a trial so you can see the match quality yourself.
+
+More info: [Link]
 
 [Your Name]
 Job-Hopper`,
@@ -82,6 +126,8 @@ Happy to send over what that could look like, no pitch attached, just numbers.
 What's the best way to get this in front of whoever handles vendor decisions for career
 services?
 
+More info: [Link]
+
 [Your Name]
 Job-Hopper`,
   },
@@ -95,6 +141,23 @@ most people don't have to think about.
 
 We put together transition packages for situations like this, custom-sized to the group
 affected, no cost to the affected employees. Can send specifics if useful.
+
+More info: [Link]
+
+[Your Name]
+Job-Hopper`,
+  },
+  career_partner: {
+    subject: 'Job-Hopper partnership opportunity',
+    body: `Hi [Name],
+
+I run product at Job-Hopper. We match visa-seeking job seekers to employers verified
+against real DOL and USCIS filing history, not a guessed "sponsors visas" tag — plus
+resume advice and interview prep built in.
+
+Happy to set up a trial so you can see the match quality yourself.
+
+More info: [Link]
 
 [Your Name]
 Job-Hopper`,
@@ -592,28 +655,38 @@ function firstName(fullName) {
   return typeof fullName === 'string' && fullName.trim() ? fullName.trim().split(/\s+/)[0] : null;
 }
 
-function renderTemplate(category, lead) {
+function renderTemplate(category, lead, campaign) {
   const template = TEMPLATES[category];
-  const replacements =
-    category === 'university'
-      ? {
-          '[Name]': firstName(lead.decision_maker_name) || '[Name]',
-          '[Your Name]': SENDER_NAME,
-          '[School Name]': lead.organization_name,
-          '[X,XXX]': lead.student_size != null ? lead.student_size.toLocaleString('en-US') : '[X,XXX]',
-          '[seat range]': lead.recommended_package || '[seat range]',
-        }
-      : {
-          '[Name]': firstName(lead.decision_maker_name) || '[Name]',
-          '[Your Name]': SENDER_NAME,
-          '[Company]': lead.organization_name,
-          '[X]':
-            lead.signals?.workers_affected != null
-              ? lead.signals.workers_affected.toLocaleString('en-US')
-              : '[X]',
-          '[location]': [lead.city, lead.state].filter(Boolean).join(', ') || '[location]',
-          '[seat range]': lead.recommended_package || '[seat range]',
-        };
+  const common = {
+    '[Name]': firstName(lead.decision_maker_name) || '[Name]',
+    '[Your Name]': SENDER_NAME,
+    '[Link]': partnerLeadUrl(category, campaign) || '[Link]',
+  };
+  let replacements;
+  if (category === 'university') {
+    replacements = {
+      ...common,
+      '[School Name]': lead.organization_name,
+      '[X,XXX]': lead.student_size != null ? lead.student_size.toLocaleString('en-US') : '[X,XXX]',
+      '[seat range]': lead.recommended_package || '[seat range]',
+    };
+  } else if (category === 'employer') {
+    replacements = {
+      ...common,
+      '[Company]': lead.organization_name,
+      '[X]':
+        lead.signals?.workers_affected != null
+          ? lead.signals.workers_affected.toLocaleString('en-US')
+          : '[X]',
+      '[location]': [lead.city, lead.state].filter(Boolean).join(', ') || '[location]',
+      '[seat range]': lead.recommended_package || '[seat range]',
+    };
+  } else {
+    replacements = {
+      ...common,
+      '[Organization]': lead.organization_name,
+    };
+  }
 
   const subject = fill(template.subject, replacements);
   const body = fill(template.body, replacements);
@@ -631,7 +704,7 @@ function unfilledPlaceholders(subject, body) {
 // numbers/location are true of the whole group. Input order is assumed to already be
 // priority order (highest opportunity_score first) — the first lead in a group becomes
 // "primary" and its category picks the template when a group spans categories.
-export function buildDedupedSends(candidateRenders) {
+export function buildDedupedSends(candidateRenders, campaign) {
   const groupsByEmail = new Map();
   for (const c of candidateRenders) {
     if (!groupsByEmail.has(c.contact_email)) groupsByEmail.set(c.contact_email, []);
@@ -645,7 +718,7 @@ export function buildDedupedSends(candidateRenders) {
     const orgNames = group.map((c) => c.lead.organization_name);
 
     if (group.length === 1) {
-      const { subject, body, unfilled } = renderTemplate(primary.category, primary);
+      const { subject, body, unfilled } = renderTemplate(primary.category, primary, campaign);
       sends.push({ merged: false, category: primary.category, contact_email: group[0].contact_email, orgNames, subject, body, unfilled });
       continue;
     }
@@ -653,7 +726,11 @@ export function buildDedupedSends(candidateRenders) {
     dedupedGroupCount += 1;
     const categories = [...new Set(group.map((c) => c.category))];
     const template = GENERIC_TEMPLATES[primary.category];
-    const nameReplacement = { '[Name]': firstName(primary.decision_maker_name) || '[Name]', '[Your Name]': SENDER_NAME };
+    const nameReplacement = {
+      '[Name]': firstName(primary.decision_maker_name) || '[Name]',
+      '[Your Name]': SENDER_NAME,
+      '[Link]': partnerLeadUrl(primary.category, campaign) || '[Link]',
+    };
     const subject = fill(template.subject, nameReplacement);
     const body = fill(template.body, nameReplacement);
     sends.push({
@@ -676,6 +753,16 @@ async function main() {
   const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   const apolloKey = requireEnv('APOLLO_API_KEY');
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+  // --campaign=<tag> is required — it's embedded in every rendered [Link] URL's
+  // utm_campaign param, and this is a preview of exactly what a real send (which
+  // requires the same flag, see outbound-live-send.mjs) would contain. No placeholder
+  // fallback: a preview with a fake campaign tag would misrepresent what ships.
+  const campaignArg = process.argv.find((a) => a.startsWith('--campaign='));
+  if (!campaignArg) {
+    throw new Error('--campaign=<tag> is required (e.g. --campaign=first-batch-2026-08-14)');
+  }
+  const campaign = campaignArg.slice('--campaign='.length);
 
   // --only="Name1,Name2" restricts the candidate set to exact organization_name matches
   // (e.g. re-testing specific prior misses) without touching the rest of the batch or
@@ -816,12 +903,14 @@ async function main() {
       lead.decision_maker_name = result.name;
     }
 
-    // No template exists for this category (e.g. career_partner) — enrichment above
-    // still ran and its write still stands, just nothing to render/log here. In
-    // practice this shouldn't trigger today: apollo_career_partner leads all have a
-    // null opportunity_score (verified — that connector's search mode doesn't return
-    // employee count), so they sort last and don't make it into a real top-N batch
-    // ranked by opportunity_score. Guarded anyway rather than assuming that holds forever.
+    // No template exists for this category (e.g. workforce_org — no outbound connector
+    // produces those leads, only inbound landing-page fills) — enrichment above still
+    // ran and its write still stands, just nothing to render/log here. career_partner
+    // now has a real template; this guard now only matters for categories that still
+    // don't. In practice career_partner/workforce_org leads mostly have a null
+    // opportunity_score anyway (verified — the discovery connectors' search mode
+    // doesn't return employee count), so they sort last and rarely make a real top-N
+    // batch. Guarded anyway rather than assuming that holds forever.
     if (!TEMPLATES[lead.category]) {
       console.log(`  (no template for category "${lead.category}" — enrichment result kept, not rendered/logged)`);
       continue;
@@ -830,7 +919,7 @@ async function main() {
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends, dedupedGroupCount } = buildDedupedSends(candidateRenders);
+  const { sends, dedupedGroupCount } = buildDedupedSends(candidateRenders, campaign);
   for (const s of sends) {
     if (s.merged) {
       if (s.mixedCategories) {
@@ -913,6 +1002,8 @@ async function main() {
   }
 }
 
+const TEST_CAMPAIGN = 'self-test-campaign';
+
 function selfTestDedup() {
   const uniLead = (name, email, dmName) => ({ organization_name: name, category: 'university', student_size: 1000, recommended_package: '25 seats', contact_email: email, decision_maker_name: dmName });
   const empLead = (name, email, dmName) => ({ organization_name: name, category: 'employer', signals: { workers_affected: 10 }, city: 'X', state: 'Y', recommended_package: '25 seats', contact_email: email, decision_maker_name: dmName });
@@ -920,10 +1011,22 @@ function selfTestDedup() {
   // Greeting/signature token split: [Name] (recipient) fills from decision_maker_name;
   // [Your Name] (sender) fills from SENDER_NAME — must never reuse the recipient's name.
   const solo0 = uniLead('Named U', 'named@u.edu', 'Jane Smith');
-  const { subject: s0, body: b0, unfilled: u0 } = renderTemplate('university', solo0);
+  const { subject: s0, body: b0, unfilled: u0 } = renderTemplate('university', solo0, TEST_CAMPAIGN);
   console.assert(s0.includes('Named U') && b0.includes('Hi Jane,'), 'greeting should fill from decision_maker_name first name');
   console.assert(b0.includes(SENDER_NAME) && !u0.includes('[Your Name]'), 'signature should fill from SENDER_NAME, not stay unfilled');
   console.assert(!b0.includes('Jane Smith') && !b0.includes('Hi ' + SENDER_NAME), 'greeting and signature must not cross-contaminate');
+
+  // [Link] must resolve to the right partner page with the real campaign in utm_campaign,
+  // not a placeholder — and must stay unfilled (never a broken partial URL) for a
+  // category with no partner page.
+  console.assert(!u0.includes('[Link]') && b0.includes('https://job-hopper.io/universities?'), '[Link] should fill for university');
+  console.assert(b0.includes(`utm_campaign=${TEST_CAMPAIGN}`), '[Link] must carry the real campaign, not a placeholder');
+  const noPageLead = { organization_name: 'X', category: 'workforce_org', decision_maker_name: null };
+  const linklessTemplate = { subject: '[Link]', body: '[Link]' };
+  console.assert(
+    fill(linklessTemplate.body, { '[Link]': partnerLeadUrl(noPageLead.category, TEST_CAMPAIGN) || '[Link]' }) === '[Link]',
+    'a category with no partner page must leave [Link] unfilled, not emit a broken URL',
+  );
 
   // Same-category duplicate: two campuses, one contact -> one generic send, no campus-specific claim.
   const a = uniLead('ASU - Broadway', 'shared@asu.edu', 'Sam Ali');
@@ -933,13 +1036,14 @@ function selfTestDedup() {
     { lead: a, category: 'university', contact_email: 'shared@asu.edu' },
     { lead: b, category: 'university', contact_email: 'shared@asu.edu' },
     { lead: c, category: 'university', contact_email: 'solo@solo.edu' },
-  ]);
+  ], TEST_CAMPAIGN);
   console.assert(r1.dedupedGroupCount === 1, 'expected exactly one deduped group');
   console.assert(r1.sends.length === 2, 'expected 2 sends total (1 merged + 1 solo)');
   const merged1 = r1.sends.find((s) => s.contact_email === 'shared@asu.edu');
   console.assert(merged1.merged === true && merged1.orgNames.length === 2, 'merged send should list both orgs');
   console.assert(!merged1.body.includes('1000') && !merged1.body.includes('Broadway'), 'generic send must not leak one lead\'s specifics');
   console.assert(merged1.body.includes('Hi Sam,'), 'merged send should still greet by the shared contact\'s first name');
+  console.assert(merged1.body.includes('https://job-hopper.io/universities?'), 'merged (generic) send should still get the real link');
   const solo1 = r1.sends.find((s) => s.contact_email === 'solo@solo.edu');
   console.assert(solo1.merged === false && solo1.body.includes('Solo U'), 'non-duplicate lead keeps its specific template');
 
@@ -949,9 +1053,17 @@ function selfTestDedup() {
   const r2 = buildDedupedSends([
     { lead: d, category: 'employer', contact_email: 'shared2@x.com' },
     { lead: e, category: 'university', contact_email: 'shared2@x.com' },
-  ]);
+  ], TEST_CAMPAIGN);
   console.assert(r2.sends.length === 1 && r2.sends[0].mixedCategories?.length === 2, 'mixed-category group should be flagged');
   console.assert(r2.sends[0].category === 'employer', 'mixed group uses first/highest-scored lead\'s category');
+
+  // career_partner: new template, real link to /career-coaches, [Organization] token
+  // (distinct from university's [School Name] / employer's [Company]).
+  const partnerLead = { organization_name: 'Example Coaching', category: 'career_partner', contact_email: 'coach@example.com', decision_maker_name: 'Robin Lee' };
+  const r3 = renderTemplate('career_partner', partnerLead, TEST_CAMPAIGN);
+  console.assert(r3.body.includes('Example Coaching'), '[Organization] should fill for career_partner');
+  console.assert(r3.body.includes('https://job-hopper.io/career-coaches?') && r3.body.includes(`utm_campaign=${TEST_CAMPAIGN}`), 'career_partner [Link] should point at /career-coaches with the real campaign');
+  console.assert(r3.unfilled.length === 0, 'career_partner template should have no leftover unfilled placeholders');
 
   console.log('selfTestDedup: all assertions passed');
 }
