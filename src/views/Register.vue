@@ -152,18 +152,21 @@ const handleCreateAccount = async () => {
     let referrerHost: string | undefined
     let utmCampaign: string | undefined
     let utmMedium: string | undefined
+    let trialInviteCode: string | undefined
     try {
       landingPath = sessionStorage.getItem('landing_path') ?? undefined
       utmSource = sessionStorage.getItem('utm_source') ?? undefined
       referrerHost = sessionStorage.getItem('referrer_host') ?? undefined
       utmCampaign = sessionStorage.getItem('utm_campaign') ?? undefined
       utmMedium = sessionStorage.getItem('utm_medium') ?? undefined
+      trialInviteCode = sessionStorage.getItem('trial_invite_code') ?? undefined
     } catch {
       landingPath = undefined
       utmSource = undefined
       referrerHost = undefined
       utmCampaign = undefined
       utmMedium = undefined
+      trialInviteCode = undefined
     }
     const { data: signUpData, error: signUpError } = await authAPI.signUp(
       email.value,
@@ -177,6 +180,7 @@ const handleCreateAccount = async () => {
       referrerHost,
       utmCampaign,
       utmMedium,
+      trialInviteCode,
     )
     if (signUpError) {
       const authErr = signUpError as AuthError & {

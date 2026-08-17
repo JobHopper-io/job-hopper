@@ -51,6 +51,7 @@ const adminPaths = [
   '/admin/user-lifecycle',
   '/admin/seo-performance',
   '/admin/acquisition-channels',
+  '/admin/trial-grants',
 ]
 
 /** Routes gated on an employer_accounts row instead of a profiles row - employers never
@@ -148,6 +149,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+    },
+    {
+      path: '/trial/:code',
+      name: 'trial-invite',
+      component: () => import('../views/TrialInvite.vue'),
     },
     {
       path: '/employer/register',
@@ -303,6 +309,11 @@ const router = createRouter({
       component: () => import('../views/AdminAcquisitionChannel.vue'),
     },
     {
+      path: '/admin/trial-grants',
+      name: 'admin-trial-grants',
+      component: () => import('../views/AdminTrialGrants.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
@@ -357,7 +368,9 @@ router.beforeEach(async (to) => {
   }
 
   const targetPath = to.path
-  const isPublicPath = publicPaths.includes(targetPath)
+  // /trial/:code is the one public route with a dynamic segment, so it can't live in the
+  // flat publicPaths string list above; matched by prefix instead.
+  const isPublicPath = publicPaths.includes(targetPath) || targetPath.startsWith('/trial/')
   // Public routes that authenticated users should be redirected away from
   const publicRedirectPaths = ['/', '/login', '/register']
 

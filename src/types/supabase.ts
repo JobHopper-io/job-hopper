@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apollo_limits: {
@@ -1719,6 +1744,7 @@ export type Database = {
           stripe_customer_id: string | null
           target_job_title: string | null
           target_role_categories: string[] | null
+          trial_grant_id: string | null
           updated_at: string | null
           utm_campaign: string | null
           utm_medium: string | null
@@ -1754,6 +1780,7 @@ export type Database = {
           stripe_customer_id?: string | null
           target_job_title?: string | null
           target_role_categories?: string[] | null
+          trial_grant_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -1789,6 +1816,7 @@ export type Database = {
           stripe_customer_id?: string | null
           target_job_title?: string | null
           target_role_categories?: string[] | null
+          trial_grant_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -1801,6 +1829,13 @@ export type Database = {
             columns: ["referred_by_institutional_lead_id"]
             isOneToOne: false
             referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_trial_grant_id_fkey"
+            columns: ["trial_grant_id"]
+            isOneToOne: false
+            referencedRelation: "trial_grants"
             referencedColumns: ["id"]
           },
         ]
@@ -2469,6 +2504,56 @@ export type Database = {
           },
         ]
       }
+      trial_grants: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          feature_tier: string
+          id: string
+          institutional_lead_id: string | null
+          invite_code: string
+          organization_name: string
+          seat_count: number
+          seats_used: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          feature_tier: string
+          id?: string
+          institutional_lead_id?: string | null
+          invite_code: string
+          organization_name: string
+          seat_count: number
+          seats_used?: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          feature_tier?: string
+          id?: string
+          institutional_lead_id?: string | null
+          invite_code?: string
+          organization_name?: string
+          seat_count?: number
+          seats_used?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_grants_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uscis_h1b_hub: {
         Row: {
           amended_approvals: number | null
@@ -2920,6 +3005,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       application_status: [

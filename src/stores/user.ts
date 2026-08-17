@@ -12,7 +12,10 @@ import type {
   SubscriptionStatus,
   FreemiumUsage,
   FreemiumSettings,
+  TrialGrant,
 } from '@/types/database'
+
+const TIER_RANK: Record<'free' | 'core' | 'premium', number> = { free: 0, core: 1, premium: 2 }
 
 type ApolloPremiumInsightsLimitsRow = {
   name: string
@@ -30,6 +33,7 @@ export const useUserStore = defineStore('user', () => {
   const freemiumUsage = ref<FreemiumUsage | null>(null)
   const freemiumSettings = ref<FreemiumSettings | null>(null)
   const apolloPremiumInsightsLimits = ref<ApolloPremiumInsightsLimitsRow | null>(null)
+  const trialGrant = ref<TrialGrant | null>(null)
 
   // Realtime subscription for subscription_product (user's subscriptions only)
   let subscriptionProductChannel: ReturnType<typeof supabase.channel> | null = null
@@ -120,11 +124,30 @@ export const useUserStore = defineStore('user', () => {
    *   to Core-equivalent so in-flight trial users keep the full dashboard rather than
    *   dropping to the Free-capped view. Premium *features* are gated separately by the
    *   premium_insights add-on (see hasPremiumInsightsAddon), not by this tier.
+   * - Also folds in an admin-granted trial seat (trialTier below, Build 09): the
+   *   effective tier is whichever ranks higher, mirroring the server-side
+   *   resolveBaseTier in supabase/functions/_shared/base-tier.ts so a trial never
+   *   downgrades a paying user.
    */
-  const baseTier = computed<'free' | 'core' | 'premium'>(() => {
+  const subscriptionTier = computed<'free' | 'core' | 'premium'>(() => {
     if (!hasActiveSubscription.value || !basePlan.value) return 'free'
     if (basePlan.value.key === 'premium') return 'premium'
     return 'core'
+  })
+
+  /** Tier granted by trialGrant.value, or 'free' if absent/expired/revoked. */
+  const trialTier = computed<'free' | 'core' | 'premium'>(() => {
+    const grant = trialGrant.value
+    if (!grant) return 'free'
+    if (grant.status !== 'active') return 'free'
+    if (new Date(grant.expires_at).getTime() <= Date.now()) return 'free'
+    return grant.feature_tier === 'premium' || grant.feature_tier === 'core' ? grant.feature_tier : 'free'
+  })
+
+  const baseTier = computed<'free' | 'core' | 'premium'>(() => {
+    return TIER_RANK[trialTier.value] > TIER_RANK[subscriptionTier.value]
+      ? trialTier.value
+      : subscriptionTier.value
   })
 
   const freemiumMaxJobSearches = computed(
@@ -237,18 +260,33 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  async function refreshTrialGrant(trialGrantId: string | null) {
+    if (!trialGrantId) {
+      trialGrant.value = null
+      return
+    }
+    const { data, error } = await subscriptionAPI.getTrialGrant(trialGrantId)
+    if (error) {
+      console.error('Error loading trial grant:', error)
+      trialGrant.value = null
+    } else {
+      trialGrant.value = data
+    }
+  }
+
   async function refreshProfile() {
     const { data, error } = await profileAPI.getCurrentUserProfile()
     if (!error && data) {
       profile.value = data
       startProfileRealtime(data.id)
-      await refreshFreemium()
+      await Promise.all([refreshFreemium(), refreshTrialGrant(data.trial_grant_id)])
     } else if (error) {
       console.error('Error loading profile data:', error)
       stopProfileRealtime()
       freemiumUsage.value = null
       freemiumSettings.value = null
       apolloPremiumInsightsLimits.value = null
+      trialGrant.value = null
     }
   }
 
@@ -338,9 +376,12 @@ export const useUserStore = defineStore('user', () => {
     freemiumUsage.value = null
     freemiumSettings.value = null
     apolloPremiumInsightsLimits.value = null
+    trialGrant.value = null
   }
 
   return {
+    trialGrant,
+    trialTier,
     profile,
     subscriptions,
     products,

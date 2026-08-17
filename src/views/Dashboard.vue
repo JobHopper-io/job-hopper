@@ -38,7 +38,18 @@ const {
   hasActiveSubscription,
   trialEndsAt,
   trialProducts,
+  trialGrant,
 } = storeToRefs(userStore)
+
+// Admin-granted trial seat (Build 09) expiry, formatted the same way as the Stripe
+// trial-charge date above.
+const trialGrantExpiryLabel = computed(() => {
+  if (!trialGrant.value) return ''
+  return new Date(trialGrant.value.expires_at).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+  })
+})
 
 // Users only ever see three plan labels — Free / Core / Premium — never the raw
 // product display_name. Legacy career-level plans all resolve to "Core" via baseTier;
@@ -1110,6 +1121,20 @@ onMounted(() => {
               </p>
               <p class="text-sm text-neutral-body mt-1">
                 Next digest: {{ nextDigestLabel }}
+              </p>
+            </div>
+            <!-- No real subscription/product row here — this tier comes from an
+            admin-granted trial seat (trial_grants), not Stripe, so it's rendered
+            separately rather than forcing it through the basePlan-shaped branch above. -->
+            <div v-else-if="trialGrant">
+              <p class="font-heading font-semibold text-brand-charcoal">
+                {{ baseTierLabel }} (trial)
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Free access via {{ trialGrant.organization_name }}
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Access until {{ trialGrantExpiryLabel }}
               </p>
             </div>
             <div v-else>

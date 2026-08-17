@@ -8,6 +8,7 @@ import type {
   SubscriptionStatus,
   SubscriptionProduct,
   Product,
+  TrialGrant,
 } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 
@@ -155,6 +156,18 @@ export const subscriptionAPI = {
    * anyone (including logged-out visitors on /pricing). Claiming happens server-side only, in
    * create-checkout-session's try_claim_core_free_month RPC call.
    */
+  /** The caller's own linked trial grant (RLS scopes this to profiles.trial_grant_id). */
+  async getTrialGrant(trialGrantId: string): Promise<{ data: TrialGrant | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('trial_grants')
+      .select('*')
+      .eq('id', trialGrantId)
+      .maybeSingle()
+
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data, error: null }
+  },
+
   async getCoreFreeMonthPromoStatus(): Promise<{
     data: { remaining: number; active: boolean } | null
     error: Error | null

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
-import type { EmployerAccount } from '@/types/database'
+import type { EmployerAccount, TrialGrant } from '@/types/database'
+import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 
 export interface SeoPerformanceRow {
   urlPath: string
@@ -95,6 +96,23 @@ interface ListEmployersResult {
 
 interface ReviewEmployerResult {
   employer: AdminEmployerRow
+}
+
+export interface AdminTrialGrantLeadRow {
+  id: string
+  organization_name: string
+  category: string
+  status: string
+  created_at: string
+}
+
+export interface CreateTrialGrantPayload {
+  organizationName: string
+  institutionalLeadId?: string | null
+  seatCount: number
+  expiresAt: string
+  featureTier: 'free' | 'core' | 'premium'
+  inviteCode?: string
 }
 
 export const adminAPI = {
@@ -213,6 +231,47 @@ export const adminAPI = {
     }
 
     return { data: data as AcquisitionChannelReport, error: null }
+  },
+
+  async listInstitutionalLeadsForTrialGrants(): Promise<{
+    data: AdminTrialGrantLeadRow[] | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'list_leads' },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: (data as { leads: AdminTrialGrantLeadRow[] }).leads, error: null }
+  },
+
+  async listTrialGrants(): Promise<{ data: TrialGrant[] | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'list_grants' },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: (data as { grants: TrialGrant[] }).grants, error: null }
+  },
+
+  async createTrialGrant(
+    payload: CreateTrialGrantPayload,
+  ): Promise<{ data: TrialGrant | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'create_grant', ...payload },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: (data as { grant: TrialGrant }).grant, error: null }
   },
 }
 
