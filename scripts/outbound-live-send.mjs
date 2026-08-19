@@ -46,8 +46,13 @@ async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html })
   }
   let messageId = null;
   try {
+    // Mailtrap's real response shape is { success, message_ids: [...] } (plural,
+    // array) -- confirmed against a live send; a singular `message_id` field never
+    // matches, which is why this was always coming back null before.
     const parsed = bodyText ? JSON.parse(bodyText) : null;
-    if (parsed && typeof parsed.message_id === 'string') messageId = parsed.message_id;
+    if (parsed && Array.isArray(parsed.message_ids) && typeof parsed.message_ids[0] === 'string') {
+      messageId = parsed.message_ids[0];
+    }
   } catch {
     // non-JSON response body; leave messageId null
   }
@@ -155,9 +160,21 @@ async function main() {
       html: s.html,
     });
 
+    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
+
     if (!result.success) {
       failedCount += 1;
       console.log(`  -> FAILED (${s.contact_email}): ${result.error}`);
+      // Failure reason is durable on the lead row, not just this run's console output --
+      // status stays 'new' so the lead is naturally retried on a future run, but the
+      // reason for last time doesn't just vanish when the terminal session ends.
+      const { error: failUpdateError } = await supabase
+        .from('institutional_leads')
+        .update({ last_send_error: result.error, last_send_attempted_at: new Date().toISOString() })
+        .in('id', leadIds);
+      if (failUpdateError) {
+        console.log(`  -> also failed to record the failure reason on institutional_leads: ${failUpdateError.message}`);
+      }
       await sleep(delayMs);
       continue;
     }
@@ -166,10 +183,15 @@ async function main() {
     rendered.push(s);
     console.log(`  -> sent (${s.contact_email}, messageId=${result.messageId ?? 'null'})`);
 
-    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
     const { error: updateError } = await supabase
       .from('institutional_leads')
-      .update({ status: 'contacted', campaign })
+      .update({
+        status: 'contacted',
+        campaign,
+        provider_message_id: result.messageId,
+        last_send_error: null,
+        last_send_attempted_at: new Date().toISOString(),
+      })
       .in('id', leadIds);
     if (updateError) {
       throw new Error(

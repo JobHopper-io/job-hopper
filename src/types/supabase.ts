@@ -744,12 +744,15 @@ export type Database = {
           decision_maker_title: string | null
           estimated_seats: number | null
           id: string
+          last_send_attempted_at: string | null
+          last_send_error: string | null
           lead_score: number | null
           next_action: string | null
           opportunity_score: number | null
           opportunity_value: number | null
           organization_name: string
           ownership: string | null
+          provider_message_id: string | null
           recommended_package: string | null
           reply_class: string | null
           scorecard_id: string | null
@@ -771,12 +774,15 @@ export type Database = {
           decision_maker_title?: string | null
           estimated_seats?: number | null
           id?: string
+          last_send_attempted_at?: string | null
+          last_send_error?: string | null
           lead_score?: number | null
           next_action?: string | null
           opportunity_score?: number | null
           opportunity_value?: number | null
           organization_name: string
           ownership?: string | null
+          provider_message_id?: string | null
           recommended_package?: string | null
           reply_class?: string | null
           scorecard_id?: string | null
@@ -798,12 +804,15 @@ export type Database = {
           decision_maker_title?: string | null
           estimated_seats?: number | null
           id?: string
+          last_send_attempted_at?: string | null
+          last_send_error?: string | null
           lead_score?: number | null
           next_action?: string | null
           opportunity_score?: number | null
           opportunity_value?: number | null
           organization_name?: string
           ownership?: string | null
+          provider_message_id?: string | null
           recommended_package?: string | null
           reply_class?: string | null
           scorecard_id?: string | null

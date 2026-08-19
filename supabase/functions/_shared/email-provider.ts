@@ -91,8 +91,12 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     if (resp.ok) {
       try {
         const parsed = bodyText ? JSON.parse(bodyText) : null
-        if (parsed && typeof parsed.message_id === 'string') {
-          messageId = parsed.message_id
+        // Mailtrap's actual response shape is { success, message_ids: [...] } (plural,
+        // array) -- not the singular message_id this used to check for, which meant
+        // messageId (and therefore email_events.provider_message_id) was always null
+        // even on a successful send. Confirmed against a real Mailtrap response.
+        if (parsed && Array.isArray(parsed.message_ids) && typeof parsed.message_ids[0] === 'string') {
+          messageId = parsed.message_ids[0]
         }
       } catch {
         // Non-JSON or unexpected; leave messageId as null
