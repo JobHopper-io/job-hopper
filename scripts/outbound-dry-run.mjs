@@ -20,7 +20,7 @@ export const MIN_OPPORTUNITY_SCORE = 50;
 
 // Sign-off name for [Your Name] in every template. Env-overridable so a real send
 // batch can swap it without a code change.
-export const SENDER_NAME = process.env.SENDER_NAME || 'Job Hopper Team';
+export const SENDER_NAME = process.env.SENDER_NAME || 'Job-Hopper Team';
 
 // Where each outbound category's CTA link lands — the partner landing pages (see
 // src/views/*.vue), UTM-tagged so App.vue's existing capture attributes the resulting

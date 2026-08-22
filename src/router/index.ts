@@ -52,6 +52,8 @@ const adminPaths = [
   '/admin/seo-performance',
   '/admin/acquisition-channels',
   '/admin/trial-grants',
+  '/admin/institutional-leads',
+  '/admin/growth-dashboard',
 ]
 
 /** Routes gated on an employer_accounts row instead of a profiles row - employers never
@@ -314,6 +316,21 @@ const router = createRouter({
       component: () => import('../views/AdminTrialGrants.vue'),
     },
     {
+      path: '/admin/institutional-leads',
+      name: 'admin-institutional-leads',
+      component: () => import('../views/AdminInstitutionalLeads.vue'),
+    },
+    {
+      path: '/admin/partner-dashboard/:leadId',
+      name: 'admin-partner-dashboard',
+      component: () => import('../views/AdminPartnerDashboard.vue'),
+    },
+    {
+      path: '/admin/growth-dashboard',
+      name: 'admin-growth-dashboard',
+      component: () => import('../views/AdminGrowthDashboard.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
@@ -475,8 +492,11 @@ router.beforeEach(async (to) => {
     return '/dashboard'
   }
 
-  // Admin routes require the user to have appropriate admin roles.
-  if (adminPaths.includes(targetPath)) {
+  // Admin routes require the user to have appropriate admin roles. Partner dashboard is
+  // the one admin route with a dynamic segment (/admin/partner-dashboard/:leadId), so it
+  // can't live in the flat adminPaths list above; matched by prefix instead, same as the
+  // public /trial/:code handling further up.
+  if (adminPaths.includes(targetPath) || targetPath.startsWith('/admin/partner-dashboard/')) {
     const [isAdmin, isSuperAdmin] = await Promise.all([
       profileAPI.hasRole('admin'),
       profileAPI.hasRole('super_admin'),

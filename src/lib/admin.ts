@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
-import type { EmployerAccount, TrialGrant } from '@/types/database'
+import type { EmployerAccount, InstitutionalLead, TrialGrant } from '@/types/database'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 
 export interface SeoPerformanceRow {
@@ -28,6 +28,35 @@ export interface AcquisitionChannelRow {
 export interface AcquisitionChannelReport {
   rows: AcquisitionChannelRow[]
   totalSignups: number
+}
+
+export interface GrowthDashboardReport {
+  b2c: {
+    totalSignups: number
+    activatedUsers: number
+    paidSubscribers: number
+    conversionRate: number
+  }
+  institutional: {
+    activeOpportunities: number
+    trialOrganizations: number
+    closedAccounts: number
+    /** Recommended-seat-range buckets among leads not marked dead - no dollar pipeline
+     * value is computed here since no per-seat price mapping exists yet. */
+    seatPipelineByPackage: { recommendedPackage: string; leadCount: number }[]
+  }
+  acquisition: {
+    totalLeads: number
+    leadsBySource: { source: string; count: number }[]
+    qualifiedOrganizations: number
+    emailsSent: number
+  }
+  revenue: {
+    mrrCents: number
+    annualizedRevenueCents: number
+    churnedCount: number
+    churnRate: number
+  }
 }
 
 export type AdminTestEmailKind =
@@ -113,6 +142,48 @@ export interface CreateTrialGrantPayload {
   expiresAt: string
   featureTier: 'free' | 'core' | 'premium'
   inviteCode?: string
+}
+
+export type AdminInstitutionalLeadRow = Pick<
+  InstitutionalLead,
+  | 'id'
+  | 'organization_name'
+  | 'category'
+  | 'source'
+  | 'status'
+  | 'opportunity_score'
+  | 'decision_maker_name'
+  | 'decision_maker_title'
+  | 'contact_email'
+  | 'campaign'
+  | 'last_send_error'
+  | 'created_at'
+  | 'updated_at'
+>
+
+export type InstitutionalLeadStatus = 'new' | 'contacted' | 'bounced' | 'dead'
+
+interface ListInstitutionalLeadsResult {
+  leads: AdminInstitutionalLeadRow[]
+  total: number
+}
+
+export type PartnerDashboardGrant = Pick<
+  TrialGrant,
+  'id' | 'seat_count' | 'seats_used' | 'feature_tier' | 'expires_at' | 'status' | 'invite_code'
+>
+
+export interface PartnerDashboardResult {
+  lead: Pick<InstitutionalLead, 'id' | 'organization_name' | 'category' | 'status'>
+  grants: PartnerDashboardGrant[]
+  metrics: {
+    linkedUserCount: number
+    activeUserCount: number
+    resumeUploads: number
+    jobMatches: number
+    applications: number
+  }
+  activeWindowDays: number
 }
 
 export const adminAPI = {
@@ -233,6 +304,21 @@ export const adminAPI = {
     return { data: data as AcquisitionChannelReport, error: null }
   },
 
+  async getGrowthDashboardReport(): Promise<{
+    data: GrowthDashboardReport | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-growth-dashboard', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as GrowthDashboardReport, error: null }
+  },
+
   async listInstitutionalLeadsForTrialGrants(): Promise<{
     data: AdminTrialGrantLeadRow[] | null
     error: Error | null
@@ -272,6 +358,57 @@ export const adminAPI = {
     }
 
     return { data: (data as { grant: TrialGrant }).grant, error: null }
+  },
+
+  async listInstitutionalLeads(params: {
+    search?: string
+    source?: string
+    category?: string
+    status?: string
+    hasContact?: boolean
+    sortBy?: 'created_at' | 'opportunity_score'
+    sortAscending?: boolean
+    limit?: number
+    offset?: number
+  }): Promise<{ data: ListInstitutionalLeadsResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-institutional-leads', {
+      body: { action: 'list', ...params },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as ListInstitutionalLeadsResult, error: null }
+  },
+
+  async updateInstitutionalLeadStatus(
+    leadId: string,
+    status: InstitutionalLeadStatus,
+  ): Promise<{ data: AdminInstitutionalLeadRow | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-institutional-leads', {
+      body: { action: 'update_status', leadId, status },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
+  },
+
+  async getPartnerDashboard(
+    leadId: string,
+  ): Promise<{ data: PartnerDashboardResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-partner-dashboard', {
+      body: { leadId },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as PartnerDashboardResult, error: null }
   },
 }
 

@@ -79,6 +79,16 @@ async function main() {
   const delayArg = process.argv.find((a) => a.startsWith('--delay-ms='));
   const delayMs = delayArg ? Number(delayArg.slice('--delay-ms='.length)) : DEFAULT_DELAY_MS;
 
+  // --limit=27 caps the batch to the top N leads (same opportunity_score-desc,
+  // organization_name-asc order already used everywhere else) -- lets a first real
+  // batch stay small on purpose. --exclude="Name1,Name2" drops specific orgs by exact
+  // organization_name before that cap is applied, so excluding one bad lead doesn't
+  // just shrink the batch by one -- the next-highest lead backfills its slot.
+  const limitArg = process.argv.find((a) => a.startsWith('--limit='));
+  const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : null;
+  const excludeArg = process.argv.find((a) => a.startsWith('--exclude='));
+  const excludeNames = excludeArg ? new Set(excludeArg.slice('--exclude='.length).split(',').map((s) => s.trim())) : null;
+
   const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
   const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
 
@@ -102,6 +112,17 @@ async function main() {
   if (leadsError) throw new Error(`Failed to query institutional_leads: ${leadsError.message}`);
   console.log(`Found ${leads.length} candidate leads.`);
 
+  let scopedLeads = leads;
+  if (excludeNames) {
+    const before = scopedLeads.length;
+    scopedLeads = scopedLeads.filter((l) => !excludeNames.has(l.organization_name));
+    console.log(`Excluded ${before - scopedLeads.length} lead(s) by name: ${[...excludeNames].join(', ')}`);
+  }
+  if (limit != null) {
+    scopedLeads = scopedLeads.slice(0, limit);
+    console.log(`Capped to top ${scopedLeads.length} leads (--limit=${limit}).`);
+  }
+
   // This pass filters obviously-suppressed leads out up front so dedup groups don't get
   // built around a lead that won't send anyway. Each send still gets its own fresh check
   // below immediately before it fires.
@@ -111,7 +132,7 @@ async function main() {
 
   const candidateRenders = [];
   let suppressedCount = 0;
-  for (const lead of leads) {
+  for (const lead of scopedLeads) {
     if (suppressedNames.has(lead.organization_name)) {
       suppressedCount += 1;
       console.log(`SKIPPED (suppressed): ${lead.organization_name}`);
@@ -120,7 +141,7 @@ async function main() {
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends } = buildDedupedSends(candidateRenders);
+  const { sends } = buildDedupedSends(candidateRenders, campaign);
 
   let sentCount = 0;
   let failedCount = 0;

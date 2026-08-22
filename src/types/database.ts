@@ -48,6 +48,9 @@ export type SubscriptionProduct = Tables<'subscription_product'>
 // Admin-granted trial seats (Build 09: instant trial seat generator)
 export type TrialGrant = Tables<'trial_grants'>
 
+// Institutional B2B sales pipeline (outbound + inbound partner-page leads)
+export type InstitutionalLead = Tables<'institutional_leads'>
+
 // Roles and profile_roles (application-level roles such as admin)
 export type Role = Tables<'roles'>
 export type ProfileRole = Tables<'profile_roles'>
