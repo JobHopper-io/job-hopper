@@ -207,7 +207,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { adminAPI, type GrowthDashboardReport } from '@/lib/admin'
+import { adminAPI, b2cFunnelChartRows, leadsBySourceChartRows, type GrowthDashboardReport } from '@/lib/admin'
 import StatTile from '@/components/GrowthStatTile.vue'
 import HorizontalBarChart from '@/components/HorizontalBarChart.vue'
 import ChartEmptyState from '@/components/ChartEmptyState.vue'
@@ -228,27 +228,9 @@ const emailSendRate = computed(() => {
   return report.value.acquisition.emailsSent / report.value.acquisition.totalLeads
 })
 
-const leadsBySourceRows = computed(() => {
-  if (!report.value) return []
-  // Nominal categories (no inherent order/magnitude ranking) - one series, one hue;
-  // bar length alone carries the comparison, color never re-encodes it.
-  return report.value.acquisition.leadsBySource.map((row) => ({
-    label: row.source,
-    value: row.count,
-    colorHex: '#2F6ECC',
-  }))
-})
+const leadsBySourceRows = computed(() => (report.value ? leadsBySourceChartRows(report.value) : []))
 
-const b2cFunnelRows = computed(() => {
-  if (!report.value) return []
-  const total = report.value.b2c.totalSignups
-  const pctOfTotal = (n: number) => (total > 0 ? `(${((n / total) * 100).toFixed(0)}% of registrations)` : '')
-  return [
-    { label: 'Registrations', value: total, colorHex: ORDINAL_RAMP[0] },
-    { label: 'Activated', value: report.value.b2c.activatedUsers, colorHex: ORDINAL_RAMP[1], subtext: pctOfTotal(report.value.b2c.activatedUsers) },
-    { label: 'Paid', value: report.value.b2c.paidSubscribers, colorHex: ORDINAL_RAMP[2], subtext: pctOfTotal(report.value.b2c.paidSubscribers) },
-  ]
-})
+const b2cFunnelRows = computed(() => (report.value ? b2cFunnelChartRows(report.value) : []))
 
 const seatPipelineRows = computed(() => {
   if (!report.value) return []

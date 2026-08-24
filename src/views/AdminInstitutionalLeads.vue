@@ -336,7 +336,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { adminAPI, type AdminInstitutionalLeadRow, type InstitutionalLeadStatus } from '@/lib/admin'
+import { adminAPI, institutionalLeadStatusBadgeClass, type AdminInstitutionalLeadRow, type InstitutionalLeadStatus } from '@/lib/admin'
 
 // category/source/status are plain-text columns (no DB enum) - lists mirror
 // submit-partner-lead's VALID_CATEGORIES and the outbound connector scripts' `source` values.
@@ -360,18 +360,7 @@ const mutatingId = ref<string | null>(null)
 const rowError = reactive<Record<string, string>>({})
 const drafts = reactive<Record<string, InstitutionalLeadStatus>>({})
 
-const statusBadgeClass = (status: string) => {
-  switch (status) {
-    case 'contacted':
-      return 'bg-blue-100 text-blue-800'
-    case 'bounced':
-      return 'bg-red-100 text-red-800'
-    case 'dead':
-      return 'bg-neutral-800 text-white'
-    default:
-      return 'bg-yellow-100 text-yellow-800'
-  }
-}
+const statusBadgeClass = institutionalLeadStatusBadgeClass
 
 const fetchLeads = async () => {
   loading.value = true
