@@ -32,12 +32,30 @@ import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, require
 
 const DEFAULT_DELAY_MS = 2000;
 const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
+const DEFAULT_FROM_NAME = 'Job-Hopper';
+
+// Duplicated from _shared/email-provider.ts's parseFromAddress -- that file is Deno-only
+// and this script runs under plain Node (see outbound-dry-run.mjs's own note on why its
+// enrichment logic is duplicated rather than imported). MAILTRAP_FROM may be a bare
+// address or an RFC 5322-style "Display Name <email>"; Mailtrap's API wants those as
+// separate from.email/from.name fields, not one combined string -- feeding the raw
+// combined string into from.email 400s with "'from' address is invalid" (confirmed
+// against a real send).
+function parseFromAddress(raw, fallbackName) {
+  const match = raw.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+  if (match) {
+    const name = match[1].replace(/^"(.*)"$/, '$1').trim();
+    return { email: match[2].trim(), name: name || fallbackName };
+  }
+  return { email: raw.trim(), name: fallbackName };
+}
 
 async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html }) {
+  const fromAddress = parseFromAddress(from, DEFAULT_FROM_NAME);
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: { email: from, name: 'Job-Hopper' }, to: [{ email: to.trim() }], subject, text, html }),
+    body: JSON.stringify({ from: fromAddress, to: [{ email: to.trim() }], subject, text, html }),
   });
   const bodyText = await res.text();
   if (!res.ok) {
