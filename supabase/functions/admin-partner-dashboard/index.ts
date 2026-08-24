@@ -145,6 +145,40 @@ serve(async (req) => {
       })
     }
 
+    const { data: orgAccount, error: orgAccountError } = await serviceClient
+      .from("org_accounts")
+      .select("id, organization_name, feature_tier, seat_count, seats_used, status, subscription_id, created_at")
+      .eq("institutional_lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (orgAccountError) {
+      console.error("admin-partner-dashboard: error loading org account", orgAccountError)
+      return new Response(JSON.stringify({ error: "Failed to load org account" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      })
+    }
+
+    let seatInvites: { email: string; invited_at: string; claimed: boolean; revoked_at: string | null }[] = []
+    if (orgAccount) {
+      const { data: invites, error: invitesError } = await serviceClient
+        .from("org_seat_invites")
+        .select("email, invited_at, claimed, revoked_at")
+        .eq("org_account_id", orgAccount.id)
+        .order("invited_at", { ascending: false })
+
+      if (invitesError) {
+        console.error("admin-partner-dashboard: error loading seat invites", invitesError)
+        return new Response(JSON.stringify({ error: "Failed to load seat invites" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        })
+      }
+      seatInvites = invites ?? []
+    }
+
     const grantIds = (grants ?? []).map((g) => g.id)
 
     // Union of both linkage paths (see file header): a profile can match either, so
@@ -191,6 +225,8 @@ serve(async (req) => {
         JSON.stringify({
           lead,
           grants: grants ?? [],
+          orgAccount,
+          seatInvites,
           metrics: {
             linkedUserCount: 0,
             activeUserCount: 0,
@@ -250,6 +286,8 @@ serve(async (req) => {
       JSON.stringify({
         lead,
         grants: grants ?? [],
+        orgAccount,
+        seatInvites,
         metrics: {
           linkedUserCount: profileIds.length,
           activeUserCount,

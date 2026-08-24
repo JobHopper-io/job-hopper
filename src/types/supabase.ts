@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       apollo_limits: {
@@ -1536,6 +1511,115 @@ export type Database = {
           },
         ]
       }
+      org_accounts: {
+        Row: {
+          billing_profile_id: string
+          converted_from_trial_grant_id: string | null
+          created_at: string
+          created_by: string | null
+          feature_tier: string
+          id: string
+          institutional_lead_id: string | null
+          organization_name: string
+          seat_count: number
+          seats_used: number
+          status: string
+          subscription_id: string | null
+        }
+        Insert: {
+          billing_profile_id: string
+          converted_from_trial_grant_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          feature_tier: string
+          id?: string
+          institutional_lead_id?: string | null
+          organization_name: string
+          seat_count: number
+          seats_used?: number
+          status?: string
+          subscription_id?: string | null
+        }
+        Update: {
+          billing_profile_id?: string
+          converted_from_trial_grant_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          feature_tier?: string
+          id?: string
+          institutional_lead_id?: string | null
+          organization_name?: string
+          seat_count?: number
+          seats_used?: number
+          status?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_accounts_billing_profile_id_fkey"
+            columns: ["billing_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_accounts_converted_from_trial_grant_id_fkey"
+            columns: ["converted_from_trial_grant_id"]
+            isOneToOne: false
+            referencedRelation: "trial_grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_accounts_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_accounts_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_seat_invites: {
+        Row: {
+          claimed: boolean
+          email: string
+          id: string
+          invited_at: string
+          org_account_id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          claimed?: boolean
+          email: string
+          id?: string
+          invited_at?: string
+          org_account_id: string
+          revoked_at?: string | null
+        }
+        Update: {
+          claimed?: boolean
+          email?: string
+          id?: string
+          invited_at?: string
+          org_account_id?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_seat_invites_org_account_id_fkey"
+            columns: ["org_account_id"]
+            isOneToOne: false
+            referencedRelation: "org_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outbound_dry_run_log: {
         Row: {
           category: string
@@ -1743,6 +1827,7 @@ export type Database = {
           onboarding_completed: boolean | null
           open_to_relocation: boolean | null
           open_to_remote: boolean | null
+          org_account_id: string | null
           phone_number: string | null
           preferred_locations: string[] | null
           recruiter_visible: boolean
@@ -1779,6 +1864,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null
+          org_account_id?: string | null
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
@@ -1815,6 +1901,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null
+          org_account_id?: string | null
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
@@ -1833,6 +1920,13 @@ export type Database = {
           years_of_experience?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_org_account_id_fkey"
+            columns: ["org_account_id"]
+            isOneToOne: false
+            referencedRelation: "org_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_referred_by_institutional_lead_id_fkey"
             columns: ["referred_by_institutional_lead_id"]
@@ -1886,6 +1980,47 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reply_events: {
+        Row: {
+          from_email: string
+          id: string
+          institutional_lead_id: string | null
+          processed: boolean
+          raw_body: string | null
+          raw_subject: string | null
+          received_at: string
+          reply_class: string | null
+        }
+        Insert: {
+          from_email: string
+          id?: string
+          institutional_lead_id?: string | null
+          processed?: boolean
+          raw_body?: string | null
+          raw_subject?: string | null
+          received_at?: string
+          reply_class?: string | null
+        }
+        Update: {
+          from_email?: string
+          id?: string
+          institutional_lead_id?: string | null
+          processed?: boolean
+          raw_body?: string | null
+          raw_subject?: string | null
+          received_at?: string
+          reply_class?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reply_events_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
             referencedColumns: ["id"]
           },
         ]
@@ -3014,9 +3149,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       application_status: [

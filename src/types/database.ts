@@ -51,6 +51,10 @@ export type TrialGrant = Tables<'trial_grants'>
 // Institutional B2B sales pipeline (outbound + inbound partner-page leads)
 export type InstitutionalLead = Tables<'institutional_leads'>
 
+// Bulk licensing / paid org accounts (Build 10-11)
+export type OrgAccount = Tables<'org_accounts'>
+export type OrgSeatInvite = Tables<'org_seat_invites'>
+
 // Roles and profile_roles (application-level roles such as admin)
 export type Role = Tables<'roles'>
 export type ProfileRole = Tables<'profile_roles'>
