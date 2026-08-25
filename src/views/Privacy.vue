@@ -62,7 +62,17 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            2. How We Use Your Information
+            2. SMS Consent
+          </h2>
+          <p>
+            SMS opt-in or phone numbers for the purpose of SMS are not shared with any third
+            parties or affiliate companies for marketing purposes.
+          </p>
+        </section>
+
+        <section class="space-y-3">
+          <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
+            3. How We Process Your Information
           </h2>
           <p>We use data to:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -77,7 +87,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            3. Data Sharing
+            4. When and With Whom We Share Your Personal Information
           </h2>
           <p>We do NOT:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -94,7 +104,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            4. Employer Access
+            5. Employer Access
           </h2>
           <p>By default, employers cannot browse or access your profile at all. You may optionally turn on Recruiter-Visible Mode, which works like this:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -108,7 +118,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            5. Cookies &amp; Tracking
+            6. Cookies &amp; Tracking
           </h2>
           <p>We may use cookies to:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -121,7 +131,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            6. Data Security
+            7. Data Security
           </h2>
           <p>We use:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -134,7 +144,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            7. Data Retention
+            8. Data Retention
           </h2>
           <p>We retain data:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -147,7 +157,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            8. Account Deletion
+            9. Account Deletion
           </h2>
           <p>Users may:</p>
           <ul class="list-disc pl-6 space-y-1">
@@ -165,7 +175,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            9. Children's Privacy
+            10. Children's Privacy
           </h2>
           <p>Job-Hopper is not intended for users under 18.</p>
           <p>We do not knowingly collect data from minors.</p>
@@ -173,7 +183,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            10. International Users
+            11. International Users
           </h2>
           <p>If accessing outside the United States:</p>
           <p>Data may be processed in the U.S.</p>
@@ -182,7 +192,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            11. Changes to Privacy Policy
+            12. Changes to Privacy Policy
           </h2>
           <p>We may update this policy periodically.</p>
           <p>Updates posted here.</p>
@@ -190,7 +200,7 @@
 
         <section class="space-y-3">
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
-            12. Contact
+            13. Contact
           </h2>
           <p>
             For privacy questions:
