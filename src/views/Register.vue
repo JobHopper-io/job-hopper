@@ -404,7 +404,8 @@ const handleCreateAccount = async () => {
           class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
         />
         <span class="text-[13px] leading-snug text-neutral-body">
-          I agree to receive text messages from Job-Hopper. Message and data rates may apply. Unsubscribe anytime.
+          I agree to receive text messages from Job-Hopper, including job match alerts. Message
+          frequency varies. Message and data rates may apply. Reply HELP for help, STOP to cancel.
         </span>
       </label>
 
