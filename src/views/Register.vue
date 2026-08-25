@@ -404,8 +404,16 @@ const handleCreateAccount = async () => {
           class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
         />
         <span class="text-[13px] leading-snug text-neutral-body">
-          I agree to receive text messages from Job-Hopper, including job match alerts. Message
-          frequency varies. Message and data rates may apply. Reply HELP for help, STOP to cancel.
+          By checking this box, you agree to receive account and job match alert SMS messages from
+          Job-Hopper. You can reply stop to opt-out at any time. Reply help to 216-759-2519.
+          Messages and data rates may apply. Message frequency will vary. You can review our
+          <router-link to="/privacy" class="text-brand-primary hover:underline" target="_blank"
+            >Privacy Policy</router-link
+          >
+          and
+          <router-link to="/terms" class="text-brand-primary hover:underline" target="_blank"
+            >Terms &amp; Conditions</router-link
+          >.
         </span>
       </label>
 
