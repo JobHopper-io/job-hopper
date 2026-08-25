@@ -51,6 +51,9 @@ const adminPaths = [
   '/admin/user-lifecycle',
   '/admin/seo-performance',
   '/admin/acquisition-channels',
+  '/admin/trial-grants',
+  '/admin/institutional-leads',
+  '/admin/growth-dashboard',
 ]
 
 /** Routes gated on an employer_accounts row instead of a profiles row - employers never
@@ -148,6 +151,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+    },
+    {
+      path: '/trial/:code',
+      name: 'trial-invite',
+      component: () => import('../views/TrialInvite.vue'),
     },
     {
       path: '/employer/register',
@@ -303,6 +311,26 @@ const router = createRouter({
       component: () => import('../views/AdminAcquisitionChannel.vue'),
     },
     {
+      path: '/admin/trial-grants',
+      name: 'admin-trial-grants',
+      component: () => import('../views/AdminTrialGrants.vue'),
+    },
+    {
+      path: '/admin/institutional-leads',
+      name: 'admin-institutional-leads',
+      component: () => import('../views/AdminInstitutionalLeads.vue'),
+    },
+    {
+      path: '/admin/partner-dashboard/:leadId',
+      name: 'admin-partner-dashboard',
+      component: () => import('../views/AdminPartnerDashboard.vue'),
+    },
+    {
+      path: '/admin/growth-dashboard',
+      name: 'admin-growth-dashboard',
+      component: () => import('../views/AdminGrowthDashboard.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundPage.vue'),
@@ -357,7 +385,9 @@ router.beforeEach(async (to) => {
   }
 
   const targetPath = to.path
-  const isPublicPath = publicPaths.includes(targetPath)
+  // /trial/:code is the one public route with a dynamic segment, so it can't live in the
+  // flat publicPaths string list above; matched by prefix instead.
+  const isPublicPath = publicPaths.includes(targetPath) || targetPath.startsWith('/trial/')
   // Public routes that authenticated users should be redirected away from
   const publicRedirectPaths = ['/', '/login', '/register']
 
@@ -462,8 +492,11 @@ router.beforeEach(async (to) => {
     return '/dashboard'
   }
 
-  // Admin routes require the user to have appropriate admin roles.
-  if (adminPaths.includes(targetPath)) {
+  // Admin routes require the user to have appropriate admin roles. Partner dashboard is
+  // the one admin route with a dynamic segment (/admin/partner-dashboard/:leadId), so it
+  // can't live in the flat adminPaths list above; matched by prefix instead, same as the
+  // public /trial/:code handling further up.
+  if (adminPaths.includes(targetPath) || targetPath.startsWith('/admin/partner-dashboard/')) {
     const [isAdmin, isSuperAdmin] = await Promise.all([
       profileAPI.hasRole('admin'),
       profileAPI.hasRole('super_admin'),

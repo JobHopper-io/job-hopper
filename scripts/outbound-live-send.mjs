@@ -32,12 +32,30 @@ import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, require
 
 const DEFAULT_DELAY_MS = 2000;
 const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
+const DEFAULT_FROM_NAME = 'Job-Hopper';
 
-async function sendEmailViaMailtrap({ apiToken, from, to, subject, text }) {
+// Duplicated from _shared/email-provider.ts's parseFromAddress -- that file is Deno-only
+// and this script runs under plain Node (see outbound-dry-run.mjs's own note on why its
+// enrichment logic is duplicated rather than imported). MAILTRAP_FROM may be a bare
+// address or an RFC 5322-style "Display Name <email>"; Mailtrap's API wants those as
+// separate from.email/from.name fields, not one combined string -- feeding the raw
+// combined string into from.email 400s with "'from' address is invalid" (confirmed
+// against a real send).
+function parseFromAddress(raw, fallbackName) {
+  const match = raw.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+  if (match) {
+    const name = match[1].replace(/^"(.*)"$/, '$1').trim();
+    return { email: match[2].trim(), name: name || fallbackName };
+  }
+  return { email: raw.trim(), name: fallbackName };
+}
+
+async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html }) {
+  const fromAddress = parseFromAddress(from, DEFAULT_FROM_NAME);
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: { email: from, name: 'Job-Hopper' }, to: [{ email: to.trim() }], subject, text }),
+    body: JSON.stringify({ from: fromAddress, to: [{ email: to.trim() }], subject, text, html }),
   });
   const bodyText = await res.text();
   if (!res.ok) {
@@ -46,8 +64,13 @@ async function sendEmailViaMailtrap({ apiToken, from, to, subject, text }) {
   }
   let messageId = null;
   try {
+    // Mailtrap's real response shape is { success, message_ids: [...] } (plural,
+    // array) -- confirmed against a live send; a singular `message_id` field never
+    // matches, which is why this was always coming back null before.
     const parsed = bodyText ? JSON.parse(bodyText) : null;
-    if (parsed && typeof parsed.message_id === 'string') messageId = parsed.message_id;
+    if (parsed && Array.isArray(parsed.message_ids) && typeof parsed.message_ids[0] === 'string') {
+      messageId = parsed.message_ids[0];
+    }
   } catch {
     // non-JSON response body; leave messageId null
   }
@@ -74,6 +97,16 @@ async function main() {
   const delayArg = process.argv.find((a) => a.startsWith('--delay-ms='));
   const delayMs = delayArg ? Number(delayArg.slice('--delay-ms='.length)) : DEFAULT_DELAY_MS;
 
+  // --limit=27 caps the batch to the top N leads (same opportunity_score-desc,
+  // organization_name-asc order already used everywhere else) -- lets a first real
+  // batch stay small on purpose. --exclude="Name1,Name2" drops specific orgs by exact
+  // organization_name before that cap is applied, so excluding one bad lead doesn't
+  // just shrink the batch by one -- the next-highest lead backfills its slot.
+  const limitArg = process.argv.find((a) => a.startsWith('--limit='));
+  const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : null;
+  const excludeArg = process.argv.find((a) => a.startsWith('--exclude='));
+  const excludeNames = excludeArg ? new Set(excludeArg.slice('--exclude='.length).split(',').map((s) => s.trim())) : null;
+
   const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
   const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
 
@@ -97,6 +130,17 @@ async function main() {
   if (leadsError) throw new Error(`Failed to query institutional_leads: ${leadsError.message}`);
   console.log(`Found ${leads.length} candidate leads.`);
 
+  let scopedLeads = leads;
+  if (excludeNames) {
+    const before = scopedLeads.length;
+    scopedLeads = scopedLeads.filter((l) => !excludeNames.has(l.organization_name));
+    console.log(`Excluded ${before - scopedLeads.length} lead(s) by name: ${[...excludeNames].join(', ')}`);
+  }
+  if (limit != null) {
+    scopedLeads = scopedLeads.slice(0, limit);
+    console.log(`Capped to top ${scopedLeads.length} leads (--limit=${limit}).`);
+  }
+
   // This pass filters obviously-suppressed leads out up front so dedup groups don't get
   // built around a lead that won't send anyway. Each send still gets its own fresh check
   // below immediately before it fires.
@@ -106,7 +150,7 @@ async function main() {
 
   const candidateRenders = [];
   let suppressedCount = 0;
-  for (const lead of leads) {
+  for (const lead of scopedLeads) {
     if (suppressedNames.has(lead.organization_name)) {
       suppressedCount += 1;
       console.log(`SKIPPED (suppressed): ${lead.organization_name}`);
@@ -115,7 +159,7 @@ async function main() {
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends } = buildDedupedSends(candidateRenders);
+  const { sends } = buildDedupedSends(candidateRenders, campaign);
 
   let sentCount = 0;
   let failedCount = 0;
@@ -152,11 +196,24 @@ async function main() {
       to: s.contact_email,
       subject: s.subject,
       text: s.body,
+      html: s.html,
     });
+
+    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
 
     if (!result.success) {
       failedCount += 1;
       console.log(`  -> FAILED (${s.contact_email}): ${result.error}`);
+      // Failure reason is durable on the lead row, not just this run's console output --
+      // status stays 'new' so the lead is naturally retried on a future run, but the
+      // reason for last time doesn't just vanish when the terminal session ends.
+      const { error: failUpdateError } = await supabase
+        .from('institutional_leads')
+        .update({ last_send_error: result.error, last_send_attempted_at: new Date().toISOString() })
+        .in('id', leadIds);
+      if (failUpdateError) {
+        console.log(`  -> also failed to record the failure reason on institutional_leads: ${failUpdateError.message}`);
+      }
       await sleep(delayMs);
       continue;
     }
@@ -165,10 +222,15 @@ async function main() {
     rendered.push(s);
     console.log(`  -> sent (${s.contact_email}, messageId=${result.messageId ?? 'null'})`);
 
-    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
     const { error: updateError } = await supabase
       .from('institutional_leads')
-      .update({ status: 'contacted', campaign })
+      .update({
+        status: 'contacted',
+        campaign,
+        provider_message_id: result.messageId,
+        last_send_error: null,
+        last_send_attempted_at: new Date().toISOString(),
+      })
       .in('id', leadIds);
     if (updateError) {
       throw new Error(

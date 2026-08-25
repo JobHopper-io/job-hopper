@@ -97,6 +97,7 @@ export const authAPI = {
     referrerHost?: string,
     utmCampaign?: string,
     utmMedium?: string,
+    trialInviteCode?: string,
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -112,6 +113,7 @@ export const authAPI = {
           referrer_host: referrerHost || null,
           utm_campaign: utmCampaign || null,
           utm_medium: utmMedium || null,
+          trial_invite_code: trialInviteCode || null,
         },
       },
     })

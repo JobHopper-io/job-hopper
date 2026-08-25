@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
-import type { EmployerAccount } from '@/types/database'
+import type { EmployerAccount, InstitutionalLead, OrgAccount, OrgSeatInvite, TrialGrant } from '@/types/database'
+import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 
 export interface SeoPerformanceRow {
   urlPath: string
@@ -27,6 +28,60 @@ export interface AcquisitionChannelRow {
 export interface AcquisitionChannelReport {
   rows: AcquisitionChannelRow[]
   totalSignups: number
+}
+
+// Nominal categories (no inherent order/magnitude ranking) - one series, one hue;
+// bar length alone carries the comparison, color never re-encodes it.
+export function leadsBySourceChartRows(report: GrowthDashboardReport): { label: string; value: number; colorHex: string }[] {
+  return report.acquisition.leadsBySource.map((row) => ({
+    label: row.source,
+    value: row.count,
+    colorHex: '#2F6ECC',
+  }))
+}
+
+// Ordinal ramp, light -> dark, single hue (brand.primary #2F6ECC) - validated with
+// scripts/validate_palette.js --ordinal (dataviz skill): monotone lightness, all
+// adjacent steps clear the CVD floor, light end clears the surface-contrast floor.
+const B2C_FUNNEL_RAMP = ['#8FB8E8', '#5B8FDB', '#2F6ECC']
+
+export function b2cFunnelChartRows(report: GrowthDashboardReport): { label: string; value: number; colorHex: string; subtext?: string }[] {
+  const total = report.b2c.totalSignups
+  const pctOfTotal = (n: number) => (total > 0 ? `(${((n / total) * 100).toFixed(0)}% of registrations)` : '')
+  return [
+    { label: 'Registrations', value: total, colorHex: B2C_FUNNEL_RAMP[0] },
+    { label: 'Activated', value: report.b2c.activatedUsers, colorHex: B2C_FUNNEL_RAMP[1], subtext: pctOfTotal(report.b2c.activatedUsers) },
+    { label: 'Paid', value: report.b2c.paidSubscribers, colorHex: B2C_FUNNEL_RAMP[2], subtext: pctOfTotal(report.b2c.paidSubscribers) },
+  ]
+}
+
+export interface GrowthDashboardReport {
+  b2c: {
+    totalSignups: number
+    activatedUsers: number
+    paidSubscribers: number
+    conversionRate: number
+  }
+  institutional: {
+    activeOpportunities: number
+    trialOrganizations: number
+    closedAccounts: number
+    /** Recommended-seat-range buckets among leads not marked dead - no dollar pipeline
+     * value is computed here since no per-seat price mapping exists yet. */
+    seatPipelineByPackage: { recommendedPackage: string; leadCount: number }[]
+  }
+  acquisition: {
+    totalLeads: number
+    leadsBySource: { source: string; count: number }[]
+    qualifiedOrganizations: number
+    emailsSent: number
+  }
+  revenue: {
+    mrrCents: number
+    annualizedRevenueCents: number
+    churnedCount: number
+    churnRate: number
+  }
 }
 
 export type AdminTestEmailKind =
@@ -95,6 +150,87 @@ interface ListEmployersResult {
 
 interface ReviewEmployerResult {
   employer: AdminEmployerRow
+}
+
+export interface AdminTrialGrantLeadRow {
+  id: string
+  organization_name: string
+  category: string
+  status: string
+  created_at: string
+}
+
+export interface CreateTrialGrantPayload {
+  organizationName: string
+  institutionalLeadId?: string | null
+  seatCount: number
+  expiresAt: string
+  featureTier: 'free' | 'core' | 'premium'
+  inviteCode?: string
+}
+
+export type AdminInstitutionalLeadRow = Pick<
+  InstitutionalLead,
+  | 'id'
+  | 'organization_name'
+  | 'category'
+  | 'source'
+  | 'status'
+  | 'opportunity_score'
+  | 'decision_maker_name'
+  | 'decision_maker_title'
+  | 'contact_email'
+  | 'campaign'
+  | 'last_send_error'
+  | 'created_at'
+  | 'updated_at'
+>
+
+export type InstitutionalLeadStatus = 'new' | 'contacted' | 'bounced' | 'dead'
+
+export function institutionalLeadStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'contacted':
+      return 'bg-blue-100 text-blue-800'
+    case 'bounced':
+      return 'bg-red-100 text-red-800'
+    case 'dead':
+      return 'bg-neutral-800 text-white'
+    default:
+      return 'bg-yellow-100 text-yellow-800'
+  }
+}
+
+interface ListInstitutionalLeadsResult {
+  leads: AdminInstitutionalLeadRow[]
+  total: number
+}
+
+export type PartnerDashboardGrant = Pick<
+  TrialGrant,
+  'id' | 'seat_count' | 'seats_used' | 'feature_tier' | 'expires_at' | 'status' | 'invite_code'
+>
+
+export type PartnerDashboardOrgAccount = Pick<
+  OrgAccount,
+  'id' | 'organization_name' | 'feature_tier' | 'seat_count' | 'seats_used' | 'status' | 'subscription_id' | 'created_at'
+>
+
+export type PartnerDashboardSeatInvite = Pick<OrgSeatInvite, 'email' | 'invited_at' | 'claimed' | 'revoked_at'>
+
+export interface PartnerDashboardResult {
+  lead: Pick<InstitutionalLead, 'id' | 'organization_name' | 'category' | 'status'>
+  grants: PartnerDashboardGrant[]
+  orgAccount: PartnerDashboardOrgAccount | null
+  seatInvites: PartnerDashboardSeatInvite[]
+  metrics: {
+    linkedUserCount: number
+    activeUserCount: number
+    resumeUploads: number
+    jobMatches: number
+    applications: number
+  }
+  activeWindowDays: number
 }
 
 export const adminAPI = {
@@ -213,6 +349,171 @@ export const adminAPI = {
     }
 
     return { data: data as AcquisitionChannelReport, error: null }
+  },
+
+  async getGrowthDashboardReport(): Promise<{
+    data: GrowthDashboardReport | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-growth-dashboard', {
+      body: {},
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as GrowthDashboardReport, error: null }
+  },
+
+  async listInstitutionalLeadsForTrialGrants(): Promise<{
+    data: AdminTrialGrantLeadRow[] | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'list_leads' },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: (data as { leads: AdminTrialGrantLeadRow[] }).leads, error: null }
+  },
+
+  async listTrialGrants(): Promise<{ data: TrialGrant[] | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'list_grants' },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: (data as { grants: TrialGrant[] }).grants, error: null }
+  },
+
+  async createTrialGrant(
+    payload: CreateTrialGrantPayload,
+  ): Promise<{ data: TrialGrant | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-trial-grants', {
+      body: { action: 'create_grant', ...payload },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: (data as { grant: TrialGrant }).grant, error: null }
+  },
+
+  async listInstitutionalLeads(params: {
+    search?: string
+    source?: string
+    category?: string
+    status?: string
+    hasContact?: boolean
+    sortBy?: 'created_at' | 'opportunity_score'
+    sortAscending?: boolean
+    limit?: number
+    offset?: number
+  }): Promise<{ data: ListInstitutionalLeadsResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-institutional-leads', {
+      body: { action: 'list', ...params },
+    })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data as ListInstitutionalLeadsResult, error: null }
+  },
+
+  async updateInstitutionalLeadStatus(
+    leadId: string,
+    status: InstitutionalLeadStatus,
+  ): Promise<{ data: AdminInstitutionalLeadRow | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-institutional-leads', {
+      body: { action: 'update_status', leadId, status },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
+  },
+
+  async getPartnerDashboard(
+    leadId: string,
+  ): Promise<{ data: PartnerDashboardResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-partner-dashboard', {
+      body: { leadId },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as PartnerDashboardResult, error: null }
+  },
+
+  async createOrgAccount(payload: {
+    leadId: string
+    organizationName: string
+    billingEmail: string
+    billingName?: string
+    featureTier: 'core' | 'premium'
+    seatCount: number
+  }): Promise<{
+    data: { orgAccount: PartnerDashboardOrgAccount; stripeSubscriptionId: string } | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-org-accounts', {
+      body: { action: 'create_org_account', ...payload },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as { orgAccount: PartnerDashboardOrgAccount; stripeSubscriptionId: string }, error: null }
+  },
+
+  async importOrgSeats(
+    orgAccountId: string,
+    emails: string[],
+  ): Promise<{
+    data: { invited: number; alreadyInvited: number; emailsSent: number; seatsUsed: number; seatCount: number } | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-org-accounts', {
+      body: { action: 'import_seats', orgAccountId, emails },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return {
+      data: data as { invited: number; alreadyInvited: number; emailsSent: number; seatsUsed: number; seatCount: number },
+      error: null,
+    }
+  },
+
+  async revokeOrgSeat(
+    orgAccountId: string,
+    email: string,
+  ): Promise<{ data: { revoked: string; seatCount: number; seatsUsed: number } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-org-accounts', {
+      body: { action: 'revoke_seat', orgAccountId, email },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as { revoked: string; seatCount: number; seatsUsed: number }, error: null }
   },
 }
 

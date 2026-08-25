@@ -19,6 +19,22 @@ export interface SendEmailResult {
 }
 
 const DEFAULT_MAILTRAP_URL = 'https://send.api.mailtrap.io/api/send'
+const DEFAULT_FROM_NAME = 'Job-Hopper'
+
+// MAILTRAP_FROM may be a bare address ("no-reply@job-hopper.io") or an RFC 5322-style
+// "Display Name <email>" ("Job-Hopper <no-reply@job-hopper.com>") -- Mailtrap's API wants
+// those as separate from.email/from.name fields, not one combined string. Feeding the raw
+// combined string into from.email fails with a 400 "'from' address is invalid" (confirmed
+// against a real send) -- every email would silently stop sending the moment this env var
+// picked up a display name.
+export function parseFromAddress(raw: string, fallbackName: string): { email: string; name: string } {
+  const match = raw.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/)
+  if (match) {
+    const name = match[1].replace(/^"(.*)"$/, '$1').trim()
+    return { email: match[2].trim(), name: name || fallbackName }
+  }
+  return { email: raw.trim(), name: fallbackName }
+}
 
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN')
@@ -37,7 +53,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress = { email: fromEnv, name: 'Job-Hopper' }
+  const fromAddress = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
 
   console.log('[email-provider] Mailtrap send attempt', {
     to: params.to,
@@ -91,8 +107,12 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     if (resp.ok) {
       try {
         const parsed = bodyText ? JSON.parse(bodyText) : null
-        if (parsed && typeof parsed.message_id === 'string') {
-          messageId = parsed.message_id
+        // Mailtrap's actual response shape is { success, message_ids: [...] } (plural,
+        // array) -- not the singular message_id this used to check for, which meant
+        // messageId (and therefore email_events.provider_message_id) was always null
+        // even on a successful send. Confirmed against a real Mailtrap response.
+        if (parsed && Array.isArray(parsed.message_ids) && typeof parsed.message_ids[0] === 'string') {
+          messageId = parsed.message_ids[0]
         }
       } catch {
         // Non-JSON or unexpected; leave messageId as null

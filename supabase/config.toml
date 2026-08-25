@@ -260,6 +260,11 @@ verify_jwt = false
 [functions.log-seo-page-view]
 verify_jwt = false
 
+# Mailtrap calls this directly (bounce webhook) -- no Supabase JWT, authenticity is
+# verified in-function via the Mailtrap-Signature HMAC header instead.
+[functions.mailtrap-bounce-webhook]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

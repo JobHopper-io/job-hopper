@@ -26,6 +26,7 @@
 - **Non-obvious rules**:
   - A partner-page resubmission for an org that already has a `landing_page_form` row resets `status` to `'new'` — a fresh inbound fill is treated as a real re-engagement signal, not a duplicate to ignore.
   - Because the upsert key is `(organization_name, source)` and not `organization_name` alone, a landing-page fill for an org that already has an *outbound-sourced* row (e.g. `college_scorecard`) does **not** update that row — it inserts a second row for the same real-world org, one per source. This matches the build spec's own literal upsert SQL; org-level (cross-source) dedup was not built.
+  - `status = 'bounced'` (Build 07-08, Deliverability Monitoring) is set by the `mailtrap-bounce-webhook` Edge Function when Mailtrap reports a hard bounce for `contact_email`. Since `scripts/outbound-live-send.mjs` only ever queries `status = 'new'`, a bounced lead is never picked up again — it isn't reset back to `'new'`, so no separate suppression check is needed to stop re-sending it. `provider_message_id` (set on a successful live send), `last_send_error`, and `last_send_attempted_at` are also tracked directly on the row — this plus `status`/`campaign` is the whole audit trail at current volume; no separate log table was built for live sends (only the dry-run path writes to `outbound_dry_run_log`).
 
 ### subscriptions
 - **Meaning**: One row per Stripe subscription; Stripe is the source of truth. Subscription and product data are written only by the `stripe-webhook` Edge Function.
