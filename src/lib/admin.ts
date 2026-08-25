@@ -233,6 +233,46 @@ export interface PartnerDashboardResult {
   activeWindowDays: number
 }
 
+export type RevenueRecoverySegmentKey =
+  | 'never_activated'
+  | 'activated_never_paid'
+  | 'cancelled'
+  | 'no_login_30d'
+  | 'heavy_free_usage'
+  | 'high_match_users'
+  | 'visa_focused_no_conversion'
+
+export interface RevenueRecoverySegmentMember {
+  profileId: string
+  email: string
+  firstName: string
+  detail: string
+}
+
+export interface RevenueRecoverySegmentSummaryRow {
+  key: RevenueRecoverySegmentKey
+  label: string
+  count: number
+}
+
+export interface RevenueRecoverySegmentsResult {
+  summary: RevenueRecoverySegmentSummaryRow[]
+  segments: Record<RevenueRecoverySegmentKey, RevenueRecoverySegmentMember[]>
+  totalProfiles: number
+}
+
+export interface SendRevenueRecoverySegmentResult {
+  mode: 'test' | 'real'
+  success?: boolean
+  error?: string | null
+  messageId?: string | null
+  segment?: RevenueRecoverySegmentKey
+  totalEligible?: number
+  sent?: number
+  suppressed?: number
+  failed?: number
+}
+
 export const adminAPI = {
   async setUserRoles(email: string, roles: string[]): Promise<{ data: SetUserRolesPayload | null; error: Error | null }> {
     const { data, error } = await supabase.functions.invoke('assign-role', {
@@ -514,6 +554,34 @@ export const adminAPI = {
     }
 
     return { data: data as { revoked: string; seatCount: number; seatsUsed: number }, error: null }
+  },
+
+  async listRevenueRecoverySegments(): Promise<{ data: RevenueRecoverySegmentsResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', {
+      body: { action: 'list_segments' },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as RevenueRecoverySegmentsResult, error: null }
+  },
+
+  /** Pass exactly one of testEmailOverride or confirmRealSend. */
+  async sendRevenueRecoverySegmentEmail(
+    segment: RevenueRecoverySegmentKey,
+    opts: { testEmailOverride?: string; confirmRealSend?: boolean },
+  ): Promise<{ data: SendRevenueRecoverySegmentResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', {
+      body: { action: 'send_segment_email', segment, ...opts },
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as SendRevenueRecoverySegmentResult, error: null }
   },
 }
 
