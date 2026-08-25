@@ -35,6 +35,7 @@ const emailAlreadyUsed = ref(false)
 const phoneAlreadyUsed = ref(false)
 
 const emailConsent = ref(false)
+const smsConsent = ref(false)
 
 const validateEmail = (value: string) => {
   if (!value.trim()) return null
@@ -392,6 +393,18 @@ const handleCreateAccount = async () => {
         />
         <span class="text-[13px] leading-snug text-neutral-body">
           I agree to receive account and marketing emails from Job-Hopper. Unsubscribe anytime.
+        </span>
+      </label>
+
+      <label class="flex items-start gap-2.5" for="sms-consent">
+        <input
+          id="sms-consent"
+          v-model="smsConsent"
+          type="checkbox"
+          class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
+        />
+        <span class="text-[13px] leading-snug text-neutral-body">
+          I agree to receive text messages from Job-Hopper. Message and data rates may apply. Unsubscribe anytime.
         </span>
       </label>
 
