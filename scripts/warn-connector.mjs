@@ -29,6 +29,19 @@ const WARN_BUCKETS = [
 const PERMANENT_LAYOFF_TYPES = new Set(['Closure', 'Layoff']);
 const PRIORITY_BONUS = 10;
 
+// Recency modifier (AI Lead Scoring Engine 2.0, Build 05): effective_date is 100%
+// populated on real WARN notices (confirmed), just wasn't used in scoring before. Kept
+// small relative to the 20-point gap between WARN_BUCKETS tiers (max swing here is
+// +5/-3, well under PRIORITY_BONUS's own +10) so recency alone can never flip a large
+// layoff below a smaller, staler one -- a fresh notice is a hotter lead, not a
+// different-sized one.
+const RECENCY_BONUS_FRESH_DAYS = 14; // within 2 weeks
+const RECENCY_BONUS_FRESH = 5;
+const RECENCY_BONUS_RECENT_DAYS = 30; // within a month
+const RECENCY_BONUS_RECENT = 2;
+const RECENCY_PENALTY_STALE_DAYS = 90; // older than 3 months
+const RECENCY_PENALTY_STALE = -3;
+
 function isPermanentLayoff(layoffType) {
   return layoffType != null && PERMANENT_LAYOFF_TYPES.has(layoffType);
 }
@@ -41,10 +54,21 @@ function requireEnv(name) {
   return value;
 }
 
-function scoreFor(workers, priority = false) {
+function recencyModifier(effectiveDate) {
+  if (!effectiveDate) return 0;
+  const days = (Date.now() - new Date(effectiveDate).getTime()) / 86400000;
+  if (Number.isNaN(days)) return 0;
+  if (days <= RECENCY_BONUS_FRESH_DAYS) return RECENCY_BONUS_FRESH;
+  if (days <= RECENCY_BONUS_RECENT_DAYS) return RECENCY_BONUS_RECENT;
+  if (days > RECENCY_PENALTY_STALE_DAYS) return RECENCY_PENALTY_STALE;
+  return 0;
+}
+
+export function scoreFor(workers, priority = false, effectiveDate = null) {
   if (workers === null || workers === undefined) return { score: null, package: null };
   const bucket = WARN_BUCKETS.find((b) => workers >= b.min);
-  const score = priority ? Math.min(100, bucket.score + PRIORITY_BONUS) : bucket.score;
+  const priorityBonus = priority ? PRIORITY_BONUS : 0;
+  const score = Math.max(0, Math.min(100, bucket.score + priorityBonus + recencyModifier(effectiveDate)));
   return { score, package: bucket.package };
 }
 
@@ -76,7 +100,8 @@ async function fetchNotices(apiKey, state, dateFrom) {
 function toLeadRow(notice) {
   const workers = notice.employees_affected ?? null;
   const priority = isPermanentLayoff(notice.layoff_type);
-  const { score, package: pkg } = scoreFor(workers, priority);
+  const effectiveDate = notice.effective_date ?? null;
+  const { score, package: pkg } = scoreFor(workers, priority, effectiveDate);
   return {
     source: 'warn',
     category: 'employer',
@@ -92,7 +117,7 @@ function toLeadRow(notice) {
       layoff_type: notice.layoff_type ?? null,
       temporary_permanent: notice.temporary_permanent ?? null,
       industry: notice.industry ?? null,
-      effective_date: notice.effective_date ?? null,
+      effective_date: effectiveDate,
     },
   };
 }
@@ -128,7 +153,12 @@ function mergeDuplicateOrgNames(rows) {
     // bump for the whole merged employer row — a company isn't less of a real
     // closure/layoff opportunity just because it also filed a second, unclassified notice.
     existing.signals.priority = existing.signals.priority || row.signals.priority;
-    const { score, package: pkg } = scoreFor(totalWorkers, existing.signals.priority);
+    // Same logic for recency: the most recent of the merged notices' dates is the real
+    // freshness signal — an additional recent filing makes the row hotter, not staler.
+    if (row.signals.effective_date && (!existing.signals.effective_date || row.signals.effective_date > existing.signals.effective_date)) {
+      existing.signals.effective_date = row.signals.effective_date;
+    }
+    const { score, package: pkg } = scoreFor(totalWorkers, existing.signals.priority, existing.signals.effective_date);
     existing.signals.workers_affected = totalWorkers;
     existing.opportunity_score = score;
     existing.recommended_package = pkg;
@@ -193,11 +223,39 @@ async function main() {
   console.table(data.map((r) => ({ ...r, signals: JSON.stringify(r.signals) })));
 }
 
+function selfTest() {
+  const now = Date.now();
+  const daysAgo = (n) => new Date(now - n * 86400000).toISOString().slice(0, 10);
+
+  console.assert(scoreFor(null).score === null, 'missing workers_affected stays null, not a guessed score');
+  console.assert(scoreFor(1000, false, null).score === 90, 'no effective_date -> no recency modifier');
+  console.assert(scoreFor(1000, false, daysAgo(3)).score === 95, 'fresh (<=14d) gets +5');
+  console.assert(scoreFor(1000, false, daysAgo(20)).score === 92, 'recent (<=30d) gets +2');
+  console.assert(scoreFor(1000, false, daysAgo(60)).score === 90, 'mid-range (30-90d) gets no modifier');
+  console.assert(scoreFor(1000, false, daysAgo(120)).score === 87, 'stale (>90d) gets -3');
+
+  // Recency's max swing (+5/-3) must never cross a WARN_BUCKETS tier gap (20 points) or
+  // beat PRIORITY_BONUS's own +10 -- a fresh small layoff must still score below a
+  // stale large one.
+  const freshSmall = scoreFor(30, false, daysAgo(1)).score; // 30 + 5 = 35
+  const staleLarge = scoreFor(200, false, daysAgo(200)).score; // 70 - 3 = 67
+  console.assert(freshSmall < staleLarge, 'recency must not flip size-tier ranking');
+
+  console.assert(scoreFor(1000, true, daysAgo(1)).score === 100, 'priority + fresh caps at 100, not over');
+  console.assert(scoreFor(1000, false, 'not-a-real-date').score === 90, 'unparseable effective_date is a no-op, not a crash');
+
+  console.log('selfTest: all assertions passed');
+}
+
 const invokedDirectly =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  main().catch((err) => {
-    console.error(err.message);
-    process.exit(1);
-  });
+  if (process.argv.includes('--self-test')) {
+    selfTest();
+  } else {
+    main().catch((err) => {
+      console.error(err.message);
+      process.exit(1);
+    });
+  }
 }

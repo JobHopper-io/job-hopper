@@ -54,6 +54,7 @@ const adminPaths = [
   '/admin/trial-grants',
   '/admin/institutional-leads',
   '/admin/growth-dashboard',
+  '/admin/revenue-recovery',
 ]
 
 /** Routes gated on an employer_accounts row instead of a profiles row - employers never
@@ -299,6 +300,11 @@ const router = createRouter({
       path: '/admin/user-lifecycle',
       name: 'admin-user-lifecycle',
       component: () => import('../views/AdminUserLifecycle.vue'),
+    },
+    {
+      path: '/admin/revenue-recovery',
+      name: 'admin-revenue-recovery',
+      component: () => import('../views/AdminRevenueRecovery.vue'),
     },
     {
       path: '/admin/seo-performance',

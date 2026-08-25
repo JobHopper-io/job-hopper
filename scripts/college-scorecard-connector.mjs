@@ -29,6 +29,28 @@ const OPPORTUNITY_BUCKETS = [
 
 const OWNERSHIP_LABELS = { 1: 'public', 2: 'private_nonprofit', 3: 'private_for_profit' };
 
+// Secondary modifiers on top of the student_size bucket score (AI Lead Scoring Engine
+// 2.0, Build 05). Deliberately small relative to the 20-point gap between adjacent
+// OPPORTUNITY_BUCKETS tiers (max combined swing here is +8/-5) so a secondary factor
+// can never flip a school below one a full size-tier smaller -- confirmed real signals
+// only (see docs audit): international-student relevance, career-center presence, and
+// program list have no field anywhere in College Scorecard's response and are not
+// approximated here.
+//
+// ownership: private nonprofits may have different budget/decision patterns than
+// public institutions -- a soft signal, small weight only. private_for_profit isn't
+// bumped either direction; no basis for a specific weight was given.
+const OWNERSHIP_MODIFIER = { private_nonprofit: 5, public: 0, private_for_profit: 0 };
+
+// degrees_awarded_predominant is College Scorecard's raw numeric code: 0 = not
+// classified, 1 = predominantly certificate-granting, 2 = predominantly
+// associate's-granting, 3 = predominantly bachelor's-granting, 4 = entirely
+// graduate-degree granting (verified against known 4-year schools: UT Austin, Texas
+// A&M, Rice, SMU all return 3). Bachelor's+ is a better campus-license fit than
+// certificate-only; associate's and "not classified" are left neutral rather than
+// guessed.
+const DEGREE_LEVEL_MODIFIER = { 0: 0, 1: -5, 2: 0, 3: 3, 4: 3 };
+
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -37,10 +59,16 @@ function requireEnv(name) {
   return value;
 }
 
-function scoreFor(size) {
+// recommended_package is deliberately driven by student_size alone (unchanged) -- it's
+// already embedded in outbound email copy that's been sent, so a secondary factor
+// nudging opportunity_score must never also silently reassign the seat package.
+export function scoreFor(size, ownership = null, degreesAwardedPredominant = null) {
   if (size === null || size === undefined) return { score: null, package: null };
   const bucket = OPPORTUNITY_BUCKETS.find((b) => size >= b.min);
-  return { score: bucket.score, package: bucket.package };
+  const ownershipModifier = OWNERSHIP_MODIFIER[ownership] ?? 0;
+  const degreeModifier = DEGREE_LEVEL_MODIFIER[degreesAwardedPredominant] ?? 0;
+  const score = Math.max(0, Math.min(100, bucket.score + ownershipModifier + degreeModifier));
+  return { score, package: bucket.package };
 }
 
 async function fetchAllSchools(apiKey, state) {
@@ -71,7 +99,9 @@ async function fetchAllSchools(apiKey, state) {
 
 function toLeadRow(school) {
   const size = school['latest.student.size'] ?? null;
-  const { score, package: pkg } = scoreFor(size);
+  const ownership = OWNERSHIP_LABELS[school['school.ownership']] || null;
+  const degreesAwardedPredominant = school['school.degrees_awarded.predominant'] ?? null;
+  const { score, package: pkg } = scoreFor(size, ownership, degreesAwardedPredominant);
   return {
     source: 'college_scorecard',
     scorecard_id: String(school.id),
@@ -80,11 +110,11 @@ function toLeadRow(school) {
     city: school['school.city'] || null,
     state: school['school.state'] || null,
     website: school['school.school_url'] || null,
-    ownership: OWNERSHIP_LABELS[school['school.ownership']] || null,
+    ownership,
     student_size: size,
     opportunity_score: score,
     recommended_package: pkg,
-    signals: { degrees_awarded_predominant: school['school.degrees_awarded.predominant'] ?? null },
+    signals: { degrees_awarded_predominant: degreesAwardedPredominant },
   };
 }
 
@@ -112,7 +142,10 @@ function mergeDuplicateOrgNames(rows) {
       existing.student_size === null && row.student_size === null
         ? null
         : (existing.student_size ?? 0) + (row.student_size ?? 0);
-    const { score, package: pkg } = scoreFor(totalSize);
+    // Merged campuses keep the primary (first-seen) campus's ownership/degree level for
+    // the secondary modifiers -- these are soft, small-weight factors, not worth a
+    // majority-vote merge across campuses for the rare multi-campus-same-name case.
+    const { score, package: pkg } = scoreFor(totalSize, existing.ownership, existing.signals.degrees_awarded_predominant);
     existing.student_size = totalSize;
     existing.opportunity_score = score;
     existing.recommended_package = pkg;
@@ -155,11 +188,32 @@ async function main() {
   console.table(data.slice(0, 15));
 }
 
+function selfTest() {
+  // Secondary modifiers must never cross an OPPORTUNITY_BUCKETS tier gap (20 points):
+  // a bachelor's-granting private nonprofit in the smallest size bucket must still
+  // score below a public certificate-only school one size bucket up.
+  const smallPrivateBachelors = scoreFor(500, 'private_nonprofit', 3).score; // 30 + 5 + 3 = 38
+  const midPublicCertificate = scoreFor(1000, 'public', 1).score; // 50 - 5 + 0 = 45
+  console.assert(smallPrivateBachelors < midPublicCertificate, 'secondary modifiers must not flip size-tier ranking');
+
+  console.assert(scoreFor(null).score === null, 'missing student_size stays null, not a guessed score');
+  console.assert(scoreFor(20000, 'private_nonprofit', 3).score === 98, 'modifiers stack: 90 + 5 + 3 = 98');
+  console.assert(scoreFor(20000, 'public', 4).score === 93, 'grad-only bump applies same as bachelor\'s');
+  console.assert(scoreFor(20000, 'unknown_value', 99).score === 90, 'unrecognized ownership/degree code defaults to no modifier, not a crash');
+  console.assert(scoreFor(20000).package === '500-1000 seats', 'recommended_package stays purely size-driven regardless of modifiers');
+
+  console.log('selfTest: all assertions passed');
+}
+
 const invokedDirectly =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  main().catch((err) => {
-    console.error(err.message);
-    process.exit(1);
-  });
+  if (process.argv.includes('--self-test')) {
+    selfTest();
+  } else {
+    main().catch((err) => {
+      console.error(err.message);
+      process.exit(1);
+    });
+  }
 }
