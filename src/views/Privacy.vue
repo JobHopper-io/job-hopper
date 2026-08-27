@@ -8,7 +8,7 @@
         Privacy Policy
       </h1>
       <p class="text-sm text-neutral-body mb-8">
-        Last updated: March 26, 2026
+        Last updated: August 26, 2026
       </p>
       <div class="text-neutral-body space-y-6">
         <p>
@@ -89,6 +89,7 @@
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
             4. When and With Whom We Share Your Personal Information
           </h2>
+          <p>No mobile information will be shared with third parties/affiliates for marketing/promotional purposes.</p>
           <p>We do NOT:</p>
           <ul class="list-disc pl-6 space-y-1">
             <li>Sell personal data</li>

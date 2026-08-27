@@ -50,12 +50,20 @@ function parseFromAddress(raw, fallbackName) {
   return { email: raw.trim(), name: fallbackName };
 }
 
-async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html }) {
+async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html, replyTo }) {
   const fromAddress = parseFromAddress(from, DEFAULT_FROM_NAME);
+  const payload = { from: fromAddress, to: [{ email: to.trim() }], subject, text, html };
+  // Inbound Reply Path build: only set reply_to when a real monitored inbox is
+  // configured (INSTITUTIONAL_REPLY_TO) -- omitted entirely otherwise, same
+  // degrade-gracefully posture as MAILTRAP_FROM, so replies still land somewhere
+  // sane (the from address) until a real inbox + ingestion source both exist.
+  if (replyTo) {
+    payload.reply_to = { email: replyTo.trim() };
+  }
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: fromAddress, to: [{ email: to.trim() }], subject, text, html }),
+    body: JSON.stringify(payload),
   });
   const bodyText = await res.text();
   if (!res.ok) {
@@ -109,6 +117,8 @@ async function main() {
 
   const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
   const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
+  // Unset until a real monitored inbox is named -- see Inbound Reply Path build notes.
+  const institutionalReplyTo = process.env.INSTITUTIONAL_REPLY_TO || null;
 
   console.log(
     preview
@@ -197,6 +207,7 @@ async function main() {
       subject: s.subject,
       text: s.body,
       html: s.html,
+      replyTo: institutionalReplyTo,
     });
 
     const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);

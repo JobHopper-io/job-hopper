@@ -50,6 +50,21 @@ Edge functions (e.g. `match-jobs`, `stripe-webhook`, `send-system-announcement`)
 
 If `MAILTRAP_API_TOKEN` is not set in a given environment, email sends will return `success: false` with a clear error message, but core flows will still succeed (job matching, subscription updates, announcements). This makes it safe to run locally without a Mailtrap account.
 
+### Inbound reply capture (institutional outreach)
+
+`supabase/functions/reply-ingest` stores one parsed inbound reply email into `reply_events`,
+matching the sender against `institutional_leads.contact_email`. It's provider-agnostic:
+whatever eventually watches the real inbox POSTs the parsed message here. **Nothing calls it
+today** — job-hopper.io's MX/SPF confirm real Google Workspace, but Gmail API credentials for
+that Workspace don't exist yet, so there's no live source wired up. Classification
+(`reply_events.reply_class`) is a separate build that reads this table once populated.
+
+- `REPLY_INGEST_SECRET`: shared secret the caller sends as `x-reply-ingest-secret`. A
+  service-role bearer token is also accepted, for local/manual testing.
+- `INSTITUTIONAL_REPLY_TO` (optional, read by `scripts/outbound-live-send.mjs`): when set, outbound
+  institutional emails carry this as `Reply-To` instead of the default `from` address. Leave unset
+  until a real monitored mailbox exists to receive replies at.
+
 To test in a non‑production environment:
 
 1. Create a Mailtrap project and Email Sending API token.
