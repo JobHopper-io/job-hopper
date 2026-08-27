@@ -89,6 +89,7 @@
           <h2 class="text-xl font-heading font-semibold text-brand-charcoal">
             4. When and With Whom We Share Your Personal Information
           </h2>
+          <p>No mobile information will be shared with third parties/affiliates for marketing/promotional purposes.</p>
           <p>We do NOT:</p>
           <ul class="list-disc pl-6 space-y-1">
             <li>Sell personal data</li>
