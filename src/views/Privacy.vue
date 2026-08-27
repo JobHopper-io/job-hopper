@@ -8,7 +8,7 @@
         Privacy Policy
       </h1>
       <p class="text-sm text-neutral-body mb-8">
-        Last updated: March 26, 2026
+        Last updated: August 26, 2026
       </p>
       <div class="text-neutral-body space-y-6">
         <p>
