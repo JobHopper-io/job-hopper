@@ -6,6 +6,35 @@
       </h1>
     </header>
 
+    <section class="mb-8 rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+      <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+        Daily summary
+      </h2>
+      <p class="text-sm text-neutral-body mb-4">
+        Plain-language read of the growth numbers — generated from the live report only, no
+        outside data. Anything it can't back with a real figure it says so.
+      </p>
+
+      <p v-if="summaryLoading" class="text-sm text-neutral-body">
+        <font-awesome-icon :icon="['fas', 'spinner']" spin class="mr-2" aria-hidden="true" />
+        Generating…
+      </p>
+      <p
+        v-else-if="summaryError"
+        class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3"
+      >
+        {{ summaryError }}
+      </p>
+      <div v-else-if="summaryParagraphs.length" class="space-y-3 text-sm text-brand-charcoal">
+        <p v-for="(para, i) in summaryParagraphs" :key="i">
+          <template v-for="(seg, j) in para" :key="j">
+            <strong v-if="seg.bold">{{ seg.text }}</strong>
+            <template v-else>{{ seg.text }}</template>
+          </template>
+        </p>
+      </div>
+    </section>
+
     <section
       v-if="glance"
       class="mb-8 grid grid-cols-2 lg:grid-cols-4 gap-4"
@@ -343,6 +372,20 @@ const glanceError = ref(false)
 const recentLeads = ref<AdminInstitutionalLeadRow[]>([])
 const recentLeadsLoading = ref(true)
 
+const summaryLoading = ref(true)
+const summaryError = ref<string | null>(null)
+const summaryText = ref<string | null>(null)
+
+// LLM returns bold-labelled sections like "**Users** ...". Split on blank lines into
+// paragraphs, then on `**` into alternating normal/bold segments.
+const summaryParagraphs = computed(() =>
+  (summaryText.value ?? '')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => p.split('**').map((text, idx) => ({ text, bold: idx % 2 === 1 }))),
+)
+
 const leadsBySourceRows = computed(() => (glance.value ? leadsBySourceChartRows(glance.value) : []))
 const b2cFunnelRows = computed(() => (glance.value ? b2cFunnelChartRows(glance.value) : []))
 
@@ -380,6 +423,24 @@ const conversionCaption = computed(() => {
   return `${formatPct(conversionRate.value)} of registrations converted`
 })
 
+async function loadSummary(data: GrowthDashboardReport) {
+  summaryLoading.value = true
+  summaryError.value = null
+  summaryText.value = null
+  try {
+    const { summary, error } = await adminAPI.getGrowthSummary(data)
+    if (error) {
+      summaryError.value = error.message
+      return
+    }
+    summaryText.value = summary
+  } catch (err) {
+    summaryError.value = err instanceof Error ? err.message : 'Failed to generate summary'
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     isSuperAdmin.value = await profileAPI.hasRole('super_admin')
@@ -391,8 +452,11 @@ onMounted(async () => {
   const { data, error } = await adminAPI.getGrowthDashboardReport()
   if (error || !data) {
     glanceError.value = true
+    summaryError.value = 'Growth report unavailable — no summary.'
+    summaryLoading.value = false
   } else {
     glance.value = data
+    void loadSummary(data)
   }
 
   try {

@@ -102,18 +102,31 @@
             User Report
           </router-link>.
         </p>
-        <dl class="grid grid-cols-2 gap-4 mb-6">
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <StatTile
-            label="Visitors"
-            not-tracked
-            hint="no pre-signup analytics captured"
+            label="New — last 24h"
+            :value="report.b2c.newSignups.last24h"
+            hint="registrations by created_at"
+          />
+          <StatTile
+            label="New — last 7d"
+            :value="report.b2c.newSignups.last7d"
+            hint="registrations by created_at"
           />
           <StatTile
             label="Conversion rate"
             :value="formatPct(report.b2c.conversionRate)"
             hint="paid ÷ registrations"
           />
+          <StatTile
+            label="New paid (by date)"
+            not-tracked
+            hint="no subscription start timestamp"
+          />
         </dl>
+        <p class="text-xs text-neutral-muted mb-6 -mt-3">
+          Visitors / pre-signup analytics: not captured.
+        </p>
 
         <p class="text-xs font-medium text-neutral-muted mb-3">
           Conversion pipeline: registrations → activated → paid

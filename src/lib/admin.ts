@@ -61,6 +61,8 @@ export interface GrowthDashboardReport {
     activatedUsers: number
     paidSubscribers: number
     conversionRate: number
+    /** New registrations only (profiles.created_at). New paid/activated by date is not tracked. */
+    newSignups: { last24h: number; last7d: number }
   }
   institutional: {
     activeOpportunities: number
@@ -404,6 +406,25 @@ export const adminAPI = {
     }
 
     return { data: data as GrowthDashboardReport, error: null }
+  },
+
+  /** LLM narration of an already-fetched growth report. Slow (one chat completion), so
+   * the view loads the tiles first and fills this in separately. */
+  async getGrowthSummary(report: GrowthDashboardReport): Promise<{
+    summary: string | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-growth-dashboard', {
+      body: { summary: true, report },
+    })
+    if (error) {
+      return { summary: null, error }
+    }
+    const payload = data as { summary?: string | null; summaryError?: string }
+    if (!payload?.summary) {
+      return { summary: null, error: new Error(payload?.summaryError || 'No summary returned') }
+    }
+    return { summary: payload.summary, error: null }
   },
 
   async listInstitutionalLeadsForTrialGrants(): Promise<{
