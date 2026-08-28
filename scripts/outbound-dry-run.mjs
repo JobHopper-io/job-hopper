@@ -13,6 +13,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
+import { Agent, setGlobalDispatcher } from 'undici';
+
+// Node's built-in fetch doesn't correctly implement Happy Eyeballs (RFC 6555): when a
+// host resolves to both IPv4 and IPv6, it tries IPv6 first and doesn't fall back
+// cleanly on a machine with no real IPv6 route -- it just times out (confirmed against
+// api.apollo.io, which resolves to both; curl and raw TCP both connect fine, only
+// fetch() hangs). Tracked upstream: nodejs/node#54359, nodejs/undici#2777. Forcing
+// IPv4-only connections at the dispatcher level is the documented fix.
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 
 const BATCH_LIMIT = 20;
 export const CANDIDATE_CATEGORIES = ['university', 'employer'];
