@@ -53,10 +53,9 @@ function parseFromAddress(raw, fallbackName) {
 async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html, replyTo }) {
   const fromAddress = parseFromAddress(from, DEFAULT_FROM_NAME);
   const payload = { from: fromAddress, to: [{ email: to.trim() }], subject, text, html };
-  // Inbound Reply Path build: only set reply_to when a real monitored inbox is
-  // configured (INSTITUTIONAL_REPLY_TO) -- omitted entirely otherwise, same
-  // degrade-gracefully posture as MAILTRAP_FROM, so replies still land somewhere
-  // sane (the from address) until a real inbox + ingestion source both exist.
+  // reply_to is set per lead category by replyToForCategory (partnerships@ /
+  // university-partnerships@ job-hopper.co, both routed into reply-ingest). Guarded
+  // anyway so a caller passing null still produces a valid payload.
   if (replyTo) {
     payload.reply_to = { email: replyTo.trim() };
   }
@@ -117,8 +116,6 @@ async function main() {
 
   const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
   const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
-  // Unset until a real monitored inbox is named -- see Inbound Reply Path build notes.
-  const institutionalReplyTo = process.env.INSTITUTIONAL_REPLY_TO || null;
 
   console.log(
     preview
@@ -207,7 +204,7 @@ async function main() {
       subject: s.subject,
       text: s.body,
       html: s.html,
-      replyTo: institutionalReplyTo,
+      replyTo: s.replyTo,
     });
 
     const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
@@ -261,6 +258,7 @@ async function main() {
   console.log(`\n--- Rendered output (${rendered.length}) ---`);
   for (const r of rendered) {
     console.log(`\n[${r.category}] ${r.orgNames.join('; ')}  (contact_email: ${r.contact_email})`);
+    console.log(`Reply-To: ${r.replyTo}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);
     if (r.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${r.unfilled.join(', ')}`);

@@ -173,6 +173,17 @@ Job-Hopper`,
   },
 };
 
+// Reply-To routing by lead category. Both are real monitored mailboxes on
+// job-hopper.co (Cloudflare Email Routing -> reply-ingest), so a Reply-To is always
+// set now -- this replaces the old INSTITUTIONAL_REPLY_TO env toggle, which existed
+// only because no monitored inbox had been stood up yet.
+export const REPLY_TO_UNIVERSITY = 'university-partnerships@job-hopper.co';
+export const REPLY_TO_DEFAULT = 'partnerships@job-hopper.co';
+
+export function replyToForCategory(category) {
+  return category === 'university' ? REPLY_TO_UNIVERSITY : REPLY_TO_DEFAULT;
+}
+
 export function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -758,7 +769,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
 
     if (group.length === 1) {
       const { subject, body, html, unfilled } = renderTemplate(primary.category, primary, campaign);
-      sends.push({ merged: false, category: primary.category, contact_email: group[0].contact_email, orgNames, subject, body, html, unfilled });
+      sends.push({ merged: false, category: primary.category, replyTo: replyToForCategory(primary.category), contact_email: group[0].contact_email, orgNames, subject, body, html, unfilled });
       continue;
     }
 
@@ -777,6 +788,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
       merged: true,
       mixedCategories: categories.length > 1 ? categories : null,
       category: primary.category,
+      replyTo: replyToForCategory(primary.category),
       contact_email: group[0].contact_email,
       orgNames,
       subject,
@@ -981,6 +993,7 @@ async function main() {
     rendered.push({
       organization_name: s.orgNames.join('; '),
       category: s.category,
+      reply_to: s.replyTo,
       contact_email: s.contact_email,
       subject: s.subject,
       body: s.body,
@@ -1037,6 +1050,7 @@ async function main() {
   console.log(`\n--- Sample rendered output (${Math.min(5, rendered.length)} of ${rendered.length}) ---`);
   for (const r of rendered.slice(0, 5)) {
     console.log(`\n[${r.category}] ${r.organization_name}  (contact_email: ${r.contact_email ?? 'MISSING'})`);
+    console.log(`Reply-To: ${r.reply_to}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);
     if (r.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${r.unfilled.join(', ')}`);
@@ -1098,6 +1112,12 @@ function selfTestDedup() {
   const solo1 = r1.sends.find((s) => s.contact_email === 'solo@solo.edu');
   console.assert(solo1.merged === false && solo1.body.includes('Solo U'), 'non-duplicate lead keeps its specific template');
 
+  // Reply-To routing: university -> university-partnerships inbox, everything else -> partnerships.
+  console.assert(replyToForCategory('university') === 'university-partnerships@job-hopper.co', 'university category routes to university-partnerships inbox');
+  console.assert(replyToForCategory('employer') === 'partnerships@job-hopper.co', 'employer category routes to partnerships inbox');
+  console.assert(replyToForCategory('career_partner') === 'partnerships@job-hopper.co', 'career_partner category routes to partnerships inbox');
+  console.assert(merged1.replyTo === 'university-partnerships@job-hopper.co' && solo1.replyTo === 'university-partnerships@job-hopper.co', 'university sends carry the university-partnerships Reply-To');
+
   // Cross-category duplicate: flagged, falls back to primary (first/highest-scored) lead's template.
   const d = empLead('Acme Corp', 'shared2@x.com', 'Pat Lee');
   const e = uniLead('Acme U', 'shared2@x.com', 'Pat Lee');
@@ -1107,6 +1127,7 @@ function selfTestDedup() {
   ], TEST_CAMPAIGN);
   console.assert(r2.sends.length === 1 && r2.sends[0].mixedCategories?.length === 2, 'mixed-category group should be flagged');
   console.assert(r2.sends[0].category === 'employer', 'mixed group uses first/highest-scored lead\'s category');
+  console.assert(r2.sends[0].replyTo === 'partnerships@job-hopper.co', 'mixed group resolving to a non-university primary routes to the partnerships inbox');
 
   // career_partner: new template, real link to /career-coaches, [Organization] token
   // (distinct from university's [School Name] / employer's [Company]).
