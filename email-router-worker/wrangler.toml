@@ -1,0 +1,8 @@
+# Deploy:  cd email-router-worker && npm install && npx wrangler deploy
+# Secret:  npx wrangler secret put REPLY_INGEST_SECRET   (paste the same value the edge function uses)
+name = "job-hopper-email-router"
+main = "src/index.mjs"
+compatibility_date = "2026-09-01"
+
+[vars]
+REPLY_INGEST_URL = "https://imekpzzvylngpoagcdow.supabase.co/functions/v1/reply-ingest"

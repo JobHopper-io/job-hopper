@@ -1,0 +1,15 @@
+{
+  "name": "job-hopper-email-router",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "postal-mime": "^3.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  }
+}
