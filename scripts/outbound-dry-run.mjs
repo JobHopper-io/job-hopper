@@ -316,6 +316,39 @@ function stripHyphenatedSuffix(name) {
   return idx === -1 ? name : name.slice(0, idx).trim();
 }
 
+// "<University>-Main Campus" / "<University> Main Campus" — Scorecard's flagship-campus
+// label. The "-Main Campus" form is already covered by stripHyphenatedSuffix, but the
+// extra "main"/"campus" tokens on the *original* name drag the exact Apollo match down
+// to the same score as the school's sub-orgs (see enrich-100 verify: New Mexico, Ohio
+// State). Stripping it as its own variant also catches the un-hyphenated " Main Campus".
+function stripMainCampusSuffix(name) {
+  return name.replace(/[-\s]+main campus$/i, '').trim();
+}
+
+// "Arizona State University Campus Immersion" / "... Digital Immersion" — ASU's own
+// labels for its in-person vs online enrollment. Apollo has one "Arizona State
+// University" org, not these; drop the suffix and search the base.
+function stripAsuImmersionSuffix(name) {
+  return name.replace(/\s+(campus|digital)\s+immersion$/i, '').trim();
+}
+
+// "CUNY <campus>" -> "<campus>": Scorecard prefixes every City University of New York
+// campus with "CUNY ", but Apollo indexes them under the bare campus name ("Hunter
+// College", "Borough of Manhattan Community College"). Baruch keeps its own entry in
+// ORG_NAME_ALIASES because stripping only "CUNY " there leaves "Bernard M Baruch
+// College", not the "Baruch College" Apollo actually uses.
+function stripCunyPrefix(name) {
+  return name.replace(/^cuny\s+/i, '').trim();
+}
+
+// Scorecard often carries the raw name of a Claude-verified alias mismatch — the
+// legal/institutional name where Apollo only indexes the common name. Keyed on the
+// full lowercased name; when it hits, that's the only extra query worth trying.
+const ORG_NAME_ALIASES = {
+  'virginia polytechnic institute and state university': 'Virginia Tech',
+  'cuny bernard m baruch college': 'Baruch College',
+};
+
 // "University of California-San Diego" / "California State University-Fresno" ->
 // common-name forms people (and Apollo's org records) actually use: "UC San Diego",
 // "Fresno State University". Scoped to their own prefix only — cross-applying would
@@ -333,13 +366,16 @@ function csuCommonName(name) {
 
 // "El Camino Community College District" -> "El Camino": Scorecard's school.name
 // carries the governing district's legal name, but Apollo's org record is usually for
-// the college itself, under whatever name remains once "Community College District" is
-// stripped out.
-function stripCommunityCollegeDistrict(name) {
-  const phrase = 'Community College District';
-  const idx = name.indexOf(phrase);
-  if (idx === -1) return name;
-  return (name.slice(0, idx) + name.slice(idx + phrase.length)).replace(/\s+/g, ' ').trim();
+// the college itself, under whatever name remains once the district wrapper is stripped.
+// Broadened after the enrich-100 verify: the earlier version only matched the exact
+// phrase "Community College District", so "Blinn College District" (no "Community")
+// slipped straight through. Now strips a trailing "[Community] College District" or a
+// bare trailing "District".
+function stripCollegeDistrict(name) {
+  return name
+    .replace(/\s+(community\s+)?college\s+district$/i, '')
+    .replace(/\s+district$/i, '')
+    .trim();
 }
 
 // College Scorecard names are the raw official institution name, which Apollo's org
@@ -350,18 +386,33 @@ function orgSearchQueriesFor(lead) {
   const base = lead.organization_name;
   if (lead.source !== 'college_scorecard') return [base];
 
+  // A known alias mismatch: try the official name once (it occasionally resolves), then
+  // the common name — nothing else is worth the extra Apollo round-trips.
+  const alias = ORG_NAME_ALIASES[base.trim().toLowerCase()];
+  if (alias) return [base, alias];
+
   const atStripped = stripCampusQualifier(base);
   const hyphenStripped = stripHyphenatedSuffix(base);
+  const mainCampusStripped = stripMainCampusSuffix(base);
+  const asuImmersionStripped = stripAsuImmersionSuffix(base);
+  const cunyStripped = stripCunyPrefix(base);
   const uc = ucCommonName(base);
   const csu = csuCommonName(base);
-  const ccdStripped = stripCommunityCollegeDistrict(base);
+  const districtStripped = stripCollegeDistrict(base); // "... Community College District" -> "..."
+  const trailingDistrictStripped = base.replace(/\s+district$/i, '').trim(); // -> "... Community College"
 
   const queries = [base];
   if (atStripped !== base) queries.push(atStripped);
   if (hyphenStripped !== base && hyphenStripped !== atStripped) queries.push(hyphenStripped);
+  if (mainCampusStripped !== base) queries.push(mainCampusStripped);
+  if (asuImmersionStripped !== base) queries.push(asuImmersionStripped);
+  if (cunyStripped !== base) queries.push(cunyStripped);
   if (uc) queries.push(uc);
   if (csu) queries.push(csu);
-  if (ccdStripped !== base) queries.push(ccdStripped);
+  if (districtStripped !== base) queries.push(districtStripped, `${districtStripped} College`);
+  if (trailingDistrictStripped !== base && trailingDistrictStripped !== districtStripped) {
+    queries.push(trailingDistrictStripped);
+  }
   queries.push(`${base} University`, `${base} College`);
 
   return [...new Set(queries)];
@@ -801,6 +852,13 @@ export function buildDedupedSends(candidateRenders, campaign) {
   return { sends, dedupedGroupCount };
 }
 
+// Supabase .range() is inclusive on both ends. `limit` rows starting at `offset` span
+// [offset, offset + limit - 1]; getting this wrong double-charges Apollo for an
+// overlapping lead or silently skips one between batches.
+function pageRange(offset, limit) {
+  return [offset, offset + limit - 1];
+}
+
 async function main() {
   const supabaseUrl = requireEnv('SUPABASE_URL');
   const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
@@ -827,6 +885,13 @@ async function main() {
   const limitArg = process.argv.find((a) => a.startsWith('--limit='));
   const batchLimit = limitArg ? Number(limitArg.slice('--limit='.length)) : BATCH_LIMIT;
 
+  // --offset=100 skips the first N leads of the ordered candidate set, so a later batch
+  // can pick up where an earlier one stopped without re-attempting (and re-charging
+  // Apollo for) leads that already failed enrichment. Relies on the same stable
+  // opportunity_score-desc, organization_name-asc ordering as every other run.
+  const offsetArg = process.argv.find((a) => a.startsWith('--offset='));
+  const offset = offsetArg ? Number(offsetArg.slice('--offset='.length)) : 0;
+
   // --all-sources drops the category/min-score restriction entirely, ranking across
   // every source (college_scorecard, warn, apollo_career_partner) by opportunity_score
   // alone. Without it, behavior is unchanged from every previous run tonight
@@ -844,7 +909,7 @@ async function main() {
       ? `Fetching only: ${onlyNames.join(', ')}`
       : allSources
         ? `Fetching top ${batchLimit} candidate leads across all sources (status=new, ordered by opportunity_score desc)...`
-        : `Fetching top ${batchLimit} candidate leads (status=new, category in [${CANDIDATE_CATEGORIES.join(', ')}], opportunity_score >= ${MIN_OPPORTUNITY_SCORE})...`,
+        : `Fetching ${batchLimit} candidate leads${offset > 0 ? ` (skipping first ${offset})` : ' (top of queue)'} (status=new, category in [${CANDIDATE_CATEGORIES.join(', ')}], opportunity_score >= ${MIN_OPPORTUNITY_SCORE})...`,
   );
   let query = supabase
     .from('institutional_leads')
@@ -870,8 +935,10 @@ async function main() {
   // between two runs with identical filters).
   query = query
     .order('opportunity_score', { ascending: false })
-    .order('organization_name', { ascending: true })
-    .limit(batchLimit);
+    .order('organization_name', { ascending: true });
+  // .range() is inclusive on both ends, so N rows starting at `offset` is
+  // [offset, offset + N - 1]. Plain .limit() when there's no offset (unchanged behaviour).
+  query = offset > 0 ? query.range(...pageRange(offset, batchLimit)) : query.limit(batchLimit);
   if (onlyNames) query = query.in('organization_name', onlyNames);
   const { data: leads, error: leadsError } = await query;
   if (leadsError) throw new Error(`Failed to query institutional_leads: ${leadsError.message}`);
@@ -1165,6 +1232,23 @@ function selfTestOrgQueries() {
     orgSearchQueriesFor({ organization_name: 'Regular University', source: 'college_scorecard' }).length === 3,
     'a name matching no special pattern should only get the base + University/College suffix queries',
   );
+
+  // enrich-100 verify follow-ups: systematic name shapes that produced org_not_found.
+  const q = (name) => orgSearchQueriesFor({ organization_name: name, source: 'college_scorecard' });
+  console.assert(q('Ohio State University-Main Campus').includes('Ohio State University'), '"-Main Campus" is stripped');
+  console.assert(q('University of New Mexico Main Campus').includes('University of New Mexico'), 'un-hyphenated " Main Campus" is stripped');
+  console.assert(q('Blinn College District').includes('Blinn'), 'bare "College District" (no "Community") is stripped');
+  console.assert(q('Mt San Jacinto Community College District').includes('Mt San Jacinto Community College'), 'trailing bare "District" is stripped');
+  console.assert(q('Arizona State University Campus Immersion').includes('Arizona State University'), '"Campus Immersion" suffix is stripped');
+  console.assert(q('Arizona State University Digital Immersion').includes('Arizona State University'), '"Digital Immersion" suffix is stripped');
+  console.assert(q('Virginia Polytechnic Institute and State University').includes('Virginia Tech'), 'Virginia Tech alias fires');
+  console.assert(q('CUNY Bernard M Baruch College').includes('Baruch College'), 'Baruch College alias fires');
+  console.assert(q('Virginia Polytechnic Institute and State University').length === 2, 'an alias hit short-circuits the other variants');
+  console.assert(q('CUNY Hunter College').includes('Hunter College'), 'generic "CUNY " prefix is stripped');
+  console.assert(q('CUNY Borough of Manhattan Community College').includes('Borough of Manhattan Community College'), '"CUNY " strip works for community colleges too');
+  console.assert(!q('CUNY Bernard M Baruch College').includes('Bernard M Baruch College'), 'Baruch alias short-circuits before the generic CUNY strip runs');
+  console.assert(!q('Regular University').some((x) => /main campus|immersion/i.test(x)), 'new strippers must not fire on an unrelated name');
+
   console.log('selfTestOrgQueries: all assertions passed');
 }
 
@@ -1204,6 +1288,11 @@ if (invokedDirectly) {
     selfTestDedup();
     selfTestOrgQueries();
     selfTestOrgTieBreak();
+    // Paging: batch 2 must start exactly where batch 1 ended, no gap, no overlap.
+    console.assert(JSON.stringify(pageRange(0, 100)) === JSON.stringify([0, 99]), 'first page is rows 0..99');
+    console.assert(JSON.stringify(pageRange(100, 100)) === JSON.stringify([100, 199]), 'second page is rows 100..199, contiguous with the first');
+    console.assert(pageRange(200, 300)[1] === 499, 'offset 200 + 300 rows ends at row 499');
+    console.log('selfTestPaging: all assertions passed');
   } else {
     main().catch((err) => {
       console.error(err.message);
