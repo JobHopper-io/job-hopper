@@ -50,8 +50,15 @@ function parseFromAddress(raw, fallbackName) {
   return { email: raw.trim(), name: fallbackName };
 }
 
-async function sendEmailViaMailtrap({ apiToken, from, to, subject, text, html, replyTo }) {
-  const fromAddress = parseFromAddress(from, DEFAULT_FROM_NAME);
+async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo }) {
+  // The display name is set per lead category by fromNameForCategory (Job-Hopper
+  // University Partnerships / Job-Hopper Partnerships) -- it always wins over whatever
+  // name MAILTRAP_FROM might embed. Only the *address* is extracted from `from`; the
+  // fallback name passed to parseFromAddress here is unused in practice since
+  // fromName is never empty, but keeping it non-null avoids a stray "undefined" name
+  // on a bare address with no embedded name.
+  const { email: fromEmail } = parseFromAddress(from, fromName || DEFAULT_FROM_NAME);
+  const fromAddress = { email: fromEmail, name: fromName || DEFAULT_FROM_NAME };
   const payload = { from: fromAddress, to: [{ email: to.trim() }], subject, text, html };
   // reply_to is set per lead category by replyToForCategory (partnerships@ /
   // university-partnerships@ job-hopper.co, both routed into reply-ingest). Guarded
@@ -116,6 +123,9 @@ async function main() {
 
   const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
   const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
+  // Just the address, for printing "From:" in preview/rendered output -- the display
+  // name itself always comes from fromNameForCategory, per send, not from here.
+  const mailtrapFromEmail = parseFromAddress(mailtrapFrom, '').email;
 
   console.log(
     preview
@@ -200,6 +210,7 @@ async function main() {
     const result = await sendEmailViaMailtrap({
       apiToken: mailtrapToken,
       from: mailtrapFrom,
+      fromName: s.fromName,
       to: s.contact_email,
       subject: s.subject,
       text: s.body,
@@ -258,6 +269,7 @@ async function main() {
   console.log(`\n--- Rendered output (${rendered.length}) ---`);
   for (const r of rendered) {
     console.log(`\n[${r.category}] ${r.orgNames.join('; ')}  (contact_email: ${r.contact_email})`);
+    console.log(`From: "${r.fromName}" <${mailtrapFromEmail}>`);
     console.log(`Reply-To: ${r.replyTo}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);

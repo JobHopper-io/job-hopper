@@ -184,6 +184,16 @@ export function replyToForCategory(category) {
   return category === 'university' ? REPLY_TO_UNIVERSITY : REPLY_TO_DEFAULT;
 }
 
+// From-name routing, same split as Reply-To. The underlying from *address* never
+// changes (no-reply@job-hopper.io, or whatever MAILTRAP_FROM resolves to) -- this only
+// picks the display name shown in the recipient's inbox.
+export const FROM_NAME_UNIVERSITY = 'Job-Hopper University Partnerships';
+export const FROM_NAME_DEFAULT = 'Job-Hopper Partnerships';
+
+export function fromNameForCategory(category) {
+  return category === 'university' ? FROM_NAME_UNIVERSITY : FROM_NAME_DEFAULT;
+}
+
 export function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -820,7 +830,18 @@ export function buildDedupedSends(candidateRenders, campaign) {
 
     if (group.length === 1) {
       const { subject, body, html, unfilled } = renderTemplate(primary.category, primary, campaign);
-      sends.push({ merged: false, category: primary.category, replyTo: replyToForCategory(primary.category), contact_email: group[0].contact_email, orgNames, subject, body, html, unfilled });
+      sends.push({
+        merged: false,
+        category: primary.category,
+        replyTo: replyToForCategory(primary.category),
+        fromName: fromNameForCategory(primary.category),
+        contact_email: group[0].contact_email,
+        orgNames,
+        subject,
+        body,
+        html,
+        unfilled,
+      });
       continue;
     }
 
@@ -840,6 +861,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
       mixedCategories: categories.length > 1 ? categories : null,
       category: primary.category,
       replyTo: replyToForCategory(primary.category),
+      fromName: fromNameForCategory(primary.category),
       contact_email: group[0].contact_email,
       orgNames,
       subject,
@@ -1061,6 +1083,7 @@ async function main() {
       organization_name: s.orgNames.join('; '),
       category: s.category,
       reply_to: s.replyTo,
+      from_name: s.fromName,
       contact_email: s.contact_email,
       subject: s.subject,
       body: s.body,
@@ -1117,6 +1140,7 @@ async function main() {
   console.log(`\n--- Sample rendered output (${Math.min(5, rendered.length)} of ${rendered.length}) ---`);
   for (const r of rendered.slice(0, 5)) {
     console.log(`\n[${r.category}] ${r.organization_name}  (contact_email: ${r.contact_email ?? 'MISSING'})`);
+    console.log(`From: ${r.from_name}`);
     console.log(`Reply-To: ${r.reply_to}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);
@@ -1185,6 +1209,12 @@ function selfTestDedup() {
   console.assert(replyToForCategory('career_partner') === 'partnerships@job-hopper.co', 'career_partner category routes to partnerships inbox');
   console.assert(merged1.replyTo === 'university-partnerships@job-hopper.co' && solo1.replyTo === 'university-partnerships@job-hopper.co', 'university sends carry the university-partnerships Reply-To');
 
+  // From-name routing: same university-vs-everyone-else split as Reply-To.
+  console.assert(fromNameForCategory('university') === 'Job-Hopper University Partnerships', 'university category gets the University Partnerships from-name');
+  console.assert(fromNameForCategory('employer') === 'Job-Hopper Partnerships', 'employer category gets the default from-name');
+  console.assert(fromNameForCategory('career_partner') === 'Job-Hopper Partnerships', 'career_partner category gets the default from-name');
+  console.assert(merged1.fromName === 'Job-Hopper University Partnerships' && solo1.fromName === 'Job-Hopper University Partnerships', 'university sends carry the University Partnerships from-name');
+
   // Cross-category duplicate: flagged, falls back to primary (first/highest-scored) lead's template.
   const d = empLead('Acme Corp', 'shared2@x.com', 'Pat Lee');
   const e = uniLead('Acme U', 'shared2@x.com', 'Pat Lee');
@@ -1195,6 +1225,7 @@ function selfTestDedup() {
   console.assert(r2.sends.length === 1 && r2.sends[0].mixedCategories?.length === 2, 'mixed-category group should be flagged');
   console.assert(r2.sends[0].category === 'employer', 'mixed group uses first/highest-scored lead\'s category');
   console.assert(r2.sends[0].replyTo === 'partnerships@job-hopper.co', 'mixed group resolving to a non-university primary routes to the partnerships inbox');
+  console.assert(r2.sends[0].fromName === 'Job-Hopper Partnerships', 'mixed group resolving to a non-university primary gets the default from-name');
 
   // career_partner: new template, real link to /career-coaches, [Organization] token
   // (distinct from university's [School Name] / employer's [Company]).
