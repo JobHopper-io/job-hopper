@@ -55,6 +55,7 @@ const adminPaths = [
   '/admin/institutional-leads',
   '/admin/growth-dashboard',
   '/admin/revenue-recovery',
+  '/admin/reply-classification',
 ]
 
 /** Routes gated on an employer_accounts row instead of a profiles row - employers never
@@ -325,6 +326,11 @@ const router = createRouter({
       path: '/admin/institutional-leads',
       name: 'admin-institutional-leads',
       component: () => import('../views/AdminInstitutionalLeads.vue'),
+    },
+    {
+      path: '/admin/reply-classification',
+      name: 'admin-reply-classification',
+      component: () => import('../views/AdminReplyClassification.vue'),
     },
     {
       path: '/admin/partner-dashboard/:leadId',

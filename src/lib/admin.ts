@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
-import type { EmployerAccount, InstitutionalLead, OrgAccount, OrgSeatInvite, TrialGrant } from '@/types/database'
+import type { EmployerAccount, InstitutionalLead, OrgAccount, OrgSeatInvite, ReplyEvent, TrialGrant } from '@/types/database'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 
 export interface SeoPerformanceRow {
@@ -205,6 +205,18 @@ export function institutionalLeadStatusBadgeClass(status: string): string {
 
 interface ListInstitutionalLeadsResult {
   leads: AdminInstitutionalLeadRow[]
+  total: number
+}
+
+export type AdminReplyEventRow = Pick<
+  ReplyEvent,
+  'id' | 'from_email' | 'raw_subject' | 'raw_body' | 'received_at' | 'reply_class' | 'processed' | 'institutional_lead_id'
+> & {
+  institutional_leads: Pick<InstitutionalLead, 'organization_name' | 'category' | 'campaign'> | null
+}
+
+interface ListReplyEventsResult {
+  replies: AdminReplyEventRow[]
   total: number
 }
 
@@ -503,6 +515,23 @@ export const adminAPI = {
     }
 
     return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
+  },
+
+  async listReplyEvents(params: {
+    replyClass?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ data: ListReplyEventsResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-reply-events', {
+      body: params,
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as ListReplyEventsResult, error: null }
   },
 
   async getPartnerDashboard(

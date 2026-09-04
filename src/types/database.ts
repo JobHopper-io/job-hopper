@@ -51,6 +51,9 @@ export type TrialGrant = Tables<'trial_grants'>
 // Institutional B2B sales pipeline (outbound + inbound partner-page leads)
 export type InstitutionalLead = Tables<'institutional_leads'>
 
+// Inbound replies to outbound institutional-lead emails (reply-ingest / classify-replies)
+export type ReplyEvent = Tables<'reply_events'>
+
 // Bulk licensing / paid org accounts (Build 10-11)
 export type OrgAccount = Tables<'org_accounts'>
 export type OrgSeatInvite = Tables<'org_seat_invites'>

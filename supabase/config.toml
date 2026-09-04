@@ -270,6 +270,12 @@ verify_jwt = false
 [functions.reply-ingest]
 verify_jwt = false
 
+# Sweeps reply_events for classification; invoked by pg_cron (create the schedule
+# manually) or by hand, no user JWT. Secured with x-cron-secret (CRON_SECRET) or service
+# role bearer.
+[functions.classify-replies]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
