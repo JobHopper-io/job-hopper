@@ -33,6 +33,7 @@
     "libphonenumber-js": "^1.12.37",
     "marked": "^18.0.0",
     "pinia": "^3.0.3",
+    "undici": "^8.10.0",
     "vue": "^3.5.18",
     "vue-router": "^4.5.1",
     "zipcodes": "^8.0.0"

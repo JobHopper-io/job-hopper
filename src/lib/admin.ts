@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { UserLifecycleReport } from '@/lib/user-lifecycle'
-import type { EmployerAccount, InstitutionalLead, OrgAccount, OrgSeatInvite, TrialGrant } from '@/types/database'
+import type { EmployerAccount, InstitutionalLead, OrgAccount, OrgSeatInvite, ReplyEvent, TrialGrant } from '@/types/database'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 
 export interface SeoPerformanceRow {
@@ -61,6 +61,8 @@ export interface GrowthDashboardReport {
     activatedUsers: number
     paidSubscribers: number
     conversionRate: number
+    /** New registrations only (profiles.created_at). New paid/activated by date is not tracked. */
+    newSignups: { last24h: number; last7d: number }
   }
   institutional: {
     activeOpportunities: number
@@ -203,6 +205,18 @@ export function institutionalLeadStatusBadgeClass(status: string): string {
 
 interface ListInstitutionalLeadsResult {
   leads: AdminInstitutionalLeadRow[]
+  total: number
+}
+
+export type AdminReplyEventRow = Pick<
+  ReplyEvent,
+  'id' | 'from_email' | 'raw_subject' | 'raw_body' | 'received_at' | 'reply_class' | 'processed' | 'institutional_lead_id'
+> & {
+  institutional_leads: Pick<InstitutionalLead, 'organization_name' | 'category' | 'campaign'> | null
+}
+
+interface ListReplyEventsResult {
+  replies: AdminReplyEventRow[]
   total: number
 }
 
@@ -406,6 +420,25 @@ export const adminAPI = {
     return { data: data as GrowthDashboardReport, error: null }
   },
 
+  /** LLM narration of an already-fetched growth report. Slow (one chat completion), so
+   * the view loads the tiles first and fills this in separately. */
+  async getGrowthSummary(report: GrowthDashboardReport): Promise<{
+    summary: string | null
+    error: Error | null
+  }> {
+    const { data, error } = await supabase.functions.invoke('admin-growth-dashboard', {
+      body: { summary: true, report },
+    })
+    if (error) {
+      return { summary: null, error }
+    }
+    const payload = data as { summary?: string | null; summaryError?: string }
+    if (!payload?.summary) {
+      return { summary: null, error: new Error(payload?.summaryError || 'No summary returned') }
+    }
+    return { summary: payload.summary, error: null }
+  },
+
   async listInstitutionalLeadsForTrialGrants(): Promise<{
     data: AdminTrialGrantLeadRow[] | null
     error: Error | null
@@ -482,6 +515,23 @@ export const adminAPI = {
     }
 
     return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
+  },
+
+  async listReplyEvents(params: {
+    replyClass?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ data: ListReplyEventsResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-reply-events', {
+      body: params,
+    })
+
+    if (error) {
+      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    }
+
+    return { data: data as ListReplyEventsResult, error: null }
   },
 
   async getPartnerDashboard(

@@ -61,9 +61,10 @@ that Workspace don't exist yet, so there's no live source wired up. Classificati
 
 - `REPLY_INGEST_SECRET`: shared secret the caller sends as `x-reply-ingest-secret`. A
   service-role bearer token is also accepted, for local/manual testing.
-- `INSTITUTIONAL_REPLY_TO` (optional, read by `scripts/outbound-live-send.mjs`): when set, outbound
-  institutional emails carry this as `Reply-To` instead of the default `from` address. Leave unset
-  until a real monitored mailbox exists to receive replies at.
+- Outbound institutional emails set `Reply-To` by lead category (`replyToForCategory` in
+  `scripts/outbound-dry-run.mjs`): `university` → `university-partnerships@job-hopper.co`, all other
+  categories → `partnerships@job-hopper.co`. Both are monitored mailboxes routed into `reply-ingest`
+  via Cloudflare Email Routing, so there is no env toggle — the value is always set.
 
 To test in a non‑production environment:
 

@@ -7,6 +7,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { categorizeUserLifecycle, subscriptionFlagsFromStatuses } from '../_shared/user-lifecycle-category.ts'
+import { callChatCompletion } from '../_shared/llm.ts'
+import { GROWTH_SUMMARY_SYSTEM, growthSummaryUserMessage } from '../_shared/growth-summary-prompt.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +32,20 @@ serve(async (req) => {
       status: 405,
     })
   }
+
+  // Summary mode: the client sends back the report it already fetched and we only run
+  // the LLM over it - no point re-querying six tables just to narrate numbers the
+  // caller already has. Admin-only page, numbers shown right next to the summary, so
+  // trusting the echoed payload here is fine.
+  // ponytail: client-echoed report; move the aggregation into _shared and recompute
+  // server-side if this summary ever needs to stand alone from the dashboard.
+  let summaryRequest: { summary?: boolean; report?: unknown } = {}
+  try {
+    summaryRequest = await req.json()
+  } catch {
+    summaryRequest = {}
+  }
+  const wantSummary = summaryRequest.summary === true && summaryRequest.report != null
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -88,6 +104,32 @@ serve(async (req) => {
     })
   }
 
+  if (wantSummary) {
+    const chatResult = await callChatCompletion(
+      [
+        { role: 'system', content: GROWTH_SUMMARY_SYSTEM },
+        { role: 'user', content: growthSummaryUserMessage(summaryRequest.report) },
+      ],
+      // Falls back to LLM_MODEL_WHY_FIT (not a hardcoded default) like every other
+      // LLM function here - production's configured provider doesn't necessarily serve
+      // a model literally named 'gpt-4o-mini'. Set LLM_MODEL_GROWTH_SUMMARY explicitly
+      // only to point this at a different model than why-fit.
+      {
+        model:
+          Deno.env.get('LLM_MODEL_GROWTH_SUMMARY') || Deno.env.get('LLM_MODEL_WHY_FIT') || 'gpt-4o-mini',
+        timeoutMs: 30_000,
+      },
+    )
+    return new Response(
+      JSON.stringify(
+        chatResult.ok
+          ? { summary: chatResult.content }
+          : { summary: null, summaryError: chatResult.error },
+      ),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    )
+  }
+
   const supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   })
@@ -122,7 +164,8 @@ serve(async (req) => {
       id: string
       onboarding_completed: boolean | null
       referred_by_institutional_lead_id: string | null
-    }>('profiles', 'id, onboarding_completed, referred_by_institutional_lead_id')
+      created_at: string | null
+    }>('profiles', 'id, onboarding_completed, referred_by_institutional_lead_id, created_at')
 
     const subscriptions = await fetchAll<{ profile_id: string; status: string }>(
       'subscriptions',
@@ -141,6 +184,15 @@ serve(async (req) => {
     let churnedCount = 0
     let closedInstitutionalAccounts = 0
 
+    // New-registration deltas. profiles.created_at is the only per-user timestamp we
+    // have - there is no activation timestamp and subscriptions has no created_at, so
+    // "new activations" / "new paid users" per day are NOT derivable here (see the
+    // KNOWN DATA GAPS list in growth-summary-prompt.ts).
+    const nowMs = Date.now()
+    const DAY_MS = 86_400_000
+    let newSignups24h = 0
+    let newSignups7d = 0
+
     for (const profile of profiles) {
       const flags = subscriptionFlagsFromStatuses(
         statusesByProfile.get(profile.id) ?? [],
@@ -154,6 +206,12 @@ serve(async (req) => {
         if (profile.referred_by_institutional_lead_id) closedInstitutionalAccounts += 1
       }
       if (category === 'churned') churnedCount += 1
+
+      if (profile.created_at) {
+        const ageMs = nowMs - new Date(profile.created_at).getTime()
+        if (ageMs >= 0 && ageMs <= DAY_MS) newSignups24h += 1
+        if (ageMs >= 0 && ageMs <= 7 * DAY_MS) newSignups7d += 1
+      }
     }
 
     const totalSignups = profiles.length
@@ -229,6 +287,7 @@ serve(async (req) => {
           activatedUsers,
           paidSubscribers,
           conversionRate: totalSignups > 0 ? paidSubscribers / totalSignups : 0,
+          newSignups: { last24h: newSignups24h, last7d: newSignups7d },
         },
         institutional: {
           activeOpportunities,
