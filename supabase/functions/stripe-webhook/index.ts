@@ -18,6 +18,11 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 })
 
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
+// Sandbox/test-mode signing secret, e.g. from `stripe listen` or a Stripe sandbox's
+// destination -- optional. Lets test-mode webhook work (checkout.session.expired
+// testing, future test-mode work) get verified without ever touching the live secret
+// above. Unset in prod == no behavior change, live verification only.
+const webhookSecretTest = Deno.env.get('STRIPE_WEBHOOK_SECRET_TEST') || ''
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
 /** Grep-friendly prefix for all webhook logs. */
@@ -112,13 +117,39 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    const event = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      webhookSecret,
-      undefined,
-      cryptoProvider
-    )
+    // Try the live secret first (the common case, and the one that must never regress).
+    // Only fall back to the test secret -- if one is configured -- when live
+    // verification fails; reject only when both fail. This means a live event is
+    // verified exactly as before (same secret, same call, first branch), and sandbox
+    // events get a second chance without either secret ever being swapped out.
+    let event: Stripe.Event
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        body,
+        signature,
+        webhookSecret,
+        undefined,
+        cryptoProvider
+      )
+    } catch (liveVerifyError) {
+      if (!webhookSecretTest) {
+        throw liveVerifyError
+      }
+      try {
+        event = await stripe.webhooks.constructEventAsync(
+          body,
+          signature,
+          webhookSecretTest,
+          undefined,
+          cryptoProvider
+        )
+        console.log(`${LOG_PREFIX} verified against STRIPE_WEBHOOK_SECRET_TEST (sandbox)`)
+      } catch {
+        // Neither secret matched -- surface the live-secret failure, since that's the
+        // primary path and the more informative error for the common (non-sandbox) case.
+        throw liveVerifyError
+      }
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -136,6 +167,7 @@ serve(async (req) => {
     // Stripe event id so redeliveries don't duplicate.
     const HANDLED_TYPES = new Set([
       'checkout.session.completed',
+      'checkout.session.expired',
       'customer.subscription.updated',
       'customer.subscription.deleted',
     ])
@@ -176,6 +208,30 @@ serve(async (req) => {
           hasSubscription: Boolean(session.subscription),
           hasCustomer: Boolean(customerId),
         })
+
+        // Close out the checkout_attempts row started by create-checkout-session.
+        // Upsert (not a plain update) so a completion still gets recorded even if the
+        // client-side 'started' write never fired (ad blocker, tab closed before the
+        // request completed) -- the webhook is the authoritative source either way.
+        const { error: checkoutAttemptCompleteError } = await supabaseAdmin
+          .from('checkout_attempts')
+          .upsert(
+            {
+              profile_id: profileId,
+              stripe_checkout_session_id: session.id,
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            },
+            { onConflict: 'stripe_checkout_session_id' },
+          )
+        if (checkoutAttemptCompleteError) {
+          console.error(`${LOG_PREFIX} failed to mark checkout_attempts completed`, {
+            sessionId: session.id,
+            error: checkoutAttemptCompleteError,
+          })
+        } else {
+          console.log(`${LOG_PREFIX} checkout_attempts marked completed`, { sessionId: session.id, profileId })
+        }
 
         if (customerId) {
           const { error: profileUpdateError } = await supabaseAdmin
@@ -361,6 +417,40 @@ serve(async (req) => {
           }
         }
 
+        break
+      }
+
+      case 'checkout.session.expired': {
+        // Stripe's backstop for the abandoned-checkout signal (~24h after an incomplete
+        // session) -- not the primary signal. The client-side write in
+        // create-checkout-session is what makes same-day recovery possible; this just
+        // closes out rows the client-side path missed or that a user genuinely never
+        // returned to. Only flips 'started' -> 'expired': a session that already
+        // completed can't also expire, and there's nothing useful to backfill if the
+        // 'started' row was never created (no profile_id available on the client side
+        // to synthesize one, unlike .completed which has session.metadata.profile_id).
+        const session = event.data.object as Stripe.Checkout.Session
+        console.log(`${LOG_PREFIX} checkout.session.expired`, { sessionId: session.id })
+
+        const { data: expiredRows, error: expireError } = await supabaseAdmin
+          .from('checkout_attempts')
+          .update({ status: 'expired' })
+          .eq('stripe_checkout_session_id', session.id)
+          .eq('status', 'started')
+          .select('id')
+
+        if (expireError) {
+          console.error(`${LOG_PREFIX} checkout.session.expired: failed to update checkout_attempts`, {
+            sessionId: session.id,
+            error: expireError,
+          })
+        } else if (!expiredRows || expiredRows.length === 0) {
+          console.warn(`${LOG_PREFIX} checkout.session.expired: no matching started checkout_attempts row`, {
+            sessionId: session.id,
+          })
+        } else {
+          console.log(`${LOG_PREFIX} checkout.session.expired: marked expired`, { sessionId: session.id })
+        }
         break
       }
 

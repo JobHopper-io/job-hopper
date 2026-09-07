@@ -14,7 +14,9 @@ only, no automation logic, scoring calculations, or email sending.
   deliberately did *not* build because the signal doesn't exist. **Abandoned-checkout
   recovery cannot work without new instrumentation** (either a `checkout.session.expired`
   webhook handler, or a client-side "checkout started" event before redirecting to
-  Stripe).
+  Stripe). **Update 2026-09-06: closed.** See `checkout_attempts` below — both halves
+  (client-side start event, `checkout.session.expired` backstop) are now built and
+  verified against real Stripe test-mode events.
 - **Product-intent signals are limited to cumulative counters.** `freemium_usage` has
   `job_searches_used` / `resume_advice_used` / `premium_insights_used` (integers) and
   `selected_tier_key` — no timestamps of individual events, no record of *when* a limit
@@ -87,11 +89,65 @@ least one.
   `sent_date` set once actually sent and `stop_reason` set when a sequence ends early
   (reply, subscribed, unsubscribed, or a manual pause).
 
+## checkout_attempts (added 2026-09-06, closes the checkout-start gap above)
+
+- **`checkout_attempts`** — one row per Stripe Checkout session: `profile_id`,
+  `stripe_checkout_session_id` (unique), `status` (`started` → `completed` | `expired`),
+  `created_at`, `completed_at`. Written by `create-checkout-session` right after the
+  Stripe session is created (primary, same-day signal). Closed out by `stripe-webhook`:
+  `checkout.session.completed` upserts it to `completed` (this also backfills a row from
+  webhook data if the client-side write never fired — ad blocker, tab closed before
+  redirect), and the new `checkout.session.expired` handler flips `started` → `expired`
+  as an authoritative backstop (~24h later, per Stripe's own expiry window). Same
+  upsert-on-conflict write pattern as `institutional_leads`/`freemium_usage`; same
+  admin-read/service-write RLS as the other tables in this doc.
+- **Abandoned-checkout query** (used for the "abandoned in the last N days" check, not
+  yet wired to any automation):
+  ```sql
+  select id, profile_id, stripe_checkout_session_id, created_at
+  from public.checkout_attempts
+  where status = 'started'
+    and completed_at is null
+    and created_at < now() - interval '2 hours'
+    and created_at >= now() - interval '7 days';
+  ```
+  Verified against a real local Stripe test-mode Checkout Session left uncompleted, and
+  against a synthetic 5-hours-old row — the query correctly excludes a session under 2
+  hours old and correctly returns one that's past the window.
+- **Manual step required, not code**: the Stripe webhook endpoint (dashboard or
+  `stripe listen` in dev) must be subscribed to `checkout.session.expired` for Part 2 to
+  ever fire in the deployed app — Stripe only sends events an endpoint is subscribed to.
+  Same category of manual setup as the `run-scheduled-jobs` pg_cron job.
+- Verified end-to-end locally: `checkout.session.completed`'s upsert and the new
+  `checkout.session.expired` handler were both exercised against real Stripe test-mode
+  events (via `stripe listen` + `stripe checkout sessions expire`), landing correctly in
+  local `checkout_attempts` rows.
+
+### Dual webhook secret (live + sandbox), added 2026-09-06
+
+`stripe-webhook` now verifies the `stripe-signature` header against `STRIPE_WEBHOOK_SECRET`
+(live) first, and only falls back to `STRIPE_WEBHOOK_SECRET_TEST` (optional; a Stripe
+sandbox/test-mode destination's signing secret) if the live check fails. Rejects only
+if neither matches. `STRIPE_WEBHOOK_SECRET` is never read differently or rotated by
+this change — an unset `STRIPE_WEBHOOK_SECRET_TEST` (the deployed default until someone
+sets it) means zero behavior change from before. Set it with:
+
+```
+supabase secrets set STRIPE_WEBHOOK_SECRET_TEST=whsec_xxxxx --project-ref imekpzzvylngpoagcdow
+```
+
+then `supabase functions deploy stripe-webhook --project-ref imekpzzvylngpoagcdow` to
+pick up the new code path (secrets apply to already-deployed functions on their next
+cold start, but deploy anyway since the code itself changed here too).
+
 ## Not built yet (explicitly out of scope for this pass)
 
-- No automation logic (scheduling, sending) — schema only.
+- No automation logic (scheduling, sending) — schema only. Nothing reads
+  `checkout_attempts` for a real recovery send yet either — the query above is proven
+  correct, not wired to anything.
 - No scoring calculation — `lead_scores` is a place to write scores, not a scorer.
-- No checkout-start / product-intent event instrumentation (see audit findings above).
+- Product-intent instrumentation beyond the free-tier-cap signal (pricing-page visits,
+  repeated-search tracking) is still missing — checkout-start is closed, that one isn't.
 - `src/types/supabase.ts` was not regenerated (needs `npm run db:types` against the
   live schema after this migration is applied) — do that before writing any frontend
   or edge-function code against these tables, per the repo's generated-types convention.

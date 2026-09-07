@@ -198,6 +198,21 @@ serve(async (req) => {
       subscription_data: subscriptionData,
     })
 
+    // Checkout-start signal for abandoned-checkout recovery: written here (session just
+    // created, user about to be redirected to Stripe) and later updated to 'completed'
+    // or 'expired' by stripe-webhook. Upsert on the session id rather than insert so a
+    // retry of this request (e.g. a flaky redirect) can't violate the unique constraint.
+    // Best-effort: never block returning the checkout URL over a logging failure.
+    const { error: checkoutAttemptError } = await supabaseAdmin
+      .from('checkout_attempts')
+      .upsert(
+        { profile_id: profile.id, stripe_checkout_session_id: session.id, status: 'started' },
+        { onConflict: 'stripe_checkout_session_id' },
+      )
+    if (checkoutAttemptError) {
+      console.error('create-checkout-session: failed to log checkout_attempts row', checkoutAttemptError)
+    }
+
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),
       {
