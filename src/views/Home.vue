@@ -91,8 +91,8 @@ const tiers = [
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 const plans = [
-  { name: 'Core', price: '$29', period: '/month', note: '14-day free trial' as string | null, desc: 'Automated matching, tracker, full insights.', cta: 'Start with Core', primary: false, badge: null as string | null },
-  { name: 'Premium', price: '$49', period: '/month', note: '14-day free trial' as string | null, desc: 'Everything in Core, plus sponsorship intelligence as it rolls out.', cta: 'Start with Premium', primary: true, badge: 'Most popular' },
+  { name: 'Core', price: '$29.99', period: '/month', note: '14-day free trial' as string | null, desc: 'Automated matching, tracker, full insights.', cta: 'Start with Core', primary: false, badge: null as string | null },
+  { name: 'Premium', price: '$49.99', period: '/month', note: '14-day free trial' as string | null, desc: 'Everything in Core, plus sponsorship intelligence as it rolls out.', cta: 'Start with Premium', primary: true, badge: 'Most popular' },
 ]
 
 // ── Testimonials ──────────────────────────────────────────────────────────────
