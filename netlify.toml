@@ -4,6 +4,13 @@
   # (scripts/generate-seo-pages.mjs) into dist/ so they ship as static HTML.
   command = "npm run build && node scripts/generate-seo-pages.mjs"
 
+[build.environment]
+  # The Supabase project URL is public (shipped to the browser as VITE_SUPABASE_URL).
+  # Netlify's secrets scanner flags it only because a build env var named SUPABASE_URL
+  # shares its value with a committed literal (email-router-worker/wrangler.toml's
+  # REPLY_INGEST_URL). Not a secret; keep SUPABASE_SERVICE_ROLE_KEY scanned.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
+
 # Canonicalize away trailing slashes on SEO pages: /jobs/x/y/ -> /jobs/x/y.
 # Our canonical tags have no trailing slash; this prevents the slash variant
 # from resolving as a separate duplicate URL. Forced so it wins over the
