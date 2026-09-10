@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
+import {
+  subscriptionAPI,
+  getProductPrice,
+  BILLING_CYCLES,
+  cycleMonthlyPrice,
+  cycleBillingNote,
+  type BillingCycle,
+} from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
 import { FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
@@ -60,6 +67,7 @@ const resumeFile = ref<File | null>(null)
 // picks Core or Premium and goes through checkout (14-day card trial).
 const basePlanProducts = ref<Product[]>([])
 const selectedBasePlanId = ref<string | null>(null)
+const billingCycle = ref<BillingCycle>('monthly')
 // Career level is required for everyone. It is the job-matching tier and is stored on
 // profiles.career_level -- never derived from the plan/product the user picks.
 const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
@@ -261,7 +269,8 @@ const handleProceedToCheckout = async () => {
     const { data, error: checkoutError } = await subscriptionAPI.createCheckoutSession(
       productIds,
       successUrl,
-      cancelUrl
+      cancelUrl,
+      { billingCycle: billingCycle.value },
     )
 
     if (checkoutError) {
@@ -523,6 +532,26 @@ const handleProceedToCheckout = async () => {
             </p>
           </div>
 
+          <div class="inline-flex items-center gap-1 rounded-full border border-neutral-border bg-white p-1">
+            <button
+              v-for="option in BILLING_CYCLES"
+              :key="option.value"
+              type="button"
+              class="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
+              :class="billingCycle === option.value ? 'bg-brand-primary text-white' : 'text-neutral-body hover:text-brand-charcoal'"
+              @click="billingCycle = option.value"
+            >
+              {{ option.label }}
+              <span
+                v-if="option.discountPct > 0"
+                class="rounded-full px-2 py-0.5 text-xs font-bold"
+                :class="billingCycle === option.value ? 'bg-white/20' : 'bg-brand-success/10 text-brand-success'"
+              >
+                Save {{ option.discountPct }}%
+              </span>
+            </button>
+          </div>
+
           <div class="grid w-full max-w-2xl grid-cols-1 gap-5 sm:grid-cols-2">
             <div v-for="product in basePlanProducts" :key="product.id" class="relative flex flex-col">
               <div
@@ -544,8 +573,10 @@ const handleProceedToCheckout = async () => {
                   <p class="font-heading font-bold text-brand-charcoal">{{ product.display_name }}</p>
                 </div>
                 <p class="text-3xl font-heading font-bold text-brand-primary">
-                  ${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span>
+                  ${{ cycleMonthlyPrice(getProductPrice(product), billingCycle).toFixed(2)
+                  }}<span class="text-sm font-normal text-neutral-body">/month</span>
                 </p>
+                <p class="text-xs text-neutral-body">{{ cycleBillingNote(getProductPrice(product), billingCycle) }}</p>
                 <p class="flex-1 text-sm text-neutral-body">{{ product.description || '' }}</p>
                 <button type="button" class="btn-primary w-full" @click="selectPaidPlan(product.id)">
                   {{ selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}

@@ -2,6 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
 import { getStripeProductId } from '../_shared/stripe-products.ts'
+import {
+  cyclePeriodAmountCents,
+  CYCLE_CONFIG,
+  normalizeBillingCycle,
+} from '../_shared/billing-cycles.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -86,11 +91,16 @@ serve(async (req) => {
       }
     }
 
-    const { productIds = [], successUrl, cancelUrl, trialEnd } = await req.json()
+    const { productIds = [], successUrl, cancelUrl, trialEnd, billingCycle } = await req.json()
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       throw new Error('productIds must be a non-empty array')
     }
+
+    // Stripe requires every recurring line item in one subscription to share interval +
+    // interval_count, so the cycle applies to the base plan and any subscription add-ons.
+    const cycle = normalizeBillingCycle(billingCycle)
+    const cycleCfg = CYCLE_CONFIG[cycle]
 
     const { data: products, error: productsError } = await supabaseAdmin
       .from('products')
@@ -149,7 +159,11 @@ serve(async (req) => {
           product.category === 'base_plan' ||
           product.category === 'subscription_addon'
         ) {
-          priceData.recurring = { interval: 'month' }
+          priceData.unit_amount = cyclePeriodAmountCents(product.price_cents, cycle)
+          priceData.recurring = {
+            interval: cycleCfg.interval,
+            interval_count: cycleCfg.intervalCount,
+          }
         }
 
         return {
