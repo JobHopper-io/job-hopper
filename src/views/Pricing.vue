@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import type { Product } from '@/types/database'
-import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 const faqOpen = ref<number | null>(null)
 const premiumProduct = ref<Product | null>(null)
@@ -209,7 +208,6 @@ const pricingFaq = [
                 ${{ discountedMonthlyPrice(tier.basePrice).toFixed(tier.basePrice === 0 ? 0 : 2) }}<span class="text-lg font-normal text-neutral-body">/month</span>
               </span>
             </p>
-            <CoreFreeMonthBadge v-if="tier.name === 'Core'" class="mb-2" />
             <p class="text-sm text-neutral-body mb-6">{{ billingNote(tier.basePrice) }}</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
               <li v-for="f in tier.features" :key="f.label" class="flex items-start">

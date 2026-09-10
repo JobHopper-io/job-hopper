@@ -7,6 +7,7 @@ import OnboardingView from '../views/Onboarding.vue'
 import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 import { employerAPI } from '@/lib/employer'
+import { subscriptionAPI } from '@/lib/subscription'
 import type { Profile } from '@/types/database'
 
 /** Single source of truth for routes that don't require authentication. */
@@ -208,6 +209,12 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/Dashboard.vue'),
+    },
+    {
+      // TEMP (Free tier removed): plan picker onboarded, non-subscribed users are forced to.
+      path: '/choose-plan',
+      name: 'choose-plan',
+      component: () => import('../views/ChoosePlan.vue'),
     },
     {
       path: '/job/:id',
@@ -502,6 +509,22 @@ router.beforeEach(async (to) => {
   // If onboarding is complete, prevent access back to `/onboarding`
   if (targetPath === '/onboarding') {
     return '/dashboard'
+  }
+
+  // TEMP (Free tier removed): onboarded users with no trial/active subscription and no
+  // admin-granted trial seat must pick Core/Premium (14-day card trial) before using the
+  // app. Admin routes are exempt so admins aren't locked out of their own tooling.
+  // Revert this block + the /choose-plan route + ChoosePlan.vue to restore the Free tier.
+  if (userProfile && !targetPath.startsWith('/admin')) {
+    const gatedOut =
+      !userProfile.trial_grant_id &&
+      !(await subscriptionAPI.hasActiveOrTrialSubscription(userProfile.id)).data
+    if (gatedOut && targetPath !== '/choose-plan') {
+      return '/choose-plan'
+    }
+    if (!gatedOut && targetPath === '/choose-plan') {
+      return '/dashboard'
+    }
   }
 
   // Admin routes require the user to have appropriate admin roles. Partner dashboard is

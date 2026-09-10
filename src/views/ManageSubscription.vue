@@ -8,7 +8,6 @@ import {
 } from '@/lib/subscription'
 import { useUserStore } from '@/stores/user'
 import PostCheckoutConfirmation from '@/components/PostCheckoutConfirmation.vue'
-import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 import type { Product } from '@/types/database'
 
 const userStore = useUserStore()
@@ -388,7 +387,6 @@ onMounted(async () => {
                     ${{ getProductPrice(product) }}/month
                     <span v-if="product.description"> — {{ product.description }}</span>
                   </span>
-                  <CoreFreeMonthBadge v-if="product.key === 'core'" class="mt-1.5" />
                 </div>
               </label>
             </div>

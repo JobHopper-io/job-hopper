@@ -15,8 +15,7 @@ const corsHeaders = {
 
 const defaultSiteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
 
-/** Standard trial for any base-plan checkout (Core or Premium). Separate from the "first 25
- * Core subscribers" free-month promo, which overrides this with a longer trial instead. */
+/** Standard trial for any base-plan checkout (Core or Premium). */
 const STANDARD_TRIAL_DAYS = 14
 
 serve(async (req) => {
@@ -168,19 +167,6 @@ serve(async (req) => {
     }
     if (typeof trialEnd === 'number' && trialEnd > 0) {
       subscriptionData.trial_end = trialEnd
-    } else if (hasBasePlan && basePlans[0].key === 'core') {
-      // "First 25 Core subscribers get a free month" promo. Eligibility is decided
-      // here, server-side, via an atomic RPC - never trust a client-supplied trial
-      // length for this, or anyone could ask for a free month.
-      const { data: claimRows, error: claimError } = await supabaseAdmin.rpc(
-        'try_claim_core_free_month',
-        { p_profile_id: profile.id },
-      )
-      if (claimError) {
-        console.error('try_claim_core_free_month failed:', claimError)
-      }
-      const claim = Array.isArray(claimRows) ? claimRows[0] : null
-      subscriptionData.trial_period_days = claim?.success ? 30 : STANDARD_TRIAL_DAYS
     } else if (hasBasePlan) {
       subscriptionData.trial_period_days = STANDARD_TRIAL_DAYS
     }
