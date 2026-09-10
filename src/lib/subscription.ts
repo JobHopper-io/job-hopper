@@ -124,6 +124,23 @@ export const subscriptionAPI = {
     return { data: data ?? [], error: null }
   },
 
+  /**
+   * TEMP (Free tier removed): true when the profile has a trial or active subscription.
+   * Used by the router guard to force onboarded, non-subscribed users into /choose-plan.
+   */
+  async hasActiveOrTrialSubscription(
+    profileId: string,
+  ): Promise<{ data: boolean; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('profile_id', profileId)
+      .in('status', ['trial', 'active'])
+      .limit(1)
+    if (error) return { data: false, error: new Error(error.message) }
+    return { data: (data?.length ?? 0) > 0, error: null }
+  },
+
   async getBasePlanProducts(): Promise<{ data: Product[] | null; error: Error | null }> {
     const { data, error } = await supabase
       .from('products')
@@ -151,11 +168,6 @@ export const subscriptionAPI = {
     return { data: data ?? null, error: null }
   },
 
-  /**
-   * "First 25 Core subscribers get a free month" promo status - remaining spots, readable by
-   * anyone (including logged-out visitors on /pricing). Claiming happens server-side only, in
-   * create-checkout-session's try_claim_core_free_month RPC call.
-   */
   /** The caller's own linked trial grant (RLS scopes this to profiles.trial_grant_id). */
   async getTrialGrant(trialGrantId: string): Promise<{ data: TrialGrant | null; error: Error | null }> {
     const { data, error } = await supabase
@@ -166,21 +178,6 @@ export const subscriptionAPI = {
 
     if (error) return { data: null, error: new Error(error.message) }
     return { data, error: null }
-  },
-
-  async getCoreFreeMonthPromoStatus(): Promise<{
-    data: { remaining: number; active: boolean } | null
-    error: Error | null
-  }> {
-    const { data, error } = await supabase
-      .from('promo_core_free_month')
-      .select('claimed_count, max_claims')
-      .eq('id', 1)
-      .maybeSingle()
-    if (error) return { data: null, error: new Error(error.message) }
-    if (!data) return { data: null, error: null }
-    const remaining = Math.max(0, data.max_claims - data.claimed_count)
-    return { data: { remaining, active: remaining > 0 }, error: null }
   },
 
   /**

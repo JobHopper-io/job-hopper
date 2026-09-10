@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import type { Product } from '@/types/database'
-import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 
 const faqOpen = ref<number | null>(null)
 const premiumProduct = ref<Product | null>(null)
@@ -18,12 +17,46 @@ const toggleFaq = (index: number) => {
   faqOpen.value = faqOpen.value === index ? null : index
 }
 
+// ── Billing cycle toggle. Display-only for now: discounted prices are computed
+// client-side off the existing monthly price_cents — quarterly/yearly aren't real
+// Stripe billing intervals yet (create-checkout-session only ever creates monthly
+// recurring prices). Wire this up for real (new Stripe prices + checkout support)
+// once the pricing itself is signed off.
+type BillingCycle = 'monthly' | 'quarterly' | 'yearly'
+const billingCycle = ref<BillingCycle>('monthly')
+const cycleOptions: { value: BillingCycle; label: string; discountPct: number }[] = [
+  { value: 'monthly', label: 'Monthly', discountPct: 0 },
+  { value: 'quarterly', label: 'Quarterly', discountPct: 10 },
+  { value: 'yearly', label: 'Yearly', discountPct: 20 },
+]
+const cycleMonths: Record<BillingCycle, number> = { monthly: 1, quarterly: 3, yearly: 12 }
+const currentDiscountPct = computed(
+  () => cycleOptions.find((c) => c.value === billingCycle.value)?.discountPct ?? 0,
+)
+
+function discountedMonthlyPrice(basePrice: number): number {
+  return basePrice * (1 - currentDiscountPct.value / 100)
+}
+function showStrikethrough(basePrice: number): boolean {
+  return basePrice > 0 && currentDiscountPct.value > 0
+}
+function periodTotal(basePrice: number): number {
+  return discountedMonthlyPrice(basePrice) * cycleMonths[billingCycle.value]
+}
+function billingNote(basePrice: number): string {
+  if (basePrice === 0) return 'No card required'
+  if (billingCycle.value === 'monthly') return 'Billed monthly'
+  const total = periodTotal(basePrice).toFixed(2)
+  return billingCycle.value === 'quarterly'
+    ? `Billed quarterly ($${total} every 3 months)`
+    : `Billed yearly ($${total}/year)`
+}
+
 // ── Sellable tiers (Free / Core). Premium is rendered separately as a locked card. ──
 const sellableTiers = [
   {
     name: 'Free',
-    price: '$0',
-    note: 'No card required',
+    basePrice: 0,
     popular: false,
     cta: 'Get started free',
     features: [
@@ -37,8 +70,7 @@ const sellableTiers = [
   },
   {
     name: 'Core',
-    price: '$29',
-    note: 'Billed monthly',
+    basePrice: 29,
     popular: true,
     cta: 'Start with Core',
     features: [
@@ -50,6 +82,8 @@ const sellableTiers = [
     ],
   },
 ]
+
+const premiumBasePrice = computed(() => getProductPrice(premiumProduct.value))
 
 const premiumFeatures = [
   'Real Sponsorship Score',
@@ -94,7 +128,7 @@ const pricingFaq = [
   },
   {
     q: 'How do billing and cancellation work?',
-    a: 'Core and Premium are billed monthly and you can cancel at any time in a couple of clicks from your account settings.',
+    a: 'Core and Premium can be billed monthly, quarterly (10% off), or yearly (20% off), and you can cancel at any time in a couple of clicks from your account settings.',
   },
 ]
 </script>
@@ -113,6 +147,35 @@ const pricingFaq = [
         <p class="text-neutral-body max-w-3xl mx-auto">
           Pick the tier that matches how much you want automated for you.
         </p>
+      </section>
+
+      <!-- Billing cycle toggle -->
+      <section class="mb-10 flex justify-center">
+        <div class="inline-flex items-center bg-white border border-neutral-border rounded-full p-1 gap-1">
+          <button
+            v-for="option in cycleOptions"
+            :key="option.value"
+            type="button"
+            :class="[
+              'px-5 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2',
+              billingCycle === option.value
+                ? 'bg-brand-primary text-white'
+                : 'text-neutral-body hover:text-brand-charcoal',
+            ]"
+            @click="billingCycle = option.value"
+          >
+            {{ option.label }}
+            <span
+              v-if="option.discountPct > 0"
+              :class="[
+                'text-xs font-bold px-2 py-0.5 rounded-full',
+                billingCycle === option.value ? 'bg-white/20' : 'bg-brand-success/10 text-brand-success',
+              ]"
+            >
+              Save {{ option.discountPct }}%
+            </span>
+          </button>
+        </div>
       </section>
 
       <!-- Tiers -->
@@ -134,11 +197,18 @@ const pricingFaq = [
               Most popular
             </div>
             <h3 class="text-xl font-heading font-semibold mb-2">{{ tier.name }}</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">
-              {{ tier.price }}<span class="text-lg font-normal text-neutral-body">/month</span>
+            <p class="mb-1 flex items-baseline gap-2 flex-wrap">
+              <span
+                v-if="showStrikethrough(tier.basePrice)"
+                class="text-lg font-normal text-neutral-body/50 line-through"
+              >
+                ${{ tier.basePrice.toFixed(2) }}
+              </span>
+              <span class="text-3xl font-bold text-brand-primary">
+                ${{ discountedMonthlyPrice(tier.basePrice).toFixed(tier.basePrice === 0 ? 0 : 2) }}<span class="text-lg font-normal text-neutral-body">/month</span>
+              </span>
             </p>
-            <CoreFreeMonthBadge v-if="tier.name === 'Core'" class="mb-2" />
-            <p class="text-sm text-neutral-body mb-6">{{ tier.note }}</p>
+            <p class="text-sm text-neutral-body mb-6">{{ billingNote(tier.basePrice) }}</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
               <li v-for="f in tier.features" :key="f.label" class="flex items-start">
                 <font-awesome-icon
@@ -156,10 +226,18 @@ const pricingFaq = [
           <!-- Premium: always sellable now, same as Free/Core above. -->
           <div class="card p-8 text-left flex flex-col border-2 border-brand-primary">
             <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
-            <p class="text-3xl font-bold text-brand-primary mb-1">
-              ${{ getProductPrice(premiumProduct) }}<span class="text-lg font-normal text-neutral-body">/month</span>
+            <p class="mb-1 flex items-baseline gap-2 flex-wrap">
+              <span
+                v-if="showStrikethrough(premiumBasePrice)"
+                class="text-lg font-normal text-neutral-body/50 line-through"
+              >
+                ${{ premiumBasePrice.toFixed(2) }}
+              </span>
+              <span class="text-3xl font-bold text-brand-primary">
+                ${{ discountedMonthlyPrice(premiumBasePrice).toFixed(2) }}<span class="text-lg font-normal text-neutral-body">/month</span>
+              </span>
             </p>
-            <p class="text-sm text-neutral-body mb-6">Billed monthly</p>
+            <p class="text-sm text-neutral-body mb-6">{{ billingNote(premiumBasePrice) }}</p>
             <p class="text-sm font-semibold text-brand-charcoal mb-2">Everything in Core, plus:</p>
             <ul class="space-y-2 text-sm text-neutral-body mb-6 flex-1">
               <li v-for="f in premiumFeatures" :key="f" class="flex items-start">

@@ -14,7 +14,6 @@ import TagInput from '@/components/TagInput.vue'
 import FormField from '@/components/auth/FormField.vue'
 import OnboardingStepHeader from '@/components/onboarding/OnboardingStepHeader.vue'
 import OnboardingChip from '@/components/onboarding/OnboardingChip.vue'
-import CoreFreeMonthBadge from '@/components/CoreFreeMonthBadge.vue'
 import jobHopperLogo from '@/assets/job-hopper-logo.png'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 import { splitTagsField, joinTagsField } from '@/lib/tags'
@@ -599,7 +598,6 @@ const handleProceedToCheckout = async () => {
                 <p class="text-3xl font-heading font-bold text-brand-primary">
                   ${{ getProductPrice(product) }}<span class="text-sm font-normal text-neutral-body">/month</span>
                 </p>
-                <CoreFreeMonthBadge v-if="isCorePlan(product)" class="self-start" />
                 <p class="flex-1 text-sm text-neutral-body">{{ product.description || '' }}</p>
                 <button type="button" class="btn-primary w-full" @click="selectPaidPlan(product.id)">
                   {{ !startFreePlan && selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}
