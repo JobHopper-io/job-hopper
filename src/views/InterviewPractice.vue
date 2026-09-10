@@ -125,7 +125,7 @@
           <p class="text-[11px] text-neutral-body/70">Press Enter to send</p>
           <div v-if="quota" class="mx-auto w-full max-w-xs">
             <div class="mb-1 flex items-center justify-between text-xs text-neutral-body">
-              <span>Free plan: {{ quota.used }} of {{ quota.dailyLimit }} used today</span>
+              <span>Practice quota: {{ quota.used }} of {{ quota.dailyLimit }} used today</span>
             </div>
             <div class="h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg">
               <div

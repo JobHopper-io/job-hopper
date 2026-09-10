@@ -230,21 +230,21 @@ const handleManageBilling = async () => {
             <h2 class="text-xl font-heading font-semibold text-brand-charcoal">Current Plan</h2>
           </div>
           <div class="flex items-center gap-3 mb-4">
-            <span class="text-lg font-semibold text-brand-charcoal">Free</span>
+            <span class="text-lg font-semibold text-brand-charcoal">No plan</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/70 text-neutral-body text-xs font-semibold">
               No active subscription
             </span>
           </div>
           <p class="text-sm text-neutral-body mb-4">
-            You can search for jobs manually with capped credits and preview limited insights.
-            Upgrade to unlock unlimited automated matching, full resume advice, and full Hiring Intel.
+            Choose Core or Premium to start using Job-Hopper. Both begin with a 14-day free
+            trial — add a card now and you're not charged until the trial ends.
           </p>
           <div class="flex flex-col sm:flex-row gap-3">
             <router-link
-              to="/billing/manage"
+              to="/choose-plan"
               class="btn-primary inline-flex items-center justify-center"
             >
-              Upgrade your plan
+              Choose a plan
             </router-link>
             <router-link
               to="/pricing"
