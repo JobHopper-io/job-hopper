@@ -6,7 +6,14 @@
 // Styling mirrors Pricing.vue (warm bg, .card tiers, "Most popular" pill, check lists).
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
+import {
+  subscriptionAPI,
+  getProductPrice,
+  BILLING_CYCLES,
+  cycleMonthlyPrice,
+  cycleBillingNote,
+  type BillingCycle,
+} from '@/lib/subscription'
 import { authAPI } from '@/lib/auth'
 import type { Product } from '@/types/database'
 
@@ -16,6 +23,7 @@ const basePlanProducts = ref<Product[]>([])
 const isLoading = ref(true)
 const redirectingId = ref<string | null>(null)
 const error = ref('')
+const billingCycle = ref<BillingCycle>('monthly')
 
 const isCorePlan = (product: Product) => product.key === 'core'
 
@@ -58,6 +66,7 @@ async function proceedToCheckout(productId: string) {
     [productId],
     `${window.location.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
     `${window.location.origin}/choose-plan`,
+    { billingCycle: billingCycle.value },
   )
   if (checkoutError || !data?.url) {
     error.value = 'Unable to start checkout. Please try again.'
@@ -89,6 +98,35 @@ async function signOut() {
         </p>
       </section>
 
+      <!-- Billing cycle toggle -->
+      <div v-if="!isLoading" class="mb-10 flex justify-center">
+        <div class="inline-flex items-center bg-white border border-neutral-border rounded-full p-1 gap-1">
+          <button
+            v-for="option in BILLING_CYCLES"
+            :key="option.value"
+            type="button"
+            :class="[
+              'px-5 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2',
+              billingCycle === option.value
+                ? 'bg-brand-primary text-white'
+                : 'text-neutral-body hover:text-brand-charcoal',
+            ]"
+            @click="billingCycle = option.value"
+          >
+            {{ option.label }}
+            <span
+              v-if="option.discountPct > 0"
+              :class="[
+                'text-xs font-bold px-2 py-0.5 rounded-full',
+                billingCycle === option.value ? 'bg-white/20' : 'bg-brand-success/10 text-brand-success',
+              ]"
+            >
+              Save {{ option.discountPct }}%
+            </span>
+          </button>
+        </div>
+      </div>
+
       <!-- Loading -->
       <div v-if="isLoading" class="py-16 text-center">
         <font-awesome-icon :icon="['fas', 'spinner']" spin class="h-8 w-8 text-brand-primary" aria-hidden="true" />
@@ -113,10 +151,12 @@ async function signOut() {
           <h3 class="text-xl font-heading font-semibold mb-2">{{ product.display_name }}</h3>
           <p class="mb-1 flex items-baseline gap-1">
             <span class="text-3xl font-bold text-brand-primary">
-              ${{ getProductPrice(product) }}<span class="text-lg font-normal text-neutral-body">/month</span>
+              ${{ cycleMonthlyPrice(getProductPrice(product), billingCycle).toFixed(2) }}<span class="text-lg font-normal text-neutral-body">/month</span>
             </span>
           </p>
-          <p class="text-sm text-neutral-body mb-6">14-day free trial, then billed monthly</p>
+          <p class="text-sm text-neutral-body mb-6">
+            14-day free trial, then {{ cycleBillingNote(getProductPrice(product), billingCycle).toLowerCase() }}
+          </p>
 
           <p v-if="!isCorePlan(product)" class="text-sm font-semibold text-brand-charcoal mb-2">
             Everything in Core, plus:

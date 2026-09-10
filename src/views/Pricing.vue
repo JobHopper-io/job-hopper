@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import {
+  BILLING_CYCLES,
+  cycleMonthlyPrice,
+  cycleBillingNote,
+  type BillingCycle,
+} from '@/lib/subscription'
 
 const faqOpen = ref<number | null>(null)
 
@@ -7,39 +13,23 @@ const toggleFaq = (index: number) => {
   faqOpen.value = faqOpen.value === index ? null : index
 }
 
-// ── Billing cycle toggle. Display-only for now: discounted prices are computed
-// client-side off the existing monthly price_cents — quarterly/yearly aren't real
-// Stripe billing intervals yet (create-checkout-session only ever creates monthly
-// recurring prices). Wire this up for real (new Stripe prices + checkout support)
-// once the pricing itself is signed off.
-type BillingCycle = 'monthly' | 'quarterly' | 'yearly'
+// Billing cycle toggle. Discounts + period math come from the shared BILLING_CYCLES table
+// (src/lib/subscription.ts); create-checkout-session charges the matching server-computed
+// amount, so what's shown here is what Stripe bills.
+const cycleOptions = BILLING_CYCLES
 const billingCycle = ref<BillingCycle>('monthly')
-const cycleOptions: { value: BillingCycle; label: string; discountPct: number }[] = [
-  { value: 'monthly', label: 'Monthly', discountPct: 0 },
-  { value: 'quarterly', label: 'Quarterly', discountPct: 10 },
-  { value: 'yearly', label: 'Yearly', discountPct: 20 },
-]
-const cycleMonths: Record<BillingCycle, number> = { monthly: 1, quarterly: 3, yearly: 12 }
 const currentDiscountPct = computed(
-  () => cycleOptions.find((c) => c.value === billingCycle.value)?.discountPct ?? 0,
+  () => BILLING_CYCLES.find((c) => c.value === billingCycle.value)?.discountPct ?? 0,
 )
 
 function discountedMonthlyPrice(basePrice: number): number {
-  return basePrice * (1 - currentDiscountPct.value / 100)
+  return cycleMonthlyPrice(basePrice, billingCycle.value)
 }
 function showStrikethrough(basePrice: number): boolean {
   return basePrice > 0 && currentDiscountPct.value > 0
 }
-function periodTotal(basePrice: number): number {
-  return discountedMonthlyPrice(basePrice) * cycleMonths[billingCycle.value]
-}
 function billingNote(basePrice: number): string {
-  if (basePrice === 0) return 'No card required'
-  if (billingCycle.value === 'monthly') return 'Billed monthly'
-  const total = periodTotal(basePrice).toFixed(2)
-  return billingCycle.value === 'quarterly'
-    ? `Billed quarterly ($${total} every 3 months)`
-    : `Billed yearly ($${total}/year)`
+  return cycleBillingNote(basePrice, billingCycle.value)
 }
 
 // ── Sellable tiers (Core). Premium is rendered separately below. Both start with a

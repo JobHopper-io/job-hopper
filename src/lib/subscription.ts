@@ -51,10 +51,53 @@ export function formatProductLineLabel(product: Product): string {
 const productColumns =
   'id, key, display_name, description, category, price_cents, available_for_purchase, stripe_product_id'
 
+export type BillingCycle = 'monthly' | 'quarterly' | 'yearly'
+
+/**
+ * Billing cycle options for the plan pickers. Discounts MUST match CYCLE_CONFIG in
+ * supabase/functions/_shared/billing-cycles.ts — the edge function charges the
+ * server-computed amount and it has to equal what we display here.
+ */
+export const BILLING_CYCLES: {
+  value: BillingCycle
+  label: string
+  discountPct: number
+  months: number
+}[] = [
+  { value: 'monthly', label: 'Monthly', discountPct: 0, months: 1 },
+  { value: 'quarterly', label: 'Quarterly', discountPct: 10, months: 3 },
+  { value: 'yearly', label: 'Yearly', discountPct: 20, months: 12 },
+]
+
+function cycleMeta(cycle: BillingCycle) {
+  return BILLING_CYCLES.find((c) => c.value === cycle) ?? BILLING_CYCLES[0]
+}
+
+/** Discounted monthly-equivalent price (dollars) shown as the big "/month" figure. */
+export function cycleMonthlyPrice(monthlyDollars: number, cycle: BillingCycle): number {
+  return monthlyDollars * (1 - cycleMeta(cycle).discountPct / 100)
+}
+
+/** Total charged per billing period (dollars) — matches the edge function's cyclePeriodAmountCents. */
+export function cyclePeriodTotal(monthlyDollars: number, cycle: BillingCycle): number {
+  return cycleMonthlyPrice(monthlyDollars, cycle) * cycleMeta(cycle).months
+}
+
+/** "Billed monthly" / "Billed quarterly ($80.97 every 3 months)" / "Billed yearly ($287.90/year)". */
+export function cycleBillingNote(monthlyDollars: number, cycle: BillingCycle): string {
+  if (cycle === 'monthly') return 'Billed monthly'
+  const total = cyclePeriodTotal(monthlyDollars, cycle).toFixed(2)
+  return cycle === 'quarterly'
+    ? `Billed quarterly ($${total} every 3 months)`
+    : `Billed yearly ($${total}/year)`
+}
+
 export interface CreateCheckoutSessionOptions {
   trialEnd?: number
   /** For per-job resume advice; passed to Stripe session metadata and webhook. */
   jobMatchId?: string
+  /** Base-plan billing cycle. Defaults to monthly on the server when omitted. */
+  billingCycle?: BillingCycle
 }
 
 export const subscriptionAPI = {
@@ -86,6 +129,7 @@ export const subscriptionAPI = {
       cancelUrl?: string
       trialEnd?: number
       jobMatchId?: string
+      billingCycle?: BillingCycle
     } = {
       productIds,
       successUrl:
@@ -97,6 +141,9 @@ export const subscriptionAPI = {
     }
     if (typeof options?.jobMatchId === 'string' && options.jobMatchId) {
       body.jobMatchId = options.jobMatchId
+    }
+    if (options?.billingCycle && options.billingCycle !== 'monthly') {
+      body.billingCycle = options.billingCycle
     }
 
     const { data, error } = await supabase.functions.invoke('create-checkout-session', {
