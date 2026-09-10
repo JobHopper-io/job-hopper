@@ -5,13 +5,11 @@
   command = "npm run build && node scripts/generate-seo-pages.mjs"
 
 [build.environment]
-  # email-router-worker/ is a standalone Cloudflare Worker (its own deploy via
-  # `wrangler deploy`), not part of this Netlify site. Its wrangler.toml hardcodes the
-  # Supabase project URL in REPLY_INGEST_URL -- not a secret (same value ships publicly
-  # as VITE_SUPABASE_URL), but it matches the build's SUPABASE_URL env var literally, so
-  # Netlify's secrets scanner flags it as a false positive. Exclude just that directory
-  # rather than disabling the scan or exempting the SUPABASE_URL key everywhere.
-  SECRETS_SCAN_OMIT_PATHS = "email-router-worker/**"
+  # The Supabase project URL is public (shipped to the browser as VITE_SUPABASE_URL).
+  # Netlify's secrets scanner flags it only because a build env var named SUPABASE_URL
+  # shares its value with a committed literal (email-router-worker/wrangler.toml's
+  # REPLY_INGEST_URL). Not a secret; keep SUPABASE_SERVICE_ROLE_KEY scanned.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
 
 # Canonicalize away trailing slashes on SEO pages: /jobs/x/y/ -> /jobs/x/y.
 # Our canonical tags have no trailing slash; this prevents the slash variant
