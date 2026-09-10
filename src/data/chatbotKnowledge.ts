@@ -70,7 +70,7 @@ export const chatbotKnowledge = [
   },
   {
     q: "Do you offer discounts, annual plans, or a cheaper tier?",
-    a: "Today Core is a flat $29/month, billed monthly, with no long-term commitment — cancel anytime. There's no annual plan currently offered."
+    a: "Today Core is a flat $29.99/month, billed monthly, with no long-term commitment — cancel anytime. There's no annual plan currently offered."
   },
   {
     q: "If I upgrade and it's not for me, how easy is it to back out?",

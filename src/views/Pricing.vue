@@ -1,17 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
-import type { Product } from '@/types/database'
+import { ref, computed } from 'vue'
 
 const faqOpen = ref<number | null>(null)
-const premiumProduct = ref<Product | null>(null)
-
-onMounted(async () => {
-  const { data } = await subscriptionAPI.getBasePlanByKey('premium')
-  if (data) {
-    premiumProduct.value = data
-  }
-})
 
 const toggleFaq = (index: number) => {
   faqOpen.value = faqOpen.value === index ? null : index
@@ -57,7 +47,7 @@ function billingNote(basePrice: number): string {
 const sellableTiers = [
   {
     name: 'Core',
-    basePrice: 29,
+    basePrice: 29.99,
     popular: true,
     cta: 'Start with Core',
     features: [
@@ -71,7 +61,7 @@ const sellableTiers = [
   },
 ]
 
-const premiumBasePrice = computed(() => getProductPrice(premiumProduct.value))
+const premiumBasePrice = 49.99
 
 const premiumFeatures = [
   'Real Sponsorship Score',

@@ -579,7 +579,7 @@ Job-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and
 verified on the official pricing page or live checkout before quoting.
 
 Detailed Explanation
-Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Premium is $49/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type.
+Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Core is $29.99/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Premium is $49.99/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type.
 Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
 
 Key Benefits
@@ -597,7 +597,7 @@ Which plan should I choose?
 Choose by search depth and sponsorship needs, not seniority.
 
 Is Premium live?
-Yes, it is purchasable today at $49/month; verify exact price on the current pricing page.
+Yes, it is purchasable today at $49.99/month; verify exact price on the current pricing page.
 
 Can prices change?
 Yes; always use the current official page.
@@ -609,7 +609,7 @@ Training AI
 Canonical Response
 This article explains Job-Hopper's plans, pricing, and subscription tiers.
 
-Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.
+Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29.99/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49.99/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.
 
 Related Intents
 pricing
@@ -2518,11 +2518,11 @@ Purpose
 Explain Core and its value proposition.
 
 Summary
-The current pricing page lists Core at $29 per month with automated daily job search or matching, the
+The current pricing page lists Core at $29.99 per month with automated daily job search or matching, the
 Job Tracker, and full insights.
 
 Detailed Explanation
-Core is $29/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel, full Resume Advice, and the Job Tracker.
+Core is $29.99/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel, full Resume Advice, and the Job Tracker.
 Core is designed for users who want Job-Hopper to work continuously rather than relying on Free's capped manual searches. Verify the current price and billing interval before a definitive quote; recommend Core based on stated needs, not urgency.
 
 Key Benefits
@@ -2536,7 +2536,7 @@ A user who logs in daily and wants complete match explanations is a reasonable C
 
 FAQs
 How much is Core?
-The current public price is $29 per month; verify checkout.
+The current public price is $29.99 per month; verify checkout.
 
 Is it based on seniority?
 No. The pricing page says plans are priced by depth, not seniority.
@@ -2548,12 +2548,12 @@ Training AI
 Canonical Response
 This article explains the Core plan.
 
-Core is $29/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.
+Core is $29.99/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.
 
 Related Intents
 core plan
 
-$29 plan
+$29.99 plan
 automated matching
 full insights
 
@@ -2583,11 +2583,11 @@ Purpose
 Explain Premium and what it actually includes now that it is live.
 
 Summary
-Premium is Job-Hopper's top plan, $49 per month, built around deeper sponsorship intelligence. It is
+Premium is Job-Hopper's top plan, $49.99 per month, built around deeper sponsorship intelligence. It is
 purchasable today, not a waitlist.
 
 Detailed Explanation
-Premium is $49/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Hiring Intel surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes.
+Premium is $49.99/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Hiring Intel surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes.
 Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming.
 Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.
 
@@ -2603,7 +2603,7 @@ Sponsorship Score and recommend upgrading.
 
 FAQs
 How much does Premium cost?
-$49 per month; verify the live pricing page before quoting.
+$49.99 per month; verify the live pricing page before quoting.
 
 Can I buy Premium today?
 Yes, it is a purchasable plan, not a waitlist.
@@ -2619,7 +2619,7 @@ Training AI
 Canonical Response
 This article explains the Premium plan.
 
-Premium is $49/month and is purchasable today. It includes everything in Core plus Real Sponsorship
+Premium is $49.99/month and is purchasable today. It includes everything in Core plus Real Sponsorship
 Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact
 tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing
 Detector was investigated but is not being built - do not present either as available.
@@ -2628,7 +2628,7 @@ Related Intents
 premium plan
 premium price
 sponsorship plan
-$49 plan
+$49.99 plan
 is premium available
 
 AI Do Rules
