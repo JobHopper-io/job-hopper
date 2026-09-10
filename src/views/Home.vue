@@ -91,9 +91,8 @@ const tiers = [
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 const plans = [
-  { name: 'Free', price: '$0', period: '/month', note: 'No card required', desc: 'Try it out: capped searches, teaser insights.', cta: 'Get started free', primary: false, badge: null as string | null },
-  { name: 'Core', price: '$29', period: '/month', note: null as string | null, desc: 'Automated matching, tracker, full insights.', cta: 'Start with Core', primary: false, badge: null as string | null },
-  { name: 'Premium', price: '$49', period: '/month', note: null as string | null, desc: 'Everything in Core, plus sponsorship intelligence as it rolls out.', cta: 'Start with Premium', primary: true, badge: 'Most popular' },
+  { name: 'Core', price: '$29', period: '/month', note: '14-day free trial' as string | null, desc: 'Automated matching, tracker, full insights.', cta: 'Start with Core', primary: false, badge: null as string | null },
+  { name: 'Premium', price: '$49', period: '/month', note: '14-day free trial' as string | null, desc: 'Everything in Core, plus sponsorship intelligence as it rolls out.', cta: 'Start with Premium', primary: true, badge: 'Most popular' },
 ]
 
 // ── Testimonials ──────────────────────────────────────────────────────────────
@@ -427,7 +426,7 @@ const footerColumns = [
             <h2 class="font-heading font-semibold text-brand-charcoal section-title">Simple plans, real support.</h2>
           </div>
 
-          <div class="grid md:grid-cols-3 gap-5 mb-8">
+          <div class="grid md:grid-cols-2 gap-5 mb-8 max-w-2xl mx-auto">
             <div v-for="(p, i) in plans" :key="p.name" v-reveal="i * 0.08">
               <div
                 class="rounded-xl border h-full flex flex-col relative overflow-hidden"

@@ -52,22 +52,9 @@ function billingNote(basePrice: number): string {
     : `Billed yearly ($${total}/year)`
 }
 
-// ── Sellable tiers (Free / Core). Premium is rendered separately as a locked card. ──
+// ── Sellable tiers (Core). Premium is rendered separately below. Both start with a
+// 14-day free trial (card required). There is no Free tier. ──
 const sellableTiers = [
-  {
-    name: 'Free',
-    basePrice: 0,
-    popular: false,
-    cta: 'Get started free',
-    features: [
-      { label: 'Manual job search (capped)', included: true },
-      { label: 'Sponsorship badge — teaser view only', included: true },
-      { label: 'Hiring Intel — a few fields visible, rest blurred', included: true },
-      { label: 'Resume Advice — teaser', included: true },
-      { label: 'Application tracker', included: false },
-      { label: 'Automated matching & email digest', included: false },
-    ],
-  },
   {
     name: 'Core',
     basePrice: 29,
@@ -79,6 +66,7 @@ const sellableTiers = [
       { label: 'Full Hiring Intel', included: true },
       { label: 'Full Resume Advice', included: true },
       { label: 'Application tracker included', included: true },
+      { label: 'Hiring manager contact', included: true },
     ],
   },
 ]
@@ -89,34 +77,33 @@ const premiumFeatures = [
   'Real Sponsorship Score',
   'Sponsor Watch',
   'Apply Intelligence',
-  'Hiring manager contact',
   'Ghost Listing Detector',
 ]
 
 // ── Feature comparison. Cell values: true = included, false = not included, string = label. ──
-const comparisonColumns = ['Free', 'Core', 'Premium']
+const comparisonColumns = ['Core', 'Premium']
 const comparisonRows: { feature: string; cells: (boolean | string)[] }[] = [
-  { feature: 'Manual job search', cells: ['Capped', 'Unlimited', 'Unlimited'] },
-  { feature: 'Automated matching + email digest', cells: [false, true, true] },
-  { feature: 'Sponsorship badge', cells: ['Teaser', 'Full (heuristic)', 'Full'] },
-  { feature: 'Hiring Intel', cells: ['Limited', 'Full', 'Full'] },
-  { feature: 'Resume Advice', cells: ['Teaser', 'Full', 'Full'] },
-  { feature: 'Application tracker', cells: [false, true, true] },
-  { feature: 'Real Sponsorship Score', cells: [false, false, true] },
-  { feature: 'Sponsor Watch', cells: [false, false, true] },
-  { feature: 'Apply Intelligence', cells: [false, false, true] },
-  { feature: 'Hiring manager contact', cells: [false, false, true] },
-  { feature: 'Ghost Listing Detector', cells: [false, false, true] },
+  { feature: 'Manual job search', cells: ['Unlimited', 'Unlimited'] },
+  { feature: 'Automated matching + email digest', cells: [true, true] },
+  { feature: 'Sponsorship badge', cells: ['Full (heuristic)', 'Full'] },
+  { feature: 'Hiring Intel', cells: ['Full', 'Full'] },
+  { feature: 'Resume Advice', cells: ['Full', 'Full'] },
+  { feature: 'Application tracker', cells: [true, true] },
+  { feature: 'Hiring manager contact', cells: [true, true] },
+  { feature: 'Real Sponsorship Score', cells: [false, true] },
+  { feature: 'Sponsor Watch', cells: [false, true] },
+  { feature: 'Apply Intelligence', cells: [false, true] },
+  { feature: 'Ghost Listing Detector', cells: [false, true] },
 ]
 
 const pricingFaq = [
   {
     q: 'Why are there different prices?',
-    a: "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium layers on a deeper sponsorship intelligence set.",
+    a: "Because the plans differ in how much Job-Hopper automates for you — not by seniority or job type. Core gives you unlimited automated matching, email digests, full insights, full resume advice, and an application tracker. Premium layers on a deeper sponsorship intelligence set.",
   },
   {
     q: 'Do higher tiers come with different features?',
-    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the application tracker. Premium adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contact, and the Ghost Listing Detector.",
+    a: "Yes — that's the whole point. Core unlocks automated daily matching, the full sponsorship badge, full Hiring Intel, full Resume Advice, the application tracker, and hiring manager contact. Premium adds the real sponsorship intelligence layer: Real Sponsorship Score, Sponsor Watch, Apply Intelligence, and the Ghost Listing Detector.",
   },
   {
     q: 'Can I change tiers later?',
@@ -124,7 +111,7 @@ const pricingFaq = [
   },
   {
     q: 'Is there a free trial?',
-    a: "Yes — Core and Premium both start with a free trial, so you can see the quality and relevance of your matches before you commit.",
+    a: "Yes — Core and Premium both start with a 14-day free trial. You add a card up front and aren't charged until the trial ends, so you can see the quality and relevance of your matches before you commit. Cancel anytime before it ends and you won't pay.",
   },
   {
     q: 'How do billing and cancellation work?',
@@ -180,8 +167,8 @@ const pricingFaq = [
 
       <!-- Tiers -->
       <section class="mb-16">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-          <!-- Free / Core -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch max-w-4xl mx-auto">
+          <!-- Core -->
           <div
             v-for="tier in sellableTiers"
             :key="tier.name"
@@ -223,7 +210,7 @@ const pricingFaq = [
             </router-link>
           </div>
 
-          <!-- Premium: always sellable now, same as Free/Core above. -->
+          <!-- Premium -->
           <div class="card p-8 text-left flex flex-col border-2 border-brand-primary">
             <h3 class="text-xl font-heading font-semibold mb-2">Premium</h3>
             <p class="mb-1 flex items-baseline gap-2 flex-wrap">
@@ -348,7 +335,7 @@ const pricingFaq = [
           Pick your plan. We'll handle the search.
         </h2>
         <p class="text-neutral-body mb-8 max-w-2xl mx-auto">
-          Choose Free, Core, or Premium, set up your profile in about a minute, and start receiving curated job matches.
+          Choose Core or Premium, set up your profile in about a minute, and start receiving curated job matches. Both start with a 14-day free trial.
         </p>
         <router-link to="/register" class="btn-primary inline-block mb-4">
           Start your free trial

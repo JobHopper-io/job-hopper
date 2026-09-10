@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { subscriptionAPI, getProductPrice } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
-import { freemiumAPI, FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
+import { FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -18,7 +17,6 @@ import jobHopperLogo from '@/assets/job-hopper-logo.png'
 import jobHopperRabbitLogo from '@/assets/job-hopper-rabbit.png'
 import { splitTagsField, joinTagsField } from '@/lib/tags'
 
-const router = useRouter()
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
 
@@ -58,12 +56,12 @@ const openToRemote = ref(false)
 // Step 4: Resume Upload
 const resumeFile = ref<File | null>(null)
 
-// Step 5: Plan Selection (product ids from DB) or free tier
+// Step 5: Plan Selection (base-plan product ids from DB). No Free tier — every user
+// picks Core or Premium and goes through checkout (14-day card trial).
 const basePlanProducts = ref<Product[]>([])
 const selectedBasePlanId = ref<string | null>(null)
-const startFreePlan = ref(false)
-// Career level is required for everyone (free and paid). It is the job-matching tier and
-// is stored on profiles.career_level -- never derived from the plan/product the user picks.
+// Career level is required for everyone. It is the job-matching tier and is stored on
+// profiles.career_level -- never derived from the plan/product the user picks.
 const careerLevel = ref<FreemiumBasePlanTierKey | ''>('')
 
 const careerLevelOptions = CAREER_LEVEL_OPTIONS
@@ -107,7 +105,7 @@ const canProceedStep3 = computed(() => {
 })
 
 const canProceedStep5 = computed(() => {
-  return startFreePlan.value || selectedBasePlanId.value !== null
+  return selectedBasePlanId.value !== null
 })
 
 const canProceedCurrentStep = computed(() => {
@@ -200,13 +198,7 @@ const toggleRoleCategory = (value: RoleCategoryValue) => {
 }
 
 function selectPaidPlan(productId: string) {
-  startFreePlan.value = false
   selectedBasePlanId.value = productId
-}
-
-function selectFreePlan() {
-  startFreePlan.value = true
-  selectedBasePlanId.value = null
 }
 
 async function persistProfileAndResume(): Promise<boolean> {
@@ -248,32 +240,6 @@ async function persistProfileAndResume(): Promise<boolean> {
 }
 
 // Note: Authentication and onboarding redirects are handled in router guard
-
-const handleContinueForFree = async () => {
-  try {
-    isLoading.value = true
-    error.value = ''
-    if (!FREEMIUM_BASE_PLAN_TIER_KEYS.includes(careerLevel.value as FreemiumBasePlanTierKey)) {
-      error.value = 'Please choose which level best describes the roles you want.'
-      return
-    }
-    const ok = await persistProfileAndResume()
-    if (!ok) return
-
-    const { error: freeError } = await freemiumAPI.completeOnboarding(careerLevel.value)
-    if (freeError) {
-      error.value = freeError.message || 'Could not finish free signup. Please try again.'
-      return
-    }
-    await userStore.refreshProfile()
-    await router.push('/dashboard')
-  } catch (err) {
-    error.value = (err as Error).message || 'An unexpected error occurred'
-    console.error('Onboarding error:', err)
-  } finally {
-    isLoading.value = false
-  }
-}
 
 const handleProceedToCheckout = async () => {
   try {
@@ -550,32 +516,14 @@ const handleProceedToCheckout = async () => {
         <!-- Step 5: Plan Selection -->
         <div v-if="currentStep === 5" class="flex flex-col items-center gap-8">
           <div class="text-center">
-            <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Choose how you want to start</h2>
+            <h2 class="text-2xl font-heading font-bold text-brand-charcoal">Choose your plan</h2>
             <p class="mt-1 text-sm text-neutral-body">
-              Start free, or subscribe with a 2-week trial for automated matching and email digests. Upgrade
-              anytime from billing.
+              Core and Premium both start with a 14-day free trial. Add a card now — you're not
+              charged until the trial ends, and you can cancel anytime before then.
             </p>
           </div>
 
-          <div class="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <div class="relative flex flex-col">
-              <div
-                class="flex h-full flex-col gap-4 rounded-2xl border p-6"
-                :class="startFreePlan ? 'border-2' : 'border'"
-                :style="startFreePlan ? { borderColor: '#2F6ECC', boxShadow: '0 6px 20px rgba(47,110,204,0.12)' } : { borderColor: '#E5E7EB' }"
-              >
-                <div>
-                  <p class="font-heading font-bold text-brand-charcoal">Free</p>
-                  <p class="mt-0.5 text-sm text-neutral-body">Explore the dashboard and preview our features.</p>
-                </div>
-                <p class="text-3xl font-heading font-bold text-brand-primary">$0</p>
-                <p class="flex-1 text-sm text-neutral-body">Manual job search, teaser insights, capped access.</p>
-                <button type="button" class="btn-secondary w-full" @click="selectFreePlan">
-                  {{ startFreePlan ? 'Selected' : 'Choose free' }}
-                </button>
-              </div>
-            </div>
-
+          <div class="grid w-full max-w-2xl grid-cols-1 gap-5 sm:grid-cols-2">
             <div v-for="product in basePlanProducts" :key="product.id" class="relative flex flex-col">
               <div
                 v-if="isCorePlan(product)"
@@ -585,9 +533,9 @@ const handleProceedToCheckout = async () => {
               </div>
               <div
                 class="flex h-full flex-col gap-4 rounded-2xl border p-6"
-                :class="[!startFreePlan && selectedBasePlanId === product.id ? 'border-2' : 'border', isCorePlan(product) ? 'mt-3' : '']"
+                :class="[selectedBasePlanId === product.id ? 'border-2' : 'border', isCorePlan(product) ? 'mt-3' : '']"
                 :style="
-                  !startFreePlan && selectedBasePlanId === product.id
+                  selectedBasePlanId === product.id
                     ? { borderColor: '#2F6ECC', boxShadow: '0 6px 20px rgba(47,110,204,0.12)' }
                     : { borderColor: '#E5E7EB' }
                 "
@@ -600,11 +548,10 @@ const handleProceedToCheckout = async () => {
                 </p>
                 <p class="flex-1 text-sm text-neutral-body">{{ product.description || '' }}</p>
                 <button type="button" class="btn-primary w-full" @click="selectPaidPlan(product.id)">
-                  {{ !startFreePlan && selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}
+                  {{ selectedBasePlanId === product.id ? 'Selected' : 'Select plan' }}
                 </button>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -625,16 +572,6 @@ const handleProceedToCheckout = async () => {
           >
             {{ currentStep === 4 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
             <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
-          </button>
-          <button
-            v-else-if="startFreePlan"
-            type="button"
-            :disabled="!canProceedStep5 || isLoading"
-            class="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-            @click="handleContinueForFree"
-          >
-            <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
-            <span>{{ isLoading ? 'Saving…' : 'Continue for free' }}</span>
           </button>
           <button
             v-else

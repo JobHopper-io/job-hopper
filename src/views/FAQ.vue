@@ -54,63 +54,51 @@ const faqs = [
   },
   {
     q: "What is the sponsorship badge, and how accurate is it?",
-    a: "It's a fast, heuristic estimate—built from employer size, industry, and role signals—that helps you quickly prioritize roles where sponsorship is more plausible, without digging through each posting. On Free you see a teaser; Core unlocks the full badge on every match. It's a smart filter, not a guarantee—no badge can tell you for certain whether a specific employer will sponsor. If you want something backed by real government filing data instead of a heuristic, that's what our upcoming Real Sponsorship Score (Premium) is built for—join the waitlist to get early access."
+    a: "It's a fast, heuristic estimate—built from employer size, industry, and role signals—that helps you quickly prioritize roles where sponsorship is more plausible, without digging through each posting. Every plan includes the full badge on every match. It's a smart filter, not a guarantee—no badge can tell you for certain whether a specific employer will sponsor. If you want something backed by real government filing data instead of a heuristic, that's what the Real Sponsorship Score on Premium is built for."
   },
   {
     q: "How does the free trial work?",
-    a: "Core starts with a free trial, so you can see the quality of your matches before being charged—cancel anytime before it ends and you won't pay. Free requires no card and has no trial period since it's free to use indefinitely. Premium isn't purchasable yet, so there's no trial for it—join the waitlist to get access when it launches."
+    a: "Core and Premium both start with a 14-day free trial. You add a card up front and aren't charged until the trial ends, so you can see the quality and relevance of your matches before you commit. Cancel anytime before the trial ends and you won't pay."
   },
   {
     q: "Is Resume Advice included, or is it a paid add-on?",
-    a: "Full Resume Advice is included in Core—not a separate purchase. Free gets a teaser version. The one-time resume upgrade and per-job resume tailoring are separate paid add-ons on top of whichever plan you're on."
+    a: "Full Resume Advice is included in Core and Premium—not a separate purchase. The one-time resume upgrade and per-job resume tailoring are separate paid add-ons on top of whichever plan you're on."
   },
   {
     q: "Why are there different plans?",
-    a: "Plans differ in how much Job-Hopper automates for you—not by seniority or job type. Free lets you search manually with capped access and teaser insights. Core adds unlimited automated matching, daily email digests, full insights, full resume advice, and an application tracker. Premium (coming soon) layers on a deeper sponsorship intelligence set."
+    a: "Plans differ in how much Job-Hopper automates for you—not by seniority or job type. Core gives you unlimited automated matching, daily email digests, full insights, full resume advice, an application tracker, and hiring manager contact. Premium layers on a deeper sponsorship intelligence set."
   },
   {
     q: "Do higher-priced tiers come with different features?",
-    a: "Yes—that's the main difference between plans. Core unlocks unlimited automated daily search, full sponsorship insights, full resume advice, and the application tracker, all of which are limited or teaser-only on Free. Premium will add deeper sponsorship intelligence—Real Sponsorship Score, Sponsor Watch, Apply Intelligence, hiring manager contacts, and the Ghost Listing Detector—on top of everything in Core."
+    a: "Yes. Core covers unlimited automated daily search, full sponsorship insights, full resume advice, the application tracker, and hiring manager contact. Premium adds deeper sponsorship intelligence—Real Sponsorship Score, Sponsor Watch, Apply Intelligence, and the Ghost Listing Detector—on top of everything in Core."
   },
   {
     q: "Can I change plans later?",
-    a: "Yes. You can upgrade or downgrade between Free, Core, and Premium (once Premium is available) from your account settings at any time. Changes typically apply to your next billing cycle."
+    a: "Yes. You can switch between Core and Premium from your account settings at any time. Changes typically apply to your next billing cycle."
   },
   {
-    q: "Do I have to upgrade to Core to get value?",
-    a: "No—Free gets you manual search with capped access and a preview of what Core unlocks. But Core is where the automation actually runs for you: unlimited daily matching, full insights, and the application tracker. Most people upgrade once they've seen a few matches and want it running automatically."
+    q: "Which plan should I start with?",
+    a: "Most people start with Core—it runs the automation for you: unlimited daily matching, full insights, the application tracker, and hiring manager contact. Choose Premium if sponsorship likelihood is central to your search and you want the Real Sponsorship Score, Sponsor Watch, Apply Intelligence, and Ghost Listing Detector on top. Both start with a 14-day free trial, so you can try either before you're charged."
   },
   {
     q: "Do I need a credit card to sign up?",
-    a: "No. Free requires no card at all—you can start using Job-Hopper immediately. A card is only needed when you choose to upgrade to Core."
-  },
-  {
-    q: "What happens when I hit my search limit on Free?",
-    a: "Free gives you 3 manual job searches. Once you use them, you'll see the option to upgrade to Core, which removes the cap entirely and switches you to unlimited automated daily search—no more manually re-running searches."
-  },
-  {
-    q: "What's the real difference between Free and Core?",
-    a: "Free lets you look around: manual search with a cap, a teaser of the sponsorship badge, a few visible Hiring Intel fields, and a preview of Resume Advice. Core removes the ceiling—unlimited automated daily search with an email digest, the full sponsorship badge on every match, full Hiring Intel, full Resume Advice, and the application tracker to keep track of where you've applied. If you're serious about your search, Core is where Job-Hopper actually starts working for you instead of you working it."
-  },
-  {
-    q: "How do I upgrade from Free to Core?",
-    a: "From your dashboard, go to your account settings and select Upgrade to Core. You'll get unlimited automated search and full access to every feature immediately—no waiting for the next billing cycle to start using it."
+    a: "Yes. Core and Premium both start with a 14-day free trial that requires a card, so billing can begin automatically when the trial ends. You won't be charged during the trial, and you can cancel anytime before it ends."
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes. Cancel from your account settings whenever you want—no minimum commitment. If you cancel Core, you'll keep access through the end of your current billing period, then drop back to Free rather than losing your account entirely."
+    a: "Yes. Cancel from your account settings whenever you want—no minimum commitment. If you cancel, you'll keep access through the end of your current billing period, then lose access to paid features; your account, profile, and saved job history stay in place."
   },
   {
     q: "Will I lose my matches or saved jobs if I switch plans?",
-    a: "No. Your account, profile, and saved job history stay in place whether you're on Free or Core. If you downgrade from Core to Free, your tracked applications aren't deleted—the application tracker view just isn't part of the Free plan, so you won't see it in your dashboard until you upgrade again, at which point everything reappears."
+    a: "No. Your account, profile, and saved job history stay in place when you switch between Core and Premium. If you downgrade from Premium to Core, Premium-only views simply stop showing until you upgrade again, at which point everything reappears."
   },
   {
-    q: "Is Premium worth waiting for?",
-    a: "If sponsorship likelihood matters a lot to your search, yes—Premium is built specifically for that. It layers a Real Sponsorship Score backed by actual filing data on top of everything Core already gives you, plus Sponsor Watch (alerts on employer filing activity), Apply Intelligence, hiring manager contacts, and the Ghost Listing Detector. It's not purchasable yet—join the waitlist from the Pricing page to get early access the moment it launches."
+    q: "Is Premium worth it?",
+    a: "If sponsorship likelihood matters a lot to your search, yes—Premium is built specifically for that. It layers a Real Sponsorship Score backed by actual filing data on top of everything Core already gives you, plus Sponsor Watch (alerts on employer filing activity), Apply Intelligence, and the Ghost Listing Detector. It also starts with a 14-day free trial, so you can see the difference before you commit."
   },
   {
-    q: "I'm not sure Core is worth it yet—what should I do?",
-    a: "Start on Free and see the quality of your matches firsthand—there's no card required and no time pressure. When you're ready to stop manually re-running searches and want the full sponsorship badge, insights, and tracker running automatically, upgrading to Core takes one click and applies immediately."
+    q: "I'm not sure which plan is worth it yet—what should I do?",
+    a: "Start the 14-day free trial on Core. You add a card but aren't charged until it ends, and you can cancel anytime before then. Once you've seen a few matches with the full sponsorship badge, insights, and tracker running automatically, you'll know whether Core is enough or whether Premium's sponsorship intelligence is worth the step up."
   },
   {
     q: "What happens if I find a job?",

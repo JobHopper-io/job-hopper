@@ -27,12 +27,13 @@ const PLAN_FEATURES: Record<string, string[]> = {
     'Full Hiring Intel',
     'Full Resume Advice',
     'Application tracker included',
+    'Hiring manager contact',
   ],
   premium: [
     'Real Sponsorship Score',
     'Sponsor Watch',
     'Apply Intelligence',
-    'Hiring manager contact',
+    'Ghost Listing Detector',
   ],
 }
 function featuresFor(product: Product): string[] {
