@@ -107,7 +107,7 @@
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal">
           Users
           <span class="text-sm font-normal text-neutral-body">
-            ({{ filteredUsers.length }}{{ categoryFilter ? ' filtered' : '' }})
+            ({{ filteredUsers.length }}{{ categoryFilter || signupWindow || searchQuery ? ' filtered' : '' }})
           </span>
         </h2>
         <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -145,6 +145,27 @@
           </div>
           <div class="w-full sm:max-w-xs">
             <label
+              for="lifecycle-signup-window"
+              class="block text-sm font-medium text-brand-charcoal mb-1"
+            >
+              Signed up
+            </label>
+            <select
+              id="lifecycle-signup-window"
+              v-model="signupWindow"
+              class="w-full rounded-lg border border-neutral-border px-3 py-2 text-sm text-brand-charcoal bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              <option
+                v-for="opt in signupWindowOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="w-full sm:max-w-xs">
+            <label
               for="lifecycle-search"
               class="block text-sm font-medium text-brand-charcoal mb-1"
             >
@@ -159,7 +180,7 @@
             >
           </div>
           <button
-            v-if="categoryFilter || searchQuery"
+            v-if="categoryFilter || searchQuery || signupWindow"
             type="button"
             class="inline-flex items-center justify-center rounded-lg border border-neutral-border px-4 py-2 text-sm font-medium text-brand-charcoal hover:bg-neutral-bg"
             @click="clearFilters"
@@ -259,6 +280,20 @@ const truncated = ref(false)
 const categoryFilter = ref<UserLifecycleCategory | ''>('')
 const searchQuery = ref('')
 
+type SignupWindow = '' | '24h' | '7d' | '30d'
+const SIGNUP_WINDOW_MS: Record<Exclude<SignupWindow, ''>, number> = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+}
+const signupWindowOptions: { value: SignupWindow; label: string }[] = [
+  { value: '', label: 'All time' },
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+]
+const signupWindow = ref<SignupWindow>('')
+
 function categoryLabel(category: UserLifecycleCategory): string {
   return USER_LIFECYCLE_CATEGORY_LABELS[category]
 }
@@ -286,20 +321,29 @@ const categoryOptions = computed(() => {
 const filteredUsers = computed(() => {
   if (!report.value) return []
   const q = searchQuery.value.trim().toLowerCase()
-  return report.value.users.filter((user) => {
-    if (categoryFilter.value && user.category !== categoryFilter.value) {
-      return false
-    }
-    if (q && !user.email.toLowerCase().includes(q)) {
-      return false
-    }
-    return true
-  })
+  const windowMs = signupWindow.value ? SIGNUP_WINDOW_MS[signupWindow.value] : null
+  const cutoff = windowMs ? Date.now() - windowMs : null
+
+  return report.value.users
+    .filter((user) => {
+      if (categoryFilter.value && user.category !== categoryFilter.value) {
+        return false
+      }
+      if (q && !user.email.toLowerCase().includes(q)) {
+        return false
+      }
+      if (cutoff !== null && (!user.createdAt || new Date(user.createdAt).getTime() < cutoff)) {
+        return false
+      }
+      return true
+    })
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 })
 
 function clearFilters() {
   categoryFilter.value = ''
   searchQuery.value = ''
+  signupWindow.value = ''
 }
 
 /** Wrap in quotes and escape internal quotes if the field needs it (comma, quote, or newline). */
