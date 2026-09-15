@@ -101,7 +101,9 @@ serve(async (req) => {
       email: string
       first_name: string
       last_name: string
+      phone_number: string | null
       onboarding_completed: boolean | null
+      created_at: string | null
     }[] = []
 
     let offset = 0
@@ -112,7 +114,7 @@ serve(async (req) => {
 
       const { data: page, error: pageError } = await supabaseAdminClient
         .from('profiles')
-        .select('id, email, first_name, last_name, onboarding_completed')
+        .select('id, email, first_name, last_name, phone_number, onboarding_completed, created_at')
         .order('email', { ascending: true })
         .range(offset, offset + take - 1)
 
@@ -140,11 +142,14 @@ serve(async (req) => {
     const truncated = allProfiles.length >= MAX_PROFILES && lastPageSize === PAGE_SIZE
 
     const statusesByProfile = new Map<string, string[]>()
+    // Only entitled (trial/active) subscriptions count towards a displayed tier, same
+    // rule as resolveBaseTier in _shared/base-tier.ts.
+    const profileByEntitledSubId = new Map<string, string>()
     let subOffset = 0
     while (true) {
       const { data: subPage, error: subError } = await supabaseAdminClient
         .from('subscriptions')
-        .select('profile_id, status')
+        .select('id, profile_id, status')
         .order('profile_id', { ascending: true })
         .range(subOffset, subOffset + PAGE_SIZE - 1)
 
@@ -169,10 +174,69 @@ serve(async (req) => {
         } else {
           statusesByProfile.set(pid, [status])
         }
+        if (status === 'trial' || status === 'active') {
+          profileByEntitledSubId.set(row.id as string, pid)
+        }
       }
 
       subOffset += subPage.length
       if (subPage.length < PAGE_SIZE) {
+        break
+      }
+    }
+
+    const { data: baseProducts, error: baseProductsError } = await supabaseAdminClient
+      .from('products')
+      .select('id, key')
+      .eq('category', 'base_plan')
+
+    if (baseProductsError) {
+      console.error('admin-user-lifecycle-report: products', baseProductsError)
+      return new Response(JSON.stringify({ error: 'Failed to load products' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
+    }
+
+    const baseProductKeyById = new Map<string, string>(
+      (baseProducts ?? []).map((p) => [p.id as string, p.key as string]),
+    )
+
+    const tierByProfile = new Map<string, 'core' | 'premium'>()
+    let subProdOffset = 0
+    while (true) {
+      const { data: subProdPage, error: subProdError } = await supabaseAdminClient
+        .from('subscription_product')
+        .select('subscription_id, product_id')
+        .order('subscription_id', { ascending: true })
+        .range(subProdOffset, subProdOffset + PAGE_SIZE - 1)
+
+      if (subProdError) {
+        console.error('admin-user-lifecycle-report: subscription_product', subProdError)
+        return new Response(JSON.stringify({ error: 'Failed to load subscription products' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        })
+      }
+
+      if (!subProdPage || subProdPage.length === 0) {
+        break
+      }
+
+      for (const row of subProdPage) {
+        const profileId = profileByEntitledSubId.get(row.subscription_id as string)
+        const key = baseProductKeyById.get(row.product_id as string)
+        if (!profileId || !key) continue
+
+        if (key === 'premium') {
+          tierByProfile.set(profileId, 'premium')
+        } else if (tierByProfile.get(profileId) !== 'premium') {
+          tierByProfile.set(profileId, 'core')
+        }
+      }
+
+      subProdOffset += subProdPage.length
+      if (subProdPage.length < PAGE_SIZE) {
         break
       }
     }
@@ -187,6 +251,9 @@ serve(async (req) => {
       email: string
       firstName: string
       lastName: string
+      phoneNumber: string | null
+      tier: 'core' | 'premium' | null
+      createdAt: string | null
       category: UserLifecycleCategory
     }[] = []
 
@@ -219,6 +286,9 @@ serve(async (req) => {
         email: profile.email,
         firstName: profile.first_name,
         lastName: profile.last_name,
+        phoneNumber: profile.phone_number,
+        tier: tierByProfile.get(profile.id) ?? null,
+        createdAt: profile.created_at,
         category,
       })
     }

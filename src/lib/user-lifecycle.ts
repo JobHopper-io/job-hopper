@@ -15,12 +15,14 @@ export const USER_LIFECYCLE_CATEGORY_ORDER: UserLifecycleCategory[] = [
   'unclassified',
 ]
 
+// There is no purchasable Free plan (see Pricing.vue) -- these labels describe where a
+// user is in the Core/Premium trial-to-paid flow, not a separate free product tier.
 export const USER_LIFECYCLE_CATEGORY_LABELS: Record<UserLifecycleCategory, string> = {
-  incomplete_onboarding: 'Incomplete onboarding',
-  stripe_free_trial: 'Stripe free trial',
-  freemium: 'Freemium',
-  active_subscription: 'Active subscription',
-  churned: 'Churned',
+  incomplete_onboarding: 'Signed up, not onboarded',
+  stripe_free_trial: 'On trial (Core/Premium)',
+  freemium: 'Onboarded, no plan yet',
+  active_subscription: 'Paying customer',
+  churned: 'Cancelled',
   unclassified: 'Data Error',
 }
 
@@ -43,6 +45,9 @@ export interface UserLifecycleUserRow {
   email: string
   firstName: string
   lastName: string
+  phoneNumber: string | null
+  tier: 'core' | 'premium' | null
+  createdAt: string | null
   category: UserLifecycleCategory
 }
 
