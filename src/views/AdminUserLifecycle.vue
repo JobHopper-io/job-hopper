@@ -180,7 +180,16 @@
                 Email
               </th>
               <th class="px-4 sm:px-6 py-3 text-left font-medium text-neutral-muted">
-                Category
+                Phone
+              </th>
+              <th class="px-4 sm:px-6 py-3 text-left font-medium text-neutral-muted">
+                Plan
+              </th>
+              <th class="px-4 sm:px-6 py-3 text-left font-medium text-neutral-muted">
+                Status
+              </th>
+              <th class="px-4 sm:px-6 py-3 text-left font-medium text-neutral-muted">
+                Signed up
               </th>
             </tr>
           </thead>
@@ -196,12 +205,21 @@
                 {{ user.email }}
               </td>
               <td class="px-4 sm:px-6 py-3 align-top text-neutral-body">
+                {{ user.phoneNumber || '—' }}
+              </td>
+              <td class="px-4 sm:px-6 py-3 align-top text-neutral-body capitalize">
+                {{ user.tier || '—' }}
+              </td>
+              <td class="px-4 sm:px-6 py-3 align-top text-neutral-body">
                 {{ categoryLabel(user.category) }}
+              </td>
+              <td class="px-4 sm:px-6 py-3 align-top text-neutral-body">
+                {{ formatDate(user.createdAt) }}
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
               <td
-                colspan="3"
+                colspan="6"
                 class="px-4 sm:px-6 py-6 text-center text-neutral-body"
               >
                 No users match the current filters.
@@ -243,6 +261,11 @@ const searchQuery = ref('')
 
 function categoryLabel(category: UserLifecycleCategory): string {
   return USER_LIFECYCLE_CATEGORY_LABELS[category]
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString()
 }
 
 const visibleSummary = computed(() => {
@@ -290,11 +313,14 @@ function csvField(value: string): string {
 function downloadCsv() {
   if (!report.value) return
 
-  const header = ['Name', 'Email', 'Category']
+  const header = ['Name', 'Email', 'Phone', 'Plan', 'Status', 'Signed up']
   const rows = report.value.users.map((user) => [
     `${user.firstName} ${user.lastName}`.trim(),
     user.email,
+    user.phoneNumber ?? '',
+    user.tier ?? '',
     categoryLabel(user.category),
+    formatDate(user.createdAt),
   ])
 
   const csv = [header, ...rows]
