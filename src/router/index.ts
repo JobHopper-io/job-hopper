@@ -23,6 +23,7 @@ export const publicPaths = [
   '/outplacement',
   '/workforce',
   '/about',
+  '/careers',
   '/support',
   '/contact',
   '/privacy',
@@ -125,6 +126,11 @@ const router = createRouter({
       path: '/about',
       name: 'about',
       component: () => import('../views/About.vue'),
+    },
+    {
+      path: '/careers',
+      name: 'careers',
+      component: () => import('../views/Careers.vue'),
     },
     {
       path: '/support',

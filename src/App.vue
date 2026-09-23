@@ -61,7 +61,7 @@ const isWarmPage = computed(
 // Same "no seam" treatment as the auth routes below: the page's own background already
 // fades to the same cream tone the footer sits on, so the usual mt-16 gap would just
 // expose the app shell's gray bg-neutral-bg between the two.
-const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard', '/universities', '/international-students', '/career-coaches', '/outplacement', '/workforce', '/choose-plan']
+const noFooterGapRoutes = [...CHROME_FREE_NAV_ROUTES, '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard', '/universities', '/international-students', '/career-coaches', '/outplacement', '/workforce', '/choose-plan', '/careers']
 const noFooterGap = computed(
   () => noFooterGapRoutes.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
 )
