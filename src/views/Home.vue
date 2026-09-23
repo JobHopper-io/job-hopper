@@ -119,7 +119,7 @@ const footerColumns = [
     items: [
       { label: 'About', to: '/about' },
       { label: 'Blog', to: null },
-      { label: 'Careers', to: null },
+      { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/support' },
       { label: 'Press', to: null },
     ],
