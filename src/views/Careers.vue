@@ -14,10 +14,10 @@
         <summary class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 cursor-pointer list-none">
           <div>
             <h2 class="text-brand-charcoal mb-1">
-              Data Analyst
+              Marketing Assistant
             </h2>
             <p class="text-neutral-body">
-              Remote &middot; Full-time &middot; ~2-3 years experience
+              Remote &middot; Full-time &middot; ~1-2 years experience
             </p>
           </div>
           <span class="text-sm font-medium text-brand-primary shrink-0 group-open:hidden">
@@ -33,13 +33,13 @@
             Overview
           </h3>
           <p class="mb-4">
-            We are seeking a Data Analyst to help turn Job-Hopper's growing pool of data into clear,
-            actionable insight. This role supports business operations and product decisions by
-            analyzing data across the platform, identifying trends, and helping the team make informed,
-            data-driven decisions. You will work cross-functionally with people across product,
-            marketing, and operations in a collaborative, fast-moving environment. It's a strong fit for
-            an analyst with roughly 2 to 3 years of experience who is ready to take ownership and grow
-            alongside an early-stage company.
+            We are seeking a Marketing Assistant to support our Head of Marketing across new marketing
+            initiatives, visual content creation, and branding. This is a hands-on role for someone who
+            enjoys making things: social posts, graphics, email campaigns, and the day-to-day work that
+            keeps a growing brand moving. You will work closely with the marketing lead and collaborate
+            across the team in a fully remote, fast-moving environment. It's a strong fit for someone
+            with roughly 1 to 2 years of experience who is ready to take ownership and grow alongside an
+            early-stage company.
           </p>
 
           <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-2">
@@ -55,33 +55,36 @@
             Key responsibilities
           </h3>
           <ul class="list-disc pl-6 mb-4 space-y-2">
-            <li>Collect, analyze, and interpret data from across the platform and multiple internal sources.</li>
-            <li>Build reports, dashboards, and visualizations that support business and product decisions.</li>
-            <li>Track key metrics such as user engagement, match quality, and conversion, and surface the trends behind them.</li>
-            <li>Identify patterns and opportunities for process and product improvement.</li>
-            <li>Collaborate with product, marketing, and operations teams on operational and strategic initiatives.</li>
-            <li>Maintain data accuracy, integrity, and consistency across systems.</li>
-            <li>Assist with data validation, reporting automation, and performance tracking.</li>
+            <li>Support the Head of Marketing in planning and executing new marketing initiatives and campaigns.</li>
+            <li>Create and edit visual content for social media, email, and the website.</li>
+            <li>Help maintain a consistent brand across all channels, materials, and messaging.</li>
+            <li>Assist with content calendars, scheduling, and posting across platforms.</li>
+            <li>Support email marketing and outreach efforts.</li>
+            <li>Help track campaign performance and pull together simple reports.</li>
+            <li>Conduct light market and competitor research to support new initiatives.</li>
+            <li>Assist with day-to-day marketing operations and related administrative tasks.</li>
           </ul>
 
           <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-2">
             Qualifications
           </h3>
           <ul class="list-disc pl-6 mb-4 space-y-2">
-            <li>Bachelor's degree in Data Analytics, Business, Information Systems, Mathematics, or a related field preferred, but not required.</li>
-            <li>Roughly 2 to 3 years of experience in a data analysis or related role.</li>
-            <li>Experience with data analysis tools such as Excel, SQL, Power BI, Tableau, or similar.</li>
-            <li>Strong analytical and problem-solving skills.</li>
-            <li>Ability to communicate insights clearly to both technical and non-technical stakeholders.</li>
-            <li>Comfort working in a fast-paced, collaborative, early-stage environment.</li>
+            <li>Roughly 1 to 2 years of experience in marketing, communications, content creation, or a related area preferred.</li>
+            <li>Bachelor's degree in Marketing, Communications, Business, or a related field is a plus, but not required.</li>
+            <li>Familiarity with social media platforms and content scheduling tools.</li>
+            <li>Basic graphic design skills and comfort with tools such as Canva, Adobe, or Figma.</li>
+            <li>Strong written and verbal communication skills.</li>
+            <li>Strong attention to detail and organizational skills.</li>
+            <li>Comfort working independently in a remote, fast-paced, early-stage environment.</li>
           </ul>
 
           <h3 class="text-lg font-heading font-semibold text-brand-charcoal mb-2">
             Nice to have
           </h3>
           <ul class="list-disc pl-6 mb-4 space-y-2">
-            <li>Experience with Python, R, or other analytics tools.</li>
-            <li>Familiarity with modern data stacks or cloud-based databases.</li>
+            <li>Experience with email marketing or social media management tools.</li>
+            <li>A basic understanding of branding and visual design principles.</li>
+            <li>Some experience with video editing or short-form content creation.</li>
             <li>A self-starter mindset with the drive to take ownership and see work through without heavy oversight.</li>
             <li>Vision and ambition, with an interest in growing into greater responsibility as the company scales.</li>
             <li>The adaptability to wear several hats and move quickly in a rapidly growing company.</li>
@@ -91,7 +94,7 @@
 
         <div class="mt-8 flex flex-wrap items-center gap-4">
           <a
-            href="https://linkedin.com/jobs/view/4470623520"
+            href="https://linkedin.com/jobs/view/4472077722"
             target="_blank"
             rel="noopener noreferrer"
             class="btn-primary inline-block"
@@ -99,7 +102,7 @@
             Apply on LinkedIn
           </a>
           <a
-            href="/careers/data-analyst-job-description.pdf"
+            href="/careers/marketing-assistant-job-description.pdf"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm font-medium text-brand-primary hover:underline"
