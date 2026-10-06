@@ -113,7 +113,7 @@ serve(async (req) => {
       .ilike("contact_email", email)
 
     if (error) {
-      console.error("mailtrap-bounce-webhook: failed to flag bounced lead", { email, error })
+      console.error("mailtrap-bounce-webhook: failed to flag bounced lead", { emailDomain: email.split("@")[1] ?? null, error })
     }
   }
 

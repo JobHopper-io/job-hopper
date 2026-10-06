@@ -165,6 +165,7 @@ serve(async (req) => {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
+    console.error('complete-onboarding: unhandled error', e)
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
