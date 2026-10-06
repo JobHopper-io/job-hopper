@@ -15,6 +15,7 @@ import { isFreemiumBasePlanTierKey } from '../_shared/freemium-tier-keys.ts'
 import { resolveBaseTier } from '../_shared/base-tier.ts'
 import { clampJobMatchFrequency } from '../_shared/job-match-email-frequency.ts'
 import { sendEmail } from '../_shared/email.ts'
+import { isServiceCall } from '../_shared/cron-auth.ts'
 import {
   renderJobMatchDigest,
   type JobSummary,
@@ -48,6 +49,16 @@ serve(async (req) => {
         status: 405,
       },
     )
+  }
+
+  // Server-to-server only: callers (scheduler, onboarding, job-search functions) send the
+  // service-role bearer. Without this, the public anon key could trigger matching + digest
+  // emails for any profile_id.
+  if (!isServiceCall(req)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401,
+    })
   }
 
   try {
