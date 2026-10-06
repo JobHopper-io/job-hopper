@@ -371,11 +371,13 @@ const router = createRouter({
   },
 })
 
-// Helper to avoid hanging the entire app if Supabase is slow/unreachable.
-// Returns the current user or null if unavailable/timeout.
-async function getUserWithTimeout(timeoutMs = 2000) {
+// Session user for routing. Reads the locally stored session (no Auth-server call), so it
+// only touches the network to refresh an expired token. The timeout is a last resort for an
+// unreachable Supabase during that refresh; it was 2s on a network getUser() call, which
+// bounced signed-in users to /login whenever Auth was slow.
+async function getUserWithTimeout(timeoutMs = 10_000) {
   try {
-    const authPromise = authAPI.getCurrentUser().then(({ user }) => user ?? null)
+    const authPromise = authAPI.getSessionUser()
     const timeoutPromise = new Promise<null>((resolve) => {
       setTimeout(() => resolve(null), timeoutMs)
     })

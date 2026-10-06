@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 import type {
   NotificationSettings,
   NotificationSettingsInsert,
@@ -7,11 +7,8 @@ import type {
 } from '@/types/database'
 
 async function getProfileId(): Promise<string | null> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (!user || authError) return null
+  const user = await getSessionUser()
+  if (!user) return null
   const { data } = await supabase
     .from('profiles')
     .select('id')
