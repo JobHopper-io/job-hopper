@@ -28,3 +28,8 @@ Deno.test('freemium when onboarded with no subscriptions', () => {
   const flags = subscriptionFlagsFromStatuses([], true)
   assertEquals(categorizeUserLifecycle(flags), 'freemium')
 })
+
+Deno.test('payment failed when past_due (not Data Error), even with older canceled subs', () => {
+  const flags = subscriptionFlagsFromStatuses(['past_due', 'canceled'], true)
+  assertEquals(categorizeUserLifecycle(flags), 'payment_failed')
+})
