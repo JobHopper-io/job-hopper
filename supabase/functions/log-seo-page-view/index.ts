@@ -7,6 +7,9 @@ const corsHeaders = {
 }
 
 const MAX_URL_PATH_LENGTH = 500
+// Crawlers (Googlebot renders JS) and headless tools fire the beacon too; skip them so
+// view counts reflect people and bot traffic doesn't cost a DB write per page.
+const BOT_USER_AGENT = /bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|curl|wget|python/i
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,7 +24,9 @@ serve(async (req) => {
     const body = await req.json().catch(() => null)
     const urlPath = typeof body?.url_path === "string" ? body.url_path.trim() : ""
 
-    if (urlPath && urlPath.length <= MAX_URL_PATH_LENGTH) {
+    const isBot = BOT_USER_AGENT.test(req.headers.get("user-agent") ?? "")
+
+    if (!isBot && urlPath && urlPath.length <= MAX_URL_PATH_LENGTH) {
       const admin = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
