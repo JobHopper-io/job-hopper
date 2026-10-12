@@ -207,6 +207,7 @@ serve(async (req) => {
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('create-checkout-session: unhandled error', error)
     return new Response(
       JSON.stringify({ error: message }),
       {

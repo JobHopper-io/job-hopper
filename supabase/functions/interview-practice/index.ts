@@ -218,6 +218,7 @@ serve(async (req) => {
     )
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
+    console.error('interview-practice: unhandled error', e)
     return jsonResponse({ error: message }, 500)
   }
 })

@@ -4,7 +4,7 @@ import {
   parsePhoneNumberFromString,
 } from 'libphonenumber-js'
 import type { CountryCode } from 'libphonenumber-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 
 /** Normalize phone to digits only for storage and uniqueness checks. */
 export function normalizePhoneToDigits(phone: string): string {
@@ -169,6 +169,9 @@ export const authAPI = {
 
     return { user, error }
   },
+
+  /** Session user without an Auth-server round trip — see getSessionUser. */
+  getSessionUser,
 }
 
 export function onAuthStateChange(

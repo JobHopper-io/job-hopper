@@ -3,6 +3,7 @@ export type UserLifecycleCategory =
   | 'incomplete_onboarding'
   | 'stripe_free_trial'
   | 'active_subscription'
+  | 'payment_failed' // Stripe past_due: trial ended or renewal charge declined
   | 'churned'
   | 'freemium'
   | 'unclassified' // UI label: "Data Error"
@@ -11,6 +12,7 @@ export interface UserSubscriptionFlags {
   onboardingCompleted: boolean
   hasTrialSub: boolean
   hasActiveSub: boolean
+  hasPastDueSub: boolean
   hasCanceledSub: boolean
   hasAnySub: boolean
 }
@@ -24,6 +26,9 @@ export function categorizeUserLifecycle(flags: UserSubscriptionFlags): UserLifec
   }
   if (flags.hasActiveSub) {
     return 'active_subscription'
+  }
+  if (flags.hasPastDueSub) {
+    return 'payment_failed'
   }
   if (flags.hasCanceledSub) {
     return 'churned'
@@ -40,6 +45,7 @@ export function subscriptionFlagsFromStatuses(
 ): UserSubscriptionFlags {
   let hasTrialSub = false
   let hasActiveSub = false
+  let hasPastDueSub = false
   let hasCanceledSub = false
   let hasAnySub = false
 
@@ -47,6 +53,7 @@ export function subscriptionFlagsFromStatuses(
     hasAnySub = true
     if (status === 'trial') hasTrialSub = true
     else if (status === 'active') hasActiveSub = true
+    else if (status === 'past_due') hasPastDueSub = true
     else if (status === 'canceled') hasCanceledSub = true
   }
 
@@ -54,6 +61,7 @@ export function subscriptionFlagsFromStatuses(
     onboardingCompleted: onboardingCompleted === true,
     hasTrialSub,
     hasActiveSub,
+    hasPastDueSub,
     hasCanceledSub,
     hasAnySub,
   }

@@ -39,15 +39,35 @@ type RealScoreByDomain = Map<
   }
 >
 
+/** PostgREST caps responses at 1000 rows, and `.in()` id lists travel in the GET URL, so
+ * a long-tenured user's match list must be paged and its lookups batched. */
+const PAGE_SIZE = 1000
+const IN_CHUNK_SIZE = 100
+
+/** Runs `.in()`-style lookups 100 ids at a time (keeps URLs ~4KB) and concatenates rows. */
+async function selectInChunks<T>(
+  ids: string[],
+  run: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: Error | null }>,
+): Promise<{ data: T[]; error: Error | null }> {
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) chunks.push(ids.slice(i, i + IN_CHUNK_SIZE))
+  const results = await Promise.all(chunks.map(run))
+  const failed = results.find((r) => r.error)
+  if (failed) return { data: [], error: failed.error }
+  return { data: results.flatMap((r) => r.data ?? []), error: null }
+}
+
 async function fetchRealScoresByDomain(domains: string[]): Promise<RealScoreByDomain> {
   const map: RealScoreByDomain = new Map()
   if (domains.length === 0) return map
 
-  const { data, error } = await supabase
-    .from('employers')
-    .select('id, domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
-    .in('domain', domains)
-    .eq('excluded_from_scoring', false)
+  const { data, error } = await selectInChunks(domains, (chunk) =>
+    supabase
+      .from('employers')
+      .select('id, domain, excluded_from_scoring, employer_sponsorship_scores(score, confidence, rationale)')
+      .in('domain', chunk)
+      .eq('excluded_from_scoring', false),
+  )
 
   if (error || !data) return map
 
@@ -270,17 +290,22 @@ async function getCurrentProfileId(): Promise<string> {
 export const jobsAPI = {
   async getJobMatches(
   ): Promise<{ data: MatchedJob[]; error: Error | null }> {
-    const query = supabase
-      .from('job_matches')
-      .select('id, profile_id, job_id, score, created_at, why_fit_bullets, why_fit_generated_at')
-      .order('created_at', { ascending: false })
-
-    const { data: matchesRaw, error } = await query
-    if (error) {
-      return { data: [], error }
+    // ponytail: loads every match and filters client-side; switch the dashboard to
+    // server-side pagination if per-user match counts reach the thousands.
+    const matches: JobMatch[] = []
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data: page, error } = await supabase
+        .from('job_matches')
+        .select('id, profile_id, job_id, score, created_at, why_fit_bullets, why_fit_generated_at')
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, from + PAGE_SIZE - 1)
+      if (error) {
+        return { data: [], error }
+      }
+      matches.push(...((page ?? []) as JobMatch[]))
+      if (!page || page.length < PAGE_SIZE) break
     }
-
-    const matches = (matchesRaw ?? []) as JobMatch[]
 
     if (!matches.length) {
       return { data: [], error: null }
@@ -298,17 +323,18 @@ export const jobsAPI = {
 
     const [{ data: jobsRaw, error: jobsError }, { data: savedRowsRaw, error: savedError }, { data: hiringRaw, error: hiringError }] =
       await Promise.all([
-        jobIds.length
-          ? supabase.from('job_hopper_live').select(JOB_HOPPER_LIVE_SELECT).in('id', jobIds)
-          : supabase.from('job_hopper_live').select('id').limit(0),
-        supabase
-          .from('saved_jobs')
-          .select('match_id')
-          .in('match_id', matchIds),
-        supabase
-          .from('job_hiring_contacts')
-          .select('job_match_id, status, contacts, error_code, org_disambiguation_options')
-          .in('job_match_id', matchIds),
+        selectInChunks(jobIds, (chunk) =>
+          supabase.from('job_hopper_live').select(JOB_HOPPER_LIVE_SELECT).in('id', chunk),
+        ),
+        selectInChunks(matchIds, (chunk) =>
+          supabase.from('saved_jobs').select('match_id').in('match_id', chunk),
+        ),
+        selectInChunks(matchIds, (chunk) =>
+          supabase
+            .from('job_hiring_contacts')
+            .select('job_match_id, status, contacts, error_code, org_disambiguation_options')
+            .in('job_match_id', chunk),
+        ),
       ])
 
     if (jobsError) {

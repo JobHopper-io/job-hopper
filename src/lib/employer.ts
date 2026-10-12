@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 import { parseFunctionsInvokeError } from '@/lib/parse-functions-invoke-error'
 import type { EmployerAccount, EmployerRevealRequest, PayType } from '@/types/database'
 
@@ -50,11 +50,8 @@ export const employerAPI = {
   },
 
   async getCurrentEmployerAccount(): Promise<{ data: EmployerAccount | null; error: Error | null }> {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
+    const user = await getSessionUser()
+    if (!user) {
       return { data: null, error: new Error('Not authenticated') }
     }
 

@@ -1,12 +1,31 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
+import { isServiceCall } from "../_shared/cron-auth.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-const INVOCATION_TIMEOUT_MS = 60_000
+const PAGE_SIZE = 1000
+// Per-profile match-jobs rows are spread over this window so each 15-minute
+// run-scheduled-jobs tick picks up only a few.
+// ponytail: run-scheduled-jobs drains 25 rows per tick sequentially (~2,400/day); past
+// that, rows queue into later ticks — raise PER_RUN_LIMIT or run rows concurrently.
+const SPREAD_WINDOW_MS = 6 * 60 * 60 * 1000
+
+function json(body: unknown, status: number) {
+  return new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status,
+  })
+}
+
+function randomTimeTomorrowUtc(): string {
+  const now = new Date()
+  const tomorrowStartUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  return new Date(tomorrowStartUtc + Math.floor(Math.random() * 24 * 60 * 60 * 1000)).toISOString()
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -14,197 +33,78 @@ serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 405,
-      },
-    )
+    return json({ error: "Method not allowed" }, 405)
+  }
+
+  // Each call enqueues matching (and digest emails) for every subscriber, so only the
+  // scheduler may trigger it — the anon key passes the gateway's verify_jwt.
+  if (!isServiceCall(req)) {
+    return json({ error: "Unauthorized" }, 401)
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-  const authHeader = req.headers.get("Authorization") ?? ""
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Server misconfiguration" }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      },
-    )
+    return json({ error: "Server misconfiguration" }, 500)
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   })
 
-  let processedProfiles = 0
-  let matchInvocationsSucceeded = 0
-  let matchInvocationsFailed = 0
-  let nextRunAtIso: string | null = null
+  // 1. Enqueue the next run FIRST, so the daily chain survives even if this run dies.
+  //    A unique index allows one pending chain row; 23505 means it is already scheduled.
+  const nextRunAtIso = randomTimeTomorrowUtc()
+  const { error: scheduleError } = await supabase
+    .from("scheduled_jobs")
+    .insert({ function_name: "daily-job-matching", payload: {}, run_at: nextRunAtIso })
 
-  // Always attempt to schedule the next run, even if part of the current run fails.
-  try {
+  if (scheduleError && scheduleError.code !== "23505") {
+    console.error("daily-job-matching: failed to schedule next run", {
+      error: scheduleError.message,
+      nextRunAtIso,
+    })
+  }
 
-    // 1. Load all profiles that currently have at least one active subscription.
-    type SubscriptionRow = {
-      profile_id: string | null
-    }
-
-    const { data: subscriptions, error: subscriptionsError } = await supabase
+  // 2. Every profile with a trial/active subscription, paginated past PostgREST's row cap.
+  const profileIds = new Set<string>()
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
       .from("subscriptions")
       .select("profile_id")
       .in("status", ["trial", "active"])
       .not("profile_id", "is", null)
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1)
 
-    if (subscriptionsError) {
-      console.error("daily-job-matching: failed to load active subscriptions", {
-        error: subscriptionsError.message,
-      })
-    } else {
-      const profileIds = new Set<string>()
-
-      for (const row of (subscriptions ?? []) as SubscriptionRow[]) {
-        if (row.profile_id) {
-          profileIds.add(row.profile_id)
-        }
-      }
-
-      // 2. For each profile, call match-jobs with a random limit between 2 and 5.
-      for (const profileId of profileIds) {
-        processedProfiles += 1
-
-        const limit = Math.floor(Math.random() * 4) + 2 // 2–5 inclusive
-
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), INVOCATION_TIMEOUT_MS)
-
-        try {
-          const url = `${supabaseUrl}/functions/v1/match-jobs`
-
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: authHeader,
-            },
-            body: JSON.stringify({
-              profile_id: profileId,
-              limit,
-            }),
-            signal: controller.signal,
-          })
-
-          clearTimeout(timeoutId)
-
-          if (response.ok) {
-            matchInvocationsSucceeded += 1
-          } else {
-            matchInvocationsFailed += 1
-            const errorBody = await response.text().catch(() => "")
-            console.error("daily-job-matching: match-jobs returned non-2xx", {
-              status: response.status,
-              statusText: response.statusText,
-              body: errorBody,
-              profileId,
-              limit,
-            })
-          }
-        } catch (err) {
-          clearTimeout(timeoutId)
-          matchInvocationsFailed += 1
-
-          if (err instanceof Error && err.name === "AbortError") {
-            console.error("daily-job-matching: match-jobs invocation timed out", {
-              profileId,
-              limit,
-            })
-          } else {
-            console.error("daily-job-matching: match-jobs invocation error", {
-              profileId,
-              limit,
-              message: err instanceof Error ? err.message : String(err),
-            })
-          }
-        }
-      }
+    if (error) {
+      console.error("daily-job-matching: failed to load active subscriptions", { error: error.message })
+      return json({ error: "Failed to load subscriptions" }, 500)
     }
 
-    // 3. Compute a random time tomorrow (UTC) for the next run.
-    const now = new Date()
-    const tomorrowStartUtc = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() + 1,
-        0,
-        0,
-        0,
-        0,
-      ),
-    )
+    for (const row of data ?? []) {
+      if (row.profile_id) profileIds.add(row.profile_id)
+    }
+    if (!data || data.length < PAGE_SIZE) break
+  }
 
-    const dayInMs = 24 * 60 * 60 * 1000
-    const randomOffsetMs = Math.floor(Math.random() * dayInMs)
-    const nextRunAt = new Date(tomorrowStartUtc.getTime() + randomOffsetMs)
-    nextRunAtIso = nextRunAt.toISOString()
-  } finally {
-    // 4. Always attempt to schedule the next run, even if the above logic failed partway through.
-    try {
-      if (!nextRunAtIso) {
-        const now = new Date()
-        const tomorrowStartUtc = new Date(
-          Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth(),
-            now.getUTCDate() + 1,
-            0,
-            0,
-            0,
-            0,
-          ),
-        )
-        const dayInMs = 24 * 60 * 60 * 1000
-        const randomOffsetMs = Math.floor(Math.random() * dayInMs)
-        nextRunAtIso = new Date(tomorrowStartUtc.getTime() + randomOffsetMs).toISOString()
-      }
+  // 3. Fan out: one match-jobs row per profile (random limit 2–5), executed by
+  //    run-scheduled-jobs, instead of looping over every profile in this invocation.
+  const now = Date.now()
+  const rows = [...profileIds].map((profileId) => ({
+    function_name: "match-jobs",
+    payload: { profile_id: profileId, limit: Math.floor(Math.random() * 4) + 2 },
+    run_at: new Date(now + Math.floor(Math.random() * SPREAD_WINDOW_MS)).toISOString(),
+  }))
 
-      const { error: scheduleError } = await supabase
-        .from("scheduled_jobs")
-        .insert({
-          function_name: "daily-job-matching",
-          payload: {},
-          run_at: nextRunAtIso,
-        })
-
-      if (scheduleError) {
-        console.error("daily-job-matching: failed to schedule next run", {
-          error: scheduleError.message,
-          nextRunAtIso,
-        })
-      }
-    } catch (err) {
-      console.error("daily-job-matching: unexpected error while scheduling next run", {
-        message: err instanceof Error ? err.message : String(err),
-        nextRunAtIso,
-      })
+  for (let i = 0; i < rows.length; i += PAGE_SIZE) {
+    const { error } = await supabase.from("scheduled_jobs").insert(rows.slice(i, i + PAGE_SIZE))
+    if (error) {
+      console.error("daily-job-matching: failed to enqueue match-jobs rows", { error: error.message })
+      return json({ error: "Failed to enqueue matching" }, 500)
     }
   }
 
-  return new Response(
-    JSON.stringify({
-      processed_profiles: processedProfiles,
-      match_invocations_succeeded: matchInvocationsSucceeded,
-      match_invocations_failed: matchInvocationsFailed,
-      next_run_at: nextRunAtIso,
-    }),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    },
-  )
+  return json({ enqueued_profiles: rows.length, next_run_at: nextRunAtIso }, 200)
 })
-

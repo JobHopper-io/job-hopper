@@ -44,6 +44,15 @@
   status = 301
   force = true
 
+# Missing build assets (old content-hashed chunks after a deploy) must 404, not fall
+# through to the SPA shell: index.html served as a JS chunk breaks the lazy import and
+# would be cached for a year under the immutable /assets/* header below. Unforced, so
+# real files are still served. The app reloads itself on the failed import (main.ts).
+[[redirects]]
+  from = "/assets/*"
+  to = "/404"
+  status = 404
+
 # SPA fallback for the Vue app. UNFORCED (no `force`/`!`), so real static files
 # — including the pre-rendered /jobs/**/index.html SEO pages — are served first
 # and only unmatched paths fall through to the app shell.
@@ -52,6 +61,11 @@
   to = "/index.html"
   status = 200
  
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    cache-control = "no-cache"
+
 [[headers]]
   for = "/manifest.webmanifest"
   [headers.values]

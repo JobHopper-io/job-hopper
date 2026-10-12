@@ -10,7 +10,7 @@ import type {
   Product,
   TrialGrant,
 } from '@/types/database'
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 
 // Keyed by string (not Record<SubscriptionStatus>) so the `past_due` label is
 // present before the generated enum in src/types/supabase.ts is regenerated to
@@ -270,9 +270,7 @@ export const subscriptionAPI = {
     } | null
     error: Error | null
   }> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getSessionUser()
     if (!user) {
       return { data: null, error: new Error('Not authenticated') }
     }

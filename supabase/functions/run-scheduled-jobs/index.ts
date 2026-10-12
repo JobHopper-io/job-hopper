@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { sendEmail } from '../_shared/email.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,10 @@ const ERROR_MESSAGE_MAX_LENGTH = 1000
 // the row 'pending' with no code alive to mark it otherwise. This is the safety net.
 // Keep comfortably above a legitimate LLM round-trip so a live row is never swept.
 const RESUME_STALE_MINUTES = 10
+
+// Self-rescheduling chains that must always have a pending or running row. If one is
+// missing the chain died silently (the 2026-07 six-day outage); re-seed it and alert.
+const RECURRING_CHAINS = ['daily-job-matching', 'reconcile-subscriptions']
 
 function isAuthorized(req: Request): boolean {
   const cronSecret = Deno.env.get('CRON_SECRET')
@@ -85,7 +90,7 @@ serve(async (req) => {
   const staleThreshold = new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString()
 
   // 1. Recover stale "running" jobs
-  const { error: staleError } = await supabase
+  const { data: staleRows, error: staleError } = await supabase
     .from('scheduled_jobs')
     .update({
       status: 'failed',
@@ -94,6 +99,7 @@ serve(async (req) => {
     })
     .eq('status', 'running')
     .lt('started_at', staleThreshold)
+    .select('function_name')
 
   if (staleError) {
     console.error('Failed to recover stale scheduled jobs', {
@@ -304,6 +310,39 @@ serve(async (req) => {
     })
   }
 
+  // Watchdog: re-seed any dead recurring chain, then email a summary of anything wrong.
+  const healedChains: string[] = []
+  const { data: liveChainRows, error: chainError } = await supabase
+    .from('scheduled_jobs')
+    .select('function_name')
+    .in('function_name', RECURRING_CHAINS)
+    .in('status', ['pending', 'running'])
+
+  if (chainError) {
+    console.error('watchdog: failed to read recurring chains', { error: chainError.message })
+  } else {
+    const live = new Set((liveChainRows ?? []).map((r) => r.function_name))
+    for (const fn of RECURRING_CHAINS.filter((f) => !live.has(f))) {
+      const { error } = await supabase
+        .from('scheduled_jobs')
+        .insert({ function_name: fn, payload: {}, run_at: new Date().toISOString() })
+      if (!error || error.code === '23505') healedChains.push(fn)
+      else console.error('watchdog: failed to re-seed chain', { fn, error: error.message })
+    }
+  }
+
+  const problems = [
+    ...healedChains.map((fn) => `Recurring chain "${fn}" had no pending run; re-seeded to run now.`),
+    ...(staleRows ?? []).map((r) => `"${r.function_name}" was stuck running > ${STALE_MINUTES} min; marked failed.`),
+    ...jobResults
+      .filter((r) => r.status === 'failed')
+      .map((r) => `"${r.function_name}" (${r.id}) failed: ${r.error_message ?? 'unknown error'}`),
+  ]
+
+  if (problems.length > 0) {
+    await sendOpsAlert(`Scheduled jobs: ${problems.length} problem(s)`, problems.join('\n'))
+  }
+
   console.log('run-scheduled-jobs completed', {
     processed: jobs.length,
     completed,
@@ -324,6 +363,17 @@ serve(async (req) => {
     },
   )
 })
+
+// Comma-separated OPS_ALERT_EMAIL; unset means log-only (local dev). Never throws.
+async function sendOpsAlert(subject: string, text: string): Promise<void> {
+  console.error('ops alert', { subject, text })
+  const recipients = (Deno.env.get('OPS_ALERT_EMAIL') ?? '').split(',').map((a) => a.trim()).filter(Boolean)
+  try {
+    await Promise.all(recipients.map((to) => sendEmail({ to, subject, text, category: 'ops_alert' })))
+  } catch (err) {
+    console.error('ops alert email failed', err)
+  }
+}
 
 function truncate(s: string, maxLength: number): string {
   if (s.length <= maxLength) return s

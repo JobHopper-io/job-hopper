@@ -1,15 +1,12 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 import { resumeFileSizeErrorIfAny } from '@/lib/resumeUploadLimits'
 import type { Profile, ProfileUpdate, ProfileUserEditable } from '@/types/database'
 
 export const profileAPI = {
   async getCurrentUserProfile(): Promise<{ data: Profile | null; error: Error | null }> {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const user = await getSessionUser()
 
-    if (!user || authError) {
+    if (!user) {
       return { data: null, error: new Error('Not authenticated') }
     }
 
@@ -23,11 +20,8 @@ export const profileAPI = {
   },
 
   async updateProfile(profileData: ProfileUserEditable) {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
+    const user = await getSessionUser()
+    if (!user) {
       return { data: null, error: new Error('Not authenticated') }
     }
 
@@ -47,9 +41,7 @@ export const profileAPI = {
       return { data: null, error: new Error(sizeError) }
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getSessionUser()
     if (!user) throw new Error('Not authenticated')
 
     const { data: existingProfile } = await supabase
@@ -101,11 +93,8 @@ export const profileAPI = {
   },
 
   async markWalkthroughSeen() {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
+    const user = await getSessionUser()
+    if (!user) {
       return { data: null, error: new Error('Not authenticated') }
     }
 
@@ -121,11 +110,6 @@ export const profileAPI = {
 
   /** Lightweight check that uses the server-side helper to see if the current user has a role. */
   async hasRole(roleName: string): Promise<boolean> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return false
-
     const { data, error } = await supabase.rpc('current_user_has_role', {
       role_name: roleName,
     })

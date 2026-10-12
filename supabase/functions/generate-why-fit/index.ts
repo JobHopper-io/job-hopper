@@ -151,6 +151,7 @@ serve(async (req) => {
     return jsonResponse({ bullets, generatedAt, cached: false }, 200)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
+    console.error('generate-why-fit: unhandled error', e)
     return jsonResponse({ error: message }, 500)
   }
 })

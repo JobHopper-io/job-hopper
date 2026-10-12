@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import {
   categorizeUserLifecycle,
+  subscriptionFlagsFromStatuses,
   type UserLifecycleCategory,
 } from '../_shared/user-lifecycle-category.ts'
 
@@ -18,6 +19,7 @@ const CATEGORY_ORDER: UserLifecycleCategory[] = [
   'stripe_free_trial',
   'freemium',
   'active_subscription',
+  'payment_failed',
   'churned',
   'unclassified',
 ]
@@ -259,25 +261,9 @@ serve(async (req) => {
 
     for (const profile of allProfiles) {
       const statuses = statusesByProfile.get(profile.id) ?? []
-      let hasTrialSub = false
-      let hasActiveSub = false
-      let hasCanceledSub = false
-      let hasAnySub = false
-
-      for (const status of statuses) {
-        hasAnySub = true
-        if (status === 'trial') hasTrialSub = true
-        else if (status === 'active') hasActiveSub = true
-        else if (status === 'canceled') hasCanceledSub = true
-      }
-
-      const category = categorizeUserLifecycle({
-        onboardingCompleted: profile.onboarding_completed === true,
-        hasTrialSub,
-        hasActiveSub,
-        hasCanceledSub,
-        hasAnySub,
-      })
+      const category = categorizeUserLifecycle(
+        subscriptionFlagsFromStatuses(statuses, profile.onboarding_completed),
+      )
 
       countByCategory.set(category, (countByCategory.get(category) ?? 0) + 1)
 

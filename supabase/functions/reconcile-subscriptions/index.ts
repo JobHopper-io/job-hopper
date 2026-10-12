@@ -61,7 +61,7 @@ serve(async (req) => {
   const { error: scheduleError } = await supabaseAdmin
     .from('scheduled_jobs')
     .insert({ function_name: 'reconcile-subscriptions', payload: {}, run_at: nextRunAt })
-  if (scheduleError) {
+  if (scheduleError && scheduleError.code !== '23505') { // 23505: next run already pending
     console.error(`${LOG} failed to enqueue next run`, { error: scheduleError.message })
   }
 

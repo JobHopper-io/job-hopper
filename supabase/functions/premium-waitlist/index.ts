@@ -73,6 +73,7 @@ serve(async (req) => {
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("premium-waitlist: unhandled error", err)
     return new Response(
       JSON.stringify({ error: message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },

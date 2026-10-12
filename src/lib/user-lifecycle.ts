@@ -2,6 +2,7 @@ export type UserLifecycleCategory =
   | 'incomplete_onboarding'
   | 'stripe_free_trial'
   | 'active_subscription'
+  | 'payment_failed'
   | 'churned'
   | 'freemium'
   | 'unclassified'
@@ -11,6 +12,7 @@ export const USER_LIFECYCLE_CATEGORY_ORDER: UserLifecycleCategory[] = [
   'stripe_free_trial',
   'freemium',
   'active_subscription',
+  'payment_failed',
   'churned',
   'unclassified',
 ]
@@ -22,6 +24,7 @@ export const USER_LIFECYCLE_CATEGORY_LABELS: Record<UserLifecycleCategory, strin
   stripe_free_trial: 'On trial (Core/Premium)',
   freemium: 'Onboarded, no plan yet',
   active_subscription: 'Paying customer',
+  payment_failed: 'Payment failed',
   churned: 'Cancelled',
   unclassified: 'Data Error',
 }

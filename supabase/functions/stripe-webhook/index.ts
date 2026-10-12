@@ -23,6 +23,11 @@ const cryptoProvider = Stripe.createSubtleCryptoProvider()
 /** Grep-friendly prefix for all webhook logs. */
 const LOG_PREFIX = '[stripe-webhook]'
 
+/** Throws on a failed DB call so the handler returns 5xx and Stripe redelivers the event. */
+function assertOk(error: { message: string } | null, context: string): void {
+  if (error) throw new Error(`${context}: ${error.message}`)
+}
+
 function mapStripeStatus(stripeStatus: string): 'trial' | 'active' | 'past_due' | 'canceled' {
   if (stripeStatus === 'trialing') return 'trial'
   if (stripeStatus === 'active') return 'active'
@@ -110,6 +115,14 @@ serve(async (req) => {
     return new Response('No signature', { status: 400 })
   }
 
+  // Set once the signature is verified; the catch uses it to tell a bad request (400)
+  // from a processing failure (500, so Stripe retries).
+  let verifiedEventId: string | null = null
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  )
+
   try {
     const body = await req.text()
     const event = await stripe.webhooks.constructEventAsync(
@@ -120,10 +133,7 @@ serve(async (req) => {
       cryptoProvider
     )
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
+    verifiedEventId = event.id
 
     console.log(`${LOG_PREFIX} received`, {
       id: event.id,
@@ -132,20 +142,39 @@ serve(async (req) => {
     })
 
     // Log every received event so delivery/coverage is answerable from our own DB.
-    // outcome=handled if a case below processes this type, else ignored. Upsert on the
-    // Stripe event id so redeliveries don't duplicate.
+    // outcome: received -> processed | failed for handled types, ignored otherwise.
+    // 'handled' is the legacy pre-idempotency value (logged before processing).
     const HANDLED_TYPES = new Set([
       'checkout.session.completed',
       'customer.subscription.updated',
       'customer.subscription.deleted',
     ])
+
+    // Idempotency: Stripe redelivers on timeouts/5xx; never re-run side effects (emails,
+    // match scheduling) for an event that already completed.
+    // ponytail: two concurrent deliveries of the same event can both pass this check;
+    // add a conditional claim (update ... where outcome <> 'processed') if that shows up.
+    const { data: priorEvent } = await supabaseAdmin
+      .from('stripe_webhook_events')
+      .select('outcome')
+      .eq('id', event.id)
+      .maybeSingle()
+    if (priorEvent?.outcome === 'processed' || priorEvent?.outcome === 'handled') {
+      console.log(`${LOG_PREFIX} duplicate delivery, already processed`, { id: event.id, type: event.type })
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
     const { error: logError } = await supabaseAdmin
       .from('stripe_webhook_events')
       .upsert(
         {
           id: event.id,
           type: event.type,
-          outcome: HANDLED_TYPES.has(event.type) ? 'handled' : 'ignored',
+          outcome: HANDLED_TYPES.has(event.type) ? 'received' : 'ignored',
+          error_message: null,
         },
         { onConflict: 'id' },
       )
@@ -185,13 +214,10 @@ serve(async (req) => {
               onboarding_completed: true,
             })
             .eq('id', profileId)
-          if (profileUpdateError) {
-            console.error('Failed to update profile stripe_customer_id/onboarding_completed:', profileUpdateError)
-          } else {
-            console.log(`${LOG_PREFIX} profile updated with stripe_customer_id and onboarding_completed`, {
-              profileId,
-            })
-          }
+          assertOk(profileUpdateError, 'checkout.session.completed: profile update')
+          console.log(`${LOG_PREFIX} profile updated with stripe_customer_id and onboarding_completed`, {
+            profileId,
+          })
         } else {
           console.warn(`${LOG_PREFIX} checkout.session.completed: no customer id on session`, {
             sessionId: session.id,
@@ -212,19 +238,24 @@ serve(async (req) => {
             ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
             : null
 
+          // Upsert: a retried delivery, or a subscription.updated that arrived first and
+          // created the row, must not fail on the stripe_subscription_id unique constraint.
           const { data: subRow, error: subInsertError } = await supabaseAdmin
             .from('subscriptions')
-            .insert({
-              stripe_subscription_id: stripeSubscription.id,
-              profile_id: profileId,
-              status: subscriptionStatus,
-              current_period_ends_at: currentPeriodEnd,
-            })
+            .upsert(
+              {
+                stripe_subscription_id: stripeSubscription.id,
+                profile_id: profileId,
+                status: subscriptionStatus,
+                current_period_ends_at: currentPeriodEnd,
+              },
+              { onConflict: 'stripe_subscription_id' },
+            )
             .select('id')
             .single()
 
           if (subInsertError) {
-            console.error('Failed to insert subscription:', subInsertError)
+            throw new Error(`checkout.session.completed: subscriptions upsert: ${subInsertError.message}`)
           } else {
             subscriptionCheckoutInsertSucceeded = true
             const subscriptionId = subRow.id
@@ -254,12 +285,7 @@ serve(async (req) => {
                 .select('id, stripe_product_id')
                 .in('stripe_product_id', stripeProductIdArray)
 
-            if (productsForSubError) {
-              console.error(
-                'checkout.session.completed: failed to load products for subscription items',
-                productsForSubError,
-              )
-            }
+            assertOk(productsForSubError, 'checkout.session.completed: load products')
 
             const productIdByStripeProductId = new Map<string, string>()
             for (const row of productsForSub ?? []) {
@@ -290,7 +316,7 @@ serve(async (req) => {
                 continue
               }
 
-              await supabaseAdmin
+              const { error: linkError } = await supabaseAdmin
                 .from('subscription_product')
                 .upsert(
                   {
@@ -300,6 +326,7 @@ serve(async (req) => {
                   },
                   { onConflict: 'subscription_id,product_id' },
                 )
+              assertOk(linkError, 'checkout.session.completed: subscription_product upsert')
             }
           }
         } else {
@@ -376,34 +403,63 @@ serve(async (req) => {
           cancelAtPeriodEnd: expanded.cancel_at_period_end,
         })
 
-        const { data: existingSub } = await supabaseAdmin
-          .from('subscriptions')
-          .select('id, profile_id')
-          .eq('stripe_subscription_id', stripeSub.id)
-          .single()
-
-        if (!existingSub) {
-          console.warn(`${LOG_PREFIX} customer.subscription.updated: no matching subscriptions row`, {
-            stripeSubscriptionId: stripeSub.id,
-          })
-          break
-        }
-
         const subscriptionStatus = mapStripeStatus(expanded.status)
         const currentPeriodEnd = expanded.current_period_end
           ? new Date(expanded.current_period_end * 1000).toISOString()
           : null
 
+        const { data: foundSub, error: findSubError } = await supabaseAdmin
+          .from('subscriptions')
+          .select('id, profile_id')
+          .eq('stripe_subscription_id', stripeSub.id)
+          .maybeSingle()
+        assertOk(findSubError, 'customer.subscription.updated: load subscription')
+
+        let existingSub = foundSub
+        if (!existingSub) {
+          // Stripe doesn't order events: this can arrive before checkout.session.completed.
+          // Checkout stamps profile_id on the subscription, so create the row from it.
+          const metaProfileId = expanded.metadata?.profile_id
+          if (!metaProfileId) {
+            console.warn(`${LOG_PREFIX} customer.subscription.updated: no local row and no profile_id metadata`, {
+              stripeSubscriptionId: stripeSub.id,
+            })
+            break
+          }
+          const { data: createdSub, error: createSubError } = await supabaseAdmin
+            .from('subscriptions')
+            .upsert(
+              {
+                stripe_subscription_id: stripeSub.id,
+                profile_id: metaProfileId,
+                status: subscriptionStatus,
+                current_period_ends_at: currentPeriodEnd,
+              },
+              { onConflict: 'stripe_subscription_id' },
+            )
+            .select('id, profile_id')
+            .single()
+          if (createSubError || !createdSub) {
+            throw new Error(`customer.subscription.updated: create missing subscription row: ${createSubError?.message ?? 'no row returned'}`)
+          }
+          existingSub = createdSub
+          console.log(`${LOG_PREFIX} customer.subscription.updated: created missing subscriptions row`, {
+            stripeSubscriptionId: stripeSub.id,
+            profileId: metaProfileId,
+          })
+        }
+
         const isCancelScheduled =
           expanded.cancel_at_period_end === true || !!expanded.cancel_at
 
-        await supabaseAdmin
+        const { error: subUpdateError } = await supabaseAdmin
           .from('subscriptions')
           .update({
             status: subscriptionStatus,
             current_period_ends_at: currentPeriodEnd,
           })
           .eq('id', existingSub.id)
+        assertOk(subUpdateError, 'customer.subscription.updated: subscriptions update')
 
         const stripeProductIds = new Set<string>()
         for (const item of expanded.items.data) {
@@ -424,12 +480,8 @@ serve(async (req) => {
             .select('id, stripe_product_id')
             .in('stripe_product_id', stripeProductIdArray)
 
-        if (productsForSubError) {
-          console.error(
-            'customer.subscription.updated: failed to load products for subscription items',
-            productsForSubError,
-          )
-        }
+        // Must throw: with no products loaded, the sync below would remove every product link.
+        assertOk(productsForSubError, 'customer.subscription.updated: load products')
 
         const productIdByStripeProductId = new Map<string, string>()
         for (const row of productsForSub ?? []) {
@@ -451,7 +503,7 @@ serve(async (req) => {
           if (!productId) continue
 
           productIdsInStripe.push(productId)
-          await supabaseAdmin
+          const { error: linkError } = await supabaseAdmin
             .from('subscription_product')
             .upsert(
               {
@@ -461,19 +513,22 @@ serve(async (req) => {
               },
               { onConflict: 'subscription_id,product_id' },
             )
+          assertOk(linkError, 'customer.subscription.updated: subscription_product upsert')
         }
 
-        const { data: currentSubProducts } = await supabaseAdmin
+        const { data: currentSubProducts, error: currentLinksError } = await supabaseAdmin
           .from('subscription_product')
           .select('product_id')
           .eq('subscription_id', existingSub.id)
+        assertOk(currentLinksError, 'customer.subscription.updated: load subscription_product')
         const toRemove = (currentSubProducts ?? []).filter((r) => !productIdsInStripe.includes(r.product_id))
         for (const row of toRemove) {
-          await supabaseAdmin
+          const { error: unlinkError } = await supabaseAdmin
             .from('subscription_product')
             .delete()
             .eq('subscription_id', existingSub.id)
             .eq('product_id', row.product_id)
+          assertOk(unlinkError, 'customer.subscription.updated: subscription_product delete')
         }
 
         console.log(`${LOG_PREFIX} customer.subscription.updated: synced subscription_product`, {
@@ -592,27 +647,21 @@ serve(async (req) => {
           stripeSubscriptionId: stripeSub.id,
         })
 
-        const { data: deletedSub } = await supabaseAdmin
+        const { data: deletedSub, error: deletedFindError } = await supabaseAdmin
           .from('subscriptions')
           .select('profile_id')
           .eq('stripe_subscription_id', stripeSub.id)
-          .single()
+          .maybeSingle()
+        assertOk(deletedFindError, 'customer.subscription.deleted: load subscription')
         const { error: canceledUpdateError } = await supabaseAdmin
           .from('subscriptions')
           .update({ status: 'canceled' })
           .eq('stripe_subscription_id', stripeSub.id)
-
-        if (canceledUpdateError) {
-          console.error(`${LOG_PREFIX} customer.subscription.deleted: failed to set status canceled`, {
-            stripeSubscriptionId: stripeSub.id,
-            error: canceledUpdateError,
-          })
-        } else {
-          console.log(`${LOG_PREFIX} customer.subscription.deleted: subscriptions row marked canceled`, {
-            stripeSubscriptionId: stripeSub.id,
-            hadLocalRow: Boolean(deletedSub?.profile_id),
-          })
-        }
+        assertOk(canceledUpdateError, 'customer.subscription.deleted: set status canceled')
+        console.log(`${LOG_PREFIX} customer.subscription.deleted: subscriptions row marked canceled`, {
+          stripeSubscriptionId: stripeSub.id,
+          hadLocalRow: Boolean(deletedSub?.profile_id),
+        })
 
         if (!deletedSub?.profile_id) {
           console.warn(`${LOG_PREFIX} customer.subscription.deleted: no subscriptions row with profile_id`, {
@@ -665,6 +714,16 @@ serve(async (req) => {
         break
     }
 
+    if (HANDLED_TYPES.has(event.type)) {
+      const { error: doneError } = await supabaseAdmin
+        .from('stripe_webhook_events')
+        .update({ outcome: 'processed' })
+        .eq('id', event.id)
+      if (doneError) {
+        console.error(`${LOG_PREFIX} failed to mark event processed`, { id: event.id, message: doneError.message })
+      }
+    }
+
     return new Response(JSON.stringify({ received: true }), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
@@ -672,12 +731,23 @@ serve(async (req) => {
   } catch (error) {
     console.error('Webhook error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
+
+    // Signature/body problems are the sender's fault: 400, no retry.
+    if (!verifiedEventId) {
+      return new Response(JSON.stringify({ error: message }), {
         headers: { 'Content-Type': 'application/json' },
         status: 400,
-      },
-    )
+      })
+    }
+
+    // Processing failed: record it and return 500 so Stripe redelivers (with backoff, up to 3 days).
+    await supabaseAdmin
+      .from('stripe_webhook_events')
+      .update({ outcome: 'failed', error_message: message.slice(0, 1000) })
+      .eq('id', verifiedEventId)
+    return new Response(JSON.stringify({ error: 'Processing failed' }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 500,
+    })
   }
 })

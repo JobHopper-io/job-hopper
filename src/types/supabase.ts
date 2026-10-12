@@ -62,6 +62,142 @@ export type Database = {
         }
         Relationships: []
       }
+      call_extractions: {
+        Row: {
+          buying_intent: string | null
+          call_id: string
+          confidence_score: number | null
+          created_at: string
+          id: string
+          objection: string | null
+          pain_point: string | null
+          promised_follow_up: string | null
+          recommended_next_action: string | null
+          sponsorship_context: string | null
+          target_role: string | null
+          timing: string | null
+        }
+        Insert: {
+          buying_intent?: string | null
+          call_id: string
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          objection?: string | null
+          pain_point?: string | null
+          promised_follow_up?: string | null
+          recommended_next_action?: string | null
+          sponsorship_context?: string | null
+          target_role?: string | null
+          timing?: string | null
+        }
+        Update: {
+          buying_intent?: string | null
+          call_id?: string
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          objection?: string | null
+          pain_point?: string | null
+          promised_follow_up?: string | null
+          recommended_next_action?: string | null
+          sponsorship_context?: string | null
+          target_role?: string | null
+          timing?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_extractions_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: true
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          created_at: string
+          id: string
+          institutional_lead_id: string | null
+          occurred_at: string
+          profile_id: string | null
+          recording_reference: string | null
+          ringcentral_call_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institutional_lead_id?: string | null
+          occurred_at?: string
+          profile_id?: string | null
+          recording_reference?: string | null
+          ringcentral_call_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institutional_lead_id?: string | null
+          occurred_at?: string
+          profile_id?: string | null
+          recording_reference?: string | null
+          ringcentral_call_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_attempts: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          profile_id: string
+          status: string
+          stripe_checkout_session_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          profile_id: string
+          status?: string
+          stripe_checkout_session_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          profile_id?: string
+          status?: string
+          stripe_checkout_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_attempts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_apollo_cache: {
         Row: {
           apollo_organization_id: string
@@ -630,6 +766,54 @@ export type Database = {
           id?: number
         }
         Relationships: []
+      }
+      followup_sequences: {
+        Row: {
+          created_at: string
+          id: string
+          institutional_lead_id: string | null
+          profile_id: string | null
+          scheduled_date: string
+          sent_date: string | null
+          sequence_stage: number
+          stop_reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institutional_lead_id?: string | null
+          profile_id?: string | null
+          scheduled_date: string
+          sent_date?: string | null
+          sequence_stage: number
+          stop_reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institutional_lead_id?: string | null
+          profile_id?: string | null
+          scheduled_date?: string
+          sent_date?: string | null
+          sequence_stage?: number
+          stop_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_sequences_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followup_sequences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       freemium_settings: {
         Row: {
@@ -1323,6 +1507,51 @@ export type Database = {
           },
         ]
       }
+      lead_scores: {
+        Row: {
+          computed_at: string
+          explanation: string | null
+          id: string
+          institutional_lead_id: string | null
+          intent_score: number
+          profile_id: string | null
+          scoring_factors: Json
+        }
+        Insert: {
+          computed_at?: string
+          explanation?: string | null
+          id?: string
+          institutional_lead_id?: string | null
+          intent_score: number
+          profile_id?: string | null
+          scoring_factors?: Json
+        }
+        Update: {
+          computed_at?: string
+          explanation?: string | null
+          id?: string
+          institutional_lead_id?: string | null
+          intent_score?: number
+          profile_id?: string | null
+          scoring_factors?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_scores_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_scores_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_synonyms: {
         Row: {
           aliases: string[]
@@ -1507,6 +1736,51 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objections: {
+        Row: {
+          call_id: string | null
+          category: string
+          created_at: string
+          email_id: string | null
+          id: string
+          notes: string | null
+          source: string | null
+        }
+        Insert: {
+          call_id?: string | null
+          category: string
+          created_at?: string
+          email_id?: string | null
+          id?: string
+          notes?: string | null
+          source?: string | null
+        }
+        Update: {
+          call_id?: string | null
+          category?: string
+          created_at?: string
+          email_id?: string | null
+          id?: string
+          notes?: string | null
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objections_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objections_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "reply_events"
             referencedColumns: ["id"]
           },
         ]
@@ -1939,47 +2213,6 @@ export type Database = {
             columns: ["trial_grant_id"]
             isOneToOne: false
             referencedRelation: "trial_grants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      promo_core_free_month: {
-        Row: {
-          claimed_count: number
-          id: number
-          max_claims: number
-        }
-        Insert: {
-          claimed_count?: number
-          id?: number
-          max_claims?: number
-        }
-        Update: {
-          claimed_count?: number
-          id?: number
-          max_claims?: number
-        }
-        Relationships: []
-      }
-      promo_core_free_month_claims: {
-        Row: {
-          claimed_at: string
-          profile_id: string
-        }
-        Insert: {
-          claimed_at?: string
-          profile_id: string
-        }
-        Update: {
-          claimed_at?: string
-          profile_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "promo_core_free_month_claims_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2446,18 +2679,21 @@ export type Database = {
       }
       stripe_webhook_events: {
         Row: {
+          error_message: string | null
           id: string
           outcome: string
           received_at: string
           type: string
         }
         Insert: {
+          error_message?: string | null
           id: string
           outcome: string
           received_at?: string
           type: string
         }
         Update: {
+          error_message?: string | null
           id?: string
           outcome?: string
           received_at?: string
@@ -2943,14 +3179,6 @@ export type Database = {
           employer_id: string
         }[]
       }
-      try_claim_core_free_month: {
-        Args: { p_profile_id: string }
-        Returns: {
-          new_claimed_count: number
-          new_max_claims: number
-          success: boolean
-        }[]
-      }
       try_consume_apollo_credits: {
         Args: { p_amount: number; p_name: string }
         Returns: {
@@ -3039,12 +3267,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3068,11 +3296,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3093,11 +3321,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3118,11 +3346,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3135,11 +3363,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

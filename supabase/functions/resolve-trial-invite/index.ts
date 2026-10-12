@@ -79,6 +79,7 @@ serve(async (req) => {
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("resolve-trial-invite: unhandled error", err)
     return new Response(JSON.stringify({ valid: false, error: message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

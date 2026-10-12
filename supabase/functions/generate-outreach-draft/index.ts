@@ -147,6 +147,7 @@ serve(async (req) => {
     return jsonResponse({ subject: draft.subject, body: draft.body, generatedAt, cached: false }, 200)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
+    console.error('generate-outreach-draft: unhandled error', e)
     return jsonResponse({ error: message }, 500)
   }
 })

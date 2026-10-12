@@ -163,7 +163,7 @@ onMounted(async () => {
       // Malformed/opaque referrer - attribution is best-effort.
     }
 
-    const { user } = await authAPI.getCurrentUser()
+    const user = await authAPI.getSessionUser()
     isAuthenticated.value = !!user
     // watch(isAuthenticated) above handles loadUserData() / clear() when this changes
 

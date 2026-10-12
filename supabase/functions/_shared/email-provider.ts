@@ -55,11 +55,8 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
   const fromAddress = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
 
-  console.log('[email-provider] Mailtrap send attempt', {
-    to: params.to,
-    category: params.category,
-    url,
-  })
+  // Log the recipient's domain only (spots provider-specific rejections) — never the address.
+  const toDomain = params.to.split('@')[1] ?? null
 
   const toAddress = { email: params.to.trim() }
 
@@ -93,6 +90,8 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      // A hung provider must not stall match-jobs or the Stripe webhook, which send inline.
+      signal: AbortSignal.timeout(10_000),
     })
 
     let messageId: string | null = null
@@ -118,7 +117,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
         // Non-JSON or unexpected; leave messageId as null
       }
       console.log('[email-provider] Mailtrap send ok', {
-        to: params.to,
+        toDomain,
         category: params.category,
         messageId,
         status: resp.status,
@@ -132,7 +131,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     const truncatedBody = bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText
     const errorMessage = `Mailtrap error ${resp.status}: ${truncatedBody || resp.statusText}`
     console.error('[email-provider] Mailtrap send failed', {
-      to: params.to,
+      toDomain,
       category: params.category,
       status: resp.status,
       url,
@@ -148,7 +147,7 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     const error =
       err instanceof Error ? `Mailtrap request failed: ${err.message}` : 'Mailtrap request failed'
     console.error('[email-provider] Mailtrap send threw', {
-      to: params.to,
+      toDomain,
       category: params.category,
       error,
     })
