@@ -65,16 +65,42 @@ serve(async (req) => {
     console.error(`${LOG} failed to enqueue next run`, { error: scheduleError.message })
   }
 
-  // Non-canceled rows with a real Stripe subscription id (skip synthetic test_ rows).
-  const { data: rows, error: selError } = await supabaseAdmin
-    .from('subscriptions')
-    .select('id, stripe_subscription_id, status, current_period_ends_at')
-    .in('status', ['trial', 'active', 'past_due'])
-    .like('stripe_subscription_id', 'sub_%')
+  // Non-canceled rows with a real Stripe subscription id (skip synthetic test_ rows),
+  // paged past PostgREST's 1000-row cap.
+  type SubRow = { id: string; stripe_subscription_id: string; status: string; current_period_ends_at: string | null }
+  const rows: SubRow[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error: selError } = await supabaseAdmin
+      .from('subscriptions')
+      .select('id, stripe_subscription_id, status, current_period_ends_at')
+      .in('status', ['trial', 'active', 'past_due'])
+      .like('stripe_subscription_id', 'sub_%')
+      .order('id')
+      .range(from, from + 999)
 
-  if (selError) {
-    console.error(`${LOG} failed to select subscriptions`, { error: selError.message })
-    return new Response(JSON.stringify({ error: 'select failed', details: selError.message }), {
+    if (selError) {
+      console.error(`${LOG} failed to select subscriptions`, { error: selError.message })
+      return new Response(JSON.stringify({ error: 'select failed', details: selError.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
+    }
+    rows.push(...((page ?? []) as SubRow[]))
+    if (!page || page.length < 1000) break
+  }
+
+  // One paged list call per 100 Stripe subscriptions instead of one retrieve per row,
+  // so the run stays well inside the scheduler's 60s budget as subscriptions grow.
+  // A failure here aborts the run (500) rather than treating everything as missing.
+  const stripeSubs = new Map<string, Stripe.Subscription>()
+  try {
+    for await (const sub of stripe.subscriptions.list({ status: 'all', limit: 100 })) {
+      stripeSubs.set(sub.id, sub)
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error(`${LOG} stripe list failed`, { message })
+    return new Response(JSON.stringify({ error: 'stripe list failed', details: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
@@ -85,22 +111,12 @@ serve(async (req) => {
   let missing = 0
   const corrections: unknown[] = []
 
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     checked += 1
-    let sub: Stripe.Subscription
-    try {
-      sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id)
-    } catch (e) {
-      const err = e as { code?: string; message?: string }
-      if (err.code === 'resource_missing') {
-        missing += 1
-        console.warn(`${LOG} subscription not in Stripe`, { stripeSubscriptionId: row.stripe_subscription_id })
-      } else {
-        console.error(`${LOG} stripe retrieve failed`, {
-          stripeSubscriptionId: row.stripe_subscription_id,
-          message: err.message,
-        })
-      }
+    const sub = stripeSubs.get(row.stripe_subscription_id)
+    if (!sub) {
+      missing += 1
+      console.warn(`${LOG} subscription not in Stripe`, { stripeSubscriptionId: row.stripe_subscription_id })
       continue
     }
 
