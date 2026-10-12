@@ -223,7 +223,17 @@ export const useUserStore = defineStore('user', () => {
   /** Whether the user can start another manual job search (credits remaining). */
   const freemiumCanRunManualJobSearch = computed(() => freemiumJobSearchesRemaining.value > 0)
 
-  async function refreshFreemium() {
+  // Login runs refreshProfile and refreshSubscription in parallel and both refresh
+  // freemium data; concurrent calls share one in-flight fetch.
+  let freemiumInFlight: Promise<void> | null = null
+  function refreshFreemium(): Promise<void> {
+    freemiumInFlight ??= loadFreemium().finally(() => {
+      freemiumInFlight = null
+    })
+    return freemiumInFlight
+  }
+
+  async function loadFreemium() {
     const pid = profile.value?.id
     if (!pid) {
       freemiumUsage.value = null
@@ -307,20 +317,30 @@ export const useUserStore = defineStore('user', () => {
       console.error('Error loading subscription data:', error)
     } finally {
       isLoading.value = false
-      void refreshFreemium()
+      // Skip until the profile has loaded: with no profile id this would clear freemium
+      // state that refreshProfile is about to load anyway.
+      if (profile.value) void refreshFreemium()
     }
   }
+
+  // What each channel is currently filtered on, so a refresh that changes nothing keeps
+  // the existing subscription instead of tearing it down and re-subscribing.
+  let profileChannelFilter: string | null = null
+  let subscriptionProductChannelFilter: string | null = null
 
   function stopProfileRealtime() {
     if (profileChannel) {
       supabase.removeChannel(profileChannel)
       profileChannel = null
+      profileChannelFilter = null
     }
   }
 
   function startProfileRealtime(profileId: string | null | undefined) {
     if (!profileId) return
+    if (profileChannel && profileChannelFilter === profileId) return
     stopProfileRealtime()
+    profileChannelFilter = profileId
     profileChannel = supabase
       .channel('user-profile-changes')
       .on(
@@ -342,13 +362,16 @@ export const useUserStore = defineStore('user', () => {
     if (subscriptionProductChannel) {
       supabase.removeChannel(subscriptionProductChannel)
       subscriptionProductChannel = null
+      subscriptionProductChannelFilter = null
     }
   }
 
   function startSubscriptionProductRealtime(subscriptionIds: string[]) {
     if (subscriptionIds.length === 0) return
-    stopSubscriptionProductRealtime()
     const filter = `subscription_id=in.(${subscriptionIds.join(',')})`
+    if (subscriptionProductChannel && subscriptionProductChannelFilter === filter) return
+    stopSubscriptionProductRealtime()
+    subscriptionProductChannelFilter = filter
     subscriptionProductChannel = supabase
       .channel('user-subscription-product-changes')
       .on(
