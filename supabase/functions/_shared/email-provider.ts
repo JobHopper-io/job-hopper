@@ -83,16 +83,28 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
 
   try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      // A hung provider must not stall match-jobs or the Stripe webhook, which send inline.
-      signal: AbortSignal.timeout(10_000),
-    })
+    const send = () =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        // A hung provider must not stall match-jobs or the Stripe webhook, which send inline.
+        signal: AbortSignal.timeout(10_000),
+      })
+
+    let resp = await send()
+    // One retry for rate limiting / gateway errors, where Mailtrap did not accept the send.
+    // Not other 5xx: the message may already be queued, and a retry would duplicate it.
+    if ([429, 502, 503, 504].includes(resp.status)) {
+      const retryAfterSec = Number(resp.headers.get('retry-after'))
+      const waitMs = retryAfterSec > 0 ? Math.min(retryAfterSec * 1000, 5000) : 1000
+      await resp.body?.cancel()
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+      resp = await send()
+    }
 
     let messageId: string | null = null
 

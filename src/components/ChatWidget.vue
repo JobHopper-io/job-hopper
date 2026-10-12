@@ -45,6 +45,7 @@
           v-model="draft"
           type="text"
           placeholder="Ask about pricing, sponsorship, or your account..."
+          :maxlength="SUPPORT_CHAT_MAX_LENGTH"
           :disabled="isLoading"
         />
         <button type="submit" :disabled="isLoading || !draft.trim()">Send</button>
@@ -56,9 +57,10 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import hopperLogo from '@/assets/job-hopper-rabbit.png'
+import { supportChatAPI, SUPPORT_CHAT_MAX_LENGTH } from '@/lib/supportChat'
 
-const WEBHOOK_URL = import.meta.env.VITE_RAG_CHAT_WEBHOOK_URL
-const CHAT_AUTH = import.meta.env.VITE_RAG_CHAT_AUTH
+const FALLBACK_REPLY =
+  "I couldn't reach support chat right now. Please try again in a moment, or email support@job-hopper.io."
 
 const isOpen = ref(false)
 const isLoading = ref(false)
@@ -85,29 +87,15 @@ async function sendMessage() {
   await scrollToBottom()
 
   try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': CHAT_AUTH
-      },
-      body: JSON.stringify({ message: text })
-    })
-
-    if (!res.ok) {
-      throw new Error(`Request failed: ${res.status}`)
-    }
-
-    const data = await res.json()
+    const { answer, error } = await supportChatAPI.ask(text)
     messages.value.push({
       role: 'assistant',
-      content: data.answer || "Sorry, something went wrong on my end."
+      content: error
+        ? error.message || FALLBACK_REPLY
+        : answer || "Sorry, something went wrong on my end."
     })
   } catch {
-    messages.value.push({
-      role: 'assistant',
-      content: "I couldn't reach support chat right now. Please try again in a moment, or email support@job-hopper.io."
-    })
+    messages.value.push({ role: 'assistant', content: FALLBACK_REPLY })
   } finally {
     isLoading.value = false
     await scrollToBottom()
@@ -275,7 +263,7 @@ async function sendMessage() {
   background-color: #fff;
   box-shadow: 0 0 0 1px var(--color-neutral-border);
 }
-g-chat-message {
+.rag-chat-message {
   max-width: 78%;
   padding: 9px 13px;
   border-radius: 14px;
