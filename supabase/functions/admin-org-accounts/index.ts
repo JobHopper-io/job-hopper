@@ -7,9 +7,13 @@
 // Real Stripe writes: this creates/updates a real Stripe subscription (quantity = seat
 // count, Stripe's own seat-billing primitive -- no custom seat-pricing math) using
 // collection_method='send_invoice' so a purchase never requires collecting a card in an
-// admin panel. Hard-aborts before writing anything if the resolved Stripe key turns out
-// to be live-mode (see assertTestMode) -- this account has zero real paying institutional
-// customers yet, so a live-mode object here would always be a bug, never intended.
+// admin panel. Live-mode writes are opt-in: they hard-abort unless the ORG_BILLING_LIVE
+// secret is "true" (see assertBillingModeAllowed), so a misconfigured key can never bill
+// a university by accident -- going live is a deliberate switch, not a side effect.
+//
+// Commercials: per-seat price = base plan products.price_cents per month (x12 when billed
+// annually); a negotiated 0/20/30% partner discount rides on the subscription as a
+// Stripe coupon, so it's visible on the university's invoice instead of hidden in price.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import Stripe from "npm:stripe@14.21.0"
@@ -27,11 +31,13 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
 })
 
 const VALID_TIERS = new Set(["core", "premium"])
+const VALID_INTERVALS = new Set(["month", "year"])
+const VALID_DISCOUNTS = new Set([0, 20, 30])
 const DAYS_UNTIL_DUE = 30
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 interface RequestBody {
-  action?: "create_org_account" | "import_seats" | "revoke_seat" | "get_stripe_status"
+  action?: "create_org_account" | "import_seats" | "revoke_seat" | "get_stripe_status" | "add_seats"
   leadId?: string
   organizationName?: string
   billingEmail?: string
@@ -41,6 +47,10 @@ interface RequestBody {
   orgAccountId?: string
   emails?: string[]
   email?: string
+  billingInterval?: string
+  discountPercent?: number
+  /** add_seats: how many seats to add to an existing license. */
+  seats?: number
 }
 
 function mapStripeStatus(stripeStatus: string): "trial" | "active" | "past_due" | "canceled" {
@@ -53,13 +63,43 @@ function mapStripeStatus(stripeStatus: string): "trial" | "active" | "past_due" 
 // Cheap read-only call before any write: Stripe stamps every object (including a
 // balance read) with `livemode`. Aborting here means a misconfigured secret can never
 // result in a real institutional org getting a real live-mode subscription by accident.
-async function assertTestMode(): Promise<void> {
+async function assertBillingModeAllowed(): Promise<void> {
+  if (Deno.env.get("ORG_BILLING_LIVE") === "true") return
   const balance = await stripe.balance.retrieve()
   if (balance.livemode) {
     throw new Error(
-      "Refusing to create/modify an org account subscription: the configured Stripe key is LIVE mode, not test mode.",
+      "Refusing to create/modify an org account subscription with a LIVE Stripe key: set the ORG_BILLING_LIVE secret to \"true\" to bill universities for real.",
     )
   }
+}
+
+// Stripe leaves a send_invoice subscription's invoice as a draft for ~1 hour before
+// auto-finalizing. Finalize + email it now, so the university gets a payable invoice (and
+// the portal a pay link) the moment the license or extra seats are created. Best-effort:
+// on failure Stripe still auto-finalizes and sends it on its own schedule.
+async function finalizeAndSend(invoice: string | Stripe.Invoice | null): Promise<void> {
+  const id = typeof invoice === "string" ? invoice : invoice?.id
+  if (!id) return
+  try {
+    const inv = await stripe.invoices.retrieve(id)
+    if (inv.status === "draft") await stripe.invoices.finalizeInvoice(id)
+    await stripe.invoices.sendInvoice(id)
+  } catch (err) {
+    console.error("admin-org-accounts: could not finalize/send invoice", id, err)
+  }
+}
+
+// One shared coupon per discount level (idempotent by id), applied for the life of the
+// subscription.
+async function partnerCouponId(percent: number): Promise<string | undefined> {
+  if (!percent) return undefined
+  const id = `jh_partner_${percent}`
+  try {
+    await stripe.coupons.retrieve(id)
+  } catch {
+    await stripe.coupons.create({ id, percent_off: percent, duration: "forever", name: `Partner discount ${percent}%` })
+  }
+  return id
 }
 
 serve(async (req) => {
@@ -197,6 +237,8 @@ serve(async (req) => {
       const billingName = (body.billingName ?? "").trim().slice(0, 200)
       const featureTier = (body.featureTier ?? "").trim()
       const seatCount = Number(body.seatCount)
+      const billingInterval = (body.billingInterval ?? "month").trim()
+      const discountPercent = Number(body.discountPercent ?? 0)
 
       if (!organizationName) {
         return new Response(JSON.stringify({ error: "An organization name is required." }), {
@@ -218,8 +260,41 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400,
         })
       }
+      if (!VALID_INTERVALS.has(billingInterval) || !VALID_DISCOUNTS.has(discountPercent)) {
+        return new Response(JSON.stringify({ error: "Billing must be month or year, and discount 0, 20 or 30%." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400,
+        })
+      }
 
-      await assertTestMode()
+      // Pilot -> paid: students already on this partner's pilot seats carry over to the
+      // paid license, so converting never cuts anyone's access off at pilot expiry.
+      // Checked before any Stripe write so an undersized license fails cleanly.
+      let pilotGrants: { id: string }[] = []
+      let pilotStudents: { id: string; email: string }[] = []
+      if (leadId) {
+        const { data: grants } = await serviceClient
+          .from("trial_grants")
+          .select("id")
+          .eq("institutional_lead_id", leadId)
+          .order("created_at", { ascending: false })
+        pilotGrants = grants ?? []
+        if (pilotGrants.length > 0) {
+          const { data: students } = await serviceClient
+            .from("profiles")
+            .select("id, email")
+            .in("trial_grant_id", pilotGrants.map((g) => g.id))
+            .is("org_account_id", null)
+          pilotStudents = students ?? []
+        }
+        if (pilotStudents.length > seatCount) {
+          return new Response(
+            JSON.stringify({ error: `${pilotStudents.length} students are on this partner's pilot; the license needs at least that many seats.` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
+          )
+        }
+      }
+
+      await assertBillingModeAllowed()
 
       // Find-or-create the billing-contact profile. This is a billing anchor, not a
       // login: auth_user_id is nullable specifically for this case (see profiles
@@ -298,6 +373,7 @@ serve(async (req) => {
       }
 
       const stripeProductId = await getStripeProductId(product)
+      const coupon = await partnerCouponId(discountPercent)
 
       const stripeSubscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
@@ -305,21 +381,24 @@ serve(async (req) => {
           {
             price_data: {
               currency: "usd",
-              unit_amount: product.price_cents,
+              unit_amount: product.price_cents * (billingInterval === "year" ? 12 : 1),
               product: stripeProductId,
-              recurring: { interval: "month" },
+              recurring: { interval: billingInterval as "month" | "year" },
             },
             quantity: seatCount,
           },
         ],
         collection_method: "send_invoice",
         days_until_due: DAYS_UNTIL_DUE,
+        ...(coupon ? { coupon } : {}),
         metadata: {
           org_account: "true",
           institutional_lead_id: leadId || "",
           organization_name: organizationName,
         },
       })
+
+      await finalizeAndSend(stripeSubscription.latest_invoice)
 
       const subscriptionStatus = mapStripeStatus(stripeSubscription.status)
       const currentPeriodEnd = stripeSubscription.current_period_end
@@ -366,6 +445,11 @@ serve(async (req) => {
           subscription_id: subRow.id,
           feature_tier: featureTier,
           seat_count: seatCount,
+          seats_used: pilotStudents.length,
+          billing_interval: billingInterval,
+          discount_percent: discountPercent,
+          list_price_cents: product.price_cents,
+          converted_from_trial_grant_id: pilotGrants[0]?.id ?? null,
           created_by: user.id,
         })
         .select("id, organization_name, feature_tier, seat_count, seats_used, status, subscription_id, created_at")
@@ -377,6 +461,21 @@ serve(async (req) => {
           JSON.stringify({ error: "Stripe subscription created but failed to record the org account." }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
         )
+      }
+
+      if (pilotStudents.length > 0) {
+        const [{ error: carryError }, { error: carryInvitesError }] = await Promise.all([
+          serviceClient
+            .from("profiles")
+            .update({ org_account_id: orgAccount.id })
+            .in("id", pilotStudents.map((s) => s.id)),
+          serviceClient
+            .from("org_seat_invites")
+            .insert(pilotStudents.map((s) => ({ org_account_id: orgAccount.id, email: s.email.toLowerCase(), claimed: true }))),
+        ])
+        if (carryError || carryInvitesError) {
+          console.error("admin-org-accounts: pilot carry-over failed", carryError ?? carryInvitesError)
+        }
       }
 
       return new Response(
@@ -524,6 +623,79 @@ serve(async (req) => {
     // -----------------------------------------------------------------
     // revoke_seat
     // -----------------------------------------------------------------
+    // -----------------------------------------------------------------
+    // add_seats: grow an existing license. Stripe invoices the prorated difference now
+    // (always_invoice) -- with annual billing, create_prorations would defer the charge
+    // up to a year. Waitlisted students pick the new seats up on their next sign-in.
+    // -----------------------------------------------------------------
+    if (body.action === "add_seats") {
+      const orgAccountId = (body.orgAccountId ?? "").trim()
+      const seats = Number(body.seats)
+      if (!orgAccountId || !Number.isInteger(seats) || seats < 1) {
+        return new Response(JSON.stringify({ error: "Pick a license and a positive number of seats to add." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400,
+        })
+      }
+
+      const { data: org } = await serviceClient
+        .from("org_accounts")
+        .select("id, institutional_lead_id, seat_count, subscription_id, status")
+        .eq("id", orgAccountId)
+        .maybeSingle()
+      if (!org || org.status !== "active" || !org.subscription_id) {
+        return new Response(JSON.stringify({ error: "No active license found." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404,
+        })
+      }
+
+      const { data: subRow } = await serviceClient
+        .from("subscriptions")
+        .select("stripe_subscription_id")
+        .eq("id", org.subscription_id)
+        .maybeSingle()
+      if (!subRow) {
+        return new Response(JSON.stringify({ error: "Failed to load the license subscription." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500,
+        })
+      }
+
+      await assertBillingModeAllowed()
+
+      const newSeatCount = org.seat_count + seats
+      const stripeSubscription = await stripe.subscriptions.retrieve(subRow.stripe_subscription_id)
+      const item = stripeSubscription.items.data[0]
+      const updated = await stripe.subscriptions.update(subRow.stripe_subscription_id, {
+        items: [{ id: item.id, quantity: newSeatCount }],
+        proration_behavior: "always_invoice",
+      })
+      await finalizeAndSend(updated.latest_invoice)
+
+      const { error: updateError } = await serviceClient
+        .from("org_accounts")
+        .update({ seat_count: newSeatCount })
+        .eq("id", org.id)
+      if (updateError) {
+        console.error("admin-org-accounts: Stripe updated but seat_count write failed", updateError)
+        return new Response(
+          JSON.stringify({ error: `Stripe now bills ${newSeatCount} seats but the database update failed. Fix seat_count manually.` }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+        )
+      }
+
+      // Seats were the ask: close any open "request more seats" from this partner.
+      if (org.institutional_lead_id) {
+        await serviceClient
+          .from("partner_seat_requests")
+          .update({ resolved_at: new Date().toISOString(), resolved_by: user.id })
+          .eq("institutional_lead_id", org.institutional_lead_id)
+          .is("resolved_at", null)
+      }
+
+      return new Response(JSON.stringify({ seatCount: newSeatCount }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+      })
+    }
+
     if (body.action === "revoke_seat") {
       const orgAccountId = (body.orgAccountId ?? "").trim()
       const email = (body.email ?? "").trim().toLowerCase()
@@ -560,7 +732,7 @@ serve(async (req) => {
         })
       }
 
-      await assertTestMode()
+      await assertBillingModeAllowed()
 
       const newSeatCount = Math.max(1, org.seat_count - 1)
 
