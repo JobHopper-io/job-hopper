@@ -9,6 +9,7 @@ import type {
   SubscriptionProduct,
   Product,
   TrialGrant,
+  OrgAccount,
 } from '@/types/database'
 import { supabase, getSessionUser } from '@/lib/supabase'
 
@@ -221,6 +222,18 @@ export const subscriptionAPI = {
       .from('trial_grants')
       .select('*')
       .eq('id', trialGrantId)
+      .maybeSingle()
+
+    if (error) return { data: null, error: new Error(error.message) }
+    return { data, error: null }
+  },
+
+  /** The caller's own linked org account (RLS: org_accounts_select_own). */
+  async getOrgAccount(orgAccountId: string): Promise<{ data: OrgAccount | null; error: Error | null }> {
+    const { data, error } = await supabase
+      .from('org_accounts')
+      .select('*')
+      .eq('id', orgAccountId)
       .maybeSingle()
 
     if (error) return { data: null, error: new Error(error.message) }

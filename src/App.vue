@@ -53,7 +53,7 @@ const hideChatWidget = computed(() => HIDE_CHAT_WIDGET_ROUTES.includes(route.pat
 // interview practice are matched by prefix since their routes carry a param
 // (/job/:id, /interview-practice/:id). employer/dashboard uses the same app-warm-bg class
 // as Dashboard.vue and was missed the same way as the employer auth routes above.
-const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/universities', '/international-students', '/career-coaches', '/outplacement', '/workforce', '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard', '/choose-plan']
+const WARM_BG_ROUTES = ['/how-it-works', '/pricing', '/install-app', '/faq', '/universities', '/international-students', '/career-coaches', '/outplacement', '/workforce', '/dashboard', '/profile', '/billing', '/billing/manage', '/applications', '/reveal-requests', '/premium-tools', '/employer/dashboard', '/choose-plan', '/partner', '/partner/report']
 const WARM_BG_PREFIXES = ['/job/', '/interview-practice/']
 const isWarmPage = computed(
   () => WARM_BG_ROUTES.includes(route.path) || WARM_BG_PREFIXES.some((p) => route.path.startsWith(p)),
@@ -207,7 +207,7 @@ const handleSignOutAndCloseMenu = async () => {
       <!-- Navigation Header -->
       <nav
         v-if="!hideNav"
-        class="backdrop-blur-md border-b border-neutral-border sticky top-0 z-50"
+        class="backdrop-blur-md border-b border-neutral-border sticky top-0 z-50 print:hidden"
         :class="isWarmPage ? 'bg-[#fff7ed]/95' : 'bg-white/95'"
       >
         <div class="max-w-6xl mx-auto px-5">
@@ -516,7 +516,7 @@ const handleSignOutAndCloseMenu = async () => {
       <!-- No top margin on the auth routes (and Dashboard): their background already fades
            to the same cream tone the footer sits on and must butt straight into it with no
            visible seam. -->
-      <footer v-if="!hideFooter" class="bg-white border-t border-neutral-border" :class="noFooterGap ? '' : 'mt-16'">
+      <footer v-if="!hideFooter" class="bg-white border-t border-neutral-border print:hidden" :class="noFooterGap ? '' : 'mt-16'">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div class="col-span-1 md:col-span-2">
@@ -566,7 +566,7 @@ const handleSignOutAndCloseMenu = async () => {
 
       <!-- RAG support chat widget: available to everyone, including logged-out visitors,
       except the signup/onboarding funnel where it's a distraction. -->
-      <ChatWidget v-if="!hideChatWidget" />
+      <ChatWidget v-if="!hideChatWidget" class="print:hidden" />
   </div>
 </template>
 

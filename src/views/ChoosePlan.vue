@@ -6,6 +6,7 @@
 // Styling mirrors Pricing.vue (warm bg, .card tiers, "Most popular" pill, check lists).
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { seatsFullFor } from '@/lib/partnerPortal'
 import {
   subscriptionAPI,
   getProductPrice,
@@ -97,6 +98,19 @@ async function signOut() {
           Add a card now — you're not charged until the trial ends, and you can cancel anytime before then.
         </p>
       </section>
+
+      <!-- Student whose university is a partner but out of seats: explain before asking them to pay. -->
+      <div
+        v-if="seatsFullFor"
+        class="mb-10 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+        role="status"
+      >
+        <p class="font-semibold mb-1">{{ seatsFullFor }} provides Job-Hopper to its students, but all seats are in use right now.</p>
+        <p>
+          You're on the waiting list and we've let your university know. You'll get access automatically
+          as soon as a seat opens, just sign in again. If you'd rather not wait, you can start a plan below.
+        </p>
+      </div>
 
       <!-- Billing cycle toggle -->
       <div v-if="!isLoading" class="mb-10 flex justify-center">

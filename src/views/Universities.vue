@@ -69,6 +69,12 @@ const valuePoints = [
           that actually sponsor, verified against real DOL and USCIS filing data instead
           of a crowdsourced guess.
         </p>
+        <p class="mt-6 text-sm text-neutral-body">
+          Already a partner?
+          <router-link :to="{ path: '/login', query: { redirect: '/partner' } }" class="font-semibold text-brand-primary hover:underline">
+            Sign in to your partner dashboard →
+          </router-link>
+        </p>
       </section>
 
       <!-- Value points -->

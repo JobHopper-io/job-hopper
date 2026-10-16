@@ -3,6 +3,9 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faTrash,
+  faUsers,
+  faMagnifyingGlass,
+  faChartLine,
   faPlus,
   faCheck,
   faSpinner,
@@ -61,6 +64,9 @@ import { faTiktok, faInstagram, faYoutube, faLinkedin, faFreeCodeCamp } from '@f
 
 library.add(
   faTrash,
+  faUsers,
+  faMagnifyingGlass,
+  faChartLine,
   faPlus,
   faCheck,
   faSpinner,

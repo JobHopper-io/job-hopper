@@ -8,6 +8,7 @@ import { authAPI } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
 import { employerAPI } from '@/lib/employer'
 import { subscriptionAPI } from '@/lib/subscription'
+import { partnerPortalAPI, seatsFullFor } from '@/lib/partnerPortal'
 import type { Profile } from '@/types/database'
 
 /** Single source of truth for routes that don't require authentication. */
@@ -55,6 +56,7 @@ const adminPaths = [
   '/admin/acquisition-channels',
   '/admin/trial-grants',
   '/admin/institutional-leads',
+  '/admin/partners',
   '/admin/growth-dashboard',
   '/admin/revenue-recovery',
   '/admin/reply-classification',
@@ -346,6 +348,21 @@ const router = createRouter({
       component: () => import('../views/AdminReplyClassification.vue'),
     },
     {
+      path: '/partner',
+      name: 'partner-portal',
+      component: () => import('../views/PartnerPortal.vue'),
+    },
+    {
+      path: '/partner/report',
+      name: 'partner-report',
+      component: () => import('../views/PartnerReport.vue'),
+    },
+    {
+      path: '/admin/partners',
+      name: 'admin-partners',
+      component: () => import('../views/AdminPartners.vue'),
+    },
+    {
       path: '/admin/partner-dashboard/:leadId',
       name: 'admin-partner-dashboard',
       component: () => import('../views/AdminPartnerDashboard.vue'),
@@ -399,6 +416,11 @@ function isPwaDisplayMode(): boolean {
   return nav.standalone === true
 }
 
+// Profile id the partner-seat claim was last attempted for (see the guard below).
+let seatClaimTriedFor: string | null = null
+// Profile id the last-active heartbeat was sent for, once per page load.
+let lastActiveTouchedFor: string | null = null
+
 // Router guard to enforce authentication and handle redirects
 router.beforeEach(async (to) => {
   // Password recovery links can land on any allowed URL: Supabase falls back to the
@@ -448,6 +470,11 @@ router.beforeEach(async (to) => {
 
   // Authenticated users should not see login/register; gracefully skip if Supabase is unavailable.
   if (user && publicRedirectPaths.includes(targetPath)) {
+    // University staff land on their partner portal, whether or not they also have a
+    // (never-onboarded) seeker profile from signing up through /register.
+    if (await partnerPortalAPI.isPartnerStaff()) {
+      return '/partner'
+    }
     const userProfile = await getProfile()
     if (userProfile) {
       return userProfile.onboarding_completed ? '/dashboard' : '/onboarding'
@@ -503,11 +530,43 @@ router.beforeEach(async (to) => {
     return employerAccount ? true : '/employer/login'
   }
 
-  const userProfile = await getProfile()
+  // Partner portal: any signed-in user may open it; the partner-portal edge function
+  // decides what (if anything) they can see. No seeker onboarding for staff.
+  if (targetPath === '/partner' || targetPath === '/partner/report') {
+    return true
+  }
+
+  let userProfile = await getProfile()
+
+  // Students of a partner university get their seat on first sign-in after their email
+  // is verified (and existing users once their university is set up). Tried once per
+  // profile per page load, and before the choose-plan gate below so a seat holder is
+  // never asked to pay.
+  if (userProfile && !userProfile.trial_grant_id && !userProfile.org_account_id && seatClaimTriedFor !== userProfile.id) {
+    seatClaimTriedFor = userProfile.id
+    const claim = await partnerPortalAPI.claimSeat()
+    seatsFullFor.value = claim.status === 'full' ? claim.organization : null
+    if (claim.status === 'claimed') {
+      profile = null
+      userProfile = await getProfile()
+    }
+  }
+
+  // Engagement heartbeat for partner dashboards ("active in the last 30 days"). Fire and
+  // forget; the RPC itself throttles writes to one per hour.
+  if (userProfile && lastActiveTouchedFor !== userProfile.id) {
+    lastActiveTouchedFor = userProfile.id
+    void partnerPortalAPI.touchLastActive()
+  }
 
   // If onboarding is not complete, force ANY protected path (including `/dashboard`, `/profile`, `/billing`, etc.)
   // to `/onboarding`. The only allowed authenticated route in this state is `/onboarding` itself.
   if (!userProfile?.onboarding_completed) {
+    // University staff aren't job seekers: never send them through seeker onboarding
+    // (Login.vue routes every un-onboarded profile straight to /onboarding).
+    if (await partnerPortalAPI.isPartnerStaff()) {
+      return '/partner'
+    }
     if (targetPath !== '/onboarding') {
       return '/onboarding'
     }
@@ -526,6 +585,7 @@ router.beforeEach(async (to) => {
   if (userProfile && !targetPath.startsWith('/admin')) {
     const gatedOut =
       !userProfile.trial_grant_id &&
+      !userProfile.org_account_id &&
       !(await subscriptionAPI.hasActiveOrTrialSubscription(userProfile.id)).data
     if (gatedOut && targetPath !== '/choose-plan') {
       return '/choose-plan'

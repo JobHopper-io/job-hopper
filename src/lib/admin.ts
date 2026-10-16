@@ -237,14 +237,6 @@ export interface PartnerDashboardResult {
   grants: PartnerDashboardGrant[]
   orgAccount: PartnerDashboardOrgAccount | null
   seatInvites: PartnerDashboardSeatInvite[]
-  metrics: {
-    linkedUserCount: number
-    activeUserCount: number
-    resumeUploads: number
-    jobMatches: number
-    applications: number
-  }
-  activeWindowDays: number
 }
 
 export type RevenueRecoverySegmentKey =
@@ -548,6 +540,15 @@ export const adminAPI = {
     return { data: data as PartnerDashboardResult, error: null }
   },
 
+  /** Grow an existing license; Stripe invoices the prorated difference immediately. */
+  async addOrgSeats(orgAccountId: string, seats: number): Promise<{ data: { seatCount: number } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-org-accounts', {
+      body: { action: 'add_seats', orgAccountId, seats },
+    })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as { seatCount: number }, error: null }
+  },
+
   async createOrgAccount(payload: {
     leadId: string
     organizationName: string
@@ -555,6 +556,8 @@ export const adminAPI = {
     billingName?: string
     featureTier: 'core' | 'premium'
     seatCount: number
+    billingInterval: 'month' | 'year'
+    discountPercent: 0 | 20 | 30
   }): Promise<{
     data: { orgAccount: PartnerDashboardOrgAccount; stripeSubscriptionId: string } | null
     error: Error | null
