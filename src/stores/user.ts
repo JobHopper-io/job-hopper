@@ -13,6 +13,7 @@ import type {
   FreemiumUsage,
   FreemiumSettings,
   TrialGrant,
+  OrgAccount,
 } from '@/types/database'
 
 const TIER_RANK: Record<'free' | 'core' | 'premium', number> = { free: 0, core: 1, premium: 2 }
@@ -34,6 +35,7 @@ export const useUserStore = defineStore('user', () => {
   const freemiumSettings = ref<FreemiumSettings | null>(null)
   const apolloPremiumInsightsLimits = ref<ApolloPremiumInsightsLimitsRow | null>(null)
   const trialGrant = ref<TrialGrant | null>(null)
+  const orgAccount = ref<OrgAccount | null>(null)
 
   // Realtime subscription for subscription_product (user's subscriptions only)
   let subscriptionProductChannel: ReturnType<typeof supabase.channel> | null = null
@@ -144,11 +146,24 @@ export const useUserStore = defineStore('user', () => {
     return grant.feature_tier === 'premium' || grant.feature_tier === 'core' ? grant.feature_tier : 'free'
   })
 
-  const baseTier = computed<'free' | 'core' | 'premium'>(() => {
-    return TIER_RANK[trialTier.value] > TIER_RANK[subscriptionTier.value]
-      ? trialTier.value
-      : subscriptionTier.value
+  /**
+   * Tier from a paid university/org seat (profiles.org_account_id). The server
+   * (resolveOrgSeatTier) additionally checks the org's Stripe-backed subscription row,
+   * which belongs to the billing contact and isn't readable here; org_accounts.status
+   * is the client-visible proxy. Server stays authoritative for actual feature access.
+   */
+  const orgSeatTier = computed<'free' | 'core' | 'premium'>(() => {
+    const org = orgAccount.value
+    if (!org || org.status !== 'active') return 'free'
+    return org.feature_tier === 'premium' ? 'premium' : 'core'
   })
+
+  const baseTier = computed<'free' | 'core' | 'premium'>(() =>
+    [trialTier.value, orgSeatTier.value].reduce(
+      (best, t) => (TIER_RANK[t] > TIER_RANK[best] ? t : best),
+      subscriptionTier.value,
+    ),
+  )
 
   const freemiumMaxJobSearches = computed(
     () => freemiumSettings.value?.max_job_searches ?? 3,
@@ -284,12 +299,26 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  async function refreshOrgAccount(orgAccountId: string | null) {
+    if (!orgAccountId) {
+      orgAccount.value = null
+      return
+    }
+    const { data, error } = await subscriptionAPI.getOrgAccount(orgAccountId)
+    if (error) console.error('Error loading org account:', error)
+    orgAccount.value = error ? null : data
+  }
+
   async function refreshProfile() {
     const { data, error } = await profileAPI.getCurrentUserProfile()
     if (!error && data) {
       profile.value = data
       startProfileRealtime(data.id)
-      await Promise.all([refreshFreemium(), refreshTrialGrant(data.trial_grant_id)])
+      await Promise.all([
+        refreshFreemium(),
+        refreshTrialGrant(data.trial_grant_id),
+        refreshOrgAccount(data.org_account_id),
+      ])
     } else if (error) {
       console.error('Error loading profile data:', error)
       stopProfileRealtime()
@@ -297,6 +326,7 @@ export const useUserStore = defineStore('user', () => {
       freemiumSettings.value = null
       apolloPremiumInsightsLimits.value = null
       trialGrant.value = null
+      orgAccount.value = null
     }
   }
 
@@ -400,10 +430,12 @@ export const useUserStore = defineStore('user', () => {
     freemiumSettings.value = null
     apolloPremiumInsightsLimits.value = null
     trialGrant.value = null
+    orgAccount.value = null
   }
 
   return {
     trialGrant,
+    orgAccount,
     trialTier,
     profile,
     subscriptions,

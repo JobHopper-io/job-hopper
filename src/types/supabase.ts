@@ -901,6 +901,7 @@ export type Database = {
           created_at: string
           decision_maker_name: string | null
           decision_maker_title: string | null
+          email_domains: string[]
           estimated_seats: number | null
           id: string
           last_send_attempted_at: string | null
@@ -915,6 +916,7 @@ export type Database = {
           recommended_package: string | null
           reply_class: string | null
           scorecard_id: string | null
+          seats_full_notified_at: string | null
           signals: Json | null
           source: string
           state: string | null
@@ -931,6 +933,7 @@ export type Database = {
           created_at?: string
           decision_maker_name?: string | null
           decision_maker_title?: string | null
+          email_domains?: string[]
           estimated_seats?: number | null
           id?: string
           last_send_attempted_at?: string | null
@@ -945,6 +948,7 @@ export type Database = {
           recommended_package?: string | null
           reply_class?: string | null
           scorecard_id?: string | null
+          seats_full_notified_at?: string | null
           signals?: Json | null
           source?: string
           state?: string | null
@@ -961,6 +965,7 @@ export type Database = {
           created_at?: string
           decision_maker_name?: string | null
           decision_maker_title?: string | null
+          email_domains?: string[]
           estimated_seats?: number | null
           id?: string
           last_send_attempted_at?: string | null
@@ -975,6 +980,7 @@ export type Database = {
           recommended_package?: string | null
           reply_class?: string | null
           scorecard_id?: string | null
+          seats_full_notified_at?: string | null
           signals?: Json | null
           source?: string
           state?: string | null
@@ -1787,13 +1793,16 @@ export type Database = {
       }
       org_accounts: {
         Row: {
+          billing_interval: string
           billing_profile_id: string
           converted_from_trial_grant_id: string | null
           created_at: string
           created_by: string | null
+          discount_percent: number
           feature_tier: string
           id: string
           institutional_lead_id: string | null
+          list_price_cents: number | null
           organization_name: string
           seat_count: number
           seats_used: number
@@ -1801,13 +1810,16 @@ export type Database = {
           subscription_id: string | null
         }
         Insert: {
+          billing_interval?: string
           billing_profile_id: string
           converted_from_trial_grant_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_percent?: number
           feature_tier: string
           id?: string
           institutional_lead_id?: string | null
+          list_price_cents?: number | null
           organization_name: string
           seat_count: number
           seats_used?: number
@@ -1815,13 +1827,16 @@ export type Database = {
           subscription_id?: string | null
         }
         Update: {
+          billing_interval?: string
           billing_profile_id?: string
           converted_from_trial_grant_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_percent?: number
           feature_tier?: string
           id?: string
           institutional_lead_id?: string | null
+          list_price_cents?: number | null
           organization_name?: string
           seat_count?: number
           seats_used?: number
@@ -1960,6 +1975,134 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_seat_releases: {
+        Row: {
+          email: string
+          institutional_lead_id: string
+          released_at: string
+          released_by: string | null
+        }
+        Insert: {
+          email: string
+          institutional_lead_id: string
+          released_at?: string
+          released_by?: string | null
+        }
+        Update: {
+          email?: string
+          institutional_lead_id?: string
+          released_at?: string
+          released_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_seat_releases_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_seat_requests: {
+        Row: {
+          created_at: string
+          id: string
+          institutional_lead_id: string
+          note: string | null
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          seats: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institutional_lead_id: string
+          note?: string | null
+          requested_by: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          seats: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institutional_lead_id?: string
+          note?: string | null
+          requested_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          seats?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_seat_requests_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_seat_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          institutional_lead_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          institutional_lead_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          institutional_lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_seat_waitlist_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_staff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          institutional_lead_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          institutional_lead_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          institutional_lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_staff_institutional_lead_id_fkey"
+            columns: ["institutional_lead_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       premium_insights_daily_usage: {
         Row: {
           count: number
@@ -2096,12 +2239,14 @@ export type Database = {
           has_seen_walkthrough: boolean
           id: string
           landing_path: string | null
+          last_active_at: string | null
           last_name: string
           location_radius_miles: number | null
           onboarding_completed: boolean | null
           open_to_relocation: boolean | null
           open_to_remote: boolean | null
           org_account_id: string | null
+          partner_seat_claimed_at: string | null
           phone_number: string | null
           preferred_locations: string[] | null
           recruiter_visible: boolean
@@ -2133,12 +2278,14 @@ export type Database = {
           has_seen_walkthrough?: boolean
           id?: string
           landing_path?: string | null
+          last_active_at: string | null
           last_name: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null
           org_account_id?: string | null
+          partner_seat_claimed_at?: string | null
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
@@ -2170,12 +2317,14 @@ export type Database = {
           has_seen_walkthrough?: boolean
           id?: string
           landing_path?: string | null
+          last_active_at?: string | null
           last_name?: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
           open_to_relocation?: boolean | null
           open_to_remote?: boolean | null
           org_account_id?: string | null
+          partner_seat_claimed_at?: string | null
           phone_number?: string | null
           preferred_locations?: string[] | null
           recruiter_visible?: boolean
@@ -3031,6 +3180,7 @@ export type Database = {
         Returns: number
       }
       check_phone_available: { Args: { phone_input: string }; Returns: boolean }
+      claim_partner_seat: { Args: never; Returns: Json }
       claim_premium_insights_for_addon: {
         Args: {
           p_daily_limit: number
@@ -3116,6 +3266,22 @@ export type Database = {
           source_doc: string
         }[]
       }
+      is_partner_staff: { Args: never; Returns: boolean }
+      partner_insights: {
+        Args: { p_lead_id: string; p_since?: string }
+        Returns: Json
+      }
+      partner_summaries: {
+        Args: never
+        Returns: {
+          activated: number
+          active_30d: number
+          applications_30d: number
+          lead_id: string
+          onboarded: number
+          seat_holders: number
+        }[]
+      }
       redeem_daily_resume_advice: {
         Args: {
           p_daily_limit: number
@@ -3179,6 +3345,7 @@ export type Database = {
           employer_id: string
         }[]
       }
+      touch_last_active: { Args: never; Returns: undefined }
       try_consume_apollo_credits: {
         Args: { p_amount: number; p_name: string }
         Returns: {

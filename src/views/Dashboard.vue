@@ -39,6 +39,7 @@ const {
   trialEndsAt,
   trialProducts,
   trialGrant,
+  orgAccount,
 } = storeToRefs(userStore)
 
 // Admin-granted trial seat (Build 09) expiry, formatted the same way as the Stripe
@@ -1126,6 +1127,14 @@ onMounted(() => {
             <!-- No real subscription/product row here — this tier comes from an
             admin-granted trial seat (trial_grants), not Stripe, so it's rendered
             separately rather than forcing it through the basePlan-shaped branch above. -->
+            <div v-else-if="orgAccount?.status === 'active'">
+              <p class="font-heading font-semibold text-brand-charcoal">
+                {{ baseTierLabel }}
+              </p>
+              <p class="text-sm text-neutral-body mt-1">
+                Provided by {{ orgAccount.organization_name }}
+              </p>
+            </div>
             <div v-else-if="trialGrant">
               <p class="font-heading font-semibold text-brand-charcoal">
                 {{ baseTierLabel }} (trial)
