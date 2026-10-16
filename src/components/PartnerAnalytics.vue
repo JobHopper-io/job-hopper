@@ -22,12 +22,12 @@
 
     <!-- KPIs -->
     <dl class="grid grid-cols-2 lg:grid-cols-5 print:grid-cols-5 gap-4">
-      <div v-for="k in kpis" :key="k.label" class="pa-card !p-5 flex flex-col">
+      <div v-for="k in kpis" :key="k.label" class="pa-card !p-5 print:!p-3.5 flex flex-col">
         <dt class="flex items-center gap-2.5 text-xs font-medium text-neutral-muted mb-3">
           <span class="pa-chip !w-8 !h-8 text-xs"><font-awesome-icon :icon="['fas', k.icon]" aria-hidden="true" /></span>
           {{ k.label }}
         </dt>
-        <dd class="text-3xl font-heading font-bold text-brand-charcoal tabular-nums leading-none">{{ k.value }}</dd>
+        <dd class="text-3xl print:text-2xl font-heading font-bold text-brand-charcoal tabular-nums leading-none whitespace-nowrap">{{ k.value }}</dd>
         <div v-if="k.meter !== undefined" class="h-1.5 rounded-full bg-brand-primary/10 mt-3 overflow-hidden">
           <div class="h-full rounded-full bg-brand-primary" :style="{ width: barWidth(k.meter, 1) }" />
         </div>
@@ -108,7 +108,7 @@
           <span class="pa-chip"><font-awesome-icon :icon="['fas', 'chart-line']" aria-hidden="true" /></span>
           <div>
             <h3 class="pa-title">Weekly activity</h3>
-            <p class="pa-caption">{{ periodLabel }}, by week. Hover a bar for details.</p>
+            <p class="pa-caption">{{ periodLabel }}, by week.<template v-if="!summaryOnly"> Hover a bar for details.</template></p>
           </div>
         </header>
         <div class="grid gap-8 md:grid-cols-2 print:grid-cols-2">
@@ -497,7 +497,7 @@ function exportCsv() {
 <style scoped>
 /* Same card language as the marketing site (Universities/Home): soft white, 2xl corners. */
 .pa-card {
-  @apply rounded-2xl bg-white border border-neutral-border/80 shadow-sm p-6 break-inside-avoid min-w-0;
+  @apply rounded-2xl bg-white border border-neutral-border/80 shadow-sm print:shadow-none p-6 break-inside-avoid min-w-0;
 }
 .pa-head {
   @apply flex items-start gap-3 mb-5;
