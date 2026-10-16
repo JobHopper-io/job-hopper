@@ -25,6 +25,9 @@ export default {
           card: '#FFFFFF',
           border: '#E5E7EB',
           body: '#374151',
+          // Secondary text (captions, hints). Was referenced across the app as
+          // text-neutral-muted before it existed, so those classes silently no-op'd.
+          muted: '#6B7280',
         }
       },
       borderRadius: {
