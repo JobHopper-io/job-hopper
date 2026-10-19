@@ -9,7 +9,8 @@ import {
   type BillingCycle,
 } from '@/lib/subscription'
 import { profileAPI } from '@/lib/profile'
-import { FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, type FreemiumBasePlanTierKey } from '@/lib/freemium'
+import { FREEMIUM_BASE_PLAN_TIER_KEYS, CAREER_LEVEL_OPTIONS, freemiumAPI, type FreemiumBasePlanTierKey } from '@/lib/freemium'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import type { Product } from '@/types/database'
 import { ROLE_CATEGORIES, type RoleCategoryValue } from '@/lib/roleCategories'
@@ -27,9 +28,20 @@ import { splitTagsField, joinTagsField } from '@/lib/tags'
 const userStore = useUserStore()
 const hasPopulatedFromProfile = ref(false)
 
-// Steps: 1=About, 2=Role & Level, 3=Compensation & Location, 4=Resume, 5=Plan
+const router = useRouter()
+
+// Students whose university provides their access (a partner pilot or paid license seat)
+// never pick or pay for a plan: onboarding ends after the resume step.
+const coveredBy = computed<string | null>(() => {
+  if (userStore.orgAccount?.status === 'active') return userStore.orgAccount.organization_name
+  if (userStore.trialTier !== 'free') return userStore.trialGrant?.organization_name ?? null
+  return null
+})
+
+// Steps: 1=About, 2=Role & Level, 3=Compensation & Location, 4=Resume, 5=Plan (skipped
+// for university-covered students)
 const currentStep = ref(1)
-const totalSteps = 5
+const totalSteps = computed(() => (coveredBy.value ? 4 : 5))
 const STEP_NAMES = ['About You', 'Role & Level', 'Compensation', 'Resume', 'Plan']
 const STEP_ICONS: [string, string][] = [
   ['fas', 'user'],
@@ -129,7 +141,7 @@ function getFirstIncompleteStep(): number {
   if (!canProceedStep2.value) return 2
   if (!canProceedStep3.value) return 3
   if (!userStore.profile?.resume_bucket_key) return 4
-  return 5
+  return totalSteps.value
 }
 
 function populateFromProfile() {
@@ -168,7 +180,9 @@ function populateFromProfile() {
 }
 
 onMounted(async () => {
-  const { data } = await subscriptionAPI.getBasePlanProducts()
+  // The router claims a university seat on navigation, possibly after the store first
+  // loaded the profile, so reload it to pick up the seat before deciding on the plan step.
+  const [{ data }] = await Promise.all([subscriptionAPI.getBasePlanProducts(), userStore.refreshProfile()])
   if (data) basePlanProducts.value = data
 })
 
@@ -185,7 +199,7 @@ const handleResumeFileSelected = (file: File) => {
 }
 
 const nextStep = () => {
-  if (currentStep.value < totalSteps) {
+  if (currentStep.value < totalSteps.value) {
     currentStep.value++
   }
 }
@@ -248,6 +262,25 @@ async function persistProfileAndResume(): Promise<boolean> {
 }
 
 // Note: Authentication and onboarding redirects are handled in router guard
+
+// University-covered students: save the profile and complete onboarding without checkout
+// (complete-onboarding records the career level and marks onboarding done).
+const handleFinishCovered = async () => {
+  isLoading.value = true
+  error.value = ''
+  try {
+    if (!(await persistProfileAndResume())) return
+    const { error: completeError } = await freemiumAPI.completeOnboarding(careerLevel.value)
+    if (completeError) {
+      error.value = completeError.message || 'Could not finish onboarding. Please try again.'
+      return
+    }
+    await userStore.refreshProfile()
+    await router.push('/dashboard')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const handleProceedToCheckout = async () => {
   try {
@@ -520,6 +553,17 @@ const handleProceedToCheckout = async () => {
             input-id="onboarding-resume-upload"
             @file-selected="handleResumeFileSelected"
           />
+
+          <p
+            v-if="coveredBy"
+            class="flex items-start gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+          >
+            <font-awesome-icon :icon="['fas', 'circle-check']" class="mt-0.5 text-brand-success" aria-hidden="true" />
+            <span>
+              Your access is provided by <strong>{{ coveredBy }}</strong>, so there's no plan to pick and nothing to pay.
+              Finish to start getting matches.
+            </span>
+          </p>
         </div>
 
         <!-- Step 5: Plan Selection -->
@@ -603,6 +647,16 @@ const handleProceedToCheckout = async () => {
           >
             {{ currentStep === 4 && !resumeFile && !userStore.profile?.resume_bucket_key ? 'Skip for now' : 'Continue' }}
             <font-awesome-icon :icon="['fas', 'arrow-right']" class="text-xs" aria-hidden="true" />
+          </button>
+          <button
+            v-else-if="coveredBy"
+            type="button"
+            :disabled="isLoading"
+            class="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="handleFinishCovered"
+          >
+            <font-awesome-icon v-if="isLoading" :icon="['fas', 'spinner']" spin aria-hidden="true" />
+            <span>{{ isLoading ? 'Finishing…' : 'Finish' }}</span>
           </button>
           <button
             v-else
