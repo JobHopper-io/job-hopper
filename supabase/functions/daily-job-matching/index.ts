@@ -97,7 +97,7 @@ serve(async (req) => {
   const nowIso = new Date().toISOString()
   const [{ data: liveGrants, error: grantsError }, { data: orgs, error: orgsError }] = await Promise.all([
     supabase.from("trial_grants").select("id").eq("status", "active").gt("expires_at", nowIso).in("feature_tier", ["core", "premium"]),
-    supabase.from("org_accounts").select("id, status, subscription_id, billing_profile_id"),
+    supabase.from("org_accounts").select("id, status, billing_profile_id"),
   ])
   if (grantsError || orgsError) {
     console.error("daily-job-matching: failed to load partner seats", { error: (grantsError ?? orgsError)?.message })
@@ -106,12 +106,13 @@ serve(async (req) => {
     // billing anchor, e.g. a bursar), not a job seeker: never match or email them.
     for (const org of orgs ?? []) profileIds.delete(org.billing_profile_id)
 
-    const orgSubIds = (orgs ?? []).filter((o) => o.status === "active" && o.subscription_id).map((o) => o.subscription_id)
-    const { data: liveSubs } = orgSubIds.length
-      ? await supabase.from("subscriptions").select("id").in("id", orgSubIds).in("status", ["trial", "active"])
-      : { data: [] }
-    const liveSubIds = new Set((liveSubs ?? []).map((s) => s.id))
-    const liveOrgIds = (orgs ?? []).filter((o) => liveSubIds.has(o.subscription_id)).map((o) => o.id)
+    // Same rule as resolveBaseTier (incl. the late-invoice grace period). One call per
+    // license, and there are only ever a handful of university licenses.
+    const liveOrgIds: string[] = []
+    for (const org of (orgs ?? []).filter((o) => o.status === "active")) {
+      const { data: live } = await supabase.rpc("org_account_is_live", { p_org_id: org.id })
+      if (live === true) liveOrgIds.push(org.id)
+    }
 
     for (const [column, ids] of [["trial_grant_id", (liveGrants ?? []).map((g) => g.id)], ["org_account_id", liveOrgIds]] as const) {
       if (ids.length === 0) continue

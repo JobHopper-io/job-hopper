@@ -49,13 +49,11 @@ async function resolveTrialTier(
   return grant.feature_tier === 'premium' || grant.feature_tier === 'core' ? grant.feature_tier : 'free'
 }
 
-// Entitlement for an org seat keys off the org's real `subscriptions` row status, not a
-// second, parallel status on org_accounts itself -- that row is already the thing
-// reconcile-subscriptions keeps in sync with live Stripe, so re-deriving trial/active
-// here (rather than trusting org_accounts.status alone) means a seat's access can never
-// drift from what Stripe actually billed. org_accounts.status still gates it too (an
-// admin-canceled org account should stop granting access even if the stale
-// subscriptions row hasn't caught up to a Stripe cancellation yet).
+// Entitlement for an org seat keys off the org's real `subscriptions` row status (the row
+// reconcile-subscriptions keeps in sync with live Stripe), via the shared SQL rule
+// org_account_is_live(): trial/active, or past_due within the 30-day grace period
+// universities get for late invoices. org_accounts.status still gates it too (an
+// admin-canceled license stops granting access even before Stripe catches up).
 async function resolveOrgSeatTier(
   supabaseAdmin: SupabaseClient,
   profileId: string,
@@ -68,21 +66,12 @@ async function resolveOrgSeatTier(
 
   if (!profile?.org_account_id) return 'free'
 
-  const { data: org } = await supabaseAdmin
-    .from('org_accounts')
-    .select('feature_tier, status, subscription_id')
-    .eq('id', profile.org_account_id)
-    .maybeSingle()
+  const [{ data: org }, { data: live }] = await Promise.all([
+    supabaseAdmin.from('org_accounts').select('feature_tier').eq('id', profile.org_account_id).maybeSingle(),
+    supabaseAdmin.rpc('org_account_is_live', { p_org_id: profile.org_account_id }),
+  ])
 
-  if (!org || org.status !== 'active' || !org.subscription_id) return 'free'
-
-  const { data: subscription } = await supabaseAdmin
-    .from('subscriptions')
-    .select('status')
-    .eq('id', org.subscription_id)
-    .maybeSingle()
-
-  if (!subscription || !['trial', 'active'].includes(subscription.status)) return 'free'
+  if (!org || live !== true) return 'free'
 
   return org.feature_tier === 'premium' ? 'premium' : 'core'
 }
