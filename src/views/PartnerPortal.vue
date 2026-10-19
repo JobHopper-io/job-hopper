@@ -66,6 +66,32 @@
           <router-link :to="`/admin/partner-dashboard/${leadId}`" class="text-brand-primary font-medium hover:underline">Manage partner →</router-link>
         </div>
 
+        <div
+          v-if="pilotBanner"
+          class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border px-5 py-4"
+          :class="pilotBanner.ended ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'"
+          role="status"
+        >
+          <div class="flex items-start gap-3">
+            <span
+              class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center"
+              :class="pilotBanner.ended ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'"
+            >
+              <font-awesome-icon :icon="['fas', 'hourglass-half']" aria-hidden="true" />
+            </span>
+            <div>
+              <p class="font-heading font-semibold text-brand-charcoal">{{ pilotBanner.title }}</p>
+              <p class="text-sm text-neutral-body">{{ pilotBanner.body }}</p>
+            </div>
+          </div>
+          <a
+            :href="`mailto:support@job-hopper.io?subject=${encodeURIComponent(`Continuing Job-Hopper at ${data.lead.organization_name}`)}`"
+            class="btn-primary !py-2 !px-5 text-sm !rounded-full whitespace-nowrap"
+          >
+            Talk to us about continuing
+          </a>
+        </div>
+
         <div class="grid gap-6 lg:grid-cols-3 mb-8">
           <!-- Program -->
           <section class="pp-card flex flex-col">
@@ -113,11 +139,20 @@
               </div>
             </dl>
             <p
-              v-if="data.billing?.subscriptionStatus === 'past_due'"
-              class="mt-4 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700"
+              v-if="data.billing?.accessPaused"
+              class="mt-4 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 leading-relaxed"
               role="alert"
             >
-              Payment is overdue. Students' access pauses until the open invoice is paid.
+              <strong>Students' access is paused</strong> because the invoice is unpaid. It's restored automatically
+              as soon as it's paid.
+            </p>
+            <p
+              v-else-if="data.billing?.graceEndsAt"
+              class="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 leading-relaxed"
+              role="status"
+            >
+              <strong>Your invoice is overdue.</strong> Students keep full access until
+              {{ longDate(data.billing.graceEndsAt) }}; please pay before then to avoid any interruption.
             </p>
             <p v-else-if="program.stage === 'pilot'" class="mt-auto pt-5 self-start">
               <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-800">
@@ -272,6 +307,27 @@ const isStaffView = computed(() => partners.value.some((p) => p.id === leadId.va
 
 const program = computed(() => describeProgram(data.value?.pilot ?? null, data.value?.paid ?? null))
 const invoice = computed(() => data.value?.billing?.latestInvoice ?? null)
+// Pilot ending soon (last 14 days, matching the reminder emails) or already ended.
+const pilotBanner = computed(() => {
+  const p = program.value
+  const end = data.value?.pilot?.expires_at
+  if (p.stage === 'pilot_ended' && end) {
+    return {
+      ended: true,
+      title: 'Your pilot has ended',
+      body: `Students' university-provided access paused on ${longDate(end)}. Let us know when you'd like to continue and we'll restore it.`,
+    }
+  }
+  if (p.stage === 'pilot' && p.daysLeft !== null && p.daysLeft <= 14 && end) {
+    return {
+      ended: false,
+      title: `Your pilot ends in ${p.daysLeftCaption.replace(' left', '')}`,
+      body: `${p.seatsUsed} students lose university-provided access on ${longDate(end)}. Set up your license now to keep it uninterrupted.`,
+    }
+  }
+  return null
+})
+
 const seatsFull = computed(() => program.value.seatTotal > 0 && program.value.seatsUsed >= program.value.seatTotal)
 
 function longDate(iso: string): string {

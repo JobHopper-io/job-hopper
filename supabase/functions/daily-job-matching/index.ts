@@ -89,6 +89,51 @@ serve(async (req) => {
     if (!data || data.length < PAGE_SIZE) break
   }
 
+  // 2b. University/org seat holders. Their access comes from a running pilot
+  //     (trial_grants) or a paid license (org_accounts), not a subscriptions row of
+  //     their own, so step 2 never reached them. Same entitlement rules as
+  //     resolveBaseTier in _shared/base-tier.ts. A failure here only skips seat holders
+  //     for today; subscribers above still get their run.
+  const nowIso = new Date().toISOString()
+  const [{ data: liveGrants, error: grantsError }, { data: orgs, error: orgsError }] = await Promise.all([
+    supabase.from("trial_grants").select("id").eq("status", "active").gt("expires_at", nowIso).in("feature_tier", ["core", "premium"]),
+    supabase.from("org_accounts").select("id, status, billing_profile_id"),
+  ])
+  if (grantsError || orgsError) {
+    console.error("daily-job-matching: failed to load partner seats", { error: (grantsError ?? orgsError)?.message })
+  } else {
+    // A license's subscriptions row belongs to the university's billing contact (a
+    // billing anchor, e.g. a bursar), not a job seeker: never match or email them.
+    for (const org of orgs ?? []) profileIds.delete(org.billing_profile_id)
+
+    // Same rule as resolveBaseTier (incl. the late-invoice grace period). One call per
+    // license, and there are only ever a handful of university licenses.
+    const liveOrgIds: string[] = []
+    for (const org of (orgs ?? []).filter((o) => o.status === "active")) {
+      const { data: live } = await supabase.rpc("org_account_is_live", { p_org_id: org.id })
+      if (live === true) liveOrgIds.push(org.id)
+    }
+
+    for (const [column, ids] of [["trial_grant_id", (liveGrants ?? []).map((g) => g.id)], ["org_account_id", liveOrgIds]] as const) {
+      if (ids.length === 0) continue
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .in(column, ids)
+          .eq("onboarding_completed", true)
+          .order("id")
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) {
+          console.error("daily-job-matching: failed to load seat holders", { column, error: error.message })
+          break
+        }
+        for (const row of data ?? []) profileIds.add(row.id)
+        if (!data || data.length < PAGE_SIZE) break
+      }
+    }
+  }
+
   // 3. Fan out: one match-jobs row per profile (random limit 2–5), executed by
   //    run-scheduled-jobs, instead of looping over every profile in this invocation.
   const now = Date.now()

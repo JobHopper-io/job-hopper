@@ -53,6 +53,12 @@ export type PartnerPaid = Pick<
 export interface PartnerBilling {
   subscriptionStatus: string
   renewsAt: string | null
+  /** When the license invoice went overdue (null unless past_due). */
+  pastDueSince: string | null
+  /** Overdue licenses keep access for a grace period; this is when it ends. */
+  graceEndsAt: string | null
+  /** Overdue past the grace period: students currently have no access. */
+  accessPaused: boolean
   latestInvoice: {
     status: 'draft' | 'open' | 'paid' | 'uncollectible' | 'void' | null
     totalCents: number
@@ -106,7 +112,7 @@ export interface PartnerListRow
     'id' | 'organization_name' | 'category' | 'status' | 'email_domains' | 'student_size' | 'estimated_seats'
   > {
   pilot: Omit<PartnerPilot, 'id' | 'invite_code'> | null
-  paid: Omit<PartnerPaid, 'id'> | null
+  paid: (Omit<PartnerPaid, 'id'> & { subscription_status: string | null; past_due_since: string | null }) | null
   summary: PartnerSummary | null
   waitlisted: number
   /** Seats requested in still-open "request more seats" asks. */
@@ -202,11 +208,13 @@ export interface PartnerProgram {
 
 const TIER_LABEL: Record<string, string> = { free: 'Free', core: 'Core', premium: 'Premium' }
 const DAY_MS = 86_400_000
+/** Mirrors the grace window in SQL org_account_is_live(), which is the actual rule. */
+const LICENSE_GRACE_DAYS = 30
 
 /** Where a partner is in the pilot -> paid lifecycle, and which seat pool is live. */
 export function describeProgram(
   pilot: Pick<PartnerPilot, 'seat_count' | 'seats_used' | 'feature_tier' | 'expires_at' | 'status' | 'created_at'> | null,
-  paid: Pick<PartnerPaid, 'seat_count' | 'seats_used' | 'feature_tier' | 'status'> | null,
+  paid: (Pick<PartnerPaid, 'seat_count' | 'seats_used' | 'feature_tier' | 'status'> & Partial<Pick<PartnerPaid, 'billing_interval'>>) | null,
 ): PartnerProgram {
   const fmt = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   const base = { daysLeftPct: null, daysLeft: null, daysLeftCaption: '' }
@@ -217,7 +225,7 @@ export function describeProgram(
       stage: 'licensed',
       label: 'Licensed',
       title: `${TIER_LABEL[paid.feature_tier] ?? paid.feature_tier} license`,
-      detail: `${paid.seat_count} seats, renews monthly`,
+      detail: `${paid.seat_count} seats, renews ${paid.billing_interval === 'year' ? 'yearly' : 'monthly'}`,
       seatsUsed: paid.seats_used,
       seatTotal: paid.seat_count,
     }
@@ -343,8 +351,17 @@ export function attentionFlags(
   pilotStartedAt: string | null,
   summary: PartnerSummary | null,
   demand: { waitlisted: number; requestedSeats: number } = { waitlisted: 0, requestedSeats: 0 },
+  license: { subscription_status: string | null; past_due_since: string | null } | null = null,
 ): AttentionFlag[] {
   const flags: AttentionFlag[] = []
+  if (license?.subscription_status === 'past_due') {
+    const graceEnds = license.past_due_since ? new Date(license.past_due_since).getTime() + LICENSE_GRACE_DAYS * DAY_MS : 0
+    flags.push(
+      graceEnds > Date.now()
+        ? { label: `Invoice overdue · access pauses in ${Math.ceil((graceEnds - Date.now()) / DAY_MS)}d`, tone: 'warning' }
+        : { label: 'Access paused · invoice unpaid', tone: 'warning' },
+    )
+  }
   if (demand.requestedSeats > 0) flags.push({ label: `Requested +${demand.requestedSeats} seats`, tone: 'warning' })
   if (demand.waitlisted > 0) flags.push({ label: `${demand.waitlisted} waiting for a seat`, tone: 'opportunity' })
   const holders = summary?.seat_holders ?? 0

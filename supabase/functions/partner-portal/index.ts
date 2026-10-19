@@ -19,6 +19,9 @@ const corsHeaders = {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Mirrors the 30-day window in SQL org_account_is_live() (the actual entitlement rule);
+// used here only to show the university the date access would pause.
+const LICENSE_GRACE_DAYS = 30
 const DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 
 // Org licenses bill products.price_cents per seat per month (admin-org-accounts sets
@@ -159,7 +162,7 @@ serve(async (req) => {
 
       const [grantsRes, orgsRes, domainLeadsRes, summariesRes, prices, waitlistRes, requestsRes] = await Promise.all([
         db.from("trial_grants").select("institutional_lead_id, seat_count, seats_used, feature_tier, expires_at, status, created_at").not("institutional_lead_id", "is", null),
-        db.from("org_accounts").select("institutional_lead_id, seat_count, seats_used, feature_tier, status, created_at, billing_interval, discount_percent, list_price_cents").not("institutional_lead_id", "is", null),
+        db.from("org_accounts").select("institutional_lead_id, seat_count, seats_used, feature_tier, status, created_at, billing_interval, discount_percent, list_price_cents, subscription_id").not("institutional_lead_id", "is", null),
         db.from("institutional_leads").select("id").neq("email_domains", "{}"),
         db.rpc("partner_summaries"),
         seatPrices(db),
@@ -200,6 +203,13 @@ serve(async (req) => {
       const pilots = latest(grantsRes.data ?? [])
       const paid = latest(orgsRes.data ?? [])
 
+      // Payment status per license, for the "invoice overdue" flag.
+      const licenseSubIds = [...paid.values()].map((o) => o.subscription_id).filter((id): id is string => !!id)
+      const { data: licenseSubs } = licenseSubIds.length
+        ? await db.from("subscriptions").select("id, status, past_due_since").in("id", licenseSubIds)
+        : { data: [] }
+      const subById = new Map((licenseSubs ?? []).map((sub) => [sub.id, sub]))
+
       const summaries = new Map(
         ((summariesRes.data ?? []) as { lead_id: string }[]).map((r) => [r.lead_id, r]),
       )
@@ -208,7 +218,13 @@ serve(async (req) => {
         partners: (leads ?? []).map((l) => ({
           ...l,
           pilot: pilots.get(l.id) ?? null,
-          paid: paid.get(l.id) ?? null,
+          paid: paid.get(l.id)
+            ? {
+                ...paid.get(l.id)!,
+                subscription_status: subById.get(paid.get(l.id)!.subscription_id ?? "")?.status ?? null,
+                past_due_since: subById.get(paid.get(l.id)!.subscription_id ?? "")?.past_due_since ?? null,
+              }
+            : null,
           summary: summaries.get(l.id) ?? null,
           waitlisted: (waitlistRes.data ?? []).filter((w) => w.institutional_lead_id === l.id).length,
           requestedSeats: (requestsRes.data ?? []).filter((r) => r.institutional_lead_id === l.id).reduce((n, r) => n + r.seats, 0),
@@ -421,10 +437,14 @@ async function licenseBilling(db: SupabaseClient, subscriptionId: string | null)
   if (!subscriptionId) return null
   const { data: sub } = await db
     .from("subscriptions")
-    .select("status, current_period_ends_at, stripe_subscription_id")
+    .select("status, current_period_ends_at, stripe_subscription_id, past_due_since")
     .eq("id", subscriptionId)
     .maybeSingle()
   if (!sub) return null
+
+  const graceEndsAt = sub.status === "past_due" && sub.past_due_since
+    ? new Date(new Date(sub.past_due_since).getTime() + LICENSE_GRACE_DAYS * 86_400_000).toISOString()
+    : null
 
   let latestInvoice = null
   try {
@@ -443,7 +463,14 @@ async function licenseBilling(db: SupabaseClient, subscriptionId: string | null)
   } catch (err) {
     console.error("partner-portal: could not load latest invoice", err)
   }
-  return { subscriptionStatus: sub.status, renewsAt: sub.current_period_ends_at, latestInvoice }
+  return {
+    subscriptionStatus: sub.status,
+    renewsAt: sub.current_period_ends_at,
+    pastDueSince: sub.past_due_since,
+    graceEndsAt,
+    accessPaused: !!graceEndsAt && new Date(graceEndsAt).getTime() <= Date.now(),
+    latestInvoice,
+  }
 }
 
 async function notifySeatsFull(db: SupabaseClient, leadId: string): Promise<Response> {

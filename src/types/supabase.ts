@@ -2278,7 +2278,7 @@ export type Database = {
           has_seen_walkthrough?: boolean
           id?: string
           landing_path?: string | null
-          last_active_at: string | null
+          last_active_at?: string | null
           last_name: string
           location_radius_miles?: number | null
           onboarding_completed?: boolean | null
@@ -2965,6 +2965,24 @@ export type Database = {
           },
         ]
       }
+      support_chat_requests: {
+        Row: {
+          created_at: string
+          id: number
+          ip_hash: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          ip_hash: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          ip_hash?: string
+        }
+        Relationships: []
+      }
       support_doc_chunks: {
         Row: {
           chunk_index: number
@@ -3253,6 +3271,7 @@ export type Database = {
         Args: { p_url_path: string }
         Returns: undefined
       }
+      is_partner_staff: { Args: never; Returns: boolean }
       match_support_chunks: {
         Args: {
           match_count?: number
@@ -3266,7 +3285,6 @@ export type Database = {
           source_doc: string
         }[]
       }
-      is_partner_staff: { Args: never; Returns: boolean }
       partner_insights: {
         Args: { p_lead_id: string; p_since?: string }
         Returns: Json
