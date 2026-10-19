@@ -190,7 +190,7 @@ const rows = computed(() =>
         flags: attentionFlags(program, partner.pilot?.created_at ?? null, partner.summary, {
           waitlisted: partner.waitlisted,
           requestedSeats: partner.requestedSeats,
-        }),
+        }, partner.paid),
       }
     })
     .sort(
