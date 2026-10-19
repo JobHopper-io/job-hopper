@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { resolveBaseTier } from '../_shared/base-tier.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,23 +99,12 @@ serve(async (req) => {
       )
     }
 
-    // This endpoint is for subscribers only; users without an active subscription use
-    // `freemium-run-job-search` (which enforces the free-tier search cap).
-    const { count: subCount, error: subError } = await supabaseAdmin
-      .from('subscriptions')
-      .select('id', { count: 'exact', head: true })
-      .eq('profile_id', profile.id)
-      .in('status', ['trial', 'active'])
+    // For Core/Premium users only; Free users use `freemium-run-job-search` (which
+    // enforces the free-tier search cap). resolveBaseTier also counts university/org seats
+    // (pilot or license), not just the caller's own subscriptions row.
+    const baseTier = await resolveBaseTier(supabaseAdmin, profile.id)
 
-    if (subError) {
-      console.error('run-job-search: subscription count failed', subError)
-      return new Response(JSON.stringify({ error: 'Server error' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      })
-    }
-
-    if ((subCount ?? 0) === 0) {
+    if (baseTier === 'free') {
       return new Response(
         JSON.stringify({ error: 'Manual job search requires an active subscription' }),
         {
