@@ -588,6 +588,11 @@ router.beforeEach(async (to) => {
       !userProfile.org_account_id &&
       !(await subscriptionAPI.hasActiveOrTrialSubscription(userProfile.id)).data
     if (gatedOut && targetPath !== '/choose-plan') {
+      // University staff without a plan of their own aren't here to buy one: send them
+      // to their partner dashboard (covers staff who already had an onboarded account).
+      if (await partnerPortalAPI.isPartnerStaff()) {
+        return '/partner'
+      }
       return '/choose-plan'
     }
     if (!gatedOut && targetPath === '/choose-plan') {

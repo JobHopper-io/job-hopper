@@ -5,6 +5,7 @@ import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
+import { partnerPortalAPI } from '@/lib/partnerPortal'
 import { useUserStore } from '@/stores/user'
 import ChatWidget from '@/components/ChatWidget.vue'
 import jobHopperFullLogo from '@/assets/job-hopper-logo.png'
@@ -78,6 +79,8 @@ onClickOutside(authMenuRef, () => {
 })
 const isAdmin = ref(false)
 const isSuperAdmin = ref(false)
+// University partner staff get a nav link to their dashboard (/partner).
+const isPartnerStaff = ref(false)
 
 const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
 const canAccessAdmin = computed(() => isAdmin.value || isSuperAdmin.value)
@@ -104,11 +107,13 @@ watch(isAuthenticated, (authenticated) => {
       userStore.refreshProfile(),
       userStore.refreshSubscription(),
       loadAdminRoles(),
+      partnerPortalAPI.isPartnerStaff().then((staff) => (isPartnerStaff.value = staff)),
     ])
   } else {
     userStore.clear()
     isAdmin.value = false
     isSuperAdmin.value = false
+    isPartnerStaff.value = false
   }
 })
 
@@ -295,6 +300,13 @@ const handleSignOutAndCloseMenu = async () => {
                   Billing
                 </router-link>
                 <router-link
+                  v-if="isPartnerStaff"
+                  to="/partner"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                >
+                  Partner dashboard
+                </router-link>
+                <router-link
                   v-if="canAccessAdmin"
                   to="/admin/dashboard"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
@@ -478,6 +490,14 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Billing
+                </router-link>
+                <router-link
+                  v-if="isPartnerStaff"
+                  to="/partner"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Partner dashboard
                 </router-link>
                 <router-link
                   v-if="canAccessAdmin"
