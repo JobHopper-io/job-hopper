@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { authAPI, onAuthStateChange } from '@/lib/auth'
 import { profileAPI } from '@/lib/profile'
+import { partnerPortalAPI } from '@/lib/partnerPortal'
 import { useUserStore } from '@/stores/user'
 import ChatWidget from '@/components/ChatWidget.vue'
 import jobHopperFullLogo from '@/assets/job-hopper-logo.png'
@@ -69,15 +69,10 @@ const noFooterGap = computed(
 const isAuthenticated = ref(false)
 const mobileMenuOpen = ref(false)
 
-// Shared nav's Login/Get Started split into a job-seeker-vs-employer choice - the employer
-// side has no other discoverable entry point from these pages.
-const authMenuOpen = ref<'login' | 'register' | null>(null)
-const authMenuRef = ref<HTMLElement | null>(null)
-onClickOutside(authMenuRef, () => {
-  authMenuOpen.value = null
-})
 const isAdmin = ref(false)
 const isSuperAdmin = ref(false)
+// University partner staff get a nav link to their dashboard (/partner).
+const isPartnerStaff = ref(false)
 
 const isOnboarded = computed(() => !!userStore.profile?.onboarding_completed)
 const canAccessAdmin = computed(() => isAdmin.value || isSuperAdmin.value)
@@ -104,11 +99,13 @@ watch(isAuthenticated, (authenticated) => {
       userStore.refreshProfile(),
       userStore.refreshSubscription(),
       loadAdminRoles(),
+      partnerPortalAPI.isPartnerStaff().then((staff) => (isPartnerStaff.value = staff)),
     ])
   } else {
     userStore.clear()
     isAdmin.value = false
     isSuperAdmin.value = false
+    isPartnerStaff.value = false
   }
 })
 
@@ -295,6 +292,13 @@ const handleSignOutAndCloseMenu = async () => {
                   Billing
                 </router-link>
                 <router-link
+                  v-if="isPartnerStaff"
+                  to="/partner"
+                  class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
+                >
+                  Partner dashboard
+                </router-link>
+                <router-link
                   v-if="canAccessAdmin"
                   to="/admin/dashboard"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
@@ -307,49 +311,13 @@ const handleSignOutAndCloseMenu = async () => {
             <!-- Desktop actions (right, matching the landing nav) -->
             <div class="hidden md:flex items-center gap-3">
               <template v-if="!isAuthenticated">
-                <div ref="authMenuRef" class="flex items-center gap-3">
-                  <div class="relative">
-                    <button
-                      type="button"
-                      class="flex items-center gap-1 text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
-                      @click="authMenuOpen = authMenuOpen === 'login' ? null : 'login'"
-                    >
-                      Login
-                      <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
-                    </button>
-                    <div
-                      v-if="authMenuOpen === 'login'"
-                      class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
-                    >
-                      <router-link to="/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
-                        Job seeker
-                      </router-link>
-                      <router-link to="/employer/login" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
-                        Employer
-                      </router-link>
-                    </div>
-                  </div>
-                  <div class="relative">
-                    <button
-                      type="button"
-                      class="btn-primary flex items-center gap-1.5 text-sm"
-                      @click="authMenuOpen = authMenuOpen === 'register' ? null : 'register'"
-                    >
-                      Get Started
-                      <font-awesome-icon :icon="['fas', 'chevron-down']" class="text-[10px]" aria-hidden="true" />
-                    </button>
-                    <div
-                      v-if="authMenuOpen === 'register'"
-                      class="absolute right-0 top-full z-10 mt-2 w-40 rounded-[12px] border border-neutral-border bg-white py-1.5 shadow-lg"
-                    >
-                      <router-link to="/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
-                        Job seeker
-                      </router-link>
-                      <router-link to="/employer/register" class="block px-4 py-2 text-sm text-brand-charcoal hover:bg-neutral-bg" @click="authMenuOpen = null">
-                        Employer
-                      </router-link>
-                    </div>
-                  </div>
+                <div class="flex items-center gap-3">
+                  <router-link to="/login" class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary">
+                    Login
+                  </router-link>
+                  <router-link to="/register" class="btn-primary text-sm">
+                    Get Started
+                  </router-link>
                 </div>
               </template>
               <template v-else>
@@ -424,10 +392,6 @@ const handleSignOutAndCloseMenu = async () => {
                 </router-link>
                 <div class="flex items-center gap-2 px-3 pt-2 mt-1 border-t border-neutral-border text-sm">
                   <span class="text-neutral-body">Hiring?</span>
-                  <router-link to="/employer/login" class="font-semibold text-brand-primary" @click="mobileMenuOpen = false">
-                    Employer login
-                  </router-link>
-                  <span class="text-neutral-body">·</span>
                   <router-link to="/employer/register" class="font-semibold text-brand-primary" @click="mobileMenuOpen = false">
                     Sign up
                   </router-link>
@@ -478,6 +442,14 @@ const handleSignOutAndCloseMenu = async () => {
                   @click="mobileMenuOpen = false"
                 >
                   Billing
+                </router-link>
+                <router-link
+                  v-if="isPartnerStaff"
+                  to="/partner"
+                  class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
+                  @click="mobileMenuOpen = false"
+                >
+                  Partner dashboard
                 </router-link>
                 <router-link
                   v-if="canAccessAdmin"
