@@ -450,6 +450,9 @@ serve(async (req) => {
           discount_percent: discountPercent,
           list_price_cents: product.price_cents,
           converted_from_trial_grant_id: pilotGrants[0]?.id ?? null,
+          // Pay-first: seats go live when the first invoice is paid (stripe-webhook
+          // invoice.paid, or partner-portal's overview fallback).
+          status: "pending_payment",
           created_by: user.id,
         })
         .select("id, organization_name, feature_tier, seat_count, seats_used, status, subscription_id, created_at")

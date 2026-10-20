@@ -148,6 +148,7 @@ serve(async (req) => {
       'checkout.session.completed',
       'customer.subscription.updated',
       'customer.subscription.deleted',
+      'invoice.paid',
     ])
 
     // Idempotency: Stripe redelivers on timeouts/5xx; never re-run side effects (emails,
@@ -702,6 +703,32 @@ serve(async (req) => {
               stripeSubscriptionId: stripeSub.id,
             })
           }
+        }
+        break
+      }
+
+      case 'invoice.paid': {
+        // University licenses are pay-first (org_accounts 'pending_payment'): the first
+        // paid invoice turns the seats on. A no-op for every other invoice.
+        const invoice = event.data.object as Stripe.Invoice
+        const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+        if (!stripeSubscriptionId) break
+        const { data: paidSub, error: paidSubError } = await supabaseAdmin
+          .from('subscriptions')
+          .select('id')
+          .eq('stripe_subscription_id', stripeSubscriptionId)
+          .maybeSingle()
+        assertOk(paidSubError, 'invoice.paid: load subscription')
+        if (!paidSub) break
+        const { data: activated, error: activateError } = await supabaseAdmin
+          .from('org_accounts')
+          .update({ status: 'active' })
+          .eq('subscription_id', paidSub.id)
+          .eq('status', 'pending_payment')
+          .select('id, organization_name')
+        assertOk(activateError, 'invoice.paid: activate org account')
+        if (activated?.length) {
+          console.log(`${LOG_PREFIX} invoice.paid: license activated`, { orgAccounts: activated })
         }
         break
       }
