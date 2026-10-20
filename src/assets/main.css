@@ -64,6 +64,11 @@
     @apply w-full px-4 py-3 border border-neutral-border rounded-[12px] focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent;
   }
 
+  /* Compact form control for admin/partner forms (inputs, selects, textareas) */
+  .input-field {
+    @apply px-3 py-2.5 bg-white text-brand-charcoal border border-neutral-border rounded-[10px] placeholder:text-neutral-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary;
+  }
+
   /* Grid that fills the row with as many equal columns as fit (min 16rem each) */
   .grid-auto-fill {
     @apply grid gap-4;

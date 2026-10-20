@@ -191,7 +191,7 @@ export const partnerPortalAPI = {
   },
 }
 
-export type PartnerStage = 'licensed' | 'pilot' | 'pilot_ended' | 'setup'
+export type PartnerStage = 'licensed' | 'awaiting_payment' | 'pilot' | 'pilot_ended' | 'setup'
 
 export interface PartnerProgram {
   stage: PartnerStage
@@ -231,6 +231,19 @@ export function describeProgram(
     }
   }
 
+  // Pay-first: a license's seats only go live once its first invoice is paid.
+  if (paid?.status === 'pending_payment') {
+    return {
+      ...base,
+      stage: 'awaiting_payment',
+      label: 'Awaiting payment',
+      title: `${TIER_LABEL[paid.feature_tier] ?? paid.feature_tier} license`,
+      detail: `${paid.seat_count} seats. Students get access as soon as the first invoice is paid.`,
+      seatsUsed: paid.seats_used,
+      seatTotal: paid.seat_count,
+    }
+  }
+
   if (pilot) {
     const end = new Date(pilot.expires_at).getTime()
     const seats = { seatsUsed: pilot.seats_used, seatTotal: pilot.seat_count }
@@ -264,6 +277,7 @@ export function describeProgram(
 /** Tailwind classes for a stage pill (dot + pill), shared by the portal and admin list. */
 export const STAGE_STYLE: Record<PartnerStage, { pill: string; dot: string }> = {
   licensed: { pill: 'bg-green-50 text-green-800', dot: 'bg-brand-success' },
+  awaiting_payment: { pill: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
   pilot: { pill: 'bg-brand-primary/10 text-brand-primary', dot: 'bg-brand-primary' },
   pilot_ended: { pill: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
   setup: { pill: 'bg-neutral-bg text-neutral-body', dot: 'bg-neutral-border' },

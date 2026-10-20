@@ -219,7 +219,7 @@
                 <th class="font-semibold px-3 py-2.5 text-right">Applied</th>
                 <th class="font-semibold px-3 py-2.5 text-right">Interviewing</th>
                 <th class="font-semibold px-3 py-2.5 text-right">Mock interviews</th>
-                <th v-if="canRelease" class="px-6 py-2.5"><span class="sr-only">Actions</span></th>
+                <th v-if="canRelease" class="pl-2 pr-6 py-2.5"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -234,8 +234,9 @@
                       {{ initials(s) }}
                     </span>
                     <div class="min-w-0">
-                      <div class="font-medium text-brand-charcoal truncate">{{ s.name || '—' }}</div>
-                      <div class="text-xs text-neutral-muted truncate">{{ s.email }}</div>
+                      <div class="font-medium text-brand-charcoal truncate">{{ s.name || s.email }}</div>
+                      <div v-if="s.name" class="text-xs text-neutral-muted truncate">{{ s.email }}</div>
+                      <div v-else class="text-xs text-neutral-muted">Hasn't added their name yet</div>
                     </div>
                   </div>
                 </td>
@@ -252,7 +253,7 @@
                 <td class="px-3 py-3 text-right tabular-nums">{{ s.applications }}</td>
                 <td class="px-3 py-3 text-right tabular-nums">{{ s.interviewing }}</td>
                 <td class="px-3 py-3 text-right tabular-nums">{{ s.practiceSessions }}</td>
-                <td v-if="canRelease" class="px-6 py-3 text-right whitespace-nowrap">
+                <td v-if="canRelease" class="pl-2 pr-6 py-3 text-right whitespace-nowrap">
                   <template v-if="confirmingRelease === s.profileId">
                     <button
                       type="button"
@@ -270,10 +271,12 @@
                   <button
                     v-else
                     type="button"
-                    class="text-xs text-neutral-muted hover:text-red-600 hover:underline"
+                    class="w-8 h-8 rounded-full text-neutral-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+                    :title="`Release ${s.name || s.email}'s seat`"
+                    :aria-label="`Release ${s.name || s.email}'s seat`"
                     @click="confirmingRelease = s.profileId"
                   >
-                    Release seat
+                    <font-awesome-icon :icon="['fas', 'user-minus']" aria-hidden="true" />
                   </button>
                 </td>
               </tr>
@@ -414,7 +417,8 @@ const kpis = computed(() => [
 ])
 
 function initials(s: PartnerRosterRow): string {
-  const source = s.name || s.email
+  // No name yet: the email's first letter (not "local" + "domain" initials).
+  const source = s.name || s.email.split('@')[0]!
   return source
     .split(/[\s.@]+/)
     .filter(Boolean)

@@ -263,6 +263,14 @@ serve(async (req) => {
 
       const billing = paidRes.data ? await licenseBilling(db, paidRes.data.subscription_id) : null
 
+      // Fallback for a missed invoice.paid webhook: a pay-first license whose first
+      // invoice Stripe reports paid goes live on the next dashboard load.
+      if (paidRes.data?.status === "pending_payment" && billing?.latestInvoice?.status === "paid") {
+        const { error: activateError } = await db.from("org_accounts").update({ status: "active" }).eq("id", paidRes.data.id).eq("status", "pending_payment")
+        if (activateError) console.error("partner-portal: could not activate paid license", activateError)
+        else paidRes.data.status = "active"
+      }
+
       return json({
         lead: leadRes.data,
         pilot: pilotRes.data,

@@ -59,14 +59,12 @@
         </form>
       </section>
 
-      <section class="bg-white rounded-2xl border border-neutral-border shadow-sm p-6 mb-6">
+      <!-- Legacy free pilots: no new ones are started (licenses are pay-first). -->
+      <section v-if="data.grants.length" class="bg-white rounded-2xl border border-neutral-border shadow-sm p-6 mb-6">
         <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-4">
           Trial grants
         </h2>
-        <p v-if="data.grants.length === 0" class="text-sm text-neutral-body mb-4">
-          No pilot yet. Start one below; students claim seats by email domain or the invite link.
-        </p>
-        <div v-else class="space-y-3">
+        <div class="space-y-3">
           <div
             v-for="grant in data.grants"
             :key="grant.id"
@@ -83,28 +81,6 @@
             </div>
           </div>
         </div>
-        <form v-if="!hasRunningPilot" class="grid gap-3 sm:grid-cols-4 items-end mt-4" @submit.prevent="startPilot">
-          <label>
-            <span class="block text-sm font-medium text-brand-charcoal mb-1">Seats</span>
-            <input v-model.number="pilotForm.seatCount" type="number" min="1" required class="input-field w-full" />
-          </label>
-          <label>
-            <span class="block text-sm font-medium text-brand-charcoal mb-1">Length (days)</span>
-            <input v-model.number="pilotForm.days" type="number" min="1" required class="input-field w-full" />
-          </label>
-          <label>
-            <span class="block text-sm font-medium text-brand-charcoal mb-1">Tier</span>
-            <select v-model="pilotForm.featureTier" class="input-field w-full">
-              <option value="core">Core</option>
-              <option value="premium">Premium</option>
-            </select>
-          </label>
-          <button type="submit" class="btn-primary" :disabled="startingPilot">
-            <font-awesome-icon v-if="startingPilot" :icon="['fas', 'spinner']" spin class="mr-2" />
-            Start pilot
-          </button>
-          <p v-if="pilotError" class="sm:col-span-4 text-sm text-red-600">{{ pilotError }}</p>
-        </form>
       </section>
 
       <section class="bg-white rounded-2xl border border-neutral-border shadow-sm p-6 mb-6">
@@ -123,7 +99,10 @@
                 · <strong class="text-brand-charcoal">{{ invoiceLabel(monthlyValueCents(paidTerms, prices), paidTerms.billing_interval) }}</strong>
               </template>
             </div>
-            <span class="capitalize text-neutral-body">
+            <span v-if="data.orgAccount.status === 'pending_payment'" class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+              Awaiting first payment
+            </span>
+            <span v-else class="capitalize text-neutral-body">
               {{ overview?.billing?.subscriptionStatus ?? data.orgAccount.status }}
             </span>
           </div>
@@ -146,6 +125,11 @@
             </p>
           </div>
 
+          <p v-if="data.orgAccount.status === 'pending_payment'" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Waiting for the first invoice to be paid. Students can't claim seats until then; it activates
+            automatically when Stripe reports it paid.
+          </p>
+          <template v-else>
           <form class="flex flex-wrap items-end gap-3 mb-6" @submit.prevent="submitAddSeats">
             <label>
               <span class="block text-sm font-medium text-brand-charcoal mb-1">Add seats</span>
@@ -180,6 +164,7 @@
               <span v-if="importSuccess" class="text-sm text-green-700">{{ importSuccess }}</span>
             </div>
           </form>
+          </template>
 
           <p v-if="data.seatInvites.length === 0" class="text-sm text-neutral-body">
             No seats imported yet.
@@ -211,8 +196,8 @@
 
         <template v-else>
           <p class="text-sm text-neutral-body mb-4">
-            No paid org account exists for this lead yet. Creating one moves every student on the pilot
-            onto a paid seat, so the seat count must cover them.
+            No license yet. Creating one emails the billing contact a Stripe invoice; seats go live for
+            students as soon as it's paid.
           </p>
           <form @submit.prevent="submitCreateOrgAccount" class="grid gap-3 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -250,7 +235,7 @@
             <div class="sm:col-span-2 flex items-center gap-3">
               <button type="submit" class="btn-primary" :disabled="creatingOrgAccount">
                 <font-awesome-icon v-if="creatingOrgAccount" :icon="['fas', 'spinner']" spin class="mr-2" />
-                Create org account (real Stripe invoice subscription)
+                Create license and send invoice
               </button>
               <span v-if="prices" class="text-sm text-neutral-body">
                 Invoices <strong class="text-brand-charcoal">{{ invoiceLabel(createEstimate, createForm.billingInterval) }}</strong>
@@ -325,10 +310,9 @@ const leadId = route.params.leadId as string
 const overview = ref<PartnerOverview | null>(null)
 const overviewError = ref<string | null>(null)
 const program = computed(() => describeProgram(overview.value?.pilot ?? null, overview.value?.paid ?? null))
-const hasRunningPilot = computed(() => program.value.stage === 'pilot')
 const prices = computed(() => overview.value?.seatPriceCents ?? null)
 // Contract terms (interval, discount, snapshotted price) live on the overview's paid pool.
-const paidTerms = computed(() => (overview.value?.paid?.status === 'active' ? overview.value.paid : null))
+const paidTerms = computed(() => (overview.value?.paid && overview.value.paid.status !== 'canceled' ? overview.value.paid : null))
 
 const addSeatsCount = ref(25)
 const addingSeats = ref(false)
@@ -408,24 +392,6 @@ async function removeStaff(email: string) {
   const { error: apiError } = await partnerPortalAPI.removeStaff(leadId, email)
   showSetupResult(apiError, `Removed ${email}.`)
   if (!apiError) await reload()
-}
-
-const pilotForm = reactive({ seatCount: 50, days: 60, featureTier: 'core' as 'core' | 'premium' })
-const startingPilot = ref(false)
-const pilotError = ref<string | null>(null)
-async function startPilot() {
-  startingPilot.value = true
-  pilotError.value = null
-  const { error: apiError } = await adminAPI.createTrialGrant({
-    organizationName: data.value?.lead.organization_name ?? '',
-    institutionalLeadId: leadId,
-    seatCount: pilotForm.seatCount,
-    featureTier: pilotForm.featureTier,
-    expiresAt: new Date(Date.now() + pilotForm.days * 86_400_000).toISOString(),
-  })
-  startingPilot.value = false
-  if (apiError) pilotError.value = apiError.message
-  else await reload()
 }
 
 const releasing = ref(false)
