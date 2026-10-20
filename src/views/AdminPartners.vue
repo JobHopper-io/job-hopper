@@ -176,7 +176,7 @@ const FILTERS = [
 ] as const
 const filter = ref<(typeof FILTERS)[number]['key']>('all')
 
-const STAGE_ORDER: Record<PartnerStage, number> = { pilot: 0, licensed: 1, pilot_ended: 2, setup: 3 }
+const STAGE_ORDER: Record<PartnerStage, number> = { awaiting_payment: 0, pilot: 1, licensed: 2, pilot_ended: 3, setup: 4 }
 const rows = computed(() =>
   partners.value
     .map((partner) => {

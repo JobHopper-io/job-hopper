@@ -109,7 +109,7 @@
             </div>
 
             <!-- Billing (paid license) -->
-            <dl v-if="program.stage === 'licensed' && data.paid" class="mt-5 space-y-2 text-sm border-t border-neutral-border pt-4">
+            <dl v-if="(program.stage === 'licensed' || program.stage === 'awaiting_payment') && data.paid" class="mt-5 space-y-2 text-sm border-t border-neutral-border pt-4">
               <div class="flex justify-between gap-3">
                 <dt class="text-neutral-muted">Billing</dt>
                 <dd class="font-medium text-brand-charcoal">{{ data.paid.billing_interval === 'year' ? 'Annual' : 'Monthly' }}</dd>
