@@ -265,6 +265,7 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Applications
                 </router-link>
+                <!-- Recruiter Requests tab hidden for now; route /reveal-requests still exists.
                 <router-link
                   v-if="userStore.profile?.recruiter_visible"
                   to="/reveal-requests"
@@ -272,6 +273,7 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Recruiter Requests
                 </router-link>
+                -->
                 <router-link
                   to="/profile"
                   class="text-sm font-medium text-neutral-body transition-colors hover:text-brand-primary"
@@ -413,6 +415,7 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Applications
                 </router-link>
+                <!-- Recruiter Requests tab hidden for now; route /reveal-requests still exists.
                 <router-link
                   v-if="userStore.profile?.recruiter_visible"
                   to="/reveal-requests"
@@ -421,6 +424,7 @@ const handleSignOutAndCloseMenu = async () => {
                 >
                   Recruiter Requests
                 </router-link>
+                -->
                 <router-link
                   to="/profile"
                   class="px-3 py-2 text-neutral-body hover:text-brand-primary rounded-md text-sm font-medium"
