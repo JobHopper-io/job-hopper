@@ -128,7 +128,7 @@ serve(async (req) => {
     .update({
       status: 'failed',
       error_message: truncate(
-        `Fulfillment did not complete within ${RESUME_STALE_MINUTES} minutes; the worker was likely terminated before n8n responded`,
+        `Fulfillment did not complete within ${RESUME_STALE_MINUTES} minutes; the worker was likely terminated mid-request`,
         ERROR_MESSAGE_MAX_LENGTH,
       ),
       completed_at: now,
@@ -148,7 +148,7 @@ serve(async (req) => {
       staleMinutes: RESUME_STALE_MINUTES,
     })
     // Reverse the Core/Premium daily credit each swept row held (no-op for free-tier rows).
-    // These rows were EarlyDropped mid-fulfillment, so markResumeProductFailed never ran.
+    // These rows' workers died mid-fulfillment, so markResumeProductFailed never ran.
     for (const swept of sweptResumeRows ?? []) {
       const { error: refundError } = await supabase.rpc('refund_daily_resume_advice', {
         p_resume_product_id: swept.id,

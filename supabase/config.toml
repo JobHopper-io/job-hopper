@@ -226,11 +226,6 @@ verify_jwt = false
 [functions.run-scheduled-jobs]
 verify_jwt = false
 
-# Called by the n8n resume workflow (not a logged-in user) to deliver generated advice,
-# so JWT verification is off. Secured with x-cron-secret (CRON_SECRET) or service role bearer.
-[functions.resume-advice-callback]
-verify_jwt = false
-
 # Read-only Stripe reconciliation (retrieve only). Invoked by an operator/service, not a
 # logged-in user, so JWT is off; secured with x-cron-secret (CRON_SECRET) or service role bearer.
 [functions.admin-stripe-reconcile]

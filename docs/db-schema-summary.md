@@ -83,7 +83,7 @@
   - UNIQUE(`profile_id`, `job_match_id`, `product_id`): at most one per-job purchase per job per profile; resume upgrade uses `job_match_id` null.
 - **Non‑obvious rules**:
   - Populated by webhook `checkout.session.completed` from one-time line items for products with `key IN ('resume_upgrade', 'per_job_resume_advice')`. For `per_job_resume_advice`, `job_match_id` is set from session metadata; for `resume_upgrade` it stays null.
-  - `improvements_text` stores plain-text LLM output from n8n for **both** product types: the `stripe-webhook` function invokes `fulfillResumeProductViaN8n` (background) which calls the appropriate n8n URL, then updates the row with `improvements_text`, `status = 'complete'`, and `completed_at`.
+  - `improvements_text` stores plain-text LLM output: `freemium-resume-advice` awaits `fulfillResumeAdvice` (`_shared/resume-advice-fulfillment.ts`), which calls the LLM directly and sets `improvements_text`, `status = 'complete'`, `completed_at` (or `status = 'failed'` + `error_message` with a daily-credit refund).
   - `status` enum: `pending` | `complete` | `cancelled`; default `pending`. `completed_at` set when fulfillment completes.
   - Only service_role (e.g. edge functions) writes; authenticated users can SELECT their own rows via RLS.
 
