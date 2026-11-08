@@ -147,17 +147,11 @@ export interface MatchedJob {
   sponsorshipEmployerId: string | null
   /** Whether the current profile has an active Sponsor Watch subscription for this employer. */
   sponsorshipWatched: boolean
-  /** True when the underlying posting is older than the matching algorithm's recency cutoff
-   * (same jobExceedsMaxAge check match-jobs uses at creation time, re-applied at read time).
-   * Purely informational - this match already exists, so nothing here re-runs the
-   * creation-time gate or hides the job; it only tells the UI whether to show a staleness note. */
-  isStale: boolean
-  /** Days since the job's posted_date (falling back to job_hopper_live.created_at), for the
-   * staleness note's copy. Null when neither date is available. */
+  /** Days since the job's posted_date (falling back to job_hopper_live.created_at).
+   * Null when neither date is available. */
   daysSincePosted: number | null
-  /** True within the first 7 days of a posting (Apply Intelligence A). Mutually exclusive with
-   * isStale by construction (7 vs. >45 day thresholds never overlap) - advice-only, no claim
-   * this app's data proves early applications do better. */
+  /** True within the first 7 days of a posting (Apply Intelligence A) - the only age pill shown.
+   * Advice-only, no claim this app's data proves early applications do better. */
   isRecentlyPosted: boolean
   contacts?: JobContact[]
   /** Hiring Intel pipeline row status for this match, if any */
