@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
-import { fulfillResumeProductViaN8n } from '../_shared/n8n-resume-fulfillment.ts'
+import { fulfillResumeAdvice } from '../_shared/resume-advice-fulfillment.ts'
 import { getFreemiumSettings } from '../_shared/freemium-settings.ts'
 import { resolveBaseTier } from '../_shared/base-tier.ts'
 
@@ -254,20 +254,15 @@ serve(async (req) => {
       }
     }
 
-    EdgeRuntime.waitUntil(
-      fulfillResumeProductViaN8n({
-        supabaseAdmin,
-        resumeProductId,
-        productKey: 'per_job_resume_advice',
-        profileId: profile.id,
-        jobMatchId,
-      }).catch((err) =>
-        console.error('[freemium-resume-advice] n8n fulfillment rejected', {
-          resumeProductId,
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      ),
-    )
+    // Awaited, not waitUntil: background work gets EarlyDropped mid-LLM-call. The row ends
+    // complete or failed (with refund) before we respond; the client then reads it.
+    await fulfillResumeAdvice({
+      supabaseAdmin,
+      resumeProductId,
+      productKey: 'per_job_resume_advice',
+      profileId: profile.id,
+      jobMatchId,
+    })
 
     return new Response(JSON.stringify(responseBody), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

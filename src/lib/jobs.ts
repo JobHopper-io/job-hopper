@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { profileAPI } from '@/lib/profile'
 import { getEffectiveSponsorshipLikelihood } from '@shared/infer-sponsorship-likelihood'
-import { jobExceedsMaxAge, defaultConfig, type JobRecord } from '@shared/job-matching-algorithm'
 import type {
   JobMatch,
   SavedJob,
@@ -231,13 +230,8 @@ function toMatchedJob(
       ? getEffectiveSponsorshipLikelihood(storedSponsorship ?? 'N/A', jobData)
       : null
 
-  // Same posted_date-else-created_at source match-jobs uses at creation time
-  // (docs/job-matching-rules.md gate #2) - re-checked here at read time only to surface a
-  // note, not to re-gate or hide anything already matched.
+  // Same posted_date-else-created_at source match-jobs uses at creation time.
   const ageSourceIso = job?.posted_date ?? job?.created_at ?? null
-  const isStale = ageSourceIso
-    ? jobExceedsMaxAge({ postedDate: ageSourceIso, createdAt: ageSourceIso } as JobRecord, defaultConfig)
-    : false
   const daysSincePosted = daysSince(ageSourceIso)
   const isRecentlyPosted = daysSincePosted != null && daysSincePosted <= 7
 
@@ -270,7 +264,6 @@ function toMatchedJob(
     sponsorshipRealRationale: realScore?.rationale ?? null,
     sponsorshipEmployerId: realScore?.employerId ?? null,
     sponsorshipWatched: realScore?.employerId ? watchedEmployerIds.has(realScore.employerId) : false,
-    isStale,
     daysSincePosted,
     isRecentlyPosted,
     whyFitBullets: parseWhyFitBullets(match.why_fit_bullets),

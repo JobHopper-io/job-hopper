@@ -536,13 +536,6 @@ async function runAdviceCheckout() {
               <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
               Recently posted — early applicants tend to get noticed first
             </span>
-            <span
-              v-if="job.isStale"
-              class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800"
-            >
-              <font-awesome-icon :icon="['fas', 'clock']" class="shrink-0" aria-hidden="true" />
-              Posted {{ job.daysSincePosted }} days ago — may no longer be accepting applications
-            </span>
             <MatchScoreRing v-if="job.score != null" :score="job.score" :size="28" show-label />
             <JobSponsorshipBadge
               v-if="showSponsorshipBadge && !showPremiumSponsorshipPanel"
