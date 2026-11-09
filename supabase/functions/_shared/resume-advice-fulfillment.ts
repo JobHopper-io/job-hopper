@@ -225,7 +225,10 @@ export async function fulfillResumeAdvice(params: FulfillResumeAdviceParams): Pr
     return
   }
 
-  const model = Deno.env.get('LLM_MODEL_RESUME_ADVICE') || 'gpt-4o-mini'
+  // Falls back to LLM_MODEL_WHY_FIT like every other LLM function: the provider behind
+  // LLM_BASE_URL is self-hosted and has no model named 'gpt-4o-mini'.
+  const model =
+    Deno.env.get('LLM_MODEL_RESUME_ADVICE') || Deno.env.get('LLM_MODEL_WHY_FIT') || 'gpt-4o-mini'
   console.log(`${LOG} calling LLM`, {
     resumeProductId,
     model,
