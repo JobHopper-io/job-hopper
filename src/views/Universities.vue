@@ -7,6 +7,8 @@ const formData = ref({
   email: '',
   name: '',
   title: '',
+  estimatedSeats: null as number | null,
+  studentSize: null as number | null,
 })
 
 const isSubmitting = ref(false)
@@ -23,6 +25,8 @@ const handleSubmit = async () => {
     email: formData.value.email.trim(),
     name: formData.value.name.trim(),
     title: formData.value.title.trim(),
+    estimatedSeats: formData.value.estimatedSeats,
+    studentSize: formData.value.studentSize,
   })
 
   isSubmitting.value = false
@@ -31,7 +35,7 @@ const handleSubmit = async () => {
     return
   }
   isSubmitted.value = true
-  formData.value = { organizationName: '', email: '', name: '', title: '' }
+  formData.value = { organizationName: '', email: '', name: '', title: '', estimatedSeats: null, studentSize: null }
 }
 
 const valuePoints = [
@@ -185,6 +189,38 @@ const valuePoints = [
               class="input"
               placeholder="you@university.edu"
             />
+          </div>
+
+          <div class="grid gap-6 sm:grid-cols-2">
+            <div>
+              <label for="estimatedSeats" class="block text-sm font-medium text-brand-charcoal mb-2">
+                Students you'd want covered
+              </label>
+              <input
+                id="estimatedSeats"
+                v-model.number="formData.estimatedSeats"
+                type="number"
+                min="1"
+                step="1"
+                required
+                class="input"
+                placeholder="e.g. 250"
+              />
+            </div>
+            <div>
+              <label for="studentSize" class="block text-sm font-medium text-brand-charcoal mb-2">
+                Total enrollment <span class="font-normal text-neutral-body">(optional)</span>
+              </label>
+              <input
+                id="studentSize"
+                v-model.number="formData.studentSize"
+                type="number"
+                min="1"
+                step="1"
+                class="input"
+                placeholder="e.g. 12000"
+              />
+            </div>
           </div>
 
           <button type="submit" :disabled="isSubmitting" class="btn-primary w-full">

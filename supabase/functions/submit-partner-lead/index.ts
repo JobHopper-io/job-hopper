@@ -28,6 +28,12 @@ function clean(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : ""
 }
 
+/** Positive whole number up to 1M, else null (optional sizing fields). */
+function count(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isInteger(n) && n > 0 && n <= 1_000_000 ? n : null
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -41,6 +47,8 @@ serve(async (req) => {
     const email = clean(body?.email, 320).toLowerCase()
     const name = clean(body?.name, 200)
     const title = clean(body?.title, 200)
+    const estimatedSeats = count(body?.estimatedSeats)
+    const studentSize = count(body?.studentSize)
 
     if (!organizationName) {
       return new Response(
@@ -78,6 +86,8 @@ serve(async (req) => {
           contact_email: email,
           decision_maker_name: name || null,
           decision_maker_title: title || null,
+          estimated_seats: estimatedSeats,
+          student_size: studentSize,
           source: "landing_page_form",
           status: "new",
         },
@@ -105,6 +115,8 @@ serve(async (req) => {
         `Organization: ${organizationName}`,
         `Category: ${category}`,
         `Contact: ${name || "(not provided)"} <${email}>${title ? ` — ${title}` : ""}`,
+        `Students to cover: ${estimatedSeats ?? "(not provided)"}`,
+        `Total enrollment: ${studentSize ?? "(not provided)"}`,
         `Submitted: ${new Date().toISOString()}`,
         `Row: institutional_leads, source = landing_page_form, organization_name = ${organizationName}`,
       ].join("\n")

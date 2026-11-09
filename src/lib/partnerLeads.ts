@@ -10,6 +10,10 @@ export interface PartnerLeadSubmission {
   email: string
   name: string
   title: string
+  /** Students the org wants covered (institutional_leads.estimated_seats). */
+  estimatedSeats?: number | null
+  /** Total enrollment (institutional_leads.student_size). */
+  studentSize?: number | null
 }
 
 export const partnerLeadsAPI = {
