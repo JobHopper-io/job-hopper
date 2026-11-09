@@ -233,7 +233,17 @@ export type PartnerDashboardOrgAccount = Pick<
 export type PartnerDashboardSeatInvite = Pick<OrgSeatInvite, 'email' | 'invited_at' | 'claimed' | 'revoked_at'>
 
 export interface PartnerDashboardResult {
-  lead: Pick<InstitutionalLead, 'id' | 'organization_name' | 'category' | 'status'>
+  lead: Pick<
+    InstitutionalLead,
+    | 'id'
+    | 'organization_name'
+    | 'category'
+    | 'status'
+    | 'estimated_seats'
+    | 'student_size'
+    | 'contact_email'
+    | 'decision_maker_name'
+  >
   grants: PartnerDashboardGrant[]
   orgAccount: PartnerDashboardOrgAccount | null
   seatInvites: PartnerDashboardSeatInvite[]

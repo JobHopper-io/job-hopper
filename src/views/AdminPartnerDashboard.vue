@@ -19,6 +19,8 @@
         </h1>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-body">
           <span>{{ data.lead.category }} · lead status: {{ data.lead.status }}</span>
+          <span v-if="data.lead.estimated_seats">Wants {{ data.lead.estimated_seats }} seats</span>
+          <span v-if="data.lead.student_size">Enrollment {{ data.lead.student_size }}</span>
           <router-link :to="`/partner?lead=${data.lead.id}`" class="text-brand-primary hover:underline">
             View as university →
           </router-link>
@@ -351,6 +353,13 @@ async function reload() {
     return
   }
   data.value = records.data
+  // Pre-fill the license form from what the school told us on the landing-page form.
+  const lead = records.data?.lead
+  if (lead && !createForm.billingEmail) {
+    createForm.billingEmail = lead.contact_email ?? ''
+    createForm.billingName = lead.decision_maker_name ?? ''
+    if (lead.estimated_seats) createForm.seatCount = lead.estimated_seats
+  }
   overviewError.value = ov.error?.message ?? null
   overview.value = ov.data
   if (ov.data) domainsRaw.value = ov.data.lead.email_domains.join(', ')

@@ -105,7 +105,7 @@ serve(async (req) => {
 
     const { data: lead, error: leadError } = await serviceClient
       .from("institutional_leads")
-      .select("id, organization_name, category, status")
+      .select("id, organization_name, category, status, estimated_seats, student_size, contact_email, decision_maker_name")
       .eq("id", leadId)
       .maybeSingle()
 
