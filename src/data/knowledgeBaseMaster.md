@@ -139,7 +139,7 @@ Do not guarantee interviews, offers, or sponsorship.
 Do not claim a feature is live unless its article says Live.
 
 Sales Opportunity
-Answer first. Recommend Free for a first look, Core for automated matching and full insights, or
+Answer first. Suggest the 14-day free trial for a first look, Core for automated matching and full insights, or
 Premium only when sponsorship intelligence is relevant and currently available.
 
 Escalation Rules
@@ -344,7 +344,7 @@ Do not attack named job boards.
 Do not claim every filtered listing is fraudulent.
 
 Sales Opportunity
-Recommend Free for users testing curation and Core for users seeking ongoing automated matching and
+Suggest the 14-day free trial for users testing curation and Core for users seeking ongoing automated matching and
 full insights.
 
 Escalation Rules
@@ -484,7 +484,7 @@ Do not disparage competitors.
 Do not publish unsupported rankings.
 
 Sales Opportunity
-Recommend Free for evaluation, Core for automated daily matching and full insights, and Premium only
+Suggest the 14-day free trial for evaluation, Core for automated daily matching and full insights, and Premium only
 for relevant sponsorship needs when available.
 
 Escalation Rules
@@ -557,7 +557,7 @@ Do not add auto-apply claims unless confirmed live.
 Do not promise a fixed number of matches.
 
 Sales Opportunity
-After explaining the flow, suggest Free to try the experience or Core for automated daily matching and
+After explaining the flow, suggest the 14-day free trial to try the experience or Core for automated daily matching and
 full insights.
 
 Escalation Rules
@@ -575,64 +575,79 @@ Purpose
 Provide one controlled explanation of current plans and pricing.
 
 Summary
-Job-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be
-verified on the official pricing page or live checkout before quoting.
+Job-Hopper has two plans, Core ($29.99/month) and Premium ($49.99/month). There is no Free plan. Both
+plans start with a 14-day free trial (card required) and can be billed monthly, quarterly (10% off), or
+yearly (20% off).
 
 Detailed Explanation
-Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Core is $29.99/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Premium is $49.99/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type.
-Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
+Job-Hopper plans and pricing: Core is $29.99/month and Premium is $49.99/month. There is no Free plan and no cheaper tier.
+Both plans start with a 14-day free trial. You add a card when you start; you are not charged until the trial ends, and cancelling before it ends means you pay nothing.
+Billing can be monthly, quarterly (10% off), or yearly (20% off), and you can cancel anytime from your billing settings.
+Core unlocks unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic, not a guarantee), full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice for specific jobs.
+Premium includes everything in Core plus Real Sponsorship Score (built on actual DOL/USCIS filing data), Sponsor Watch alerts when an employer's H-1B filing activity changes, and more hiring contacts per job.
+Two one-time extras are available on any plan: Per-Job Resume Advice and Per-Job Resume Tailoring, $4.49 each.
+Students whose university has a Job-Hopper license get access through their school and do not pick or pay for a plan (see KB-0058).
+Plans are priced by depth, not seniority. The pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
 
 Key Benefits
-No-cost starting point
-Clear paid path for deeper use
+A full-product free trial before paying
+Clear choice between two plans
+Discounts for quarterly and yearly billing
 Plan choice based on depth rather than seniority
 
 Examples
-User wants to test: recommend Free.
+User wants to test: explain the 14-day free trial on either plan.
 User wants daily automated matching and full insights: explain Core.
-User needs deeper sponsorship intelligence: explain Premium, which is available to purchase today.
+User needs deeper sponsorship intelligence: explain Premium.
+User asks for a free plan: explain there isn't one, and offer the free trial.
 
 FAQs
+Is there a free plan?
+No. Both plans start with a 14-day free trial instead.
+
+Do I need a card for the trial?
+Yes. You are not charged until the trial ends, and you can cancel before then.
+
+Is there an annual plan?
+Yes. Yearly billing is 20% off and quarterly is 10% off.
+
 Which plan should I choose?
 Choose by search depth and sponsorship needs, not seniority.
-
-Is Premium live?
-Yes, it is purchasable today at $49.99/month; verify exact price on the current pricing page.
 
 Can prices change?
 Yes; always use the current official page.
 
 Related Articles
-KB-0036; KB-0037; KB-0038; KB-0039
+KB-0036; KB-0037; KB-0038; KB-0039; KB-0058
 
 Training AI
 Canonical Response
-This article explains Job-Hopper's plans, pricing, and subscription tiers.
-
-Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29.99/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49.99/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.
+Job-Hopper plans and pricing: there are two plans and no Free plan. Core is $29.99/month and Premium is $49.99/month, and both start with a 14-day free trial (card required, no charge if you cancel before it ends). You can pay monthly, quarterly (10% off), or yearly (20% off). Core gives you unlimited automated daily matching with an email digest, full insights, hiring manager contact, Resume Advice, the application tracker, and interview practice. Premium adds Real Sponsorship Score, Sponsor Watch, and more hiring contacts per job.
 
 Related Intents
 pricing
 plans
-free vs core
-premium price
+price
+cost
+free plan
+free trial
+annual plan
+core vs premium
 which plan
-is premium available
 
 AI Do Rules
-State when the price was verified.
+Say plainly that there is no Free plan, and mention the 14-day free trial.
+Mention the quarterly and yearly discounts when asked about cost or annual billing.
 Link to the pricing page.
-Confirm Premium is purchasable today when asked.
 
-AI Don’t Rules
-Do not invent discounts.
-Do not describe Premium as waitlist-only or not yet available.
+AI Don't Rules
+Do not describe a Free plan, a $0 tier, or "no card required".
+Do not invent coupons or discounts beyond the quarterly and yearly ones.
 Do not sell by seniority.
 
 Sales Opportunity
 Core is appropriate for ongoing automated matching and full insights. Premium is relevant when
-sponsorship depth matters to the user - it's a normal purchase now, not something to gate on
-availability.
+sponsorship depth matters to the user. The free trial is the natural answer to "is it worth it?".
 
 Escalation Rules
 Escalate billing discrepancies, checkout errors, legacy-plan questions, coupon requests, or conflicts
@@ -643,7 +658,8 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Review monthly and after every checkout or pricing change.
+Updated 2026-11-10: Free tier removed 2026-09-10 (14-day card trial on both plans); quarterly/yearly
+billing shipped 2026-09-11. Review monthly and after every checkout or pricing change.
 
 KB-0009 - H-1B Jobs and Sponsorship Intelligence
 Purpose
@@ -814,8 +830,8 @@ Examples
 A user registers with an accessible email, verifies it if required, and continues to profile setup.
 
 FAQs
-Do I need a card for Free?
-The current pricing page states no card is required for Free.
+Do I need a card to sign up?
+A card is needed to start the 14-day free trial on Core or Premium; students covered by their university don't need one.
 
 Can I create multiple accounts?
 Users should normally maintain one accurate personal account unless support approves otherwise.
@@ -844,7 +860,7 @@ Never request a password or one-time code.
 Do not create accounts on behalf of users.
 
 Sales Opportunity
-Free is the natural recommendation for someone who wants to test the product.
+The 14-day free trial is the natural recommendation for someone who wants to test the product.
 
 Escalation Rules
 Escalate duplicate-account, verification, blocked-registration, or suspicious-access issues.
@@ -1434,7 +1450,7 @@ Do not translate score into hiring probability.
 Do not call it an eligibility decision.
 
 Sales Opportunity
-Core’s full insights may be relevant when a Free user wants deeper explanations.
+Premium's Real Sponsorship Score may be relevant when a Core user wants deeper sponsorship context.
 
 Escalation Rules
 Escalate clearly inconsistent scores, discriminatory-impact concerns, or reproducible calculation bugs.
@@ -2251,11 +2267,11 @@ Define the sponsorship signal in operational terms.
 
 Summary
 A sponsorship-likelihood signal is built by extracting and scoring real evidence, not by guessing:
-job posting language, employer size, and industry (Free/Core), or actual DOL and USCIS H-1B filing
+job posting language, employer size, and industry (Core), or actual DOL and USCIS H-1B filing
 records for that employer (Premium). It helps a user prioritize an employer or role.
 
 Detailed Explanation
-Free and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.
+Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.
 Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.
 
 Key Benefits
@@ -2448,120 +2464,134 @@ URL, screenshot if available, steps already tried.
 Internal Notes
 Legal review is required before expanding allowed immigration content.
 
-KB-0036 - Free Plan
+KB-0036 - Free Trial (No Free Plan)
 Purpose
-Explain the Free plan without overstating limits or features.
+Explain the 14-day free trial, and answer "is there a Free plan?" accurately.
 
 Summary
-The current pricing page describes Free as $0 with no card required, capped searches, and teaser
-insights.
+There is no Free plan. Core and Premium both start with a 14-day free trial; a card is required, and you
+are not charged until the trial ends.
 
 Detailed Explanation
-Free is designed for users who want to experience Job-Hopper before paying. It includes 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice.
-Once the 3 searches are used, upgrading to Core removes the cap entirely and switches to unlimited automated daily search. If this number ever changes on the live product, the current interface is the source of truth over this article.
+Job-Hopper no longer has a Free plan. Instead, both Core ($29.99/month) and Premium ($49.99/month) start with a 14-day free trial of the full plan.
+You add a card when you start the trial. You are not charged during the 14 days. When the trial ends, the plan you chose continues and your card is charged for your billing period (monthly, quarterly, or yearly) unless you cancelled before the trial ended.
+To avoid any charge, cancel from your billing settings before the 14 days are up.
+Accounts created when Job-Hopper had a Free plan now need to choose Core or Premium to keep using the dashboard; their profile and data are kept.
+University students whose school has a Job-Hopper license don't need a trial or a card; their access comes from the university (see KB-0058).
 
 Key Benefits
-No-cost entry
-No card required according to current pricing
-Ability to evaluate match quality
+Try the full product before paying
+No charge if you cancel within 14 days
+Same trial on both plans
 
 Examples
-A new user creates a Free account, completes a profile, and reviews the available capped results.
+A user asks for the free plan: explain there isn't one and describe the 14-day trial.
+A user was charged on day 15: explain the trial converts automatically, then route billing questions to support.
 
 FAQs
-Is Free really free?
-The current pricing page says $0 and no card required.
+Is there a free plan?
+No. There is a 14-day free trial on Core and Premium instead.
 
-What is the exact cap?
-3 manual job searches.
+Do I need a card for the free trial?
+Yes. You aren't charged until the trial ends.
+
+What happens when the trial ends?
+Your plan continues and you're charged, unless you cancelled before the end of the trial.
+
+I used to be on Free. What now?
+Choose Core or Premium to keep using your dashboard; your profile and data are kept.
 
 Related Articles
-KB-0008; KB-0037; KB-0039
+KB-0008; KB-0037; KB-0038; KB-0039
 
 Training AI
-
 Canonical Response
-This article explains the Free plan.
-Free is $0 with no card required. It includes 3 manual job searches, a teaser of the sponsorship badge, a few visible Hiring Intel fields, and a teaser of Resume Advice.
+Is there a free plan? No, Job-Hopper doesn't have a Free plan anymore. Core ($29.99/month) and Premium ($49.99/month) both start with a 14-day free trial: you add a card, you aren't charged during the trial, and if you cancel before the 14 days end you pay nothing.
 
 Related Intents
 free plan
 free trial
+is it free
 no card
-
-free limits
+free tier
+trial length
 
 AI Do Rules
-Verify current terms.
-Be transparent about limits.
+Say clearly there is no Free plan.
+Explain that the trial needs a card and converts to paid unless cancelled.
+Explain how to cancel during the trial.
 
-AI Don’t Rules
-Do not call Free a trial unless the product does.
-Do not invent search caps.
+AI Don't Rules
+Do not describe a Free plan, $0 tier, search caps, or "no card required".
+Do not imply the trial can be extended unless support confirms it.
 
 Sales Opportunity
-Recommend Core only when the user wants automated daily matching, tracker access, or full insights.
+The free trial answers "is it worth it?"; suggest Core or Premium by stated need.
 
 Escalation Rules
-Escalate inconsistent caps, unexpected payment requests, or a Free account that cannot access promised
-features.
+Escalate charges the user believes happened during the trial, trial-length disputes, or accounts that
+can't start a trial.
 
 Required Ticket Payload
 Article ID, user email if voluntarily provided, account plan, exact error or question, timestamp, page
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Review after every pricing-page change.
+Rewritten 2026-11-10: the Free plan was removed 2026-09-10 (router sends plan-less users to
+/choose-plan). This article replaces the old Free Plan article; keep the "no Free plan" phrasing so
+pricing queries still retrieve it.
 
 KB-0037 - Core Plan
 Purpose
 Explain Core and its value proposition.
 
 Summary
-The current pricing page lists Core at $29.99 per month with automated daily job search or matching, the
-Job Tracker, and full insights.
+Core is $29.99 per month (or 10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It
+runs your job search automatically every day and includes full insights, the application tracker, and
+interview practice.
 
 Detailed Explanation
-Core is $29.99/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel, full Resume Advice, and the Job Tracker.
-Core is designed for users who want Job-Hopper to work continuously rather than relying on Free's capped manual searches. Verify the current price and billing interval before a definitive quote; recommend Core based on stated needs, not urgency.
+Core is $29.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off).
+Core includes unlimited automated daily job search with an email digest, unlimited manual searches, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel including hiring manager contact, full Resume Advice, the application tracker, and interview practice with mock questions and feedback for a specific job.
+Core is designed for users who want Job-Hopper working in the background every day. Recommend Core based on stated needs, not urgency.
 
 Key Benefits
 Automated daily matching
-Job Tracker access
-Full insights
-Ongoing search workflow
+Application tracker
+Full insights and hiring manager contact
+Interview practice for specific jobs
 
 Examples
 A user who logs in daily and wants complete match explanations is a reasonable Core candidate.
 
 FAQs
 How much is Core?
-The current public price is $29.99 per month; verify checkout.
+$29.99 per month, or 10% off quarterly and 20% off yearly; verify checkout.
+
+Is there a trial?
+Yes, 14 days free with a card on file.
 
 Is it based on seniority?
-No. The pricing page says plans are priced by depth, not seniority.
+No. Plans are priced by depth, not seniority.
 
 Related Articles
-KB-0008; KB-0036; KB-0039
+KB-0008; KB-0036; KB-0038; KB-0039; KB-0057
 
 Training AI
 Canonical Response
-This article explains the Core plan.
-
-Core is $29.99/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.
+The Core plan is $29.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice.
 
 Related Intents
 core plan
-
 $29.99 plan
 automated matching
 full insights
 
 AI Do Rules
 Map the recommendation to stated needs.
-Verify price and checkout.
+Mention the 14-day free trial.
 
-AI Don’t Rules
+AI Don't Rules
 Do not pressure the user.
 Do not promise outcomes from subscribing.
 
@@ -2576,105 +2606,99 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Price-sensitive; review monthly.
+Updated 2026-11-10 for the trial, billing cycles, and interview practice. Price-sensitive; review monthly.
 
 KB-0038 - Premium Plan
 Purpose
-Explain Premium and what it actually includes now that it is live.
+Explain Premium and what it actually includes.
 
 Summary
-Premium is Job-Hopper's top plan, $49.99 per month, built around deeper sponsorship intelligence. It is
-purchasable today, not a waitlist.
+Premium is Job-Hopper's top plan, $49.99 per month (10% off quarterly, 20% off yearly), with a 14-day
+free trial. It adds deeper sponsorship intelligence on top of everything in Core.
 
 Detailed Explanation
-Premium is $49.99/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Hiring Intel surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes.
-Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming.
-Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.
+Premium is $49.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off).
+Premium includes everything in Core, plus:
+- Real Sponsorship Score, built on actual DOL/USCIS government filing data instead of Core's heuristic badge. It shows on a growing share of postings as more employers are matched to their filing records, so not every job has it.
+- Sponsor Watch: email alerts when an employer's H-1B filing volume changes meaningfully, based on real DOL/USCIS data checked quarterly (not real-time). You turn it on for an employer from a job card and manage your watched employers on the Sponsor Watch page.
+- More hiring manager contacts per job than Core.
+If a user asks about Apply Intelligence: today that is the "Recently posted" flag on listings under 7 days old, which every user sees. If a user asks about the Ghost Listing Detector: it is not available; do not describe it as a feature.
+Premium should be recommended when sponsorship intelligence materially affects the user's search.
 
 Key Benefits
-Deeper sponsorship context backed by real filing data
+Sponsorship context backed by real filing data
+Alerts when watched employers' sponsorship activity changes
 More hiring contacts per job
-Small, honest nudges on when and how to apply
-A specialized path for sponsorship-aware users
 
 Examples
-A user repeatedly asks which employers have relevant sponsorship history; explain Premium's Real
-Sponsorship Score and recommend upgrading.
+A user repeatedly asks which employers have relevant sponsorship history; explain Real Sponsorship
+Score and Sponsor Watch.
 
 FAQs
 How much does Premium cost?
-$49.99 per month; verify the live pricing page before quoting.
-
-Can I buy Premium today?
-Yes, it is a purchasable plan, not a waitlist.
+$49.99 per month, or 10% off quarterly and 20% off yearly.
 
 Does Premium guarantee sponsorship?
 No. Real Sponsorship Score is built on real filing data, but it is still a likelihood signal, not a
-guarantee, and coverage is still expanding across postings.
+guarantee.
+
+How often does Sponsor Watch update?
+Quarterly, when new DOL/USCIS filing data is published.
 
 Related Articles
-KB-0008; KB-0009; KB-0033
+KB-0008; KB-0009; KB-0033; KB-0037
 
 Training AI
 Canonical Response
-This article explains the Premium plan.
-
-Premium is $49.99/month and is purchasable today. It includes everything in Core plus Real Sponsorship
-Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact
-tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing
-Detector was investigated but is not being built - do not present either as available.
+The Premium plan is $49.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It includes everything in Core plus Real Sponsorship Score (real DOL/USCIS filing data, not the heuristic badge), Sponsor Watch alerts when an employer's H-1B filing volume changes, and more hiring manager contacts per job.
 
 Related Intents
 premium plan
 premium price
 sponsorship plan
+sponsor watch
 $49.99 plan
-is premium available
 
 AI Do Rules
-Confirm Premium is purchasable today when asked.
-Use sponsorship need as the trigger for recommending it.
-Verify current price and checkout before a definitive quote.
+Use sponsorship need as the trigger for recommending Premium.
+Say Sponsor Watch data updates quarterly.
 
-AI Don’t Rules
-Do not describe Sponsor Watch as available.
-Do not mention the Ghost Listing Detector as a current or upcoming feature.
+AI Don't Rules
+Do not present the Ghost Listing Detector as a feature.
+Do not present Apply Intelligence as more than the "Recently posted" flag.
 Do not imply sponsorship is guaranteed.
 
 Sales Opportunity
-Recommend Premium when deeper sponsorship context is relevant to the user's search; it is now a
-straightforward purchase, not something requiring a waitlist explanation.
+Recommend Premium when deeper sponsorship context is relevant to the user's search.
 
 Escalation Rules
-Escalate checkout errors, billing discrepancies, or a user who was told Sponsor Watch or the Ghost
-Listing Detector are available.
+Escalate checkout errors, billing discrepancies, Sponsor Watch alerts that never arrive, or a user who
+was promised the Ghost Listing Detector.
 
 Required Ticket Payload
 Article ID, user email if voluntarily provided, account plan, exact error or question, timestamp, page
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Updated 2026-07-28 to reflect Premium's launch (available_for_purchase flipped true on 2026-07-22,
-migration 20260722130000_premium_sellable.sql). Real Sponsorship Score and Hiring Manager Contact are
-live; Apply Intelligence v1 (recency badge + reach-out nudge) shipped 2026-07-21. Sponsor Watch is
-built but not deployed - re-check before this article is next reviewed. Ghost Listing Detector was
-closed as not viable with current data and should be dropped from all plan-comparison copy, not just
-this article.
+Updated 2026-11-10: Sponsor Watch is deployed (sponsor-watch-check function, scheduled). The
+pricing, FAQ, and choose-plan pages still list the Ghost Listing Detector and Apply Intelligence as
+Premium features; Ghost Listing Detector is not built and the recency flag is shown on all plans.
+Product decision pending on that copy.
 
 KB-0039 - Upgrading, Downgrading, and Cancelling a Subscription
 Purpose
-Provide safe subscription-management guidance while exact controls are validated.
+Provide clear subscription-management guidance.
 
 Summary
-Users should manage plan changes through the current account or billing interface; billing effects
-depend on the live checkout and subscription policy.
+Users change or cancel their plan from the billing settings in their account. Cancelling during the
+14-day free trial means no charge; after that, access continues to the end of the paid period.
 
 Detailed Explanation
-The chatbot may direct a user to visible subscription or billing controls, but it must not promise
-proration, immediate credits, refunds, retained access, or a specific cancellation effective date unless the
-current billing policy confirms it.
-Cancellation should be handled clearly and without retention pressure. Users should receive the
-practical next step and a support path when self-service controls are unavailable.
+Plan changes and cancellation are self-service from the billing settings in the account.
+Cancelling during the 14-day free trial means the user is not charged. Cancelling after the trial stops renewal; access continues until the end of the period already paid for (monthly, quarterly, or yearly).
+When the plan ends, the account, profile, and saved data are kept, but the dashboard requires an active plan again. There is no Free plan to fall back to.
+The chatbot must not promise proration, credits, or refunds; those depend on billing review.
+Cancellation should be handled clearly and without retention pressure.
 
 Key Benefits
 User control
@@ -2682,42 +2706,47 @@ Clear plan management
 Reduced billing confusion
 
 Examples
-A user asks to cancel. The AI explains where to look for billing controls and offers support if the option is
-missing, without trying to block cancellation.
+A user asks to cancel. The AI explains where the billing settings are and what happens to access,
+without trying to block cancellation.
 
 FAQs
 Will I keep access until the end of the period?
-Verify the current billing policy.
+Yes, until the end of the period already paid for.
+
+Will I be charged if I cancel during the trial?
+No.
 
 Will I receive a prorated refund?
-Do not promise; billing must review the current terms.
+Do not promise; billing must review.
+
+What happens to my data?
+It is kept; you need an active plan to use the dashboard again.
 
 Related Articles
-KB-0008; KB-0040; KB-0049
+KB-0008; KB-0036; KB-0040; KB-0049
 
 Training AI
 Canonical Response
-Use the subscription controls in your account if available. Because timing and credits depend on the
-current billing policy, contact support if the option is missing or you need confirmation.
+To cancel or change your subscription, use the billing settings in your account. If you cancel during the 14-day free trial you aren't charged; otherwise you keep access until the end of the period you've paid for. Your account and data aren't deleted, but you'll need an active plan to use the dashboard again. For refunds or proration, contact support@job-hopper.io.
 
 Related Intents
 cancel subscription
-
 upgrade plan
 downgrade plan
 change plan
+cancel trial
 
 AI Do Rules
 Help the user complete the requested action.
 Use neutral language.
 
-AI Don’t Rules
+AI Don't Rules
 Do not hide cancellation instructions.
 Do not promise proration or refunds.
+Do not say the user will drop to a Free plan.
 
 Sales Opportunity
-Do not upsell during a cancellation request. A retention offer is allowed only if a documented, non-
-obstructive policy exists and the user already received cancellation instructions.
+Do not upsell during a cancellation request.
 
 Escalation Rules
 Escalate any plan change that cannot be completed, duplicate subscription, or disputed effective date.
@@ -2727,7 +2756,8 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Product and Billing must validate the exact self-service path and policy before full approval.
+Updated 2026-11-10 after the Free plan was removed. Billing must still publish refund and proration
+policy.
 
 KB-0040 - Billing, Charges, Receipts, and Refund Requests
 Purpose
@@ -3506,7 +3536,7 @@ Do not act as a lawyer, recruiter, employer, or billing approver.
 
 Sales Opportunity
 Sales is permitted only after the direct answer, only for a genuine current need, and only using verified
-plan facts. Free = evaluate; Core = automated daily matching, tracker, full insights; Premium = deeper
+plan facts. Free trial = evaluate; Core = automated daily matching, tracker, full insights; Premium = deeper
 sponsorship intelligence when available.
 ================================================================================
 
