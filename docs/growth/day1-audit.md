@@ -87,16 +87,41 @@ Snapshot of the repo as of 2026-11-20 (branch `revenue-data-model`). Covers lead
 - An Unsubscribe suppresses the whole company, not the person.
 - README.md:58 still says nothing calls `reply-ingest`. README.md:47 and docs/architecture.md:170 give the wrong `MAILTRAP_FROM` fallback.
 
+### Status on branch `growth/suppression` (2026-11-21, not deployed)
+
+Built and tested on the branch; nothing is live until it's deployed (see [deploy-growth-suppression.md](deploy-growth-suppression.md)). Design: [lead-system-design.md](lead-system-design.md).
+
+| Gap | Status |
+|---|---|
+| Lead schema: no people/contacts table | **Built**: `prospects` + `prospect_evidence`, linked to `institutional_leads`, `profiles` (at signup), `reply_events`, `email_events`, `lead_scores`; `prospect_send_eligibility` view. Nothing sends to prospects yet. |
+| Lead schema: no send history per lead | **Built**: `email_events` is the single send log (type `outbound`, campaign, lead, message id), backfilled from past sends; webhook records delivered / bounced / complained. |
+| Lead schema: `bd_leads` / `enriched_lead` unused; connectors manual | Open |
+| Source attribution: first-touch only, no touch history | Open. `/unsubscribe` visits no longer record attribution. |
+| Consent at signup not stored | **Built**: append-only `consent_records`, separate optional marketing box, legacy backfill (approximate, by commit date). Wording pending approval. |
+| No marketing category / consent gate | **Built** for revenue-recovery real sends (`current_marketing_consent`). System announcements still use the per-category opt-in. |
+| Split suppression (company vs profile) | **Built**: global `suppressed_emails`, checked by `sendEmail` and the outbound script; `exclusion_lists` kept for companies. |
+| Outbound templates: no unsubscribe link or postal address | **Built**: per-recipient signed link + `OUTBOUND_POSTAL_ADDRESS` footer; live send refuses to start without them. |
+| No `List-Unsubscribe` headers | **Built** on marketing sends and outbound (one-click, RFC 8058). |
+| Unsubscribe on GET; silent fallback link | **Built**: GET only shows a confirm page, POST writes; missing secret now fails closed. |
+| Bounces only for leads; complaints ignored | **Built**: bounce, spam and unsubscribe events suppress any address. |
+| Shared sending stream / From address | Open (sending domain decision) |
+| Abandoned checkout: `checkout_attempts` not written | Open (only the `stripe_customer_id` proxy, now on the dashboard) |
+| Activity tracking gaps; no subscription history | Open |
+| Reply matching only on `contact_email` | **Built**: replies also match prospects; an Unsubscribe reply suppresses the sender even with no lead match. `classify-replies` cron still manual. |
+| Stale generated types | Open: a cast in `src/lib/notifications.ts` stands in until the migrations are pushed and `npm run db:types` re-runs. |
+| Baseline dashboard | **Built**: segments + outbound funnel on the admin growth dashboard (`growth_dashboard_counts()`). |
+
 ## 3. External access still needed
 
 | Access | Needed for | Current state in repo | Owner |
 |---|---|---|---|
-| RingCentral API | Call ingestion into `calls` | Schema only; `calls.ringcentral_call_id` is nullable and never written | |
-| HeyGen | Video outreach | No references in repo | |
-| Separate sending domain | Cold outbound, kept apart from transactional mail | All mail sends from one address (code default `no-reply@job-hopper.io`); Reply-To on `job-hopper.co` | |
-| LLM provider billing (replacing the ngrok Courier tunnel) | Job processor domain resolution, edge-function LLM calls | Edge functions read `LLM_API_KEY`/`LLM_BASE_URL` (`_shared/llm.ts`). The job processor routes domain confirmation through an n8n webhook because the "Courier" key is locked inside n8n (`domain_resolution.py:175`). The ngrok tunnel itself isn't in the repo. | |
-| Netlify | Frontend deploys and env vars | `netlify.toml` present | |
-| Hostman VPS | Presumably the job-processor-service host | No references in repo; the host is only reachable via the `JOB_PROCESSOR_URL` secret | |
+| RingCentral API | Call ingestion into `calls` | Schema only; `calls.ringcentral_call_id` is nullable and never written | Nick (pending) |
+| HeyGen | Video outreach | No references in repo | Nick (pending) |
+| Separate sending domain | Cold outbound, kept apart from transactional mail | All mail sends from one address (code default `no-reply@job-hopper.io`); Reply-To on `job-hopper.co` | Nick (pending) |
+| Postal address | Footer of every outbound email (`OUTBOUND_POSTAL_ADDRESS`); a live outbound send refuses to start without it | Not set anywhere | Nick (pending) |
+| LLM provider billing (replacing the ngrok Courier tunnel) | Job processor domain resolution, edge-function LLM calls | Edge functions read `LLM_API_KEY`/`LLM_BASE_URL` (`_shared/llm.ts`). The job processor routes domain confirmation through an n8n webhook because the "Courier" key is locked inside n8n (`domain_resolution.py:175`). The ngrok tunnel itself isn't in the repo. | Nick (pending) |
+| Netlify | Frontend deploys and env vars | `netlify.toml` present | Nick (pending) |
+| Hostman VPS | Presumably the job-processor-service host | No references in repo; the host is only reachable via the `JOB_PROCESSOR_URL` secret | Nick (pending) |
 
 ## 4. Baseline 2026-11-20
 
