@@ -66,6 +66,15 @@ export interface SendEmailOptions {
   supabase?: { from: (table: string) => { insert: (row: unknown) => Promise<{ error: unknown }> } }
 }
 
+/** RFC 2369 + RFC 8058 one-click unsubscribe headers. The URL is the same signed
+ * unsubscribe-email link as the footer; its POST handler accepts the one-click body. */
+export function listUnsubscribeHeaders(unsubscribeUrl: string): Record<string, string> {
+  return {
+    "List-Unsubscribe": `<${unsubscribeUrl}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  }
+}
+
 /** Test seams; production callers never pass this. */
 export interface SendEmailDeps {
   isSuppressed?: SuppressionCheck
@@ -108,6 +117,7 @@ export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps =
       html: options.html,
       category: options.category,
       metadata: options.metadata,
+      headers: options.kind === "marketing" ? listUnsubscribeHeaders(options.unsubscribeUrl!) : undefined,
     })
 
   if (options.supabase && options.profileId != null && options.eventType) {

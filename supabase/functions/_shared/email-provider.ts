@@ -10,6 +10,9 @@ export interface SendEmailParams {
   html?: string
   category?: string
   metadata?: Record<string, unknown>
+  /** Extra MIME headers, e.g. List-Unsubscribe. Sent as Mailtrap's `headers` object
+   * (Record<string, string>, per the official mailtrap-nodejs SDK types). */
+  headers?: Record<string, string>
 }
 
 export interface SendEmailResult {
@@ -79,6 +82,10 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
   if (params.metadata && Object.keys(params.metadata).length > 0) {
     payload.custom_variables = params.metadata
+  }
+
+  if (params.headers && Object.keys(params.headers).length > 0) {
+    payload.headers = params.headers
   }
 
 

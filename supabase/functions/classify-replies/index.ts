@@ -4,16 +4,16 @@
 // reset-apollo-limits/reconcile-subscriptions. Not routed through run-scheduled-jobs
 // because this sweeps a table, not a one-shot payload.
 //
-// Compliance: an Unsubscribe classification writes the reply's source lead's
-// organization_name into exclusion_lists, the same suppression list scripts/outbound-*
-// already check before every send -- real, not optional. This system only tracks
-// suppression at the organization level (exclusion_lists.company_name, no email column),
-// so a reply with no institutional_lead_id match (sender doesn't match any lead's
-// contact_email) can't be suppressed by company; logged loudly rather than silently
-// dropped so it can be handled by hand.
+// Compliance: an Unsubscribe classification suppresses the sender's address in
+// suppressed_emails (scope marketing) for every reply, matched to a lead or not, and,
+// for a reply matched to a lead, also adds the lead's organization_name to
+// exclusion_lists. scripts/outbound-live-send.mjs checks both before every send. If the
+// address write fails the reply stays unprocessed and is retried next sweep. Per-reply
+// logic: _shared/reply-outcome.ts.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { callChatCompletion } from '../_shared/llm.ts'
+import { recordClassifiedReply, type ReplyOutcomeDeps } from '../_shared/reply-outcome.ts'
 import { REPLY_CLASSIFICATION_SYSTEM, replyClassificationUserMessage, normalizeReplyClass } from '../_shared/reply-classification-prompt.ts'
 
 const corsHeaders = {
@@ -82,7 +82,35 @@ serve(async (req) => {
   let classified = 0
   let unparseable = 0
   let unsubscribed = 0
+  let companiesExcluded = 0
   let errors = 0
+
+  const outcomeDeps: ReplyOutcomeDeps = {
+    suppressSender: async (fromEmail) => {
+      const { error } = await admin.rpc('suppress_email', {
+        p_email: fromEmail,
+        p_reason: 'unsubscribe',
+        p_scope: 'marketing',
+        p_source: 'classify-replies',
+      })
+      if (error) throw new Error(error.message)
+    },
+    markClassified: async (replyId, replyClass) => {
+      const { error } = await admin.from('reply_events').update({ reply_class: replyClass, processed: true }).eq('id', replyId)
+      if (error) throw new Error(error.message)
+    },
+    findLeadOrganization: async (leadId) => {
+      const { data, error } = await admin.from('institutional_leads').select('organization_name').eq('id', leadId).maybeSingle()
+      if (error) throw new Error(error.message)
+      return data?.organization_name ?? null
+    },
+    excludeCompany: async (organizationName) => {
+      const { error } = await admin
+        .from('exclusion_lists')
+        .upsert({ company_name: organizationName }, { onConflict: 'company_name', ignoreDuplicates: true })
+      if (error) throw new Error(error.message)
+    },
+  }
 
   for (const reply of pending) {
     const chatResult = await callChatCompletion(
@@ -113,64 +141,20 @@ serve(async (req) => {
     }
 
     const replyClass = normalizeReplyClass(chatResult.content)
+    const outcome = await recordClassifiedReply(outcomeDeps, reply, replyClass)
+    if (outcome === 'retry') {
+      errors += 1
+      continue
+    }
     if (!replyClass) unparseable += 1
     else classified += 1
-
-    const { error: updateError } = await admin
-      .from('reply_events')
-      .update({ reply_class: replyClass, processed: true })
-      .eq('id', reply.id)
-
-    if (updateError) {
-      errors += 1
-      console.error('classify-replies: failed to write reply_class', { replyEventId: reply.id, error: updateError })
-      continue
-    }
-
-    if (replyClass !== 'Unsubscribe') continue
-
-    if (!reply.institutional_lead_id) {
-      console.error('classify-replies: Unsubscribe reply has no matched lead, cannot suppress by company', {
-        replyEventId: reply.id,
-        fromEmail: reply.from_email,
-      })
-      continue
-    }
-
-    const { data: lead, error: leadError } = await admin
-      .from('institutional_leads')
-      .select('organization_name')
-      .eq('id', reply.institutional_lead_id)
-      .maybeSingle()
-
-    if (leadError || !lead) {
-      errors += 1
-      console.error('classify-replies: failed to look up lead for Unsubscribe suppression', {
-        replyEventId: reply.id,
-        error: leadError,
-      })
-      continue
-    }
-
-    const { error: exclusionError } = await admin
-      .from('exclusion_lists')
-      .upsert({ company_name: lead.organization_name }, { onConflict: 'company_name', ignoreDuplicates: true })
-
-    if (exclusionError) {
-      errors += 1
-      console.error('classify-replies: failed to add company to exclusion_lists', {
-        replyEventId: reply.id,
-        organizationName: lead.organization_name,
-        error: exclusionError,
-      })
-      continue
-    }
-
-    unsubscribed += 1
+    if (outcome === 'unsubscribed' || outcome === 'unsubscribed_unmatched') unsubscribed += 1
+    if (outcome === 'unsubscribed') companiesExcluded += 1
+    if (outcome === 'error') errors += 1
   }
 
   return new Response(
-    JSON.stringify({ processed: pending.length, classified, unparseable, unsubscribed, errors }),
+    JSON.stringify({ processed: pending.length, classified, unparseable, unsubscribed, companiesExcluded, errors }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
   )
 })

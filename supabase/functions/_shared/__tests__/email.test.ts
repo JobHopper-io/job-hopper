@@ -179,3 +179,20 @@ Deno.test(
     await assertRejects(() => isEmailSuppressed('a@b.com', 'transactional'), Error, 'not set')
   }),
 )
+
+// --- List-Unsubscribe headers (step 2b) ---
+
+Deno.test('marketing send carries List-Unsubscribe + List-Unsubscribe-Post with the footer URL', async () => {
+  const provider = fakeProvider()
+  await sendEmail({ kind: 'marketing', unsubscribeUrl: UNSUB_URL, to: 'a@example.com', subject: 's' }, { isSuppressed: notSuppressed, send: provider.send })
+  assertEquals(provider.sent[0].headers, {
+    'List-Unsubscribe': `<${UNSUB_URL}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  })
+})
+
+Deno.test('transactional send carries no List-Unsubscribe headers', async () => {
+  const provider = fakeProvider()
+  await sendEmail({ kind: 'transactional', unsubscribeUrl: UNSUB_URL, to: 'a@example.com', subject: 's' }, { isSuppressed: notSuppressed, send: provider.send })
+  assertEquals(provider.sent[0].headers, undefined)
+})

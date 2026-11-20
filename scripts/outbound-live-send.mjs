@@ -16,6 +16,10 @@
 //   fresh immediately before each individual send, so a suppression added mid-run still
 //   takes effect for sends later in the batch. suppressed_emails (per address, via the
 //   is_email_suppressed RPC) is checked at the same two points; an RPC error stops the run.
+// - Every email ends with the postal address (OUTBOUND_POSTAL_ADDRESS) and a signed
+//   per-recipient unsubscribe link, and carries List-Unsubscribe / List-Unsubscribe-Post
+//   one-click headers (outbound-unsubscribe.mjs). A real send refuses to start if
+//   OUTBOUND_POSTAL_ADDRESS or UNSUBSCRIBE_EMAIL_SECRET is missing.
 // - institutional_leads.status -> 'contacted' and campaign -> the given tag are written
 //   ONLY after a confirmed-successful send, for every lead folded into that send (not
 //   just the primary one whose template was used). A failed send leaves status
@@ -30,6 +34,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, requireEnv } from './outbound-dry-run.mjs';
+import { listUnsubscribeHeaders, makeFooterFor, readFooterConfig } from './outbound-unsubscribe.mjs';
 
 const DEFAULT_DELAY_MS = 2000;
 const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
@@ -51,7 +56,7 @@ function parseFromAddress(raw, fallbackName) {
   return { email: raw.trim(), name: fallbackName };
 }
 
-async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo }) {
+async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo, headers }) {
   // The display name is set per lead category by fromNameForCategory (Job-Hopper
   // University Partnerships / Job-Hopper Partnerships) -- it always wins over whatever
   // name MAILTRAP_FROM might embed. Only the *address* is extracted from `from`; the
@@ -66,6 +71,11 @@ async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, tex
   // anyway so a caller passing null still produces a valid payload.
   if (replyTo) {
     payload.reply_to = { email: replyTo.trim() };
+  }
+  // Mailtrap's `headers` field (Record<string, string>, per the mailtrap-nodejs SDK types):
+  // List-Unsubscribe + List-Unsubscribe-Post for one-click unsubscribe.
+  if (headers && Object.keys(headers).length > 0) {
+    payload.headers = headers;
   }
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
@@ -117,6 +127,17 @@ async function main() {
   const campaign = campaignArg ? campaignArg.slice('--campaign='.length) : null;
   if (!preview && !campaign) {
     throw new Error('--campaign=<tag> is required for a real send (e.g. --campaign=first-batch-2026-08-14)');
+  }
+
+  // Every email carries the postal address and a signed per-recipient unsubscribe link
+  // (outbound-unsubscribe.mjs). A real send refuses to start without them; the preview
+  // still renders, with a visible placeholder footer.
+  const { config: footerConfig, missing: footerMissing } = readFooterConfig();
+  if (!footerConfig) {
+    if (!preview) {
+      throw new Error(`Refusing to send: missing ${footerMissing.join(', ')} (needed for the unsubscribe footer and headers)`);
+    }
+    console.warn(`WARNING: footer not configured (${footerMissing.join(', ')}); preview shows a placeholder footer.`);
   }
 
   const delayArg = process.argv.find((a) => a.startsWith('--delay-ms='));
@@ -192,7 +213,7 @@ async function main() {
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends } = buildDedupedSends(candidateRenders, campaign);
+  const { sends } = buildDedupedSends(candidateRenders, campaign, makeFooterFor(footerConfig, footerMissing));
 
   let sentCount = 0;
   let failedCount = 0;
@@ -237,6 +258,7 @@ async function main() {
       text: s.body,
       html: s.html,
       replyTo: s.replyTo,
+      headers: listUnsubscribeHeaders(s.unsubscribeUrl),
     });
 
     const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
@@ -292,6 +314,7 @@ async function main() {
     console.log(`\n[${r.category}] ${r.orgNames.join('; ')}  (contact_email: ${r.contact_email})`);
     console.log(`From: "${r.fromName}" <${mailtrapFromEmail}>`);
     console.log(`Reply-To: ${r.replyTo}`);
+    console.log(`List-Unsubscribe: ${r.unsubscribeUrl ? `<${r.unsubscribeUrl}>` : '(not configured)'}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);
     if (r.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${r.unfilled.join(', ')}`);
