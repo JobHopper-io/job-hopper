@@ -11,14 +11,10 @@
 // Logic and tests: _shared/mailtrap-webhook.ts.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
+import { ilikeExact } from "../_shared/email-match.ts"
 import { createMailtrapWebhookHandler } from "../_shared/mailtrap-webhook.ts"
 
 const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "")
-
-/** Exact case-insensitive match: escape ILIKE's own wildcards so a "_" in an address can't match any character. */
-function ilikeExact(value: string): string {
-  return value.replace(/[\\%_]/g, (c) => `\\${c}`)
-}
 
 serve(createMailtrapWebhookHandler({
   secret: Deno.env.get("MAILTRAP_WEBHOOK_SECRET"),

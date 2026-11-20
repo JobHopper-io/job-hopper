@@ -55,6 +55,23 @@ prospect_evidence (                    -- one-to-many: a person can be found sev
 - **Fit score history** reuses `lead_scores` by adding a `prospect_id` column; `prospects.fit_score` keeps only the latest score.
 - **Linking at signup:** `handle_new_user()` already matches `institutional_leads.contact_email` by email. Add the same match on `prospects.email_normalized` to set `prospect.profile_id` and `status = 'converted'`.
 
+### Mapping the existing `outreach_leads` table (hosted only)
+
+The hosted DB has `outreach_leads` (no migration, nothing in the repo writes or reads it). It's one row per social post found, with no email and no person identifier beyond a display name. Not imported yet; this is how it would map:
+
+| `outreach_leads` | Goes to | Notes |
+|---|---|---|
+| `id` | `prospects.source_ref` | One prospect per row. There's no stable person key, so two posts by the same person become two prospects until an email (`email_normalized` is unique) or a manual merge joins them. |
+| `source` | `prospects.source` and `prospect_evidence.source` | Unique `(source, source_ref)` makes a re-import a no-op. |
+| `poster_name` | `prospects.first_name` (whole string), `last_name` null | Can be a handle rather than a real name, so don't split it. |
+| `post_url` | `prospect_evidence.url` | |
+| `post_snippet` | `prospect_evidence.snippet` | |
+| `found_at` | `prospect_evidence.found_at` | |
+| `signal_type` | no column yet | Evidence-level ("what kind of post"). Needs `prospect_evidence.signal_type` (text) or the snippet; decide before importing. |
+| `status` | `prospects.status` | Value mapping unknown; the hosted values have to be checked first (`select status, count(*) from outreach_leads group by 1`). |
+| `created_at` | `prospects.created_at` | |
+| (none) | `prospects.kind = 'job_seeker'`, `consent_status = 'none'`, `email` / `country` null | Every imported row starts ineligible (`no_email`) until enriched. |
+
 **Files that change:**
 - `handle_new_user()` (new migration)
 - `src/types/database.ts` (aliases)
