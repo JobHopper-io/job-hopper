@@ -2,30 +2,56 @@
 -- applied. Runs in one rolled-back transaction:
 --
 --   PGPASSWORD=postgres psql -h 127.0.0.1 -p 54432 -U postgres -d postgres -v ON_ERROR_STOP=1 \
---     -c 'begin' -f supabase/migrations/20261121120000_consent_records.sql \
+--     -c 'begin' -f supabase/tests/consent_records.reset.sql \
+--     -f supabase/tests/consent_records.seed.sql \
+--     -f supabase/migrations/20261121120000_consent_records.sql \
 --     -f supabase/tests/consent_records.test.sql -c 'rollback'
 --
--- Drop the migration -f once it's applied locally (the backfill check then compares the
--- backfill against profiles that existed when it ran).
+-- reset.sql undoes the migration (only needed if it's applied locally); seed.sql adds
+-- profiles on each side of the backfill cutoffs. Both run inside the rolled-back transaction.
 
--- Backfill: one legacy row per signed-up profile, captured_at = created_at, no SMS rows.
+-- Backfill: split by signup date (commit-date cutoffs, UTC), signed-up profiles only, no SMS.
 do $$
+declare
+  w text;
 begin
-  assert (select count(*) from public.consent_records where source = 'backfill_legacy_signup')
-       = (select count(*) from public.profiles where auth_user_id is not null and public.normalize_email(email) <> ''),
-    'backfill row count != signed-up profiles';
+  assert (select count(*) from public.consent_records where source = 'backfill_legacy_signup_approx')
+       = (select count(*) from public.profiles
+          where auth_user_id is not null and created_at >= '2026-03-05 00:00:00+00' and public.normalize_email(email) <> ''),
+    'backfill row count != signed-up profiles created on/after 2026-03-05';
   assert not exists (
     select 1 from public.consent_records r join public.profiles p on p.id = r.profile_id
-    where r.source = 'backfill_legacy_signup'
-      and (r.captured_at is distinct from coalesce(p.created_at, r.captured_at) or r.wording_version <> 'legacy_bundled_v0'
-           or not r.granted or r.channel <> 'email' or r.purpose <> 'marketing')
-  ), 'backfill row shape';
-  assert not exists (select 1 from public.consent_records where source = 'backfill_legacy_signup' and channel = 'sms'), 'sms backfilled';
-  assert not exists (
-    select 1 from public.consent_records r join public.profiles p on p.id = r.profile_id
-    where r.source = 'backfill_legacy_signup' and p.auth_user_id is null
-  ), 'profile without an auth user was backfilled';
-  raise notice 'PASS backfill (% rows)', (select count(*) from public.consent_records where source = 'backfill_legacy_signup');
+    where r.source = 'backfill_legacy_signup_approx'
+      and (r.captured_at is distinct from p.created_at or not r.granted or r.channel <> 'email' or r.purpose <> 'marketing'
+           or r.wording_version <> case when p.created_at < '2026-07-29 00:00:00+00' then 'legacy_bundled_v0_mar2026' else 'legacy_bundled_v0' end)
+  ), 'backfill row shape / band';
+  assert not exists (select 1 from public.consent_records where source like 'backfill%' and channel = 'sms'), 'sms backfilled';
+  assert not exists (select 1 from public.accepted_marketing_wordings where wording_version like 'legacy%'), 'legacy wording accepted';
+
+  -- boundaries (seeded, when present)
+  if exists (select 1 from public.profiles where auth_user_id = '00000000-0000-4000-8000-0000000000f1') then
+    assert not exists (select 1 from public.consent_records r join public.profiles p on p.id = r.profile_id
+                       where p.auth_user_id = '00000000-0000-4000-8000-0000000000f1'), '2026-03-04 23:59:59 should get no row';
+    w := (select r.wording_version from public.consent_records r join public.profiles p on p.id = r.profile_id
+          where p.auth_user_id = '00000000-0000-4000-8000-0000000000f2');
+    assert w = 'legacy_bundled_v0_mar2026', '2026-03-05 00:00 should be the March wording, got ' || coalesce(w, 'none');
+    w := (select r.wording_version from public.consent_records r join public.profiles p on p.id = r.profile_id
+          where p.auth_user_id = '00000000-0000-4000-8000-0000000000f3');
+    assert w = 'legacy_bundled_v0_mar2026', '2026-07-28 23:59:59 should be the March wording, got ' || coalesce(w, 'none');
+    w := (select r.wording_version from public.consent_records r join public.profiles p on p.id = r.profile_id
+          where p.auth_user_id = '00000000-0000-4000-8000-0000000000f4');
+    assert w = 'legacy_bundled_v0', '2026-07-29 00:00 should be the July wording, got ' || coalesce(w, 'none');
+    assert not exists (select 1 from public.consent_records r join public.profiles p on p.id = r.profile_id
+                       where p.auth_user_id = '00000000-0000-4000-8000-0000000000f5'), 'null created_at should get no row';
+    assert not exists (select 1 from public.consent_records where profile_id = '00000000-0000-4000-8000-0000000000f6'),
+      'profile without an auth user was backfilled';
+    assert not public.current_marketing_consent((select id from public.profiles where auth_user_id = '00000000-0000-4000-8000-0000000000f2')),
+      'March legacy must not count';
+    assert not public.current_marketing_consent((select id from public.profiles where auth_user_id = '00000000-0000-4000-8000-0000000000f4')),
+      'July legacy must not count';
+    raise notice 'PASS backfill boundaries (before Mar 5: none; Mar 5 and Jul 28: March wording; Jul 29: July wording; null date / no auth user: none)';
+  end if;
+  raise notice 'PASS backfill bands (% rows)', (select count(*) from public.consent_records where source = 'backfill_legacy_signup_approx');
 end;
 $$;
 

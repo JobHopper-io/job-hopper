@@ -4,8 +4,8 @@
 --   accepted_marketing_wordings which wording versions count as marketing consent
 --   consent_records             append-only log; current state = latest row per subject + purpose
 --
--- Whether the legacy bundled signup checkbox counts as marketing consent is undecided, so
--- it is recorded (backfill) but NOT accepted. If it's decided that it counts, that's one
+-- Whether the legacy bundled signup checkboxes count as marketing consent is undecided, so
+-- they are recorded (backfill) but NOT accepted. If it's decided that it counts, that's one
 -- insert into accepted_marketing_wordings, no code change.
 
 -- ---------------------------------------------------------------------------
@@ -24,6 +24,11 @@ revoke all on table public.consent_wordings from anon, authenticated;
 grant select, insert on table public.consent_wordings to service_role;
 
 insert into public.consent_wordings (version, purpose, channel, text, effective_at) values
+  -- Register.vue checkbox from commit 30faa32 (2026-03-05) until 4dc0d68 (2026-07-29), verbatim.
+  ('legacy_bundled_v0_mar2026', 'marketing', 'email',
+   'I agree to receive emails from Job-Hopper about my account and services, including product updates and general marketing emails. You can change your email preferences or unsubscribe at any time from your settings or from any email we send.',
+   '2026-03-05 15:45:53+00'),
+  -- Register.vue checkbox from commit 4dc0d68 (2026-07-29) until this change, verbatim.
   ('legacy_bundled_v0', 'marketing', 'email',
    'I agree to receive account and marketing emails from Job-Hopper. Unsubscribe anytime.',
    '2026-07-29 13:07:52+00'),
@@ -96,17 +101,27 @@ on public.consent_records for select to authenticated
 using (profile_id in (select id from public.profiles where auth_user_id = auth.uid()));
 
 -- ---------------------------------------------------------------------------
--- Backfill: what happened at signup for existing users -- they ticked the bundled box.
--- Profiles with no auth user (billing contacts created by admin-org-accounts) never
--- signed up through the form, so they get no row. Not SMS.
+-- Backfill: what existing users saw at signup -- a required checkbox bundling marketing
+-- with account emails, in one of two wordings, chosen by signup date:
+--   created before 2026-03-05         no checkbox existed yet -> no row
+--   2026-03-05 up to 2026-07-28       legacy_bundled_v0_mar2026
+--   2026-07-29 onward                 legacy_bundled_v0
+-- The cutoffs are the COMMIT dates of 30faa32 and 4dc0d68, not deploy dates, so users
+-- who signed up near a cutoff may be in the wrong band; source
+-- 'backfill_legacy_signup_approx' marks these rows as inferred. Cutoffs are UTC midnight.
+-- Profiles with no auth user (billing contacts created by admin-org-accounts, who never
+-- used the signup form) or no created_at get no row. Not SMS. Neither legacy wording
+-- is in accepted_marketing_wordings, so none of this counts as marketing consent.
 -- ---------------------------------------------------------------------------
 insert into public.consent_records (captured_at, profile_id, email_normalized, channel, purpose, granted, wording_version, source)
-select coalesce(p.created_at, now()), p.id, public.normalize_email(p.email), 'email', 'marketing', true,
-       'legacy_bundled_v0', 'backfill_legacy_signup'
+select p.created_at, p.id, public.normalize_email(p.email), 'email', 'marketing', true,
+       case when p.created_at < '2026-07-29 00:00:00+00' then 'legacy_bundled_v0_mar2026' else 'legacy_bundled_v0' end,
+       'backfill_legacy_signup_approx'
 from public.profiles p
 where p.auth_user_id is not null
+  and p.created_at >= '2026-03-05 00:00:00+00'
   and public.normalize_email(p.email) <> ''
-order by p.created_at nulls first, p.id;
+order by p.created_at, p.id;
 
 -- ---------------------------------------------------------------------------
 -- Signup: record what the form sent. A separate trigger from handle_new_user(), named to

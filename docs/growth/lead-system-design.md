@@ -124,6 +124,32 @@ consent_records (            -- append-only; current state = latest row per (sub
 - **`unsubscribe-email`:** append a `granted = false` row.
 - **`admin-revenue-recovery-segments`:** gate on the current marketing consent.
 
+## Consent: pending approval
+
+Built in step 4 (migration `20261121120000_consent_records`). The new wordings below are drafts that need approval before deploy. Each text lives in two places and must stay identical: `src/lib/consent.ts` / `src/views/Register.vue`, and the `consent_wordings` seed.
+
+**Terms box** (required, `Register.vue`; transactional, so not stored as consent):
+
+> I agree to the Terms & Conditions and Privacy Policy, and to receive emails about my account, such as sign-in, billing and the job alerts I set up.
+
+"Terms & Conditions" links to `/terms` and "Privacy Policy" to `/privacy`.
+
+**Marketing opt-in** (optional, unticked; `marketing_email_v1`, the only version in `accepted_marketing_wordings`):
+
+> Send me job search tips, product news and offers by email. Optional. Unsubscribe anytime.
+
+**Legacy wordings** (recorded by the backfill, `source = 'backfill_legacy_signup_approx'`; neither counts as marketing consent):
+
+| Version | Signups created | Exact text |
+|---|---|---|
+| none | before 2026-03-05 | No checkbox existed; no row |
+| `legacy_bundled_v0_mar2026` | 2026-03-05 to 2026-07-28 | "I agree to receive emails from Job-Hopper about my account and services, including product updates and general marketing emails. You can change your email preferences or unsubscribe at any time from your settings or from any email we send." |
+| `legacy_bundled_v0` | 2026-07-29 onward | "I agree to receive account and marketing emails from Job-Hopper. Unsubscribe anytime." |
+
+The cutoffs are the commit dates of `30faa32` and `4dc0d68` (UTC midnight), not deploy dates, so signups near a cutoff may be in the wrong band. Counting either legacy wording as consent later is one insert into `accepted_marketing_wordings`.
+
+**System announcements** don't check marketing consent. They rely on the per-category announcements opt-in (`notification_settings.system_announcements_email_enabled`) plus suppression. Only revenue-recovery real sends are gated on `current_marketing_consent()`.
+
 ## 4. Per-send log
 
 Widen `email_events` rather than adding a separate `outbound_sends` table. It already has a nullable `profile_id`, `type`, `template_key`, `provider_message_id`, `status` and `error_message`. One log for all mail also lets the bounce webhook update any send by message id.
