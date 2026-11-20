@@ -3,6 +3,7 @@ import { ref, onMounted, onActivated, watch, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { profileAPI } from '@/lib/profile'
+import { MARKETING_EMAIL_WORDING_TEXT } from '@/lib/consent'
 import { resumeProductsAPI } from '@/lib/resumeProducts'
 import {
   notificationsAPI,
@@ -142,6 +143,7 @@ onMounted(() => {
     initialLoadDone.value = true
   })
   loadNotificationSettings()
+  void loadMarketingConsent()
   void loadResumeUpgradePurchase()
 })
 
@@ -193,6 +195,29 @@ async function saveNotificationSettings(updates: Partial<NotificationSettingsUpd
     if (!error && data) notificationSettings.value = pickNotificationSettingsView(data)
   } finally {
     notificationSettingsSaving.value = false
+  }
+}
+
+// Marketing emails: effective consent (current_marketing_consent). Each change appends a
+// consent_records row; a legacy signup checkbox doesn't count, so it starts off for them.
+const marketingConsent = ref<boolean | null>(null)
+const marketingConsentSaving = ref(false)
+
+async function loadMarketingConsent() {
+  const { data, error } = await notificationsAPI.getMarketingConsent()
+  if (error) console.error('Failed to load marketing consent:', error)
+  marketingConsent.value = data
+}
+
+async function toggleMarketingConsent() {
+  if (marketingConsent.value === null) return
+  marketingConsentSaving.value = true
+  try {
+    const { error } = await notificationsAPI.setMarketingConsent(!marketingConsent.value)
+    if (error) console.error('Failed to update marketing consent:', error)
+    await loadMarketingConsent()
+  } finally {
+    marketingConsentSaving.value = false
   }
 }
 
@@ -680,6 +705,19 @@ watch(
                   @change="saveNotificationSettings({ system_announcements_email_enabled: !notificationSettings.system_announcements_email_enabled })"
                 />
                 <span class="text-sm text-brand-charcoal">System announcements</span>
+              </label>
+              <label v-if="marketingConsent !== null" class="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  class="mt-0.5 w-4 h-4 shrink-0"
+                  :checked="marketingConsent"
+                  :disabled="marketingConsentSaving"
+                  @change="toggleMarketingConsent"
+                />
+                <span class="text-sm text-brand-charcoal">
+                  Marketing emails
+                  <span class="block text-xs text-neutral-body">{{ MARKETING_EMAIL_WORDING_TEXT }}</span>
+                </span>
               </label>
               <div class="pt-2 border-t border-neutral-border">
                 <button

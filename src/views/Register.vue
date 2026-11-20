@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import type { AuthError } from '@supabase/supabase-js'
 import { authAPI, DEFAULT_PHONE_COUNTRY, getPhoneCountryOptions, validatePhoneNumber } from '@/lib/auth'
+import { MARKETING_EMAIL_WORDING_TEXT } from '@/lib/consent'
 import type { CountryCode } from 'libphonenumber-js'
 import AuthSplitPanel from '@/components/auth/AuthSplitPanel.vue'
 import FormField from '@/components/auth/FormField.vue'
@@ -34,7 +35,10 @@ const error = ref('')
 const emailAlreadyUsed = ref(false)
 const phoneAlreadyUsed = ref(false)
 
-const emailConsent = ref(false)
+// Required: terms + account emails (transactional, not consent). Optional, unticked:
+// marketing. Both consent boxes are recorded in consent_records at signup.
+const termsAccepted = ref(false)
+const marketingConsent = ref(false)
 const smsConsent = ref(false)
 
 const validateEmail = (value: string) => {
@@ -104,7 +108,7 @@ const canProceedStep1 = computed(() => {
     !passwordValidationError.value &&
     confirmPassword.value &&
     passwordsMatch.value &&
-    emailConsent.value
+    termsAccepted.value
   )
 })
 
@@ -182,6 +186,7 @@ const handleCreateAccount = async () => {
       utmCampaign,
       utmMedium,
       trialInviteCode,
+      { marketingEmail: marketingConsent.value, sms: smsConsent.value },
     )
     if (signUpError) {
       const authErr = signUpError as AuthError & {
@@ -384,16 +389,35 @@ const handleCreateAccount = async () => {
         />
       </div>
 
-      <label class="flex items-start gap-2.5" for="email-consent">
+      <label class="flex items-start gap-2.5" for="terms-consent">
         <input
-          id="email-consent"
-          v-model="emailConsent"
+          id="terms-consent"
+          v-model="termsAccepted"
           type="checkbox"
+          required
           class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
         />
         <span class="text-[13px] leading-snug text-neutral-body">
-          I agree to receive account and marketing emails from Job-Hopper. Unsubscribe anytime.
+          I agree to the
+          <router-link to="/terms" class="text-brand-primary hover:underline" target="_blank"
+            >Terms &amp; Conditions</router-link
+          >
+          and
+          <router-link to="/privacy" class="text-brand-primary hover:underline" target="_blank"
+            >Privacy Policy</router-link
+          >, and to receive emails about my account, such as sign-in, billing and the job
+          alerts I set up.
         </span>
+      </label>
+
+      <label class="flex items-start gap-2.5" for="marketing-consent">
+        <input
+          id="marketing-consent"
+          v-model="marketingConsent"
+          type="checkbox"
+          class="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-border accent-brand-primary"
+        />
+        <span class="text-[13px] leading-snug text-neutral-body">{{ MARKETING_EMAIL_WORDING_TEXT }}</span>
       </label>
 
       <label class="flex items-start gap-2.5" for="sms-consent">

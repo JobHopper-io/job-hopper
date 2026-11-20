@@ -27,6 +27,7 @@ import {
   isNoLogin30d,
   isVisaFocusedNoConversion,
   subscriptionFlagsFromStatuses,
+  partitionByMarketingConsent,
   type RevenueRecoverySegmentKey,
 } from "../_shared/revenue-recovery-segments.ts"
 
@@ -314,10 +315,21 @@ serve(async (req) => {
       if (unsubError) throw new Error(`Failed to load suppression list: ${unsubError.message}`)
       const unsubscribed = new Set((unsubRows ?? []).map((r) => r.profile_id as string))
 
+      // Marketing consent gate (consent_records via current_marketing_consent). Test sends
+      // above are unaffected.
+      const { consented, skippedNoConsent, consentCheckErrors } = await partitionByMarketingConsent(
+        members,
+        async (profileId) => {
+          const { data, error } = await serviceClient.rpc("current_marketing_consent", { p_profile_id: profileId })
+          if (error) throw new Error(error.message)
+          return data === true
+        },
+      )
+
       let sent = 0
       let suppressed = 0
       let failed = 0
-      for (const member of members) {
+      for (const member of consented) {
         if (unsubscribed.has(member.profileId)) {
           suppressed += 1
           continue
@@ -352,7 +364,7 @@ serve(async (req) => {
         else failed += 1
       }
 
-      return new Response(JSON.stringify({ segment, totalEligible: members.length, sent, suppressed, failed, mode: "real" }), {
+      return new Response(JSON.stringify({ segment, totalEligible: members.length, skippedNoConsent, consentCheckErrors, sent, suppressed, failed, mode: "real" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       })
     }

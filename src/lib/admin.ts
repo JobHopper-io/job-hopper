@@ -299,6 +299,9 @@ export interface SendRevenueRecoverySegmentResult {
   messageId?: string | null
   segment?: RevenueRecoverySegmentKey
   totalEligible?: number
+  /** Real sends only: members skipped for lack of current marketing consent. */
+  skippedNoConsent?: number
+  consentCheckErrors?: number
   sent?: number
   suppressed?: number
   failed?: number

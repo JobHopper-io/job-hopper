@@ -1,5 +1,6 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import {
+  partitionByMarketingConsent,
   highMatchCountThreshold,
   isActivatedNeverPaid,
   isCancelled,
@@ -77,4 +78,20 @@ Deno.test('isVisaFocusedNoConversion: real requires_us_sponsorship=true, non-pay
   assertEquals(isVisaFocusedNoConversion(false, noSubs), false)
   assertEquals(isVisaFocusedNoConversion(null, noSubs), false, 'unanswered onboarding question is not a signal either way')
   assertEquals(isVisaFocusedNoConversion(true, activeSubs), false, 'already converted')
+})
+
+Deno.test('partitionByMarketingConsent: real sends keep only consented members and count the rest', async () => {
+  const members = [{ profileId: 'yes' }, { profileId: 'legacy-only' }, { profileId: 'revoked' }, { profileId: 'broken' }, { profileId: 'yes-2' }]
+  const consent: Record<string, boolean> = { yes: true, 'yes-2': true, 'legacy-only': false, revoked: false }
+  const result = await partitionByMarketingConsent(members, (id) =>
+    id === 'broken' ? Promise.reject(new Error('rpc down')) : Promise.resolve(consent[id]))
+  assertEquals(result.consented.map((m) => m.profileId), ['yes', 'yes-2'])
+  assertEquals(result.skippedNoConsent, 2)
+  assertEquals(result.consentCheckErrors, 1)
+})
+
+Deno.test('partitionByMarketingConsent: nobody consented -> nothing sent', async () => {
+  const result = await partitionByMarketingConsent([{ profileId: 'a' }, { profileId: 'b' }], () => Promise.resolve(false))
+  assertEquals(result.consented, [])
+  assertEquals(result.skippedNoConsent, 2)
 })
