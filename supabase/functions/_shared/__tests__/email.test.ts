@@ -196,3 +196,26 @@ Deno.test('transactional send carries no List-Unsubscribe headers', async () => 
   await sendEmail({ kind: 'transactional', unsubscribeUrl: UNSUB_URL, to: 'a@example.com', subject: 's' }, { isSuppressed: notSuppressed, send: provider.send })
   assertEquals(provider.sent[0].headers, undefined)
 })
+
+// --- send log (step 3) ---
+
+Deno.test('logged row carries to_email_normalized and campaign', async () => {
+  const inserted: Record<string, unknown>[] = []
+  const supabase = {
+    from: (_table: string) => ({
+      insert: (row: unknown) => (inserted.push(row as Record<string, unknown>), Promise.resolve({ error: null })),
+    }),
+  }
+  await sendEmail(
+    { kind: 'transactional', to: '  Reader@Example.COM ', subject: 's', profileId: 'p1', eventType: 'job_match_digest', campaign: 'winter-digest', supabase },
+    { isSuppressed: notSuppressed, send: fakeProvider().send },
+  )
+  await sendEmail(
+    { kind: 'transactional', to: 'b@example.com', subject: 's', profileId: 'p1', eventType: 'job_match_digest', supabase },
+    { isSuppressed: notSuppressed, send: fakeProvider().send },
+  )
+  assertEquals(inserted[0].to_email_normalized, 'reader@example.com')
+  assertEquals(inserted[0].campaign, 'winter-digest')
+  assertEquals(inserted[0].provider_message_id, 'msg-1')
+  assertEquals(inserted[1].campaign, null)
+})

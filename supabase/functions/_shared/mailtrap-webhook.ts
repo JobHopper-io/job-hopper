@@ -10,6 +10,12 @@
  *   spam        -> spam_complaint, scope all
  *   unsubscribe -> unsubscribe,    scope marketing
  * Everything else (including soft bounces) is ignored for now.
+ *
+ * Separately, delivery / bounce / spam update the matching email_events row (by
+ * message_id) to delivered / bounced / complained with a timestamp, via
+ * record_email_delivery_event(). "delivery" is handled ONLY for this -- it never writes
+ * suppressed_emails. An unknown message_id (e.g. an email sent before the send log
+ * existed) matches no row and is not an error.
  */
 
 export interface MailtrapEvent {
@@ -17,6 +23,7 @@ export interface MailtrapEvent {
   email?: unknown
   message_id?: unknown
   event_id?: unknown
+  timestamp?: unknown
 }
 
 export type SuppressionReason = "hard_bounce" | "spam_complaint" | "unsubscribe"
@@ -53,6 +60,35 @@ export function suppressionsFromEvents(events: MailtrapEvent[]): SuppressionWrit
   return [...byKey.values()]
 }
 
+export type DeliveryStatus = "delivered" | "bounced" | "complained"
+
+export interface DeliveryUpdate {
+  messageId: string
+  status: DeliveryStatus
+  at: string | null // ISO; null = let the DB use now()
+}
+
+const STATUS_MAP: Record<string, DeliveryStatus> = {
+  delivery: "delivered",
+  bounce: "bounced",
+  spam: "complained",
+}
+
+/** One update per (message_id, status). `timestamp` is read as Unix seconds when numeric. */
+export function deliveryUpdatesFromEvents(events: MailtrapEvent[]): DeliveryUpdate[] {
+  const byKey = new Map<string, DeliveryUpdate>()
+  for (const e of events) {
+    if (typeof e.event !== "string" || typeof e.message_id !== "string" || !e.message_id) continue
+    const status = STATUS_MAP[e.event]
+    if (!status) continue
+    const key = `${e.message_id}|${status}`
+    if (byKey.has(key)) continue
+    const at = typeof e.timestamp === "number" && Number.isFinite(e.timestamp) ? new Date(e.timestamp * 1000).toISOString() : null
+    byKey.set(key, { messageId: e.message_id, status, at })
+  }
+  return [...byKey.values()]
+}
+
 export async function verifyMailtrapSignature(rawBody: string, signatureHeader: string | null, secret: string): Promise<boolean> {
   if (!signatureHeader) return false
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
@@ -73,6 +109,8 @@ export interface MailtrapWebhookDeps {
   suppress: (write: SuppressionWrite) => Promise<void>
   /** Existing behaviour: institutional_leads.status = 'bounced' for a hard-bounced contact. */
   flagBouncedLead: (email: string) => Promise<void>
+  /** record_email_delivery_event RPC. Resolves to the number of email_events rows matched (0 = unknown message id). */
+  recordDelivery: (update: DeliveryUpdate) => Promise<number>
 }
 
 const corsHeaders = {
@@ -109,12 +147,12 @@ export function createMailtrapWebhookHandler(deps: MailtrapWebhookDeps): (req: R
     }
 
     const writes = suppressionsFromEvents(events)
-    let failed = 0
+    let suppressFailed = 0
     for (const write of writes) {
       try {
         await deps.suppress(write)
       } catch (err) {
-        failed += 1
+        suppressFailed += 1
         console.error("mailtrap-bounce-webhook: failed to suppress address", {
           emailDomain: write.email.split("@")[1] ?? null,
           reason: write.reason,
@@ -134,15 +172,36 @@ export function createMailtrapWebhookHandler(deps: MailtrapWebhookDeps): (req: R
       }
     }
 
+    const updates = deliveryUpdatesFromEvents(events)
+    let statusUpdated = 0
+    let deliveryFailed = 0
+    let unknownMessages = 0
+    for (const update of updates) {
+      try {
+        const matched = await deps.recordDelivery(update)
+        if (matched > 0) statusUpdated += 1
+        else unknownMessages += 1
+      } catch (err) {
+        deliveryFailed += 1
+        console.error("mailtrap-bounce-webhook: failed to record delivery event", {
+          status: update.status,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
     const counts = {
       received: events.length,
-      suppressed: writes.length - failed,
-      failed,
+      suppressed: writes.length - suppressFailed,
+      failed: suppressFailed + deliveryFailed,
       bounced: writes.filter((w) => w.reason === "hard_bounce").length,
+      statusUpdated,
+      unknownMessages,
     }
-    // A failed suppression returns 500 so Mailtrap redelivers the batch (it retries
-    // non-2xx responses); every write here is idempotent, so a redelivery is harmless.
-    // Previously a failed write was only logged, which could silently lose a spam complaint.
-    return json(counts, failed > 0 ? 500 : 200)
+    // A failed suppression or delivery write returns 500 so Mailtrap redelivers the batch
+    // (it retries non-2xx responses); every write here is idempotent (suppress_email
+    // dedupes, record_email_delivery_event keeps the first timestamp and only moves status
+    // forward), so a redelivery is harmless. An unknown message id is not a failure.
+    return json(counts, suppressFailed + deliveryFailed > 0 ? 500 : 200)
   }
 }

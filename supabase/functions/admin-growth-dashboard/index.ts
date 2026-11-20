@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { categorizeUserLifecycle, subscriptionFlagsFromStatuses } from '../_shared/user-lifecycle-category.ts'
 import { callChatCompletion } from '../_shared/llm.ts'
+import { type OutboundEventRow, summarizeOutboundEmails } from '../_shared/outbound-email-stats.ts'
 import { GROWTH_SUMMARY_SYSTEM, growthSummaryUserMessage } from '../_shared/growth-summary-prompt.ts'
 
 const corsHeaders = {
@@ -227,7 +228,6 @@ serve(async (req) => {
     const leadsBySourceMap = new Map<string, number>()
     let activeOpportunities = 0
     let qualifiedOrganizations = 0
-    let emailsSent = 0
     const seatPackageMap = new Map<string, number>()
 
     // "Active" excludes both a manually-closed-out lead (dead) and one whose contact
@@ -242,8 +242,17 @@ serve(async (req) => {
         }
       }
       if ((lead.opportunity_score ?? 0) >= QUALIFIED_OPPORTUNITY_SCORE) qualifiedOrganizations += 1
-      if (lead.status === 'contacted') emailsSent += 1
     }
+
+    // Outbound sends come from the email_events send log (growth step 3), not from
+    // institutional_leads.status = 'contacted', which only remembers the latest attempt.
+    const outbound = summarizeOutboundEmails(
+      await fetchAll<OutboundEventRow>('email_events', 'campaign, status, delivered_at, bounced_at, complained_at, blocked_reason:payload->>blocked_reason', {
+        column: 'type',
+        op: 'eq',
+        value: 'outbound',
+      }),
+    )
 
     const nowIso = new Date().toISOString()
     const trialGrants = await fetchAll<{ status: string; expires_at: string }>(
@@ -303,7 +312,12 @@ serve(async (req) => {
             .map(([source, count]) => ({ source, count }))
             .sort((a, b) => b.count - a.count),
           qualifiedOrganizations,
-          emailsSent,
+          emailsSent: outbound.totals.sent,
+          emailsDelivered: outbound.totals.delivered,
+          emailsBounced: outbound.totals.bounced,
+          emailsComplained: outbound.totals.complained,
+          emailsBlocked: outbound.totals.blocked,
+          emailsByCampaign: outbound.byCampaign,
         },
         revenue: {
           mrrCents,

@@ -1,7 +1,9 @@
 // Receives Mailtrap Sending API webhook events (Settings -> Webhooks in the Mailtrap
 // dashboard). bounce / spam / unsubscribe events write suppressed_emails for any address
 // (not just outbound leads), and a bounce also flags a matching institutional_leads
-// contact as 'bounced'. Mailtrap sends batched POSTs (up to 500 events, every ~30s).
+// contact as 'bounced'. delivery / bounce / spam also update the matching email_events
+// row by message_id (delivered / bounced / complained). Mailtrap sends batched POSTs
+// (up to 500 events, every ~30s).
 //
 // Public endpoint (no user JWT): authenticity is the Mailtrap-Signature header, an
 // HMAC-SHA256 of the raw body with the per-webhook signing secret. Requests with a
@@ -39,5 +41,14 @@ serve(createMailtrapWebhookHandler({
       .update({ status: "bounced", updated_at: new Date().toISOString() })
       .ilike("contact_email", ilikeExact(email))
     if (error) throw new Error(error.message)
+  },
+  recordDelivery: async ({ messageId, status, at }) => {
+    const { data, error } = await admin.rpc("record_email_delivery_event", {
+      p_message_id: messageId,
+      p_status: status,
+      ...(at ? { p_at: at } : {}),
+    })
+    if (error) throw new Error(error.message)
+    return typeof data === "number" ? data : 0
   },
 }))

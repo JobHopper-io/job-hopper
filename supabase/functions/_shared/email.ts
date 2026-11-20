@@ -9,7 +9,7 @@
 
 import type { SendEmailResult } from "./email-provider.ts"
 import { sendEmailViaProvider } from "./email-provider.ts"
-import { isValidUnsubscribeUrl } from "./unsubscribe-token.ts"
+import { isValidUnsubscribeUrl, normalizeEmail } from "./unsubscribe-token.ts"
 
 export type { SendEmailResult }
 
@@ -61,6 +61,8 @@ export interface SendEmailOptions {
     | "sponsor_watch_alert"
     | "reveal_request_received"
   templateKey?: string | null
+  /** Campaign tag stored on the email_events row (growth sends). */
+  campaign?: string | null
   payload?: Record<string, unknown> | null
   /** Supabase client (service_role) to insert into email_events. If omitted, no DB log. */
   supabase?: { from: (table: string) => { insert: (row: unknown) => Promise<{ error: unknown }> } }
@@ -128,6 +130,8 @@ export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps =
         type: options.eventType,
         subject: options.subject,
         template_key: options.templateKey ?? null,
+        to_email_normalized: normalizeEmail(options.to) || null,
+        campaign: options.campaign ?? null,
         payload: options.payload ?? null,
         provider_message_id: result.messageId,
         status,

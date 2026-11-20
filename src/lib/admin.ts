@@ -76,7 +76,22 @@ export interface GrowthDashboardReport {
     totalLeads: number
     leadsBySource: { source: string; count: number }[]
     qualifiedOrganizations: number
+    /** Outbound emails handed to the provider (email_events type outbound, status not failed). */
     emailsSent: number
+    /** Each of these is a subset of emailsSent. */
+    emailsDelivered: number
+    emailsBounced: number
+    emailsComplained: number
+    /** Leads the outbound script skipped because of suppression (not send failures). */
+    emailsBlocked: number
+    emailsByCampaign: {
+      campaign: string | null
+      sent: number
+      delivered: number
+      bounced: number
+      complained: number
+      blocked: number
+    }[]
   }
   revenue: {
     mrrCents: number
