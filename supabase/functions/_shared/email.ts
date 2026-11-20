@@ -9,6 +9,7 @@
 
 import type { SendEmailResult } from "./email-provider.ts"
 import { sendEmailViaProvider } from "./email-provider.ts"
+import { isValidUnsubscribeUrl } from "./unsubscribe-token.ts"
 
 export type { SendEmailResult }
 
@@ -43,6 +44,8 @@ export const isEmailSuppressed: SuppressionCheck = async (email, kind) => {
 
 export interface SendEmailOptions {
   kind: EmailKind
+  /** The signed one-click link in this email's footer. Required for marketing: a marketing send without a valid one is refused. */
+  unsubscribeUrl?: string | null
   to: string
   subject: string
   text?: string
@@ -74,16 +77,21 @@ export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps =
   const send = deps.send ?? sendEmailViaProvider
   const toDomain = options.to.split("@")[1] ?? null
 
-  let blockedReason: string | null = null
-  try {
-    if (await isSuppressed(options.to, options.kind)) blockedReason = "address is suppressed"
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (options.kind === "marketing") {
-      blockedReason = `suppression check failed: ${message}`
-      console.error("[email] suppression check failed; blocking marketing send", { toDomain, error: message })
-    } else {
-      console.error("[email] suppression check failed; sending transactional anyway", { toDomain, error: message })
+  let blockedReason: string | null =
+    options.kind === "marketing" && !isValidUnsubscribeUrl(options.unsubscribeUrl)
+      ? "marketing email has no valid unsubscribe link"
+      : null
+  if (!blockedReason) {
+    try {
+      if (await isSuppressed(options.to, options.kind)) blockedReason = "address is suppressed"
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (options.kind === "marketing") {
+        blockedReason = `suppression check failed: ${message}`
+        console.error("[email] suppression check failed; blocking marketing send", { toDomain, error: message })
+      } else {
+        console.error("[email] suppression check failed; sending transactional anyway", { toDomain, error: message })
+      }
     }
   }
 

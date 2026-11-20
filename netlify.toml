@@ -66,6 +66,15 @@
   [headers.values]
     cache-control = "no-cache"
 
+# Unsubscribe links carry a signed token in the query string (until the page strips it on
+# load). no-referrer keeps that URL out of the Referer of every request the page makes.
+# The path is served through the SPA rewrite above; verify after deploy with
+# `curl -sI https://job-hopper.io/unsubscribe | grep -i referrer`.
+[[headers]]
+  for = "/unsubscribe"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+
 [[headers]]
   for = "/manifest.webmanifest"
   [headers.values]

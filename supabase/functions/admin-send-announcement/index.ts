@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import { sendEmail } from "../_shared/email.ts"
 import { wrapAnnouncementWithFooter } from "../_shared/email-templates.ts"
 import { sendSystemAnnouncement } from "../_shared/system-announcement-send.ts"
+import { getFooterLinksForProfile } from "../_shared/unsubscribe-token.ts"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TEST_METADATA = { test_send: "true" as const }
@@ -12,9 +13,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-// Preview-only placeholder links - a dry run has no specific recipient to build a real
-// signed unsubscribe token for. The real send (getFooterLinksForProfile, per recipient)
-// replaces these with working links.
+// Placeholder links for the dry-run HTML preview only (nothing is sent) - it has no
+// recipient to sign a token for. Test sends and the real broadcast get real signed links
+// (getFooterLinksForProfile) because sendEmail refuses marketing without one.
 const PREVIEW_FOOTER = { preferencesUrl: "/profile", unsubscribeUrl: "#" }
 
 interface SendAnnouncementRequest {
@@ -147,11 +148,15 @@ serve(async (req) => {
     // row, no touching the real recipient list - lets an admin see it land in an inbox
     // before firing the irreversible broadcast.
     if (testEmail) {
+      // A real signed link for the test address, so the test send passes the same
+      // unsubscribe-link requirement as the broadcast (and the link works if clicked).
+      const testFooter = await getFooterLinksForProfile(null, testEmail, "marketing")
       const result = await sendEmail({
         kind: "marketing",
+        unsubscribeUrl: testFooter.unsubscribeUrl,
         to: testEmail,
         subject: emailSubject,
-        html: wrapAnnouncementWithFooter(emailBodyHtml, PREVIEW_FOOTER),
+        html: wrapAnnouncementWithFooter(emailBodyHtml, testFooter),
         category: "test",
         metadata: TEST_METADATA,
         eventType: "system_announcement",

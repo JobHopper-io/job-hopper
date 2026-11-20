@@ -25,11 +25,35 @@ function fakeProvider() {
 }
 
 const failingCheck: SuppressionCheck = () => Promise.reject(new Error('rpc down'))
+const UNSUB_URL = 'https://proj.supabase.co/functions/v1/unsubscribe-email?token=abc.def'
+const notSuppressed: SuppressionCheck = () => Promise.resolve(false)
+
+Deno.test('marketing without a valid unsubscribe link is refused before any check or send', async () => {
+  for (const unsubscribeUrl of [undefined, null, '', '#', 'https://job-hopper.io/profile?unsubscribe=1', 'https://x.co/functions/v1/unsubscribe-email']) {
+    const provider = fakeProvider()
+    let checked = false
+    const result = await sendEmail(
+      { kind: 'marketing', unsubscribeUrl, to: 'a@example.com', subject: 's' },
+      { isSuppressed: () => { checked = true; return Promise.resolve(false) }, send: provider.send },
+    )
+    assertEquals(result.success, false, String(unsubscribeUrl))
+    assert(result.error?.includes('no valid unsubscribe link'))
+    assertEquals(provider.sent.length, 0)
+    assertEquals(checked, false)
+  }
+})
+
+Deno.test('transactional without an unsubscribe link still sends', async () => {
+  const provider = fakeProvider()
+  const result = await sendEmail({ kind: 'transactional', to: 'a@example.com', subject: 'receipt' }, { isSuppressed: notSuppressed, send: provider.send })
+  assertEquals(result.success, true)
+  assertEquals(provider.sent.length, 1)
+})
 
 Deno.test('suppressed address: marketing send is blocked before the provider', async () => {
   const provider = fakeProvider()
   const result = await sendEmail(
-    { kind: 'marketing', to: 'gone@example.com', subject: 's' },
+    { kind: 'marketing', unsubscribeUrl: UNSUB_URL, to: 'gone@example.com', subject: 's' },
     { isSuppressed: fakeSuppressionList({ 'gone@example.com': 'marketing' }), send: provider.send },
   )
   assertEquals(result.success, false)
@@ -54,7 +78,7 @@ Deno.test('scope all: blocks both marketing and transactional', async () => {
   const check = fakeSuppressionList({ 'bounced@example.com': 'all' })
   for (const kind of ['marketing', 'transactional'] as const) {
     const provider = fakeProvider()
-    const result = await sendEmail({ kind, to: 'bounced@example.com', subject: 's' }, { isSuppressed: check, send: provider.send })
+    const result = await sendEmail({ kind, unsubscribeUrl: UNSUB_URL, to: 'bounced@example.com', subject: 's' }, { isSuppressed: check, send: provider.send })
     assertEquals(result.success, false, kind)
     assertEquals(provider.sent.length, 0, kind)
   }
@@ -63,7 +87,7 @@ Deno.test('scope all: blocks both marketing and transactional', async () => {
 Deno.test('mixed-case / padded address is matched against the normalized list', async () => {
   const provider = fakeProvider()
   const result = await sendEmail(
-    { kind: 'marketing', to: '  Gone@Example.COM\t', subject: 's' },
+    { kind: 'marketing', unsubscribeUrl: UNSUB_URL, to: '  Gone@Example.COM\t', subject: 's' },
     { isSuppressed: fakeSuppressionList({ 'gone@example.com': 'all' }), send: provider.send },
   )
   assertEquals(result.success, false)
@@ -72,7 +96,7 @@ Deno.test('mixed-case / padded address is matched against the normalized list', 
 
 Deno.test('check error: marketing is blocked (fail closed)', async () => {
   const provider = fakeProvider()
-  const result = await sendEmail({ kind: 'marketing', to: 'a@example.com', subject: 's' }, { isSuppressed: failingCheck, send: provider.send })
+  const result = await sendEmail({ kind: 'marketing', unsubscribeUrl: UNSUB_URL, to: 'a@example.com', subject: 's' }, { isSuppressed: failingCheck, send: provider.send })
   assertEquals(result.success, false)
   assert(result.error?.includes('suppression check failed'))
   assertEquals(provider.sent.length, 0)
@@ -96,7 +120,7 @@ Deno.test('blocked send is still logged to email_events as failed', async () => 
     }),
   }
   await sendEmail(
-    { kind: 'marketing', to: 'gone@example.com', subject: 's', profileId: 'p1', eventType: 'system_announcement', supabase },
+    { kind: 'marketing', unsubscribeUrl: UNSUB_URL, to: 'gone@example.com', subject: 's', profileId: 'p1', eventType: 'system_announcement', supabase },
     { isSuppressed: fakeSuppressionList({ 'gone@example.com': 'all' }), send: fakeProvider().send },
   )
   assertEquals(inserted.length, 1)

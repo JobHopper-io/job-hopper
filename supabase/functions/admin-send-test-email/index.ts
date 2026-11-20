@@ -10,7 +10,7 @@ import {
   wrapAnnouncementWithFooter,
   type JobSummary,
 } from "../_shared/email-templates.ts"
-import { getFooterLinksForProfile } from "../_shared/unsubscribe-token.ts"
+import { getTransactionalFooterLinks } from "../_shared/unsubscribe-token.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,7 +179,7 @@ serve(async (req) => {
       profile = { id: row.id, email: row.email, first_name: row.first_name }
     }
 
-    const footer = await getFooterLinksForProfile(profile.id)
+    const footer = await getTransactionalFooterLinks(profile.id, profile.email)
     const recipientName = profile.first_name?.trim() || "there"
 
     if (kind === "job_match_digest") {
@@ -431,6 +431,7 @@ serve(async (req) => {
 
     const result = await sendEmail({
       kind: "marketing",
+      unsubscribeUrl: footer.unsubscribeUrl,
       to: profile.email,
       subject: announcement.email_subject,
       html: fullHtml,

@@ -79,18 +79,31 @@ export const notificationsAPI = {
     return { data, error: null }
   },
 
-  async unsubscribeFromAll(): Promise<{ error: Error | null }> {
-    return this.updateNotificationSettings({
-      email_unsubscribed_at: new Date().toISOString(),
-    }).then((r) => ({ error: r.error }))
-  },
-
-  async resubscribe(): Promise<{ error: Error | null }> {
-    return this.updateNotificationSettings({
-      email_unsubscribed_at: null,
-    }).then((r) => ({ error: r.error }))
+  /**
+   * "Unsubscribe from all" / "Re-enable emails". One RPC sets
+   * notification_settings.email_unsubscribed_at and the suppressed_emails row (source
+   * 'profile'); re-enabling removes only that row, never bounce/complaint rows. Returns
+   * the refreshed settings.
+   */
+  async setUnsubscribedFromAll(
+    unsubscribed: boolean
+  ): Promise<{ data: NotificationSettings | null; error: Error | null }> {
+    const { error } = await setOwnEmailUnsubscribed('set_own_email_unsubscribed', {
+      p_unsubscribed: unsubscribed,
+    })
+    if (error) return { data: null, error }
+    return this.getNotificationSettings()
   },
 }
+
+// ponytail: set_own_email_unsubscribed (migration 20261120130000) isn't in the generated
+// src/types/supabase.ts until that migration is pushed and `npm run db:types` re-runs
+// (regenerating from the local DB would drop remote-only tables). Delete this cast then
+// and call supabase.rpc directly.
+const setOwnEmailUnsubscribed = supabase.rpc.bind(supabase) as unknown as (
+  fn: 'set_own_email_unsubscribed',
+  args: { p_unsubscribed: boolean }
+) => PromiseLike<{ error: Error | null }>
 
 export const JOB_MATCH_FREQUENCY_OPTIONS: { value: JobMatchEmailFrequency; label: string }[] = [
   { value: 'immediate', label: 'Immediate (when we find matches)' },

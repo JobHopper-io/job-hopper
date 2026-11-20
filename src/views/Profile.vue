@@ -196,12 +196,16 @@ async function saveNotificationSettings(updates: Partial<NotificationSettingsUpd
   }
 }
 
-async function setUnsubscribedFromAll() {
-  await saveNotificationSettings({ email_unsubscribed_at: new Date().toISOString() })
-}
-
-async function setResubscribed() {
-  await saveNotificationSettings({ email_unsubscribed_at: null })
+async function setUnsubscribedFromAll(unsubscribed: boolean) {
+  if (!notificationSettings.value) return
+  notificationSettingsSaving.value = true
+  try {
+    const { data, error } = await notificationsAPI.setUnsubscribedFromAll(unsubscribed)
+    if (error) console.error('Failed to update email unsubscribe:', error)
+    if (data) notificationSettings.value = pickNotificationSettingsView(data)
+  } finally {
+    notificationSettingsSaving.value = false
+  }
 }
 
 const toggleRoleCategory = (value: RoleCategoryValue) => {
@@ -598,7 +602,7 @@ watch(
                 type="button"
                 class="btn-primary text-sm"
                 :disabled="notificationSettingsSaving"
-                @click="setResubscribed"
+                @click="setUnsubscribedFromAll(false)"
               >
                 Re-enable emails
               </button>
@@ -682,7 +686,7 @@ watch(
                   type="button"
                   class="text-sm text-red-600 hover:underline"
                   :disabled="notificationSettingsSaving"
-                  @click="setUnsubscribedFromAll"
+                  @click="setUnsubscribedFromAll(true)"
                 >
                   Unsubscribe from all emails
                 </button>

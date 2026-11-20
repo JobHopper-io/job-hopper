@@ -277,11 +277,15 @@ serve(async (req) => {
       // real account holder.
       if (body.testEmailOverride) {
         const copy = buildSegmentCopy(segment, { recipientName: "there", siteUrl, matchCount: 42 })
+        // A real signed link for the test address (no profile), so the test exercises the same
+        // footer and unsubscribe path as a real send.
+        const testFooter = await getFooterLinksForProfile(null, body.testEmailOverride, "marketing")
         const result = await sendEmail({
           kind: "marketing",
+          unsubscribeUrl: testFooter.unsubscribeUrl,
           to: body.testEmailOverride,
           subject: `[TEST] ${copy.subject}`,
-          html: wrapAnnouncementWithFooter(plainTextToHtml(copy.body), { preferencesUrl: `${siteUrl}/profile`, unsubscribeUrl: `${siteUrl}/profile?unsubscribe=1` }),
+          html: wrapAnnouncementWithFooter(plainTextToHtml(copy.body), testFooter),
           text: copy.body,
           category: "revenue_recovery_test",
         })
@@ -318,11 +322,21 @@ serve(async (req) => {
           suppressed += 1
           continue
         }
-        const footer = await getFooterLinksForProfile(member.profileId)
+        let footer
+        try {
+          footer = await getFooterLinksForProfile(member.profileId, member.email, "marketing")
+        } catch (err) {
+          console.error("admin-revenue-recovery-segments: cannot sign unsubscribe link; not sending", {
+            error: err instanceof Error ? err.message : String(err),
+          })
+          failed += 1
+          continue
+        }
         const matchCount = sources.matchCountByProfile.get(member.profileId)
         const copy = buildSegmentCopy(segment, { recipientName: member.firstName, siteUrl: footer.siteUrl, matchCount })
         const result = await sendEmail({
           kind: "marketing",
+          unsubscribeUrl: footer.unsubscribeUrl,
           to: member.email,
           subject: copy.subject,
           html: wrapAnnouncementWithFooter(plainTextToHtml(copy.body), footer),

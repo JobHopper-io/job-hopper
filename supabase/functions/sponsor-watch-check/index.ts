@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { sendEmail } from '../_shared/email.ts'
 import { renderSponsorWatchAlert } from '../_shared/email-templates.ts'
-import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import { getTransactionalFooterLinks } from '../_shared/unsubscribe-token.ts'
 import { resolveBaseTier } from '../_shared/base-tier.ts'
 
 // D51-55: quarterly diff-alert worker for Sponsor Watch. See
@@ -267,7 +267,7 @@ serve(async (req) => {
           if (!profile?.email) continue
 
           try {
-            const footer = await getFooterLinksForProfile(profileId)
+            const footer = await getTransactionalFooterLinks(profileId, profile.email)
             const { html, text } = renderSponsorWatchAlert({
               recipientName: profile.first_name ?? 'there',
               employerName,

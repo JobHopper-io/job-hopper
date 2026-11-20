@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { normalizeCompanyName } from '../_shared/apollo.ts'
 import { sendEmail } from '../_shared/email.ts'
 import { renderRevealRequestReceived } from '../_shared/email-templates.ts'
-import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import { getTransactionalFooterLinks } from '../_shared/unsubscribe-token.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -198,7 +198,7 @@ serve(async (req) => {
       .maybeSingle()
 
     if (!settings?.email_unsubscribed_at) {
-      const footer = await getFooterLinksForProfile(candidate.id)
+      const footer = await getTransactionalFooterLinks(candidate.id, candidate.email)
       const { html, text } = renderRevealRequestReceived({
         recipientName: candidate.first_name || 'there',
         employerCompanyName: employerAccount.company_name,

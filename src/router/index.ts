@@ -35,6 +35,7 @@ export const publicPaths = [
   '/reset-password',
   '/confirm-email',
   '/email-verified',
+  '/unsubscribe',
   '/unsubscribe-success',
   '/employer/register',
   '/employer/login',
@@ -202,6 +203,11 @@ const router = createRouter({
       path: '/email-verified',
       name: 'email-verified',
       component: EmailVerifiedView,
+    },
+    {
+      path: '/unsubscribe',
+      name: 'unsubscribe',
+      component: () => import('../views/Unsubscribe.vue'),
     },
     {
       path: '/unsubscribe-success',
