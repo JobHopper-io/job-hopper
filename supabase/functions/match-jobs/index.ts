@@ -342,6 +342,7 @@ serve(async (req) => {
             },
           })
           const result = await sendEmail({
+            kind: 'transactional',
             to: profile.email,
             subject: 'Your new Job-Hopper matches',
             html,

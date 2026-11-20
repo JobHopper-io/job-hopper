@@ -124,7 +124,7 @@ serve(async (req) => {
       try {
         await Promise.all(
           alertRecipients.map((to) =>
-            sendEmail({ to, subject: `New partner lead: ${organizationName}`, text: summary, category: "partner_lead_alert" }),
+            sendEmail({ kind: "transactional", to, subject: `New partner lead: ${organizationName}`, text: summary, category: "partner_lead_alert" }),
           ),
         )
       } catch (err) {

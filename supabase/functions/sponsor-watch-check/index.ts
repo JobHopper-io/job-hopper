@@ -281,6 +281,7 @@ serve(async (req) => {
               footer,
             })
             const result = await sendEmail({
+              kind: 'transactional',
               to: profile.email,
               subject: `Sponsor Watch: ${employerName}'s filing activity changed`,
               html,

@@ -210,6 +210,7 @@ serve(async (req) => {
         footer,
       })
       await sendEmail({
+        kind: 'transactional',
         to: candidate.email,
         subject: `${employerAccount.company_name} wants to learn more about you`,
         html,

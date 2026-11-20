@@ -65,6 +65,7 @@ export async function sendSystemAnnouncement(
         unsubscribeUrl: footer.unsubscribeUrl,
       })
       const result = await sendEmail({
+        kind: "marketing",
         to: profile.email,
         subject: announcement.email_subject,
         html: fullHtml,

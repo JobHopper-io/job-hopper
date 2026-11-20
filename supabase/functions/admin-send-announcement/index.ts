@@ -148,6 +148,7 @@ serve(async (req) => {
     // before firing the irreversible broadcast.
     if (testEmail) {
       const result = await sendEmail({
+        kind: "marketing",
         to: testEmail,
         subject: emailSubject,
         html: wrapAnnouncementWithFooter(emailBodyHtml, PREVIEW_FOOTER),

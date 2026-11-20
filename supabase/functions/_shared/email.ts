@@ -2,6 +2,9 @@
  * Public email API for Edge Functions. Uses the provider-agnostic sendEmailViaProvider.
  * Callers pass profileId/type/templateKey for email_events logging; the actual send
  * is delegated to _shared/email-provider.ts (stub or real SMTP/API).
+ *
+ * Every send is checked against suppressed_emails (is_email_suppressed RPC) first.
+ * If the check itself fails, marketing is blocked and transactional still sends.
  */
 
 import type { SendEmailResult } from "./email-provider.ts"
@@ -9,7 +12,37 @@ import { sendEmailViaProvider } from "./email-provider.ts"
 
 export type { SendEmailResult }
 
+/** transactional: billing, account, and alerts the user set up. marketing: anything promotional or broadcast. */
+export type EmailKind = "transactional" | "marketing"
+
+/** Resolves true when the address must not receive this kind of email; throws when it can't tell. */
+export type SuppressionCheck = (email: string, kind: EmailKind) => Promise<boolean>
+
+export const isEmailSuppressed: SuppressionCheck = async (email, kind) => {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
+  }
+  const resp = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/is_email_suppressed`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_email: email, p_kind: kind }),
+    signal: AbortSignal.timeout(5_000),
+  })
+  const body = await resp.text()
+  if (!resp.ok) throw new Error(`is_email_suppressed ${resp.status}: ${body.slice(0, 200)}`)
+  const parsed = JSON.parse(body)
+  if (typeof parsed !== "boolean") throw new Error(`is_email_suppressed returned ${body.slice(0, 200)}`)
+  return parsed
+}
+
 export interface SendEmailOptions {
+  kind: EmailKind
   to: string
   subject: string
   text?: string
@@ -30,15 +63,44 @@ export interface SendEmailOptions {
   supabase?: { from: (table: string) => { insert: (row: unknown) => Promise<{ error: unknown }> } }
 }
 
-export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
-  const result = await sendEmailViaProvider({
-    to: options.to,
-    subject: options.subject,
-    text: options.text,
-    html: options.html,
-    category: options.category,
-    metadata: options.metadata,
-  })
+/** Test seams; production callers never pass this. */
+export interface SendEmailDeps {
+  isSuppressed?: SuppressionCheck
+  send?: typeof sendEmailViaProvider
+}
+
+export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps = {}): Promise<SendEmailResult> {
+  const isSuppressed = deps.isSuppressed ?? isEmailSuppressed
+  const send = deps.send ?? sendEmailViaProvider
+  const toDomain = options.to.split("@")[1] ?? null
+
+  let blockedReason: string | null = null
+  try {
+    if (await isSuppressed(options.to, options.kind)) blockedReason = "address is suppressed"
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (options.kind === "marketing") {
+      blockedReason = `suppression check failed: ${message}`
+      console.error("[email] suppression check failed; blocking marketing send", { toDomain, error: message })
+    } else {
+      console.error("[email] suppression check failed; sending transactional anyway", { toDomain, error: message })
+    }
+  }
+
+  if (blockedReason) {
+    console.log("[email] send blocked", { toDomain, kind: options.kind, category: options.category, reason: blockedReason })
+  }
+
+  const result: SendEmailResult = blockedReason
+    ? { messageId: null, success: false, error: `Not sent: ${blockedReason}` }
+    : await send({
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
+      category: options.category,
+      metadata: options.metadata,
+    })
 
   if (options.supabase && options.profileId != null && options.eventType) {
     const status = result.success ? "sent" : "failed"

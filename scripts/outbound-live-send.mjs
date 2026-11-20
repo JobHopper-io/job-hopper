@@ -14,7 +14,8 @@
 //   when multiple leads share a contact (see outbound-dry-run.mjs's buildDedupedSends).
 // - exclusion_lists is checked once up front (to keep dedup groups clean) AND re-checked
 //   fresh immediately before each individual send, so a suppression added mid-run still
-//   takes effect for sends later in the batch.
+//   takes effect for sends later in the batch. suppressed_emails (per address, via the
+//   is_email_suppressed RPC) is checked at the same two points; an RPC error stops the run.
 // - institutional_leads.status -> 'contacted' and campaign -> the given tag are written
 //   ONLY after a confirmed-successful send, for every lead folded into that send (not
 //   just the primary one whose template was used). A failed send leaves status
@@ -89,6 +90,16 @@ async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, tex
     // non-JSON response body; leave messageId null
   }
   return { success: true, messageId };
+}
+
+// Per-address suppression (suppressed_emails via the is_email_suppressed RPC, same check
+// sendEmail runs). Cold outbound is always kind 'marketing'. An RPC error throws and stops
+// the run -- fail closed, same as an exclusion_lists query error.
+export async function isEmailSuppressed(supabase, email) {
+  const { data, error } = await supabase.rpc('is_email_suppressed', { p_email: email, p_kind: 'marketing' });
+  if (error) throw new Error(`Failed to check suppressed_emails for ${email.split('@')[1] ?? 'address'}: ${error.message}`);
+  if (typeof data !== 'boolean') throw new Error(`is_email_suppressed returned ${JSON.stringify(data)}`);
+  return data;
 }
 
 function sleep(ms) {
@@ -173,6 +184,11 @@ async function main() {
       console.log(`SKIPPED (suppressed): ${lead.organization_name}`);
       continue;
     }
+    if (await isEmailSuppressed(supabase, lead.contact_email)) {
+      suppressedCount += 1;
+      console.log(`SKIPPED (suppressed email): ${lead.organization_name}`);
+      continue;
+    }
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
@@ -194,6 +210,11 @@ async function main() {
     if (s.orgNames.some((name) => freshSuppressed.has(name))) {
       reSuppressedCount += 1;
       console.log(`SKIPPED (suppressed at send time): ${s.orgNames.join(', ')}`);
+      continue;
+    }
+    if (await isEmailSuppressed(supabase, s.contact_email)) {
+      reSuppressedCount += 1;
+      console.log(`SKIPPED (email suppressed at send time): ${s.orgNames.join(', ')}`);
       continue;
     }
 

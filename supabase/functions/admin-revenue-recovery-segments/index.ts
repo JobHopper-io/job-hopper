@@ -278,6 +278,7 @@ serve(async (req) => {
       if (body.testEmailOverride) {
         const copy = buildSegmentCopy(segment, { recipientName: "there", siteUrl, matchCount: 42 })
         const result = await sendEmail({
+          kind: "marketing",
           to: body.testEmailOverride,
           subject: `[TEST] ${copy.subject}`,
           html: wrapAnnouncementWithFooter(plainTextToHtml(copy.body), { preferencesUrl: `${siteUrl}/profile`, unsubscribeUrl: `${siteUrl}/profile?unsubscribe=1` }),
@@ -321,6 +322,7 @@ serve(async (req) => {
         const matchCount = sources.matchCountByProfile.get(member.profileId)
         const copy = buildSegmentCopy(segment, { recipientName: member.firstName, siteUrl: footer.siteUrl, matchCount })
         const result = await sendEmail({
+          kind: "marketing",
           to: member.email,
           subject: copy.subject,
           html: wrapAnnouncementWithFooter(plainTextToHtml(copy.body), footer),

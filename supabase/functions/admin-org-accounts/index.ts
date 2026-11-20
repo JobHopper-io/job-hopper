@@ -602,6 +602,7 @@ serve(async (req) => {
       let emailsSent = 0
       for (const email of [...newEmails, ...alreadyInvited]) {
         const result = await sendEmail({
+          kind: "transactional",
           to: email,
           subject: `You're invited to Job-Hopper via ${org.organization_name}`,
           text: `${org.organization_name} has set you up with ${tierLabel} access on Job-Hopper.\n\nCreate your account with this email address (${email}) to activate it: ${siteUrl}/register\n\nJob-Hopper`,

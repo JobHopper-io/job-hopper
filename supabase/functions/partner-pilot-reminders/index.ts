@@ -120,6 +120,7 @@ serve(async (req) => {
     const sends = [
       ...(staff ?? []).map((s) =>
         sendEmail({
+          kind: "transactional",
           to: s.email,
           subject: staffSubject,
           text: `${staffLead}\n\n${staffAsk}\n\nYour dashboard: ${portalUrl}\n\nJob-Hopper`,
@@ -128,6 +129,7 @@ serve(async (req) => {
         })
       ),
       sendEmail({
+        kind: "transactional",
         to: TEAM_EMAIL,
         subject: kind === "ended" ? `Pilot lapsed: ${org} (${pilot.seats_used} students)` : `Convert: ${org} pilot ends in ${daysLeft}d (${pilot.seats_used} students)`,
         text: `${org}'s pilot ${kind === "ended" ? "ended" : "ends"} on ${endDate}. ${pilot.seats_used}/${pilot.seat_count} seats used.\n\n${adminUrl}`,

@@ -244,6 +244,7 @@ serve(async (req) => {
       })
 
       const result = await sendEmail({
+        kind: "transactional",
         to: profile.email,
         subject: "Your new Job-Hopper matches",
         html,
@@ -275,6 +276,7 @@ serve(async (req) => {
         footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
       })
       const result = await sendEmail({
+        kind: "transactional",
         to: profile.email,
         subject: "Welcome to Job-Hopper",
         html,
@@ -310,6 +312,7 @@ serve(async (req) => {
         footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
       })
       const result = await sendEmail({
+        kind: "transactional",
         to: profile.email,
         subject: "Your Job-Hopper subscription was updated",
         html,
@@ -343,6 +346,7 @@ serve(async (req) => {
         footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
       })
       const result = await sendEmail({
+        kind: "transactional",
         to: profile.email,
         subject: "Your Job-Hopper subscription will be canceled",
         html,
@@ -373,6 +377,7 @@ serve(async (req) => {
         footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
       })
       const result = await sendEmail({
+        kind: "transactional",
         to: profile.email,
         subject: "Your Job-Hopper subscription was canceled",
         html,
@@ -425,6 +430,7 @@ serve(async (req) => {
     })
 
     const result = await sendEmail({
+      kind: "marketing",
       to: profile.email,
       subject: announcement.email_subject,
       html: fullHtml,
