@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
+import { checkCustomerOwnership } from '../_shared/stripe-customer-ownership.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -51,7 +52,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('stripe_customer_id')
+      .select('id, auth_user_id, email, stripe_customer_id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -61,6 +62,22 @@ serve(async (req) => {
 
     if (!profile.stripe_customer_id) {
       throw new Error('Complete a purchase first to access the billing portal.')
+    }
+
+    // Defense in depth: only open the portal for a Stripe customer that belongs to this
+    // profile (metadata, or email for customers with none), so a stripe_customer_id that
+    // was changed to someone else's id can't open their billing.
+    const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+    const ownership = checkCustomerOwnership(customer, profile)
+    if (!ownership.ok) {
+      console.error('create-billing-portal: refusing customer that does not belong to this profile', {
+        profileId: profile.id,
+        reason: ownership.reason,
+      })
+      return new Response(
+        JSON.stringify({ error: 'This billing account could not be verified. Please contact support.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 },
+      )
     }
 
     const body = await req.json().catch(() => ({}))
