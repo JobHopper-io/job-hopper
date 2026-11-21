@@ -19,8 +19,12 @@
 // a person already known by email (people repost monthly) adds an evidence row to the
 // existing prospect instead of a duplicate. Existing prospects are not overwritten.
 //
+// By default only posts whose Location is clearly the US are kept; the rest are skipped and
+// counted as non_us / unknown_country. --include-non-us keeps them all.
+//
 // Usage: node scripts/hn-hiring-connector.mjs                 # dry run, latest thread
 //        node scripts/hn-hiring-connector.mjs --threads=3     # dry run, latest 3 threads
+//        node scripts/hn-hiring-connector.mjs --include-non-us  # keep non-US / unknown too
 //        node scripts/hn-hiring-connector.mjs --write         # insert (needs SUPABASE_URL,
 //                                                             #   SUPABASE_SERVICE_ROLE_KEY)
 
@@ -190,13 +194,23 @@ const US_COUNTRY_CASE_SENSITIVE_RE = /(?<![A-Za-z])(?:USA|US|U\.S\.A?\.?)(?![A-Z
 const NON_US_RE = wordsRe(NON_US.filter((p) => p !== 'UK' && p !== 'EU'));
 const NON_US_UPPER_RE = /(?<![A-Za-z])(?:UK|EU)(?![A-Za-z])/;
 
-/** 'US' when the Location field clearly is the US, otherwise null. */
-export function detectCountry(location) {
-  if (!location) return null;
+/**
+ * 'US'              the Location field clearly is the US (a US city/state, or USA/US/United States)
+ * 'non_us'          it names a non-US place, including mixed ones ("Berlin, open to US hours")
+ * 'unknown_country' no location, or no recognizable place ("Remote", "Anywhere")
+ */
+export function classifyLocation(location) {
+  if (!location) return 'unknown_country';
   const usCountry = US_COUNTRY_CASE_SENSITIVE_RE.test(location) || /united states/i.test(location);
   const hasUs = usCountry || US_STATE_RE.test(location) || US_CITY_RE.test(location) || US_CODE_AFTER_COMMA_RE.test(location);
   const hasNonUs = NON_US_RE.test(location) || NON_US_UPPER_RE.test(location);
-  return hasUs && !hasNonUs ? 'US' : null;
+  if (hasNonUs) return 'non_us';
+  return hasUs ? 'US' : 'unknown_country';
+}
+
+/** 'US' when the Location field clearly is the US, otherwise null. */
+export function detectCountry(location) {
+  return classifyLocation(location) === 'US' ? 'US' : null;
 }
 
 /** true / false from the Remote field; if there's none, true when the location says remote. */
@@ -227,16 +241,18 @@ export function parseComment(comment) {
     fields,
     email,
     country: detectCountry(location),
+    locationClass: classifyLocation(location),
     openToRemote: parseRemote(fields.remote, location),
     preferredLocations: location && !/^remote\b/i.test(location) ? [location.slice(0, 200)] : null,
     hasProfileFields,
   };
 }
 
-/** Which comments to keep, and why the rest were skipped. */
-export function selectPosts(children) {
+/** Which comments to keep, and why the rest were skipped. By default only clearly-US posts
+ * are kept; includeNonUs keeps every post with profile fields (the original behaviour). */
+export function selectPosts(children, { includeNonUs = false } = {}) {
   const posts = [];
-  const skipped = { deleted_or_no_text: 0, no_profile_fields: 0 };
+  const skipped = { deleted_or_no_text: 0, no_profile_fields: 0, non_us: 0, unknown_country: 0 };
   for (const child of children) {
     if (!child?.author || !child?.text) {
       skipped.deleted_or_no_text += 1;
@@ -245,6 +261,10 @@ export function selectPosts(children) {
     const post = parseComment(child);
     if (!post.hasProfileFields) {
       skipped.no_profile_fields += 1;
+      continue;
+    }
+    if (!includeNonUs && post.locationClass !== 'US') {
+      skipped[post.locationClass] += 1;
       continue;
     }
     posts.push(post);
@@ -394,6 +414,7 @@ function requireEnv(name) {
 
 async function main() {
   const write = process.argv.includes('--write');
+  const includeNonUs = process.argv.includes('--include-non-us');
   const threadsArg = process.argv.find((a) => a.startsWith('--threads='));
   const threadCount = threadsArg ? Number(threadsArg.slice('--threads='.length)) : 1;
   if (!Number.isInteger(threadCount) || threadCount < 1) throw new Error('--threads must be a positive integer');
@@ -403,16 +424,15 @@ async function main() {
 
   const threads = await findThreads(threadCount);
   if (threads.length === 0) throw new Error('No "Who wants to be hired?" threads found');
-  console.log(`${write ? 'WRITE' : 'DRY RUN (nothing written; pass --write to insert)'}: ${threads.length} thread(s)`);
+  console.log(`${write ? 'WRITE' : 'DRY RUN (nothing written; pass --write to insert)'}: ${threads.length} thread(s), ${includeNonUs ? 'all countries (--include-non-us)' : 'US posts only'}`);
 
   const allPosts = [];
-  const skipped = { dead_deleted_or_flagged: 0, deleted_or_no_text: 0, no_profile_fields: 0 };
+  const skipped = { dead_deleted_or_flagged: 0, deleted_or_no_text: 0, no_profile_fields: 0, non_us: 0, unknown_country: 0 };
   for (const thread of threads) {
     const { children, deadDeletedOrFlagged } = await loadThread(thread);
-    const { posts, skipped: s } = selectPosts(children);
+    const { posts, skipped: s } = selectPosts(children, { includeNonUs });
     skipped.dead_deleted_or_flagged += deadDeletedOrFlagged;
-    skipped.deleted_or_no_text += s.deleted_or_no_text;
-    skipped.no_profile_fields += s.no_profile_fields;
+    for (const [reason, n] of Object.entries(s)) skipped[reason] += n;
     allPosts.push(...posts);
     console.log(`  ${thread.title} (id ${thread.id}): ${children.length} top-level comments returned, ${posts.length} parsed`);
   }

@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
   SIGNAL_TYPE,
   SOURCE,
+  classifyLocation,
   decodeEmail,
   detectCountry,
   extractFields,
@@ -143,7 +144,36 @@ test('skips deleted comments and posts with no profile fields', () => {
     comment(201, 'meta_person', 'Is this thread also for contract work? Asking for a friend.'),
   ]);
   assert.deepEqual(posts.map((p) => p.id), ['101']);
-  assert.deepEqual(skipped, { deleted_or_no_text: 1, no_profile_fields: 1 });
+  assert.deepEqual(skipped, { deleted_or_no_text: 1, no_profile_fields: 1, non_us: 0, unknown_country: 0 });
+});
+
+test('default keeps US posts only; non-US and unknown-country are skipped and counted', () => {
+  const all = [OBFUSCATED, NO_EMAIL, US_CITY, NON_US_CITY, REMOTE_ONLY, MESSY,
+    comment(107, 'noloc', 'Remote: Yes<p>Technologies: Go<p>Email: noloc@example.dev')];
+  const { posts, skipped } = selectPosts(all);
+  assert.deepEqual(posts.map((p) => p.id), ['101', '103', '106'], 'Austin TX, San Francisco, Seattle WA');
+  assert.ok(posts.every((p) => p.country === 'US'));
+  assert.deepEqual(skipped, { deleted_or_no_text: 0, no_profile_fields: 0, non_us: 2, unknown_country: 2 },
+    'Lisbon + Berlin are non_us; "Remote" and no location are unknown_country');
+});
+
+test('--include-non-us keeps every post with profile fields (old behaviour)', () => {
+  const { posts, skipped } = selectPosts([OBFUSCATED, NO_EMAIL, NON_US_CITY, REMOTE_ONLY], { includeNonUs: true });
+  assert.deepEqual(posts.map((p) => p.id), ['101', '102', '104', '105']);
+  assert.equal(skipped.non_us + skipped.unknown_country, 0);
+  assert.deepEqual(posts.map((p) => p.country), ['US', null, null, null]);
+});
+
+test('classifyLocation', () => {
+  assert.equal(classifyLocation('Austin, TX'), 'US');
+  assert.equal(classifyLocation('USA'), 'US');
+  assert.equal(classifyLocation('Lisbon, Portugal'), 'non_us');
+  assert.equal(classifyLocation('Berlin, Germany (open to US hours)'), 'non_us', 'mixed counts as non_us');
+  assert.equal(classifyLocation('Henderson, NV, USA and Thailand'), 'non_us', 'mixed counts as non_us');
+  assert.equal(classifyLocation('Remote'), 'unknown_country');
+  assert.equal(classifyLocation('Anywhere'), 'unknown_country');
+  assert.equal(classifyLocation('NY'), 'unknown_country', 'bare state code stays unknown');
+  assert.equal(classifyLocation(null), 'unknown_country');
 });
 
 test('prospect and evidence rows', () => {
