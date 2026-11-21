@@ -1,9 +1,14 @@
--- SECURITY: re-assert the profiles column allowlist (20261016120000 did this once, but the
--- hosted DB was found with UPDATE on every profiles column for authenticated, and the own-row
--- UPDATE policy on role public with no WITH CHECK). With every column writable, a signed-in
--- user could set their own stripe_customer_id (another customer's billing portal),
--- org_account_id / trial_grant_id (a paid partner seat without using one),
--- onboarding_completed, email (where product email is sent), and more.
+-- SECURITY (safety re-apply, not a fix for a live hole): re-asserts the profiles column
+-- allowlist from 20261016120000. A hosted check on 2026-11-21 confirmed production is already
+-- locked down (authenticated can update first_name but not stripe_customer_id,
+-- org_account_id or email). This re-applies it idempotently so it doesn't depend on that
+-- state surviving, and hardens it further:
+--   - also revokes per-column UPDATE grants (a table-level REVOKE leaves those in place)
+--   - limits the own-row UPDATE policy to authenticated, with an explicit WITH CHECK
+--   - pins resume_bucket_key to the caller's own upload path
+-- If these columns were ever writable, a signed-in user could set their own
+-- stripe_customer_id (another customer's billing portal), org_account_id / trial_grant_id (a
+-- paid partner seat without using one), onboarding_completed, email, and more.
 --
 -- Server code uses service_role and is unaffected. touch_last_active() is SECURITY DEFINER,
 -- so last_active_at keeps updating. A new self-editable column must be added to the grant
