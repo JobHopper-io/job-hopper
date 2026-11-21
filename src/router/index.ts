@@ -57,6 +57,7 @@ const adminPaths = [
   '/admin/acquisition-channels',
   '/admin/trial-grants',
   '/admin/institutional-leads',
+  '/admin/prospects',
   '/admin/partners',
   '/admin/growth-dashboard',
   '/admin/revenue-recovery',
@@ -342,6 +343,11 @@ const router = createRouter({
       path: '/admin/trial-grants',
       name: 'admin-trial-grants',
       component: () => import('../views/AdminTrialGrants.vue'),
+    },
+    {
+      path: '/admin/prospects',
+      name: 'admin-prospects',
+      component: () => import('../views/AdminProspects.vue'),
     },
     {
       path: '/admin/institutional-leads',

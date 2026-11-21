@@ -305,6 +305,8 @@ const funnelRows = computed(() => {
   if (!f) return []
   return [
     { label: 'Leads discovered', value: f.leadsDiscovered, hint: `${f.institutionalLeads} organizations + ${f.prospects} people` },
+    { label: 'Prospects reviewed', value: f.prospectsReviewed, hint: 'approved or rejected in /admin/prospects' },
+    { label: 'Prospects approved', value: f.prospectsApproved, hint: '' },
     { label: 'Outbound sent', value: f.outboundSent, hint: 'handed to Mailtrap' },
     { label: 'Delivered', value: f.outboundDelivered, hint: 'Mailtrap delivery event' },
     { label: 'Replies', value: f.replies, hint: 'all inbound replies' },

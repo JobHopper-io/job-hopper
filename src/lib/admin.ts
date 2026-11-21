@@ -89,6 +89,9 @@ export interface GrowthDashboardReport {
     leadsDiscovered: number
     institutionalLeads: number
     prospects: number
+    /** Prospects reviewed in /admin/prospects (approved or rejected). */
+    prospectsReviewed: number
+    prospectsApproved: number
     outboundSent: number
     outboundDelivered: number
     replies: number

@@ -285,6 +285,15 @@ serve(async (req) => {
     if (countsError) throw new Error(`Failed to load growth_dashboard_counts: ${countsError.message}`)
     const counts = countsData as GrowthDashboardCounts
 
+    // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
+    const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
+      supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
+      supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).eq('review_status', 'approved'),
+    ])
+    if (reviewedError || approvedError) {
+      throw new Error(`Failed to count reviewed prospects: ${(reviewedError ?? approvedError)!.message}`)
+    }
+
     const nowIso = new Date().toISOString()
     const trialGrants = await fetchAll<{ status: string; expires_at: string }>(
       'trial_grants',
@@ -352,6 +361,8 @@ serve(async (req) => {
           leadsDiscovered: leads.length + counts.funnel.prospects,
           institutionalLeads: leads.length,
           prospects: counts.funnel.prospects,
+          prospectsReviewed: prospectsReviewed ?? 0,
+          prospectsApproved: prospectsApproved ?? 0,
           outboundSent: outbound.totals.sent,
           outboundDelivered: outbound.totals.delivered,
           replies: counts.funnel.replies,
