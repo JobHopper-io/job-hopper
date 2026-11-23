@@ -1,97 +1,71 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import {
-  partitionByMarketingConsent,
+  assignSegment,
   highMatchCountThreshold,
-  isActivatedNeverPaid,
-  isCancelled,
-  isHeavyFreeUsage,
   isHighMatchUser,
-  isNeverActivated,
-  isNoLogin30d,
-  isNonPayer,
-  isVisaFocusedNoConversion,
-  subscriptionFlagsFromStatuses,
+  matchingSegments,
+  RECOVERY_SEGMENT_PRIORITY,
 } from '../revenue-recovery-segments.ts'
+import { candidate, NOW as NOW_DATE } from './recovery-fixtures.ts'
 
-const NOW = new Date('2026-08-24T00:00:00Z').getTime()
-const daysAgo = (n: number) => new Date(NOW - n * 86400000).toISOString()
+const NOW = NOW_DATE.getTime()
+const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString()
 
-const noSubs = subscriptionFlagsFromStatuses([])
-const activeSubs = subscriptionFlagsFromStatuses(['active'])
-const trialSubs = subscriptionFlagsFromStatuses(['trial'])
-const canceledSubs = subscriptionFlagsFromStatuses(['canceled'])
-
-Deno.test('isNonPayer: true only with no active/trial sub', () => {
-  assertEquals(isNonPayer(noSubs), true)
-  assertEquals(isNonPayer(canceledSubs), true)
-  assertEquals(isNonPayer(activeSubs), false)
-  assertEquals(isNonPayer(trialSubs), false)
+Deno.test('baseline fixture is in no segment', () => {
+  assertEquals(matchingSegments(candidate(), NOW), [])
+  assertEquals(assignSegment(candidate(), NOW), null)
 })
 
-Deno.test('isNeverActivated: onboarding incomplete, real auth user, past the 3-day grace window', () => {
-  assertEquals(isNeverActivated({ onboardingCompleted: false, createdAt: daysAgo(5), hasAuthUser: true }, NOW), true)
-  assertEquals(isNeverActivated({ onboardingCompleted: false, createdAt: daysAgo(1), hasAuthUser: true }, NOW), false, 'too fresh, inside the grace window')
-  assertEquals(isNeverActivated({ onboardingCompleted: true, createdAt: daysAgo(5), hasAuthUser: true }, NOW), false, 'already activated')
-  assertEquals(isNeverActivated({ onboardingCompleted: false, createdAt: daysAgo(5), hasAuthUser: false }, NOW), false, 'no real auth user (billing-only profile)')
+Deno.test('each segment rule', () => {
+  const cases: [Partial<Parameters<typeof candidate>[0]>, string][] = [
+    [{ abandoned_checkout_at: daysAgo(1) }, 'abandoned_checkout'],
+    [{ abandoned_checkout_proxy: true }, 'abandoned_checkout'],
+    [{ has_canceled_sub: true }, 'cancelled'],
+    [{ job_searches_used: 3 }, 'heavy_free_usage'],
+    [{ requires_us_sponsorship: true }, 'visa_focused_no_conversion'],
+    [{ has_any_sub: false }, 'activated_never_paid'],
+    [{ has_resume: false }, 'onboarded_no_resume'],
+    [{ onboarding_completed: false, created_at: daysAgo(3), has_resume: true }, 'never_activated'],
+    [{ last_seen_at: daysAgo(30) }, 'no_login_30d'],
+  ]
+  for (const [over, expected] of cases) assertEquals(assignSegment(candidate(over), NOW), expected, JSON.stringify(over))
 })
 
-Deno.test('isActivatedNeverPaid: onboarded with zero subscription rows ever', () => {
-  assertEquals(isActivatedNeverPaid(true, noSubs), true)
-  assertEquals(isActivatedNeverPaid(true, canceledSubs), false, 'has a subscription row -> cancelled segment, not this one')
-  assertEquals(isActivatedNeverPaid(false, noSubs), false)
+Deno.test('edges: under the search cap, signup under 3 days, never seen, sponsorship unknown', () => {
+  assertEquals(assignSegment(candidate({ job_searches_used: 2 }), NOW), null)
+  assertEquals(assignSegment(candidate({ onboarding_completed: false, created_at: daysAgo(2) }), NOW), null)
+  assertEquals(assignSegment(candidate({ last_seen_at: null }), NOW), null)
+  assertEquals(assignSegment(candidate({ last_seen_at: daysAgo(29) }), NOW), null)
+  assertEquals(assignSegment(candidate({ requires_us_sponsorship: null }), NOW), null)
 })
 
-Deno.test('isCancelled matches the existing lifecycle report churned definition', () => {
-  assertEquals(isCancelled(canceledSubs), true)
-  assertEquals(isCancelled(activeSubs), false)
-  assertEquals(isCancelled(subscriptionFlagsFromStatuses(['canceled', 'active'])), false, 'has another active sub -> not churned')
+Deno.test('priority: someone in every segment gets abandoned_checkout; then each next one down', () => {
+  const all: Parameters<typeof candidate>[0] = {
+    abandoned_checkout_at: daysAgo(1), has_canceled_sub: true, job_searches_used: 5, requires_us_sponsorship: true,
+    has_any_sub: false, has_resume: false, last_seen_at: daysAgo(40),
+  }
+  assertEquals(matchingSegments(candidate(all), NOW), [
+    'abandoned_checkout', 'cancelled', 'heavy_free_usage', 'visa_focused_no_conversion',
+    'activated_never_paid', 'onboarded_no_resume', 'no_login_30d',
+  ])
+  assertEquals(assignSegment(candidate(all), NOW), 'abandoned_checkout')
+  assertEquals(assignSegment(candidate({ ...all, abandoned_checkout_at: null }), NOW), 'cancelled')
+  assertEquals(assignSegment(candidate({ ...all, abandoned_checkout_at: null, has_canceled_sub: false }), NOW), 'heavy_free_usage')
+  assertEquals(assignSegment(candidate({ has_resume: false, last_seen_at: daysAgo(40) }), NOW), 'onboarded_no_resume')
+  // never_activated outranks no_login_30d
+  assertEquals(assignSegment(candidate({ onboarding_completed: false, created_at: daysAgo(40), last_seen_at: daysAgo(40) }), NOW), 'never_activated')
 })
 
-Deno.test('isNoLogin30d: non-payer, real last sign-in, past 30 days', () => {
-  assertEquals(isNoLogin30d(daysAgo(45), NOW, noSubs), true)
-  assertEquals(isNoLogin30d(daysAgo(10), NOW, noSubs), false, 'inside the window')
-  assertEquals(isNoLogin30d(daysAgo(45), NOW, activeSubs), false, 'currently paying -> excluded, retention not revenue-recovery')
-  assertEquals(isNoLogin30d(null, NOW, noSubs), false, 'no real sign-in on record is a data gap, not a signal')
+Deno.test('priority order is exactly as specified; high_match_users is not active', () => {
+  assertEquals([...RECOVERY_SEGMENT_PRIORITY], [
+    'abandoned_checkout', 'cancelled', 'heavy_free_usage', 'visa_focused_no_conversion',
+    'activated_never_paid', 'onboarded_no_resume', 'never_activated', 'no_login_30d',
+  ])
+  assertEquals((RECOVERY_SEGMENT_PRIORITY as readonly string[]).includes('high_match_users'), false)
 })
 
-Deno.test('isHeavyFreeUsage: hit the real freemium_settings cap, not an invented number', () => {
-  assertEquals(isHeavyFreeUsage(3, 3, noSubs), true)
-  assertEquals(isHeavyFreeUsage(2, 3, noSubs), false)
-  assertEquals(isHeavyFreeUsage(3, 3, activeSubs), false, 'already paying')
-})
-
-Deno.test('highMatchCountThreshold: 80th percentile of the real distribution', () => {
-  const counts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  assertEquals(highMatchCountThreshold(counts), 9)
-  assertEquals(highMatchCountThreshold([]), Infinity, 'no matches anywhere -> nobody qualifies, not a guessed cutoff')
-})
-
-Deno.test('isHighMatchUser: non-payer at/above the real threshold', () => {
-  assertEquals(isHighMatchUser(9, 9, noSubs), true)
-  assertEquals(isHighMatchUser(8, 9, noSubs), false)
-  assertEquals(isHighMatchUser(9, 9, activeSubs), false)
-  assertEquals(isHighMatchUser(0, 0, noSubs), false, 'zero matches never qualifies even if threshold is 0')
-})
-
-Deno.test('isVisaFocusedNoConversion: real requires_us_sponsorship=true, non-payer', () => {
-  assertEquals(isVisaFocusedNoConversion(true, noSubs), true)
-  assertEquals(isVisaFocusedNoConversion(false, noSubs), false)
-  assertEquals(isVisaFocusedNoConversion(null, noSubs), false, 'unanswered onboarding question is not a signal either way')
-  assertEquals(isVisaFocusedNoConversion(true, activeSubs), false, 'already converted')
-})
-
-Deno.test('partitionByMarketingConsent: real sends keep only consented members and count the rest', async () => {
-  const members = [{ profileId: 'yes' }, { profileId: 'legacy-only' }, { profileId: 'revoked' }, { profileId: 'broken' }, { profileId: 'yes-2' }]
-  const consent: Record<string, boolean> = { yes: true, 'yes-2': true, 'legacy-only': false, revoked: false }
-  const result = await partitionByMarketingConsent(members, (id) =>
-    id === 'broken' ? Promise.reject(new Error('rpc down')) : Promise.resolve(consent[id]))
-  assertEquals(result.consented.map((m) => m.profileId), ['yes', 'yes-2'])
-  assertEquals(result.skippedNoConsent, 2)
-  assertEquals(result.consentCheckErrors, 1)
-})
-
-Deno.test('partitionByMarketingConsent: nobody consented -> nothing sent', async () => {
-  const result = await partitionByMarketingConsent([{ profileId: 'a' }, { profileId: 'b' }], () => Promise.resolve(false))
-  assertEquals(result.consented, [])
-  assertEquals(result.skippedNoConsent, 2)
+Deno.test('high-match helpers kept for re-enabling', () => {
+  assertEquals(highMatchCountThreshold([1, 2, 3, 4, 5]), 5)
+  assertEquals(isHighMatchUser(5, 5), true)
+  assertEquals(isHighMatchUser(0, 0), false)
 })

@@ -10,6 +10,7 @@ import { categorizeUserLifecycle, subscriptionFlagsFromStatuses } from '../_shar
 import { callChatCompletion } from '../_shared/llm.ts'
 import { type OutboundEventRow, summarizeOutboundEmails } from '../_shared/outbound-email-stats.ts'
 import { GROWTH_SUMMARY_SYSTEM, growthSummaryUserMessage } from '../_shared/growth-summary-prompt.ts'
+import { RECOVERY_SEGMENT_PRIORITY, SEGMENT_LABELS } from '../_shared/revenue-recovery-segments.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -295,6 +296,22 @@ serve(async (req) => {
     if (cancellationError) throw new Error(`Failed to load cancellation_dashboard_counts: ${cancellationError.message}`)
     const cancellation = cancellationData as CancellationDashboardCounts
 
+    // Recovery sequences, people per segment from their first send (migration 20261124120100).
+    const { data: recoveryData, error: recoveryError } = await supabaseAdminClient.rpc('recovery_funnel_counts')
+    if (recoveryError) throw new Error(`Failed to load recovery_funnel_counts: ${recoveryError.message}`)
+    const recoveryCounts = (recoveryData ?? {}) as Record<string, { sent: number; delivered: number; came_back: number; paid_30d: number }>
+    const recoveryFunnel = RECOVERY_SEGMENT_PRIORITY.map((segment) => {
+      const c = recoveryCounts[segment]
+      return {
+        segment,
+        label: SEGMENT_LABELS[segment],
+        sent: c?.sent ?? 0,
+        delivered: c?.delivered ?? 0,
+        cameBack: c?.came_back ?? 0,
+        paid30d: c?.paid_30d ?? 0,
+      }
+    })
+
     // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
     const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
       supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
@@ -380,6 +397,7 @@ serve(async (req) => {
           outboundSignups: counts.funnel.outbound_signups,
           outboundPaid: counts.funnel.outbound_paid,
         },
+        recoveryFunnel,
         cancellations: {
           // Portal feedback per canceled / scheduled-to-cancel B2C subscription; 'none' = no feedback.
           byFeedback: Object.entries(cancellation.by_feedback)

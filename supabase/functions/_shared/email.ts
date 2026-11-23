@@ -60,12 +60,15 @@ export interface SendEmailOptions {
     | "system_announcement"
     | "sponsor_watch_alert"
     | "reveal_request_received"
+    | "recovery"
   templateKey?: string | null
   /** Campaign tag stored on the email_events row (growth sends). */
   campaign?: string | null
+  /** Stage within a sequence (recovery sequences), stored on email_events.sequence_stage. */
+  sequenceStage?: number | null
   payload?: Record<string, unknown> | null
   /** Supabase client (service_role) to insert into email_events. If omitted, no DB log. */
-  supabase?: { from: (table: string) => { insert: (row: unknown) => Promise<{ error: unknown }> } }
+  supabase?: { from: (table: string) => { insert: (row: unknown) => PromiseLike<{ error: unknown }> } }
 }
 
 /** RFC 2369 + RFC 8058 one-click unsubscribe headers. The URL is the same signed
@@ -83,7 +86,11 @@ export interface SendEmailDeps {
   send?: typeof sendEmailViaProvider
 }
 
-export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps = {}): Promise<SendEmailResult> {
+/** emailEventId: id of the email_events row logged for this send (null when not logged). */
+export async function sendEmail(
+  options: SendEmailOptions,
+  deps: SendEmailDeps = {},
+): Promise<SendEmailResult & { emailEventId: string | null }> {
   const isSuppressed = deps.isSuppressed ?? isEmailSuppressed
   const send = deps.send ?? sendEmailViaProvider
   const toDomain = options.to.split("@")[1] ?? null
@@ -122,22 +129,29 @@ export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps =
       headers: options.kind === "marketing" ? listUnsubscribeHeaders(options.unsubscribeUrl!) : undefined,
     })
 
+  let emailEventId: string | null = null
   if (options.supabase && options.profileId != null && options.eventType) {
     const status = result.success ? "sent" : "failed"
+    // Id generated here so callers can link the row (followup_sequences.email_event_id)
+    // without changing the insert call's shape.
+    const id = crypto.randomUUID()
     try {
       const { error } = await options.supabase.from("email_events").insert({
+        id,
         profile_id: options.profileId,
         type: options.eventType,
         subject: options.subject,
         template_key: options.templateKey ?? null,
         to_email_normalized: normalizeEmail(options.to) || null,
         campaign: options.campaign ?? null,
+        sequence_stage: options.sequenceStage ?? null,
         payload: options.payload ?? null,
         provider_message_id: result.messageId,
         status,
         error_message: result.error ?? null,
       })
 
+      if (!error) emailEventId = id
       if (error) {
         console.error("[email] failed to insert email_events row", {
           profileId: options.profileId,
@@ -156,5 +170,5 @@ export async function sendEmail(options: SendEmailOptions, deps: SendEmailDeps =
     }
   }
 
-  return result
+  return { ...result, emailEventId }
 }

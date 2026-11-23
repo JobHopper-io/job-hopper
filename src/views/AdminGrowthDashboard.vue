@@ -78,6 +78,38 @@
 
       <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Recovery emails
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          People per segment, counted from their first recovery email. Came back: active in the app after
+          it. Paid: completed a checkout within 30 days of it.
+        </p>
+        <div class="-mx-4 sm:-mx-6 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-xs text-neutral-muted">
+                <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium">Segment</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Sent</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Delivered</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Came back</th>
+                <th scope="col" class="px-4 sm:px-6 py-2 text-right font-medium">Paid in 30 days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in report.recoveryFunnel" :key="row.segment" class="border-t border-neutral-border">
+                <th scope="row" class="px-4 sm:px-6 py-2 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.sent.toLocaleString() }}</td>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.delivered.toLocaleString() }}</td>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.cameBack.toLocaleString() }}</td>
+                <td class="px-4 sm:px-6 py-2 text-right tabular-nums">{{ row.paid30d.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
           Cancellations
         </h2>
         <p class="text-sm text-neutral-body mb-5">
@@ -252,7 +284,7 @@
           <StatTile
             label="Recovered revenue"
             not-tracked
-            hint="no revenue-recovery segments built yet"
+            hint="no revenue amounts; see Recovery emails for paid within 30 days"
           />
         </dl>
         <p class="text-xs text-neutral-muted pt-4 border-t border-neutral-border">
