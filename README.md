@@ -124,7 +124,7 @@ written to a table yet.
 
 ```bash
 set -a; . ./.env.local; set +a   # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
-node scripts/warn-connector.mjs CA --days=60 --dry-run
+node scripts/warn-connector.mjs CA --days=60 --min-workers=25 --dry-run
 ```
 
 - Supported states: `CA` (EDD's xlsx, updated Tue/Thu, fiscal year to date). No API key.
@@ -133,7 +133,9 @@ node scripts/warn-connector.mjs CA --days=60 --dry-run
 - States: comma-separated (default `CA`). A state that fails is reported and skipped.
 - `--days=N` (or a second positional `YYYY-MM-DD`) keeps notices whose notice date is on
   or after it.
-- `--dry-run` fetches and prints counts and 5 samples, never writes. With Supabase env
+- `--min-workers=N` (default 25) skips employers below N workers after merging notices
+  (counted as `below_min_workers`; unknown size is skipped too).
+- `--dry-run` fetches and prints counts and the top 5 by score, never writes. With Supabase env
   set it also reads `exclusion_lists` and existing rows.
 - Companies on `exclusion_lists` (case-insensitive, trimmed) are skipped. Stored warn rows
   already on the list are reported by name and left unchanged.

@@ -7,9 +7,10 @@
 // Supported states: CA (EDD's weekly xlsx). The warnfirehose.com API this used before
 // needs a paid plan since the free trial ended (2026-09-11); not used.
 //
-// Usage: node scripts/warn-connector.mjs [STATES] [DATE_FROM] [--days=N] [--dry-run]
+// Usage: node scripts/warn-connector.mjs [STATES] [DATE_FROM] [--days=N] [--min-workers=N] [--dry-run]
 //   STATES: comma-separated, default CA. DATE_FROM (YYYY-MM-DD) or --days=N keeps only
-//   notices with notice_date on/after it. --dry-run prints counts + samples, never writes.
+//   notices with notice_date on/after it. --min-workers=N (default 25) skips employers
+//   below N workers after merging. --dry-run prints counts + samples, never writes.
 
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
@@ -338,8 +339,19 @@ function summarizeB2C(rows) {
 export const filterByNoticeDate = (notices, dateFrom) =>
   dateFrom ? notices.filter((n) => n.notice_date && n.notice_date >= dateFrom) : notices;
 
+// Unknown size (null) can't be shown to meet the minimum, so it's skipped too.
+export function splitBelowMin(rows, minWorkers) {
+  const kept = [];
+  const skipped = [];
+  for (const row of rows) ((row.signals.workers_affected ?? -1) >= minWorkers ? kept : skipped).push(row);
+  return { kept, skipped };
+}
+
 export function parseArgs(argv, today = new Date()) {
   const positional = argv.filter((a) => !a.startsWith('--'));
+  const minArg = argv.find((a) => a.startsWith('--min-workers='));
+  const minWorkers = minArg ? Number(minArg.slice('--min-workers='.length)) : 25;
+  if (!Number.isInteger(minWorkers) || minWorkers < 0) throw new Error(`Invalid ${minArg}`);
   const daysArg = argv.find((a) => a.startsWith('--days='));
   let dateFrom = positional[1];
   if (daysArg) {
@@ -351,7 +363,7 @@ export function parseArgs(argv, today = new Date()) {
   for (const st of states) {
     if (!STATE_SOURCES[st]) throw new Error(`Unsupported state: ${st} (supported: ${Object.keys(STATE_SOURCES).join(', ')})`);
   }
-  return { states, dateFrom, dryRun: argv.includes('--dry-run') };
+  return { states, dateFrom, minWorkers, dryRun: argv.includes('--dry-run') };
 }
 
 // PostgREST caps a response at 1000 rows; page through so a long exclusion list can't
@@ -367,7 +379,7 @@ async function selectAll(build) {
 }
 
 async function main() {
-  const { states, dateFrom, dryRun } = parseArgs(process.argv.slice(2));
+  const { states, dateFrom, minWorkers, dryRun } = parseArgs(process.argv.slice(2));
   const hasDb = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   // A write needs exclusions + existing rows; a dry run may skip them.
   const supabase = !dryRun || hasDb
@@ -384,47 +396,58 @@ async function main() {
   console.table(summarizeB2C(mappedRows));
 
   let rows = mergeDuplicateOrgNames(mappedRows);
-  let skipped = [];
+  let excluded = [];
+  let existingByName = new Map();
   if (supabase) {
     const exclusions = await selectAll(() => supabase.from('exclusion_lists').select('company_name'));
-    const existing = await selectAll(() => supabase.from('institutional_leads').select('organization_name, city, signals').eq('source', 'warn'));
+    const existing = await selectAll(() => supabase.from('institutional_leads').select('organization_name, city, signals, status, created_at').eq('source', 'warn'));
     const exclusionNames = exclusions.map((r) => r.company_name);
 
     // Read-only report: stored warn rows that are on the list. Left untouched.
     const storedExcluded = splitExcluded(existing, exclusionNames).skipped.map((r) => r.organization_name);
     console.log(`Existing warn rows on exclusion_lists (not changed): ${storedExcluded.length}${storedExcluded.length ? `\n  - ${storedExcluded.join('\n  - ')}` : ''}`);
 
-    ({ kept: rows, skipped } = splitExcluded(rows, exclusionNames));
-    const existingByName = new Map(existing.map((r) => [r.organization_name, r]));
-    console.log(`Rows: ${rows.length} to write (${rows.filter((r) => existingByName.has(r.organization_name)).length} update, ${rows.filter((r) => !existingByName.has(r.organization_name)).length} new); skipped: excluded ${skipped.length}`);
+    ({ kept: rows, skipped: excluded } = splitExcluded(rows, exclusionNames));
+    existingByName = new Map(existing.map((r) => [r.organization_name, r]));
     rows = mergeWithExisting(rows, existingByName);
   } else {
     console.log('(SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset: exclusion and existing-row checks skipped)');
   }
+  // After merging with stored notices, so a re-run can lift an employer over the line.
+  const { kept, skipped: belowMin } = splitBelowMin(rows, minWorkers);
+  rows = kept;
+
+  const updates = rows.filter((r) => existingByName.has(r.organization_name));
+  console.log(`\nRows to write: ${rows.length} (${rows.length - updates.length} new, ${updates.length} update)`);
+  console.log(`Skipped: excluded ${excluded.length}, below_min_workers ${belowMin.length} (min ${minWorkers})`);
+  if (updates.length) {
+    console.log('Existing rows that would be updated:');
+    console.table(updates.map((r) => {
+      const e = existingByName.get(r.organization_name);
+      return { company: r.organization_name, created_at: e.created_at, status: e.status, stored_notices: noticesOf(e).length, notices_after: noticesOf(r).length };
+    }));
+  }
+
+  const top = (n) => [...rows].sort((x, y) => y.opportunity_score - x.opportunity_score || y.signals.workers_affected - x.signals.workers_affected).slice(0, n)
+    .map((r) => ({ company: r.organization_name, city: r.city, workers: r.signals.workers_affected, notices: noticesOf(r).length, effective_date: r.signals.effective_date, score: r.opportunity_score, package: r.recommended_package }));
 
   if (dryRun) {
-    console.log('\nDRY RUN: nothing written.');
-    const byCompany = new Map(notices.map((n) => [n.company_name, n]));
-    console.table(rows.slice(0, 5).map((r) => ({
-      company: r.organization_name,
-      notice_date: byCompany.get(r.organization_name)?.notice_date ?? null,
-      effective_date: r.signals.effective_date,
-      state: r.state,
-      employees_affected: r.signals.workers_affected,
-      score: r.opportunity_score,
-    })));
+    console.log('\nDRY RUN: nothing written. Top 5 by score:');
+    console.table(top(5));
     return;
   }
 
   if (!rows.length) return console.log('Nothing to upsert.');
+  // status/contact fields are not in the payload: new rows get the column default
+  // ('new'), existing rows keep theirs.
   const { data, error } = await supabase
     .from('institutional_leads')
     .upsert(rows, { onConflict: 'organization_name,source' })
-    .select('organization_name, city, state, opportunity_score, recommended_package, signals');
+    .select('organization_name');
   if (error) throw new Error(`Failed to upsert institutional_leads: ${error.message}`);
 
-  console.log(`Upserted ${data.length} rows into institutional_leads; skipped: excluded ${skipped.length}.`);
-  console.table(data.map((r) => ({ ...r, signals: JSON.stringify(r.signals) })));
+  console.log(`\nUpserted ${data.length} rows (${rows.length - updates.length} inserted, ${updates.length} updated). Top 10 by score:`);
+  console.table(top(10));
 }
 
 async function selfTest() {
@@ -444,9 +467,10 @@ async function selfTest() {
 
   // args: --days, --dry-run, states
   const today = new Date('2026-11-23T12:00:00Z');
-  const a = parseArgs(['ca, CA', '--days=60', '--dry-run'], today);
-  assert.deepEqual(a, { states: ['CA'], dateFrom: '2026-09-24', dryRun: true }, 'states deduped, upper-cased; --days sets date_from');
-  assert.deepEqual(parseArgs([], today), { states: ['CA'], dateFrom: undefined, dryRun: false }, 'default CA');
+  const a = parseArgs(['ca, CA', '--days=60', '--min-workers=100', '--dry-run'], today);
+  assert.deepEqual(a, { states: ['CA'], dateFrom: '2026-09-24', minWorkers: 100, dryRun: true }, 'states deduped, upper-cased; --days sets date_from');
+  assert.deepEqual(parseArgs([], today), { states: ['CA'], dateFrom: undefined, minWorkers: 25, dryRun: false }, 'defaults: CA, min 25');
+  assert.throws(() => parseArgs(['--min-workers=abc']), /Invalid --min-workers/);
   assert.throws(() => parseArgs(['TX']), /Unsupported state: TX/);
 
   // CA parser: header found by text, serial dates, permanent vs temporary, city from address
@@ -506,6 +530,15 @@ async function selfTest() {
   // Notices without ids dedupe on city+date+workers.
   const noId = mergeDuplicateOrgNames([row('NoId', null, 50, null, '2026-10-01'), row('NoId', null, 50, null, '2026-10-01')])[0];
   assert.equal(noId.signals.workers_affected, 50);
+
+  // --min-workers: applied to merged totals; null size is skipped
+  const sized = mergeDuplicateOrgNames([row('Two Rounds', 'a', 15), row('Two Rounds', 'b', 15), row('Small', 'c', 24), row('Exact', 'd', 25), row('Unknown', 'e', null)]);
+  const mw = splitBelowMin(sized, 25);
+  assert.deepEqual(mw.kept.map((r) => r.organization_name), ['Two Rounds', 'Exact'], '15+15 merged clears 25; 25 is inclusive');
+  assert.deepEqual(mw.skipped.map((r) => r.organization_name), ['Small', 'Unknown']);
+  // A re-run can lift a stored small employer over the line.
+  const lifted = mergeWithExisting([row('Small', 'f', 10)], new Map([['Small', mw.skipped[0]]]));
+  assert.equal(splitBelowMin(lifted, 25).kept.length, 1);
 
   // 3. multi-state: a failing state is skipped, the rest still run
   const res = await fetchAllStates(['CA', 'TX', 'NY'], async (st) => {
