@@ -124,14 +124,21 @@ console as the B2C geo-targeting signal — not written to a table yet.
 
 ```bash
 WARN_FIREHOSE_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
-  node scripts/warn-connector.mjs TX
+  node scripts/warn-connector.mjs CA,TX,NY --days=60 --dry-run
 ```
 
 - `WARN_FIREHOSE_API_KEY`: free key from warnfirehose.com/account.
 - Free tier is 25 calls/day, 25 records/call — this script makes one call, no
   pagination, by design. Revisit if/when the $49/mo Starter tier is approved.
-- State argument defaults to `TX`; an optional second argument sets `date_from`
-  (`YYYY-MM-DD`).
+- States: comma-separated, one API call each (default `TX`). On the free-tier limit the
+  run stops and processes only the states already fetched. An optional second argument
+  sets `date_from` (`YYYY-MM-DD`); `--days=N` sets it to N days ago.
+- `--dry-run` fetches and prints counts and 5 samples, never writes. With Supabase env
+  set it also reads `exclusion_lists` and existing rows.
+- Companies on `exclusion_lists` (case-insensitive, trimmed) are skipped. Stored warn rows
+  already on the list are reported by name and left unchanged.
+- Re-runs merge new notices into `signals.merged_notices` (deduped by `notice_id`), sum
+  `workers_affected` across unique notices and recompute the score.
 
 ### Outbound dry-run + contact enrichment (run manually)
 

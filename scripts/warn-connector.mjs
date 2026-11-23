@@ -6,8 +6,11 @@
 //
 // Free tier: 25 calls/day, 25 records/call, no pagination here on purpose.
 //
-// Usage: node scripts/warn-connector.mjs [STATE] [DATE_FROM]   (default STATE: TX)
+// Usage: node scripts/warn-connector.mjs [STATES] [DATE_FROM] [--days=N] [--dry-run]
+//   (STATES: comma-separated, one API call each, default TX; --days=N sets DATE_FROM to N days ago; --dry-run fetches and
+//   prints counts + samples, never writes)
 
+import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 
@@ -72,6 +75,10 @@ export function scoreFor(workers, priority = false, effectiveDate = null) {
   return { score, package: bucket.package };
 }
 
+// Free-tier quota exhaustion. The exact status/body isn't documented in the repo:
+// 429 is treated as the limit, as is any other 4xx whose body mentions a limit/quota.
+export class WarnLimitError extends Error {}
+
 async function fetchNotices(apiKey, state, dateFrom) {
   const url = new URL(WARN_API_URL);
   url.searchParams.set('state', state);
@@ -80,7 +87,11 @@ async function fetchNotices(apiKey, state, dateFrom) {
 
   const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
   if (!res.ok) {
-    throw new Error(`WARN Firehose API request failed: ${res.status} ${await res.text()}`);
+    const text = await res.text();
+    if (res.status === 429 || (res.status >= 400 && res.status < 500 && /limit|quota/i.test(text))) {
+      throw new WarnLimitError(`WARN Firehose limit hit on ${state}: ${res.status} ${text}`);
+    }
+    throw new Error(`WARN Firehose API request failed: ${res.status} ${text}`);
   }
   const body = await res.json();
 
@@ -95,6 +106,24 @@ async function fetchNotices(apiKey, state, dateFrom) {
     );
   }
   return records;
+}
+
+// One call per state, sequentially. On the free-tier limit, stop and keep what was
+// already fetched; any other error still aborts the run.
+export async function fetchAllStates(states, fetchOne) {
+  const notices = [];
+  const fetched = [];
+  for (const state of states) {
+    try {
+      notices.push(...(await fetchOne(state)));
+      fetched.push(state);
+    } catch (err) {
+      if (!(err instanceof WarnLimitError)) throw err;
+      console.warn(`${err.message}\nStopping: not fetched: ${states.slice(fetched.length).join(', ')}`);
+      return { notices, fetched, limited: true };
+    }
+  }
+  return { notices, fetched, limited: false };
 }
 
 function toLeadRow(notice) {
@@ -122,58 +151,81 @@ function toLeadRow(notice) {
   };
 }
 
+// A row's notices: the primary one (top-level signals) plus signals.merged_notices.
+// Top-level workers_affected is the merged TOTAL, so the primary notice's own count is
+// total minus the others. Top-level effective_date is the max across notices, so the
+// primary's own date isn't recoverable; the max is what scoring uses anyway.
+function noticesOf(row) {
+  const { notice_id, workers_affected, layoff_type, effective_date, merged_notices = [] } = row.signals ?? {};
+  const others = merged_notices.reduce((sum, n) => sum + (n.workers_affected ?? 0), 0);
+  const own = workers_affected == null ? null : workers_affected - others;
+  return [{ notice_id, city: row.city ?? null, workers_affected: own, layoff_type, effective_date }, ...merged_notices];
+}
+
+// Notices without an id fall back to city+date+workers so a re-run can't double-count them.
+const noticeKey = (n) => n.notice_id ?? `${n.city}|${n.effective_date}|${n.workers_affected}`;
+
+// Rebuilds one employer row from a list of notices: dedupes by notice_id, sums
+// workers_affected across unique notices (a company with multiple rounds is a bigger
+// opportunity), priority if any notice is a permanent layoff, freshest effective_date,
+// and recomputes the score from those merged totals. The first notice stays primary.
+export function combineNotices(base, notices) {
+  const byKey = new Map();
+  for (const n of notices) if (!byKey.has(noticeKey(n))) byKey.set(noticeKey(n), n); // first copy wins
+  const unique = [...byKey.values()];
+  const [primary, ...rest] = unique;
+  const known = unique.filter((n) => n.workers_affected != null);
+  const workers = known.length ? known.reduce((sum, n) => sum + n.workers_affected, 0) : null;
+  const priority = unique.some((n) => isPermanentLayoff(n.layoff_type));
+  const effectiveDate = unique.map((n) => n.effective_date).filter(Boolean).sort().at(-1) ?? null;
+  const { score, package: pkg } = scoreFor(workers, priority, effectiveDate);
+  return {
+    ...base,
+    city: primary.city,
+    opportunity_score: score,
+    recommended_package: pkg,
+    signals: {
+      ...base.signals,
+      notice_id: primary.notice_id ?? null,
+      workers_affected: workers,
+      priority,
+      layoff_type: primary.layoff_type ?? null,
+      effective_date: effectiveDate,
+      merged_notices: rest,
+    },
+  };
+}
+
 // institutional_leads is unique on (organization_name, source). Same company can file
-// more than one WARN notice in a pull (separate rounds/locations) — merge those into
-// one row, summing workers_affected (a company with multiple rounds is a bigger
-// Career Transition opportunity, not a smaller one) and keeping each collapsed
-// notice's detail in signals.merged_notices so nothing is silently lost.
-// ponytail: each run's upsert reflects only that pull's summed workers, it doesn't
-// accumulate on top of a previous run's stored total — fine for this single-state
-// proof run; revisit if incremental pulls need cumulative tracking across runs.
-function mergeDuplicateOrgNames(rows) {
+// more than one notice in a pull (separate rounds/locations): collapse them into one row.
+export function mergeDuplicateOrgNames(rows) {
   const byName = new Map();
   for (const row of rows) {
-    const existing = byName.get(row.organization_name);
-    if (!existing) {
-      byName.set(row.organization_name, { ...row, signals: { ...row.signals, merged_notices: [] } });
-      continue;
-    }
-    existing.signals.merged_notices.push({
-      notice_id: row.signals.notice_id,
-      city: row.city,
-      workers_affected: row.signals.workers_affected,
-      layoff_type: row.signals.layoff_type,
-      effective_date: row.signals.effective_date,
-    });
-    const totalWorkers =
-      existing.signals.workers_affected === null && row.signals.workers_affected === null
-        ? null
-        : (existing.signals.workers_affected ?? 0) + (row.signals.workers_affected ?? 0);
-    // Any collapsed notice being a confirmed permanent layoff carries the priority
-    // bump for the whole merged employer row — a company isn't less of a real
-    // closure/layoff opportunity just because it also filed a second, unclassified notice.
-    existing.signals.priority = existing.signals.priority || row.signals.priority;
-    // Same logic for recency: the most recent of the merged notices' dates is the real
-    // freshness signal — an additional recent filing makes the row hotter, not staler.
-    if (row.signals.effective_date && (!existing.signals.effective_date || row.signals.effective_date > existing.signals.effective_date)) {
-      existing.signals.effective_date = row.signals.effective_date;
-    }
-    const { score, package: pkg } = scoreFor(totalWorkers, existing.signals.priority, existing.signals.effective_date);
-    existing.signals.workers_affected = totalWorkers;
-    existing.opportunity_score = score;
-    existing.recommended_package = pkg;
+    const group = byName.get(row.organization_name);
+    if (group) group.notices.push(...noticesOf(row));
+    else byName.set(row.organization_name, { base: row, notices: noticesOf(row) });
   }
-  const merged = [...byName.values()];
-  const collapsed = merged.filter((r) => r.signals.merged_notices.length > 0);
-  if (collapsed.length) {
-    console.warn(`Merged ${collapsed.length} multi-notice employer(s) into one lead row each:`);
-    for (const r of collapsed) {
-      console.warn(
-        `  - ${r.organization_name} (${r.signals.merged_notices.length + 1} notices, summed workers_affected ${r.signals.workers_affected})`,
-      );
-    }
-  }
-  return merged;
+  return [...byName.values()].map(({ base, notices }) => combineNotices(base, notices));
+}
+
+// Re-run: fold in the notices already stored for that employer so earlier pulls aren't
+// overwritten. Existing notices go first so the stored primary notice stays primary.
+export function mergeWithExisting(rows, existingByName) {
+  return rows.map((row) => {
+    const existing = existingByName.get(row.organization_name);
+    return existing ? combineNotices(row, [...noticesOf(existing), ...noticesOf(row)]) : row;
+  });
+}
+
+const normName = (s) => (s ?? '').trim().toLowerCase();
+
+// Case-insensitive, trimmed match against exclusion_lists.company_name.
+export function splitExcluded(rows, exclusionNames) {
+  const excluded = new Set(exclusionNames.map(normName));
+  const kept = [];
+  const skipped = [];
+  for (const row of rows) (excluded.has(normName(row.organization_name)) ? skipped : kept).push(row);
+  return { kept, skipped };
 }
 
 function summarizeB2C(rows) {
@@ -188,61 +240,160 @@ function summarizeB2C(rows) {
   });
 }
 
+export function parseArgs(argv, today = new Date()) {
+  const positional = argv.filter((a) => !a.startsWith('--'));
+  const daysArg = argv.find((a) => a.startsWith('--days='));
+  let dateFrom = positional[1];
+  if (daysArg) {
+    const days = Number(daysArg.slice('--days='.length));
+    if (!Number.isInteger(days) || days < 1) throw new Error(`Invalid ${daysArg}`);
+    dateFrom = new Date(today.getTime() - days * 86400000).toISOString().slice(0, 10);
+  }
+  const states = [...new Set((positional[0] || 'TX').split(',').map((st) => st.trim().toUpperCase()).filter(Boolean))];
+  for (const st of states) if (!/^[A-Z]{2}$/.test(st)) throw new Error(`Invalid state: ${st}`);
+  return { states, dateFrom, dryRun: argv.includes('--dry-run') };
+}
+
+// PostgREST caps a response at 1000 rows; page through so a long exclusion list can't
+// be silently truncated (that would fail open).
+async function selectAll(build) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...data);
+    if (data.length < 1000) return out;
+  }
+}
+
 async function main() {
-  const state = process.argv[2] || 'TX';
-  const dateFrom = process.argv[3];
+  const { states, dateFrom, dryRun } = parseArgs(process.argv.slice(2));
   const apiKey = requireEnv('WARN_FIREHOSE_API_KEY');
-  const supabaseUrl = requireEnv('SUPABASE_URL');
-  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const hasDb = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  // A write needs exclusions + existing rows; a dry run may skip them.
+  const supabase = !dryRun || hasDb
+    ? createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } })
+    : null;
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-
-  console.log(
-    `Fetching WARN notices for ${state}${dateFrom ? ` from ${dateFrom}` : ''} (limit 25, single call, free tier)...`,
-  );
-  const notices = await fetchNotices(apiKey, state, dateFrom);
-  console.log(`Fetched ${notices.length} notices.`);
+  console.log(`Fetching WARN notices for ${states.join(', ')}${dateFrom ? ` from ${dateFrom}` : ''} (limit 25, one call per state, free tier)...`);
+  const { notices, fetched, limited } = await fetchAllStates(states, (st) => fetchNotices(apiKey, st, dateFrom));
+  console.log(`Fetched ${notices.length} notices from ${fetched.length}/${states.length} states${limited ? ' (stopped at the free-tier limit)' : ''}.`);
+  if (dryRun && notices[0]) console.log(`API record fields: ${Object.keys(notices[0]).join(', ')}`);
 
   const mappedRows = notices.map(toLeadRow);
-
   console.log('B2C signal — notices by state+industry (console only, no table write yet):');
   console.table(summarizeB2C(mappedRows));
 
-  const leadRows = mergeDuplicateOrgNames(mappedRows);
+  let rows = mergeDuplicateOrgNames(mappedRows);
+  let skipped = [];
+  if (supabase) {
+    const exclusions = await selectAll(() => supabase.from('exclusion_lists').select('company_name'));
+    const existing = await selectAll(() => supabase.from('institutional_leads').select('organization_name, city, signals').eq('source', 'warn'));
+    const exclusionNames = exclusions.map((r) => r.company_name);
 
-  const { data, error } = await supabase
-    .from('institutional_leads')
-    .upsert(leadRows, { onConflict: 'organization_name,source' })
-    .select('organization_name, city, state, opportunity_score, recommended_package, signals');
+    // Read-only report: stored warn rows that are on the list. Left untouched.
+    const storedExcluded = splitExcluded(existing, exclusionNames).skipped.map((r) => r.organization_name);
+    console.log(`Existing warn rows on exclusion_lists (not changed): ${storedExcluded.length}${storedExcluded.length ? `\n  - ${storedExcluded.join('\n  - ')}` : ''}`);
 
-  if (error) {
-    throw new Error(`Failed to upsert institutional_leads: ${error.message}`);
+    ({ kept: rows, skipped } = splitExcluded(rows, exclusionNames));
+    const existingByName = new Map(existing.map((r) => [r.organization_name, r]));
+    console.log(`Rows: ${rows.length} to write (${rows.filter((r) => existingByName.has(r.organization_name)).length} update, ${rows.filter((r) => !existingByName.has(r.organization_name)).length} new); skipped: excluded ${skipped.length}`);
+    rows = mergeWithExisting(rows, existingByName);
+  } else {
+    console.log('(SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset: exclusion and existing-row checks skipped)');
   }
 
-  console.log(`Upserted ${data.length} rows into institutional_leads.`);
+  if (dryRun) {
+    console.log('\nDRY RUN: nothing written.');
+    const byCompany = new Map(notices.map((n) => [n.company_name, n]));
+    console.table(rows.slice(0, 5).map((r) => ({
+      company: r.organization_name,
+      notice_date: byCompany.get(r.organization_name)?.notice_date ?? '(not in response)',
+      effective_date: r.signals.effective_date,
+      state: r.state,
+      employees_affected: r.signals.workers_affected,
+      score: r.opportunity_score,
+    })));
+    return;
+  }
+
+  if (!rows.length) return console.log('Nothing to upsert.');
+  const { data, error } = await supabase
+    .from('institutional_leads')
+    .upsert(rows, { onConflict: 'organization_name,source' })
+    .select('organization_name, city, state, opportunity_score, recommended_package, signals');
+  if (error) throw new Error(`Failed to upsert institutional_leads: ${error.message}`);
+
+  console.log(`Upserted ${data.length} rows into institutional_leads; skipped: excluded ${skipped.length}.`);
   console.table(data.map((r) => ({ ...r, signals: JSON.stringify(r.signals) })));
 }
 
-function selfTest() {
+async function selfTest() {
   const now = Date.now();
   const daysAgo = (n) => new Date(now - n * 86400000).toISOString().slice(0, 10);
 
-  console.assert(scoreFor(null).score === null, 'missing workers_affected stays null, not a guessed score');
-  console.assert(scoreFor(1000, false, null).score === 90, 'no effective_date -> no recency modifier');
-  console.assert(scoreFor(1000, false, daysAgo(3)).score === 95, 'fresh (<=14d) gets +5');
-  console.assert(scoreFor(1000, false, daysAgo(20)).score === 92, 'recent (<=30d) gets +2');
-  console.assert(scoreFor(1000, false, daysAgo(60)).score === 90, 'mid-range (30-90d) gets no modifier');
-  console.assert(scoreFor(1000, false, daysAgo(120)).score === 87, 'stale (>90d) gets -3');
+  assert.equal(scoreFor(null).score, null, 'missing workers_affected stays null, not a guessed score');
+  assert.equal(scoreFor(1000, false, null).score, 90, 'no effective_date -> no recency modifier');
+  assert.equal(scoreFor(1000, false, daysAgo(3)).score, 95, 'fresh (<=14d) gets +5');
+  assert.equal(scoreFor(1000, false, daysAgo(20)).score, 92, 'recent (<=30d) gets +2');
+  assert.equal(scoreFor(1000, false, daysAgo(60)).score, 90, 'mid-range (30-90d) gets no modifier');
+  assert.equal(scoreFor(1000, false, daysAgo(120)).score, 87, 'stale (>90d) gets -3');
+  // Recency's swing (+5/-3) must never flip the size-tier ranking.
+  assert.ok(scoreFor(30, false, daysAgo(1)).score < scoreFor(200, false, daysAgo(200)).score, 'recency must not flip size-tier ranking');
+  assert.equal(scoreFor(1000, true, daysAgo(1)).score, 100, 'priority + fresh caps at 100, not over');
+  assert.equal(scoreFor(1000, false, 'not-a-real-date').score, 90, 'unparseable effective_date is a no-op, not a crash');
 
-  // Recency's max swing (+5/-3) must never cross a WARN_BUCKETS tier gap (20 points) or
-  // beat PRIORITY_BONUS's own +10 -- a fresh small layoff must still score below a
-  // stale large one.
-  const freshSmall = scoreFor(30, false, daysAgo(1)).score; // 30 + 5 = 35
-  const staleLarge = scoreFor(200, false, daysAgo(200)).score; // 70 - 3 = 67
-  console.assert(freshSmall < staleLarge, 'recency must not flip size-tier ranking');
+  // args: --days, --dry-run, multi-state
+  const today = new Date('2026-11-23T12:00:00Z');
+  const a = parseArgs(['ca, tx,NY,CA', '--days=60', '--dry-run'], today);
+  assert.deepEqual(a, { states: ['CA', 'TX', 'NY'], dateFrom: '2026-09-24', dryRun: true }, 'multi-state, deduped, upper-cased; --days sets date_from');
+  assert.deepEqual(parseArgs([], today), { states: ['TX'], dateFrom: undefined, dryRun: false }, 'defaults unchanged');
+  assert.throws(() => parseArgs(['CAL']), /Invalid state/);
 
-  console.assert(scoreFor(1000, true, daysAgo(1)).score === 100, 'priority + fresh caps at 100, not over');
-  console.assert(scoreFor(1000, false, 'not-a-real-date').score === 90, 'unparseable effective_date is a no-op, not a crash');
+  // 1. exclusion: case-insensitive, trimmed
+  const row = (name, id, workers, layout = null, eff = null, city = 'X') =>
+    toLeadRow({ id, company_name: name, city, state: 'TX', employees_affected: workers, layoff_type: layout, effective_date: eff });
+  const { kept, skipped } = splitExcluded([row('Acme Corp', 1, 10), row('Beta', 2, 10), row('  gamma inc ', 3, 10)], ['  ACME corp', 'Gamma Inc']);
+  assert.deepEqual(kept.map((r) => r.organization_name), ['Beta']);
+  assert.equal(skipped.length, 2, 'skipped: excluded counted');
+
+  // 2. merge within a pull, then with an earlier run; dedupe by notice_id
+  const first = mergeDuplicateOrgNames([row('Acme', 1, 100, null, '2026-10-01'), row('Acme', 2, 20, null, '2026-10-05', 'Y')])[0];
+  assert.equal(first.signals.workers_affected, 120);
+  assert.deepEqual(first.signals.merged_notices.map((n) => n.notice_id), [2]);
+  assert.equal(first.opportunity_score, scoreFor(120, false, '2026-10-05').score);
+  const existingByName = new Map([['Acme', first]]);
+  // Re-run: notice 2 again (duplicate) plus new notice 3, a permanent closure.
+  const pulled = mergeDuplicateOrgNames([row('Acme', 2, 20, null, '2026-10-05', 'Y'), row('Acme', 3, 400, 'Closure', '2026-11-01', 'Z')]);
+  const [rerun] = mergeWithExisting(pulled, existingByName);
+  assert.equal(rerun.signals.notice_id, 1, 'stored primary notice stays primary');
+  assert.deepEqual(rerun.signals.merged_notices.map((n) => n.notice_id).sort(), [2, 3], 'deduped by notice_id, earlier data kept');
+  assert.equal(rerun.signals.workers_affected, 520, 'sum across unique notices');
+  assert.equal(rerun.signals.priority, true);
+  assert.equal(rerun.signals.effective_date, '2026-11-01');
+  assert.equal(rerun.opportunity_score, scoreFor(520, true, '2026-11-01').score, 'score recomputed from merged totals');
+  assert.equal(rerun.recommended_package, '500+ seat custom cohort');
+  // Running the same pull again changes nothing.
+  assert.deepEqual(mergeWithExisting(pulled, new Map([['Acme', rerun]]))[0].signals, rerun.signals, 'idempotent re-run');
+  // New employer passes through untouched.
+  assert.equal(mergeWithExisting([row('New Co', 9, 30)], existingByName)[0].signals.workers_affected, 30);
+  // Notices without ids dedupe on city+date+workers.
+  const noId = mergeDuplicateOrgNames([row('NoId', null, 50, null, '2026-10-01'), row('NoId', null, 50, null, '2026-10-01')])[0];
+  assert.equal(noId.signals.workers_affected, 50);
+
+  // 3. multi-state: limit error stops cleanly with what was fetched; other errors throw
+  const calls = [];
+  const res = await fetchAllStates(['CA', 'TX', 'NY'], async (st) => {
+    calls.push(st);
+    if (st === 'TX') throw new WarnLimitError('limit');
+    return [{ id: st }];
+  });
+  assert.deepEqual(calls, ['CA', 'TX'], 'no calls after the limit');
+  assert.deepEqual(res, { notices: [{ id: 'CA' }], fetched: ['CA'], limited: true });
+  await assert.rejects(fetchAllStates(['CA'], () => Promise.reject(new Error('500 boom'))), /500 boom/);
+  const all = await fetchAllStates(['CA', 'TX'], async (st) => [{ id: st }]);
+  assert.equal(all.notices.length, 2);
+  assert.equal(all.limited, false);
 
   console.log('selfTest: all assertions passed');
 }
@@ -250,12 +401,8 @@ function selfTest() {
 const invokedDirectly =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  if (process.argv.includes('--self-test')) {
-    selfTest();
-  } else {
-    main().catch((err) => {
+  (process.argv.includes('--self-test') ? selfTest() : main()).catch((err) => {
       console.error(err.message);
-      process.exit(1);
-    });
-  }
+    process.exit(1);
+  });
 }
