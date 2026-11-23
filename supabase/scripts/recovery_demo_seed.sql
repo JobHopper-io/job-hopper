@@ -8,10 +8,10 @@
 -- d02 cancelled            canceled subscription            (later "pays")
 -- d03 heavy_free_usage     3/3 free searches used
 -- d04 visa_focused         needs sponsorship
--- d05 activated_never_paid onboarded, resume, no subscription
--- d06 would-be onboarded_no_resume   (no resume; lands in activated_never_paid)
+-- d05 activated_never_paid onboarded, resume, no subscription, active 2 days ago
+-- d06 onboarded_no_resume  onboarded, no resume
 -- d07 never_activated      signed up 5 days ago, not onboarded (later unsubscribes)
--- d08 would-be no_login_30d          (last seen 40 days ago; lands in activated_never_paid)
+-- d08 no_login_30d         onboarded, no subscription, last seen 40 days ago
 -- d09 admin                excluded   (also the demo admin who reads the dashboard)
 -- d10 partner staff        excluded
 -- d11 active subscriber    excluded

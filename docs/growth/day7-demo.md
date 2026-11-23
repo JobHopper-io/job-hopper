@@ -11,18 +11,19 @@ and `20261124120100_recovery_sequences` (the dry run listed exactly these three)
 `cli_login` sessions afterwards. `growth_settings.recovery_auto_send = false`, 25 sends per
 run, no offers.
 
-`recovery_candidates()`: **268 people**, one segment each after the priority rule:
+`recovery_candidates()`: **268 people**, one segment each after the priority rule
+(re-run after the priority fix below):
 
-| Segment | People | Marketing consent now | Consent if both legacy wordings were accepted |
+| Segment (priority order) | People | Marketing consent now | Consent if both legacy wordings were accepted |
 |---|---:|---:|---:|
 | Abandoned checkout | 24 | 0 | 24 |
 | Cancelled | 28 | 0 | 28 |
 | Heavy free usage | 8 | 0 | 8 |
 | Visa/sponsorship-focused | 49 | 0 | 49 |
-| Activated, never paid | 37 | 0 | 37 |
-| Onboarded, no resume | 0 | 0 | 0 |
-| Signed up, never activated | 122 | 0 | 122 |
-| Not seen in 30+ days | 0 | 0 | 0 |
+| Onboarded, no resume | 4 | 0 | 4 |
+| Activated, never paid (active in 30 days) | 0 | 0 | 0 |
+| Not seen in 30+ days | 125 | 0 | 125 |
+| Signed up, never activated | 30 | 0 | 30 |
 
 - **Nobody can be emailed today.** `accepted_marketing_wordings` only holds
   `marketing_email_v1`, the new signup checkbox, which isn't deployed yet. Every
@@ -30,17 +31,36 @@ run, no offers.
   `legacy_bundled_v0_mar2026`, 64 `legacy_bundled_v0`. The last column counts them as if
   both were accepted; that was computed in the query, and `accepted_marketing_wordings`
   is unchanged.
-- **Two segments can never fire with the current priority order.** Subscription status
-  is only `trial`, `active`, `canceled` or `past_due`. Trial and active are live access,
-  past_due is excluded and canceled goes to Cancelled. So an onboarded candidate always
-  has no subscription row, and lands in "Activated, never paid" first. "Onboarded, no
-  resume" needs an onboarded person who isn't in that segment, which can't happen. "Not
-  seen in 30+ days" is the same for onboarded people. Non-onboarded people go to "Never
-  activated" once they're 3 days old, and nobody under 3 days old can be 30 days unseen.
-  Before priority they'd hold 10 and 231 people respectively (94 match "activated, never
-  paid" before priority).
+- "Activated, never paid" is 0 because only one onboarded, never-paid candidate has been
+  active in the last 30 days, and they have no resume, so they're in "Onboarded, no
+  resume".
+
+### Priority fix (2026-11-23)
+
+The first order (activated_never_paid, onboarded_no_resume, never_activated, no_login_30d
+at the end) left two segments unable to fire. Subscription status is only `trial`,
+`active` (both live access), `past_due` (excluded) or `canceled`, so every onboarded
+candidate outside Cancelled has no subscription row and matched "activated, never paid"
+first; "onboarded, no resume" and onboarded "not seen in 30+ days" could never win (0 on
+hosted, against 10 and 231 before priority). Now:
+
+- order: abandoned_checkout, cancelled, heavy_free_usage, visa_focused_no_conversion,
+  onboarded_no_resume, activated_never_paid, no_login_30d, never_activated
+- activated_never_paid only counts people active in the last 30 days (later of
+  `last_active_at` and last sign-in), so inactive ones reach no_login_30d
+
+With the first order the hosted split was: abandoned 24, cancelled 28, heavy 8, visa 49,
+activated never paid 37, never activated 122, the other two 0.
+
+Re-checked locally with the demo seed and the real runner in preview mode: every segment
+got exactly one demo user (d01 abandoned checkout, d02 cancelled, d03 heavy free usage,
+d04 visa, d06 onboarded no resume, d05 activated never paid, d08 not seen 30+ days, d07
+never activated); seed cleaned up afterwards.
 
 ## Local demo
+
+The walkthrough below ran with the first priority order; the sends, stops and funnel
+behave the same with the fixed one.
 
 ### Setup
 
@@ -60,9 +80,9 @@ run, no offers.
 | d03 | 3/3 free searches | Heavy free usage |
 | d04 | needs sponsorship | Visa |
 | d05 | onboarded, resume, no subscription | Activated, never paid |
-| d06 | onboarded, no resume | Activated, never paid (see above) |
+| d06 | onboarded, no resume | Activated, never paid (first order; Onboarded, no resume since the fix) |
 | d07 | not onboarded, 5 days old | Never activated |
-| d08 | onboarded, last seen 40 days ago | Activated, never paid (see above) |
+| d08 | onboarded, last seen 40 days ago | Activated, never paid (first order; Not seen in 30+ days since the fix) |
 | d09 | admin | excluded |
 | d10 | partner staff | excluded |
 | d11 | active subscription | excluded |

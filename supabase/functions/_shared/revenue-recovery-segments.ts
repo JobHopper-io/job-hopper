@@ -7,7 +7,11 @@
  * live access (active/trial subscription, live org seat, active trial grant) and anyone
  * past_due (they get the transactional payment-failed email instead).
  *
- * A user in several segments gets only the first one in RECOVERY_SEGMENT_PRIORITY.
+ * A user in several segments gets only the first one in RECOVERY_SEGMENT_PRIORITY. Every
+ * segment can fire with this order: subscription status is only trial/active (live
+ * access), past_due (excluded) or canceled, so any onboarded candidate outside
+ * "cancelled" has no subscription row; activated_never_paid is limited to people active
+ * in the last 30 days, so the inactive ones reach no_login_30d.
  *
  * Not built:
  *   - "Trial expired" (distinct from real churn): subscriptions keeps no transition
@@ -22,10 +26,10 @@ export const RECOVERY_SEGMENT_PRIORITY = [
   'cancelled',
   'heavy_free_usage',
   'visa_focused_no_conversion',
-  'activated_never_paid',
   'onboarded_no_resume',
-  'never_activated',
+  'activated_never_paid',
   'no_login_30d',
+  'never_activated',
 ] as const
 
 export type RevenueRecoverySegmentKey = (typeof RECOVERY_SEGMENT_PRIORITY)[number]
@@ -35,10 +39,10 @@ export const SEGMENT_LABELS: Record<RevenueRecoverySegmentKey, string> = {
   cancelled: 'Cancelled',
   heavy_free_usage: 'Heavy free usage',
   visa_focused_no_conversion: 'Visa/sponsorship-focused, not converted',
-  activated_never_paid: 'Activated, never paid',
   onboarded_no_resume: 'Onboarded, no resume',
-  never_activated: 'Signed up, never activated',
+  activated_never_paid: 'Activated, never paid (active in 30 days)',
   no_login_30d: 'Not seen in 30+ days',
+  never_activated: 'Signed up, never activated',
 }
 
 /** One row of public.recovery_candidates(). */
@@ -68,6 +72,10 @@ const NO_LOGIN_DAYS = 30
 
 type Rule = (c: RecoveryCandidate, nowMs: number) => boolean
 
+/** last_seen_at (later of last_active_at and last sign-in) within the last `days`. */
+const seenWithin = (c: RecoveryCandidate, nowMs: number, days: number) =>
+  c.last_seen_at !== null && (nowMs - new Date(c.last_seen_at).getTime()) / DAY_MS < days
+
 /** Every candidate already has no live access and isn't past_due (SQL). */
 export const SEGMENT_RULES: Record<RevenueRecoverySegmentKey, Rule> = {
   // A started/expired checkout over an hour old with nothing completed after it; the
@@ -77,12 +85,13 @@ export const SEGMENT_RULES: Record<RevenueRecoverySegmentKey, Rule> = {
   // Used every free search the admin-tunable freemium cap allows.
   heavy_free_usage: (c) => c.job_searches_used >= c.max_job_searches,
   visa_focused_no_conversion: (c) => c.requires_us_sponsorship === true,
-  activated_never_paid: (c) => c.onboarding_completed && !c.has_any_sub,
   onboarded_no_resume: (c) => c.onboarding_completed && !c.has_resume,
+  // Onboarded, never paid, and seen in the last 30 days.
+  activated_never_paid: (c, now) => c.onboarding_completed && !c.has_any_sub && seenWithin(c, now, NO_LOGIN_DAYS),
+  // Never seen at all is a data gap, not a signal: excluded.
+  no_login_30d: (c, now) => c.last_seen_at !== null && !seenWithin(c, now, NO_LOGIN_DAYS),
   never_activated: (c, now) =>
     !c.onboarding_completed && (now - new Date(c.created_at).getTime()) / DAY_MS >= MIN_NEVER_ACTIVATED_AGE_DAYS,
-  // Never seen at all is a data gap, not a signal: excluded.
-  no_login_30d: (c, now) => c.last_seen_at !== null && (now - new Date(c.last_seen_at).getTime()) / DAY_MS >= NO_LOGIN_DAYS,
 }
 
 /** Every segment the candidate matches, in priority order. */
