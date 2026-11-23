@@ -178,11 +178,17 @@ Deno.test('v2 token round-trip carries the normalized email, ids and scope', asy
 function withEnv(env: Record<string, string | undefined>, fn: () => Promise<void>) {
   return async () => {
     const saved = Object.fromEntries(Object.keys(env).map((k) => [k, Deno.env.get(k)]))
-    for (const [k, v] of Object.entries(env)) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v)
+    for (const [k, v] of Object.entries(env)) {
+      if (v === undefined) Deno.env.delete(k)
+      else Deno.env.set(k, v)
+    }
     try {
       await fn()
     } finally {
-      for (const [k, v] of Object.entries(saved)) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v)
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) Deno.env.delete(k)
+        else Deno.env.set(k, v)
+      }
     }
   }
 }
