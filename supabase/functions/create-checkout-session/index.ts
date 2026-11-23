@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
 import { getStripeProductId } from '../_shared/stripe-products.ts'
+import { checkCustomerOwnership } from '../_shared/stripe-customer-ownership.ts'
 import {
   cyclePeriodAmountCents,
   CYCLE_CONFIG,
@@ -60,7 +61,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, first_name, last_name, stripe_customer_id')
+      .select('id, auth_user_id, email, first_name, last_name, stripe_customer_id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -69,6 +70,28 @@ serve(async (req) => {
     }
 
     let customerId = profile.stripe_customer_id
+
+    // Defense in depth: only reuse a stored customer that belongs to this profile (see
+    // _shared/stripe-customer-ownership.ts). If it doesn't, or Stripe no longer has it, start
+    // a fresh customer for this profile below rather than checking out under someone else's.
+    if (customerId) {
+      let ownershipFailure: string | null = null
+      try {
+        const existing = await stripe.customers.retrieve(customerId)
+        const ownership = checkCustomerOwnership(existing, profile)
+        if (!ownership.ok) ownershipFailure = ownership.reason
+      } catch (err) {
+        if ((err as { code?: string })?.code !== 'resource_missing') throw err
+        ownershipFailure = 'customer not found in Stripe'
+      }
+      if (ownershipFailure) {
+        console.error('create-checkout-session: stored customer not usable for this profile; creating a new one', {
+          profileId: profile.id,
+          reason: ownershipFailure,
+        })
+        customerId = null
+      }
+    }
 
     if (!customerId) {
       const customer = await stripe.customers.create({
