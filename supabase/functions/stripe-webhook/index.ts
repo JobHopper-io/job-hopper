@@ -11,6 +11,8 @@ import {
   renderSubscriptionCanceled,
 } from '../_shared/email-templates.ts'
 import { getTransactionalFooterLinks } from '../_shared/unsubscribe-token.ts'
+import { markCheckoutCompleted, markCheckoutExpired } from '../_shared/checkout-attempts.ts'
+import { cancellationPatch } from '../_shared/subscription-cancellation.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -146,6 +148,7 @@ serve(async (req) => {
     // 'handled' is the legacy pre-idempotency value (logged before processing).
     const HANDLED_TYPES = new Set([
       'checkout.session.completed',
+      'checkout.session.expired',
       'customer.subscription.updated',
       'customer.subscription.deleted',
       'invoice.paid',
@@ -206,6 +209,11 @@ serve(async (req) => {
           hasSubscription: Boolean(session.subscription),
           hasCustomer: Boolean(customerId),
         })
+
+        // Close out the checkout_attempts row (upsert, so it's recorded even if the
+        // 'started' write was missed). First, so a failure here retries before any
+        // other side effect has run.
+        await markCheckoutCompleted(supabaseAdmin, profileId, session.id, new Date())
 
         if (customerId) {
           const { error: profileUpdateError } = await supabaseAdmin
@@ -393,6 +401,14 @@ serve(async (req) => {
         break
       }
 
+      case 'checkout.session.expired': {
+        // Stripe expires an unpaid session (24h by default): the abandoned-checkout signal.
+        const session = event.data.object as Stripe.Checkout.Session
+        const expired = await markCheckoutExpired(supabaseAdmin, session.id)
+        console.log(`${LOG_PREFIX} checkout.session.expired`, { sessionId: session.id, markedExpired: expired })
+        break
+      }
+
       case 'customer.subscription.updated': {
         const stripeSub = event.data.object as Stripe.Subscription
         const expanded = await stripe.subscriptions.retrieve(stripeSub.id, {
@@ -459,6 +475,7 @@ serve(async (req) => {
           .update({
             status: subscriptionStatus,
             current_period_ends_at: currentPeriodEnd,
+            ...cancellationPatch(expanded),
           })
           .eq('id', existingSub.id)
         assertOk(subUpdateError, 'customer.subscription.updated: subscriptions update')
@@ -660,7 +677,7 @@ serve(async (req) => {
         assertOk(deletedFindError, 'customer.subscription.deleted: load subscription')
         const { error: canceledUpdateError } = await supabaseAdmin
           .from('subscriptions')
-          .update({ status: 'canceled' })
+          .update({ status: 'canceled', ...cancellationPatch(stripeSub) })
           .eq('stripe_subscription_id', stripeSub.id)
         assertOk(canceledUpdateError, 'customer.subscription.deleted: set status canceled')
         console.log(`${LOG_PREFIX} customer.subscription.deleted: subscriptions row marked canceled`, {

@@ -48,6 +48,12 @@ interface GrowthDashboardCounts {
   }
 }
 
+/** public.cancellation_dashboard_counts() (migration 20261123120000). */
+interface CancellationDashboardCounts {
+  by_feedback: Record<string, number>
+  churn_30d: { canceled: number; ended: number; pending_period_end: number; canceled_no_date: number }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -285,6 +291,10 @@ serve(async (req) => {
     if (countsError) throw new Error(`Failed to load growth_dashboard_counts: ${countsError.message}`)
     const counts = countsData as GrowthDashboardCounts
 
+    const { data: cancellationData, error: cancellationError } = await supabaseAdminClient.rpc('cancellation_dashboard_counts')
+    if (cancellationError) throw new Error(`Failed to load cancellation_dashboard_counts: ${cancellationError.message}`)
+    const cancellation = cancellationData as CancellationDashboardCounts
+
     // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
     const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
       supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
@@ -369,6 +379,18 @@ serve(async (req) => {
           positiveReplies: counts.funnel.positive_replies,
           outboundSignups: counts.funnel.outbound_signups,
           outboundPaid: counts.funnel.outbound_paid,
+        },
+        cancellations: {
+          // Portal feedback per canceled / scheduled-to-cancel B2C subscription; 'none' = no feedback.
+          byFeedback: Object.entries(cancellation.by_feedback)
+            .map(([feedback, count]) => ({ feedback, count }))
+            .sort((a, b) => b.count - a.count),
+          churn30d: {
+            canceled: cancellation.churn_30d.canceled,
+            ended: cancellation.churn_30d.ended,
+            pendingPeriodEnd: cancellation.churn_30d.pending_period_end,
+            canceledNoDate: cancellation.churn_30d.canceled_no_date,
+          },
         },
         institutional: {
           activeOpportunities,

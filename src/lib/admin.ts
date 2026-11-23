@@ -99,6 +99,13 @@ export interface GrowthDashboardReport {
     outboundSignups: number
     outboundPaid: number
   }
+  /** B2C subscriptions only (university licenses excluded). */
+  cancellations: {
+    /** Canceled or scheduled-to-cancel subscriptions by Stripe portal feedback; 'none' = no feedback given. */
+    byFeedback: { feedback: string; count: number }[]
+    /** By canceled_at (when cancellation was requested). canceledNoDate: canceled before the field existed. */
+    churn30d: { canceled: number; ended: number; pendingPeriodEnd: number; canceledNoDate: number }
+  }
   institutional: {
     activeOpportunities: number
     trialOrganizations: number

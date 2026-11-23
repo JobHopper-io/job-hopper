@@ -10,10 +10,10 @@
  *     that ended without converting is indistinguishable from a subscription that was
  *     briefly active then canceled. Needs new instrumentation (e.g. an audit trail of
  *     every real transition, not just reconciliation drift corrections).
- *   - "Checkout abandoned": stripe-webhook only subscribes to checkout.session.completed
- *     / customer.subscription.updated / customer.subscription.deleted -- no
- *     checkout.session.expired handler and no client-side "began checkout" event
- *     anywhere, so an abandoned Stripe Checkout session is invisible to this app today.
+ *   - "Checkout abandoned": now tracked in checkout_attempts (create-checkout-session
+ *     writes 'started'; stripe-webhook marks 'completed' or 'expired' on
+ *     checkout.session.expired), but no segment reads it yet. Expired rows need the
+ *     Stripe endpoint subscribed to checkout.session.expired.
  */
 
 export type RevenueRecoverySegmentKey =

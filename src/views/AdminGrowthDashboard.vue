@@ -76,6 +76,25 @@
         </table>
       </section>
 
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Cancellations
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          From Stripe, recorded since 2026-11-23. {{ report.cancellations.churn30d.canceledNoDate.toLocaleString() }}
+          earlier cancellations have no date or reason.
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in cancellationRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- Acquisition (institutional outbound) -->
       <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
@@ -313,6 +332,21 @@ const funnelRows = computed(() => {
     { label: 'Positive replies', value: f.positiveReplies, hint: 'Interested, Meeting requested, More information' },
     { label: 'Signups from outbound', value: f.outboundSignups, hint: 'utm_source email_outbound, or matched to a lead' },
     { label: 'Paid from outbound', value: f.outboundPaid, hint: 'active subscription' },
+  ]
+})
+
+const cancellationRows = computed(() => {
+  const c = report.value?.cancellations
+  if (!c) return []
+  return [
+    { label: 'Canceled, last 30 days', value: c.churn30d.canceled, hint: 'cancellation requested in the last 30 days' },
+    { label: 'Ended', value: c.churn30d.ended, hint: 'of those, subscription already ended' },
+    { label: 'Ending at period end', value: c.churn30d.pendingPeriodEnd, hint: 'of those, still running until period end' },
+    ...c.byFeedback.map((f) => ({
+      label: `Reason: ${f.feedback === 'none' ? 'no feedback' : f.feedback.replace(/_/g, ' ')}`,
+      value: f.count,
+      hint: 'all time, Stripe portal feedback',
+    })),
   ]
 })
 

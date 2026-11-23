@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
 import { getStripeProductId } from '../_shared/stripe-products.ts'
 import { checkCustomerOwnership } from '../_shared/stripe-customer-ownership.ts'
+import { recordCheckoutStarted } from '../_shared/checkout-attempts.ts'
 import {
   cyclePeriodAmountCents,
   CYCLE_CONFIG,
@@ -220,6 +221,9 @@ serve(async (req) => {
       metadata: { profile_id: profile.id },
       subscription_data: subscriptionData,
     })
+
+    // Abandoned-checkout tracking; best effort, never blocks returning the checkout URL.
+    await recordCheckoutStarted(supabaseAdmin, profile.id, session.id)
 
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),
