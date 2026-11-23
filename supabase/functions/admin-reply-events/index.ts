@@ -1,7 +1,9 @@
-// Admin-only read of reply_events for /admin/reply-classification: real replies with
-// their classify-replies output, joined back to the source institutional lead (org name,
-// category, campaign). List-only -- no mutation, classification/exclusion writes are
-// classify-replies's job. Same admin-role-check shape as admin-institutional-leads.
+// Admin-only reply_events for /admin/reply-classification: replies with their
+// classify-replies output (class, extracted need, draft, owner, next action), joined back
+// to the source institutional lead. The only write is action 'mark_handled' (sets
+// handled_at); classification/exclusion writes are classify-replies's job. Drafts are
+// shown for copying, never sent from here. Same admin-role-check shape as
+// admin-institutional-leads.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 
@@ -10,10 +12,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const REPLY_COLUMNS =
-  'id, from_email, raw_subject, raw_body, received_at, reply_class, processed, institutional_lead_id, institutional_leads(organization_name, category, campaign)'
+const REPLY_COLUMNS = [
+  'id, from_email, raw_subject, raw_body, received_at, reply_class, processed, institutional_lead_id, prospect_id, profile_id',
+  'audience, extracted, draft_response, draft_generated_at, next_action, next_action_due, handled_at',
+  'classify_attempts, last_classify_error, needs_manual_review, assigned_to',
+  'institutional_leads(organization_name, category, campaign)',
+  'owner:profiles!reply_events_assigned_to_fkey(first_name, last_name, email)',
+].join(', ')
+
+type View = 'all' | 'open' | 'overdue' | 'manual_review'
 
 interface RequestBody {
+  action?: 'list' | 'mark_handled'
+  replyId?: string
+  view?: View
   replyClass?: string
   search?: string
   limit?: number
@@ -98,7 +110,34 @@ serve(async (req) => {
       })
     }
 
+    if (body.action === 'mark_handled') {
+      if (!body.replyId || !/^[0-9a-f-]{36}$/i.test(body.replyId)) {
+        return new Response(JSON.stringify({ error: 'replyId is required' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+      const { data: handled, error: handledError } = await serviceClient
+        .from('reply_events')
+        .update({ handled_at: new Date().toISOString() })
+        .eq('id', body.replyId)
+        .is('handled_at', null)
+        .select('id, handled_at')
+      if (handledError) {
+        console.error('admin-reply-events: mark handled failed', handledError)
+        return new Response(JSON.stringify({ error: 'Failed to mark handled' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        })
+      }
+      return new Response(JSON.stringify({ handled: handled?.[0] ?? null }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
     const replyClass = (body.replyClass ?? '').trim()
+    const view: View = body.view === 'open' || body.view === 'overdue' || body.view === 'manual_review' ? body.view : 'all'
     const search = (body.search ?? '').trim()
     const limit = Math.min(Math.max(body.limit ?? 50, 1), 200)
     const offset = Math.max(body.offset ?? 0, 0)
@@ -110,6 +149,9 @@ serve(async (req) => {
       .range(offset, offset + limit - 1)
 
     if (replyClass) query = query.eq('reply_class', replyClass)
+    if (view === 'open' || view === 'overdue') query = query.is('handled_at', null).not('next_action', 'is', null)
+    if (view === 'overdue') query = query.lt('next_action_due', new Date().toISOString())
+    if (view === 'manual_review') query = query.eq('needs_manual_review', true)
     if (search) query = query.ilike('from_email', `%${search}%`)
 
     const { data: replies, error: repliesError, count } = await query

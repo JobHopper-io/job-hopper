@@ -276,12 +276,41 @@ interface ListInstitutionalLeadsResult {
   total: number
 }
 
+/** _shared/reply-assist.ts ReplyExtraction. */
+export interface ReplyExtraction {
+  need: string | null
+  roles: string[]
+  locations: string[]
+  timeline: string | null
+  question: string | null
+  sentiment: 'positive' | 'neutral' | 'negative'
+}
+
+// prospect_id (20261121130000) and the reply-handling columns (20261124130000) are typed by hand until
+// src/types/supabase.ts is regenerated against a DB that has them.
 export type AdminReplyEventRow = Pick<
   ReplyEvent,
   'id' | 'from_email' | 'raw_subject' | 'raw_body' | 'received_at' | 'reply_class' | 'processed' | 'institutional_lead_id'
 > & {
+  prospect_id: string | null
+  profile_id: string | null
+  audience: 'b2b' | 'b2c' | null
+  extracted: ReplyExtraction | null
+  /** Suggested reply for a person to review and send by hand; never sent automatically. */
+  draft_response: string | null
+  draft_generated_at: string | null
+  next_action: string | null
+  next_action_due: string | null
+  handled_at: string | null
+  classify_attempts: number
+  last_classify_error: string | null
+  needs_manual_review: boolean
+  assigned_to: string | null
+  owner: { first_name: string | null; last_name: string | null; email: string } | null
   institutional_leads: Pick<InstitutionalLead, 'organization_name' | 'category' | 'campaign'> | null
 }
+
+export type ReplyEventsView = 'all' | 'open' | 'overdue' | 'manual_review'
 
 interface ListReplyEventsResult {
   replies: AdminReplyEventRow[]
@@ -584,7 +613,15 @@ export const adminAPI = {
     return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
   },
 
+  /** Sets handled_at on a reply (no-op if it's already handled). */
+  async markReplyHandled(replyId: string): Promise<{ data: { id: string; handled_at: string } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-reply-events', { body: { action: 'mark_handled', replyId } })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: (data as { handled: { id: string; handled_at: string } | null }).handled, error: null }
+  },
+
   async listReplyEvents(params: {
+    view?: ReplyEventsView
     replyClass?: string
     search?: string
     limit?: number
