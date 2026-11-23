@@ -13,6 +13,8 @@ export function buildPayload(parsed, message) {
     subject: parsed.subject ?? message.headers.get("subject") ?? "",
     body: parsed.text ?? parsed.html ?? "",
     receivedAt: new Date().toISOString(),
+    // reply-ingest ignores a second delivery of the same Message-ID.
+    messageId: parsed.messageId ?? message.headers.get("message-id") ?? null,
   };
 }
 

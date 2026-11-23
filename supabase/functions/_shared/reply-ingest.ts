@@ -3,9 +3,12 @@
  * reply_events, matched to whoever we emailed. Kept here so tests can drive it without a
  * server or a DB.
  *
- * The sender is matched against both institutional_leads.contact_email (organization
- * leads) and prospects.email_normalized (person-level leads); either, both or neither may
- * match, and each match is stored on the row.
+ * The sender is matched against institutional_leads.contact_email (organization leads),
+ * prospects.email_normalized (person-level leads) and profiles.email (signed-up users);
+ * any, all or none may match, and each match is stored on the row.
+ *
+ * Idempotent on the email's Message-ID: a re-delivered email (same messageId) returns the
+ * existing row instead of creating a second one. Without a messageId every POST is new.
  */
 
 import { normalizeEmail } from "./unsubscribe-token.ts"
@@ -15,11 +18,15 @@ export interface ReplyIngestBody {
   subject?: string
   body?: string
   receivedAt?: string
+  /** The email's Message-ID header. */
+  messageId?: string
 }
 
 export interface ReplyEventInsert {
   institutional_lead_id: string | null
   prospect_id: string | null
+  profile_id: string | null
+  message_id: string | null
   from_email: string
   raw_subject: string | null
   raw_body: string | null
@@ -32,8 +39,18 @@ export interface ReplyIngestDeps {
   findLeadIdByEmail: (fromEmail: string) => Promise<string | null>
   /** Prospect whose email_normalized equals the (already normalized) address. */
   findProspectIdByEmail: (emailNormalized: string) => Promise<string | null>
-  insertReply: (row: ReplyEventInsert) => Promise<string>
+  /** Profile whose email equals the (already normalized) address. */
+  findProfileIdByEmail: (emailNormalized: string) => Promise<string | null>
+  /** Inserts the row; with a message_id that already exists, inserts nothing and returns
+   * the existing row's id with duplicate: true. */
+  insertReply: (row: ReplyEventInsert) => Promise<{ id: string; duplicate: boolean }>
   now?: () => Date
+}
+
+/** "<abc@mail.x>" -> "abc@mail.x"; null when absent or blank. */
+export function normalizeMessageId(raw: string | undefined | null): string | null {
+  const t = raw?.trim().replace(/^<+|>+$/g, '').trim()
+  return t ? t.slice(0, 998) : null
 }
 
 const corsHeaders = {
@@ -63,10 +80,13 @@ export function createReplyIngestHandler(deps: ReplyIngestDeps): (req: Request) 
 
     let leadId: string | null
     let prospectId: string | null
+    let profileId: string | null
+    const normalized = normalizeEmail(fromEmail)
     try {
-      ;[leadId, prospectId] = await Promise.all([
+      ;[leadId, prospectId, profileId] = await Promise.all([
         deps.findLeadIdByEmail(fromEmail),
-        normalizeEmail(fromEmail) ? deps.findProspectIdByEmail(normalizeEmail(fromEmail)) : Promise.resolve(null),
+        normalized ? deps.findProspectIdByEmail(normalized) : Promise.resolve(null),
+        normalized ? deps.findProfileIdByEmail(normalized) : Promise.resolve(null),
       ])
     } catch (err) {
       console.error("reply-ingest: failed to look up the sender", { error: err instanceof Error ? err.message : String(err) })
@@ -74,15 +94,18 @@ export function createReplyIngestHandler(deps: ReplyIngestDeps): (req: Request) 
     }
 
     try {
-      const id = await deps.insertReply({
+      const { id, duplicate } = await deps.insertReply({
         institutional_lead_id: leadId,
         prospect_id: prospectId,
+        profile_id: profileId,
+        message_id: normalizeMessageId(body.messageId),
         from_email: fromEmail,
         raw_subject: body.subject ?? null,
         raw_body: body.body ?? null,
         received_at: body.receivedAt ?? (deps.now?.() ?? new Date()).toISOString(),
       })
-      return json({ id, matchedLeadId: leadId, matchedProspectId: prospectId }, 200)
+      // 200 for a duplicate too, so the email worker doesn't retry it.
+      return json({ id, duplicate, matchedLeadId: leadId, matchedProspectId: prospectId, matchedProfileId: profileId }, 200)
     } catch (err) {
       console.error("reply-ingest: failed to insert reply_events row", { error: err instanceof Error ? err.message : String(err) })
       return json({ error: "Failed to store reply" }, 500)

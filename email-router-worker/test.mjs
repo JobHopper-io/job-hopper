@@ -19,4 +19,9 @@ assert.equal(p.subject, "hdr subj");
 assert.equal(p.body, "<p>hi</p>");
 
 assert.ok(!Number.isNaN(Date.parse(p.receivedAt)));
+
+// Message-ID: parsed first, then the raw header, else null.
+assert.equal(buildPayload({ messageId: "<a1@mail.x>" }, msg).messageId, "<a1@mail.x>");
+assert.equal(buildPayload({}, { from: "e@x.com", headers: new Map([["message-id", "<h2@mail.x>"]]) }).messageId, "<h2@mail.x>");
+assert.equal(buildPayload({}, msg).messageId, null);
 console.log("ok");
