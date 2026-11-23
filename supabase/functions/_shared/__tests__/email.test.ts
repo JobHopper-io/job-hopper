@@ -112,7 +112,7 @@ Deno.test('check error: transactional is still sent (fail open)', async () => {
 Deno.test('blocked send is still logged to email_events as failed', async () => {
   const inserted: Record<string, unknown>[] = []
   const supabase = {
-    from: (_table: string) => ({
+    from: () => ({
       insert: (row: unknown) => {
         inserted.push(row as Record<string, unknown>)
         return Promise.resolve({ error: null })
@@ -134,13 +134,19 @@ function withEnvAndFetch(env: Record<string, string | undefined>, fetchImpl: typ
   return async () => {
     const saved = Object.fromEntries(Object.keys(env).map((k) => [k, Deno.env.get(k)]))
     const savedFetch = globalThis.fetch
-    for (const [k, v] of Object.entries(env)) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v)
+    for (const [k, v] of Object.entries(env)) {
+      if (v === undefined) Deno.env.delete(k)
+      else Deno.env.set(k, v)
+    }
     globalThis.fetch = fetchImpl
     try {
       await fn()
     } finally {
       globalThis.fetch = savedFetch
-      for (const [k, v] of Object.entries(saved)) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v)
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) Deno.env.delete(k)
+        else Deno.env.set(k, v)
+      }
     }
   }
 }
@@ -202,7 +208,7 @@ Deno.test('transactional send carries no List-Unsubscribe headers', async () => 
 Deno.test('logged row carries to_email_normalized and campaign', async () => {
   const inserted: Record<string, unknown>[] = []
   const supabase = {
-    from: (_table: string) => ({
+    from: () => ({
       insert: (row: unknown) => (inserted.push(row as Record<string, unknown>), Promise.resolve({ error: null })),
     }),
   }

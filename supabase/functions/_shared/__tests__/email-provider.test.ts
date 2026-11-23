@@ -38,7 +38,8 @@ Deno.test('sendEmailViaProvider passes headers through as Mailtrap\'s `headers` 
     await sendEmailViaProvider({ to: 'a@example.com', subject: 's', text: 't' })
   } finally {
     globalThis.fetch = savedFetch
-    savedToken === undefined ? Deno.env.delete('MAILTRAP_API_TOKEN') : Deno.env.set('MAILTRAP_API_TOKEN', savedToken)
+    if (savedToken === undefined) Deno.env.delete('MAILTRAP_API_TOKEN')
+    else Deno.env.set('MAILTRAP_API_TOKEN', savedToken)
   }
   assertEquals(bodies[0].headers, {
     'List-Unsubscribe': '<https://x/unsubscribe-email?token=t>',
