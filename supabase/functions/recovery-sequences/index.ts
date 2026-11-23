@@ -46,8 +46,8 @@ serve(async (req) => {
       skipped: result.skipped,
       stopped: result.stopped,
     })
-    const { planned: _planned, ...summary } = result
-    return new Response(JSON.stringify(summary), { headers: { 'Content-Type': 'application/json' }, status: 200 })
+    // planned (masked emails) stays out of the response, like the log line above.
+    return new Response(JSON.stringify({ ...result, planned: undefined }), { headers: { 'Content-Type': 'application/json' }, status: 200 })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`${LOG} run failed`, { error: message })
