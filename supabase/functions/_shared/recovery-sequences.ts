@@ -160,7 +160,7 @@ export interface RecoveryRunResult {
   mode: 'preview' | 'send'
   candidates: number
   bySegment: Partial<Record<RevenueRecoverySegmentKey, { members: number; due: number }>>
-  /** preview: everyone due now (ignoring the per-run cap); send: everyone attempted. */
+  /** preview: everyone due now who'd pass the pre-send check (ignoring the per-run cap); send: everyone attempted. */
   planned: PlannedSend[]
   sent: number
   failed: number
@@ -171,7 +171,8 @@ export interface RecoveryRunResult {
 const bump = <K extends string>(m: Partial<Record<K, number>>, k: K, by = 1) => { m[k] = (m[k] ?? 0) + by }
 
 /**
- * preview: reads only, writes and sends nothing. send: stops finished sequences, then
+ * preview: reads only (including each due person's send state), writes and sends
+ * nothing. send: stops finished sequences, then
  * sends up to maxSends, re-checking each profile right before its send.
  */
 export async function runRecovery(
@@ -231,7 +232,17 @@ export async function runRecovery(
   })
 
   if (opts.mode === 'preview') {
-    result.planned = due.map(toPlanned)
+    // Same state check as a send (read-only), so the preview only lists people who would
+    // actually get an email: no consent, unsubscribed, suppressed etc. are counted as skips.
+    for (const d of due) {
+      const reason = blockReason(await deps.sendState(d.candidate.profile_id))
+      if (reason) {
+        bump(result.skipped, reason)
+        result.bySegment[d.segment]!.due -= 1
+      } else {
+        result.planned.push(toPlanned(d))
+      }
+    }
     return result
   }
 
@@ -243,6 +254,7 @@ export async function runRecovery(
     const key = sequenceKey(d.segment)
     const reason = blockReason(await deps.sendState(d.candidate.profile_id))
     if (reason) {
+      result.bySegment[d.segment]!.due -= 1
       // Only a started sequence (stage 2 due) has something to stop.
       if (d.stage === 2 && isStopReason(reason)) {
         await deps.stopSequence(d.candidate.profile_id, key, reason)

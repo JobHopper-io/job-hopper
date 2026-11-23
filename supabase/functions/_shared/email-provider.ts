@@ -1,6 +1,10 @@
 /**
  * Email provider abstraction: stable interface for sending email.
  * This implementation uses the Mailtrap Email Sending HTTP API.
+ *
+ * EMAIL_PROVIDER=log (local demos/tests only): never calls Mailtrap; logs the recipient,
+ * subject and campaign and reports success with a "log-" message id. Unset or
+ * "mailtrap": real sends.
  */
 
 export interface SendEmailParams {
@@ -13,6 +17,8 @@ export interface SendEmailParams {
   /** Extra MIME headers, e.g. List-Unsubscribe. Sent as Mailtrap's `headers` object
    * (Record<string, string>, per the official mailtrap-nodejs SDK types). */
   headers?: Record<string, string>
+  /** email_events.campaign, shown by the log provider. */
+  campaign?: string | null
 }
 
 export interface SendEmailResult {
@@ -40,6 +46,11 @@ export function parseFromAddress(raw: string, fallbackName: string): { email: st
 }
 
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
+  if (Deno.env.get('EMAIL_PROVIDER') === 'log') {
+    // Full address on purpose: this mode exists to see who would have been emailed.
+    console.log('[email-provider:log] not sent', { to: params.to, subject: params.subject, campaign: params.campaign ?? null, category: params.category ?? null })
+    return { messageId: `log-${crypto.randomUUID()}`, success: true }
+  }
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN')
   const url = (Deno.env.get('MAILTRAP_URL') ?? DEFAULT_MAILTRAP_URL).replace(/\/+$/, '')
   const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? 'no-reply@job-hopper.io'

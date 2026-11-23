@@ -47,3 +47,24 @@ Deno.test('sendEmailViaProvider passes headers through as Mailtrap\'s `headers` 
   assertEquals('headers' in bodies[1], false)
   assertEquals('headers' in bodies[2], false)
 })
+
+Deno.test('EMAIL_PROVIDER=log never calls Mailtrap and reports a log- message id', async () => {
+  const realFetch = globalThis.fetch
+  let fetched = 0
+  globalThis.fetch = (() => (fetched++, Promise.reject(new Error('no network')))) as typeof fetch
+  const logged: unknown[] = []
+  const realLog = console.log
+  console.log = (...args: unknown[]) => logged.push(args)
+  Deno.env.set('EMAIL_PROVIDER', 'log')
+  try {
+    const r = await sendEmailViaProvider({ to: 'a@example.test', subject: 'Hi', campaign: 'recovery_cancelled_s1' })
+    assertEquals(r.success, true)
+    assertEquals(r.messageId?.startsWith('log-'), true)
+    assertEquals(fetched, 0)
+    assertEquals(JSON.stringify(logged).includes('recovery_cancelled_s1'), true)
+  } finally {
+    Deno.env.delete('EMAIL_PROVIDER')
+    globalThis.fetch = realFetch
+    console.log = realLog
+  }
+})

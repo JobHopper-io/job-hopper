@@ -332,7 +332,7 @@ export interface RecoveryRunResult {
   mode: 'preview' | 'send'
   candidates: number
   bySegment: Partial<Record<RevenueRecoverySegmentKey, { members: number; due: number }>>
-  /** preview: everyone due now (before the per-run cap); send: everyone attempted. */
+  /** preview: everyone due now who'd pass the pre-send check (before the per-run cap); send: everyone attempted. */
   planned: { profileId: string; emailMasked: string | null; segment: RevenueRecoverySegmentKey; stage: 1 | 2; campaign: string }[]
   sent: number
   failed: number

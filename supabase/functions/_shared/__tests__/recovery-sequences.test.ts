@@ -108,7 +108,16 @@ Deno.test('auto-send off: the scheduled run only previews; nothing is claimed, s
   const h = harness({ candidates: [cancelled('a'), cancelled('b')] })
   const result = await runRecovery({ mode: scheduledRunMode({ recovery_auto_send: false }), maxSends: 25, now: NOW }, h.deps)
   assertEquals(result.planned.map((p) => [p.emailMasked, p.segment, p.stage]), [['a***@example.com', 'cancelled', 1], ['b***@example.com', 'cancelled', 1]])
-  assertEquals(h.sent.length + h.stops.length + h.rows.length + h.stateCalls.length, 0)
+  assertEquals(h.sent.length + h.stops.length + h.rows.length, 0)
+})
+
+Deno.test('preview lists only people who would pass the pre-send check', async () => {
+  const h = harness({ candidates: [cancelled('a'), cancelled('b')], state: (id) => ({ ...OK, marketing_consent: id === 'a' }) })
+  const result = await runRecovery({ mode: 'preview', maxSends: 25, now: NOW }, h.deps)
+  assertEquals(result.planned.map((p) => p.profileId), ['a'])
+  assertEquals(result.skipped.no_consent, 1)
+  assertEquals(result.bySegment.cancelled, { members: 2, due: 1 })
+  assertEquals(h.sent.length + h.stops.length + h.rows.length, 0)
 })
 
 Deno.test('send: claims, sends, marks sent with the email_events id; a second run sends nothing', async () => {

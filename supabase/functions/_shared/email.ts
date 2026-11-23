@@ -127,6 +127,7 @@ export async function sendEmail(
       category: options.category,
       metadata: options.metadata,
       headers: options.kind === "marketing" ? listUnsubscribeHeaders(options.unsubscribeUrl!) : undefined,
+      campaign: options.campaign ?? null,
     })
 
   let emailEventId: string | null = null
