@@ -106,13 +106,18 @@
   },
   {
     "source_doc": "privacy",
-    "title": "How We Use Your Information",
+    "title": "SMS Consent",
+    "content": "SMS opt-in or phone numbers for the purpose of SMS are not shared with any third\n\nparties or affiliate companies for marketing purposes."
+  },
+  {
+    "source_doc": "privacy",
+    "title": "How We Process Your Information",
     "content": "We use data to:\n\n- Match you with jobs\n- Improve recommendations\n- Send notifications\n- Process payments\n- Improve product performance\n- Provide customer support"
   },
   {
     "source_doc": "privacy",
-    "title": "Data Sharing",
-    "content": "We do NOT:\n\n- Sell personal data\n- Share with advertisers\n- Sell user profiles\n\nWe may share:\n\n- With service providers (Stripe, hosting, analytics)\n- When legally required"
+    "title": "When and With Whom We Share Your Personal Information",
+    "content": "No mobile information will be shared with third parties/affiliates for marketing/promotional purposes.\n\nWe do NOT:\n\n- Sell personal data\n- Share with advertisers\n- Sell user profiles\n\nWe may share:\n\n- With service providers (Stripe, hosting, analytics)\n- When legally required"
   },
   {
     "source_doc": "privacy",
@@ -192,7 +197,7 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Is the sponsorship badge based on real government data or a guess?",
-    "content": "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
+    "content": "The sponsorship badge on Core is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
   },
   {
     "source_doc": "chatbot_kb",
@@ -207,47 +212,47 @@
   {
     "source_doc": "chatbot_kb",
     "title": "Does upgrading to Core or Premium improve my actual chances of getting sponsored?",
-    "content": "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
+    "content": "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge, and Premium adds real filing-data-backed scoring instead of the heuristic, plus Sponsor Watch alerts. Better information, not better odds."
   },
   {
     "source_doc": "chatbot_kb",
     "title": "Why can't you just guarantee sponsorship-friendly jobs only?",
-    "content": "Because sponsorship willingness isn't fully knowable in advance — even employers who've sponsored before don't always do so for every role or every year. Instead we extract and score real signal: on Free/Core that's the job posting text, employer size, and industry; on Premium it's actual DOL and USCIS H-1B filing records for that employer (petitions filed, approved, denied). Neither is a promise, but it's real extracted data, not a guess — use it to prioritize where you apply."
+    "content": "Because sponsorship willingness isn't fully knowable in advance — even employers who've sponsored before don't always do so for every role or every year. Instead we extract and score real signal: on Core that's the job posting text, employer size, and industry; on Premium it's actual DOL and USCIS H-1B filing records for that employer (petitions filed, approved, denied). Neither is a promise, but it's real extracted data, not a guess — use it to prioritize where you apply."
   },
   {
     "source_doc": "chatbot_kb",
-    "title": "I've been on Free for a while — what am I actually missing?",
-    "content": "The biggest gap is automation: on Free you're manually re-running a capped number of searches, while Core runs your search automatically every day and emails you a digest. You're also seeing teaser versions of the sponsorship badge, Hiring Intel, and Resume Advice on Free — Core unlocks all three fully, plus the application tracker."
+    "title": "Is there a free plan?",
+    "content": "No — there's no Free plan. Job-Hopper has two plans, Core ($29.99/month) and Premium ($49.99/month), and both start with a 14-day free trial. You add a card when you start, you aren't charged until the trial ends, and if you cancel before then you pay nothing. If your university provides Job-Hopper, you don't need to pick a plan at all."
   },
   {
     "source_doc": "chatbot_kb",
-    "title": "Is it worth upgrading if I'm only casually looking?",
-    "content": "If you're not actively searching, Free is genuinely fine — no card required, no pressure, and you can see match quality without committing. Core makes the most sense once you're actively applying and want the process running in the background instead of manually checking in."
+    "title": "Is it worth paying if I'm only casually looking?",
+    "content": "Use the 14-day free trial to decide. It's the full product, so you can see how relevant your matches are before you pay anything, and you can cancel before the trial ends without being charged. Core makes the most sense once you're actively applying and want your search running every day in the background."
   },
   {
     "source_doc": "chatbot_kb",
-    "title": "What's the single biggest reason to upgrade to Core?",
-    "content": "Automation. Free requires you to manually trigger a limited number of searches; Core runs unlimited automated daily search and emails you when something good shows up, so you're not the one doing the searching anymore."
+    "title": "What's the difference between Core and Premium?",
+    "content": "Core ($29.99/month) runs your job search automatically every day with an email digest, and includes the full sponsorship badge, full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice. Premium ($49.99/month) adds the sponsorship layer: Real Sponsorship Score built on actual DOL/USCIS filing data, Sponsor Watch alerts when an employer's H-1B filing activity changes, and more hiring contacts per job."
   },
   {
     "source_doc": "chatbot_kb",
     "title": "Do you offer discounts, annual plans, or a cheaper tier?",
-    "content": "Today Core is a flat $29/month, billed monthly, with no long-term commitment — cancel anytime. There's no annual plan currently offered."
+    "content": "Yes — you can pay monthly, quarterly (10% off), or yearly (20% off) on both Core and Premium. There's no cheaper tier below Core, but both plans start with a 14-day free trial. We don't offer coupon codes through the chat."
   },
   {
     "source_doc": "chatbot_kb",
-    "title": "If I upgrade and it's not for me, how easy is it to back out?",
-    "content": "Cancel anytime from your account settings — a couple of clicks. You keep access through the end of your current billing period, then drop back to Free rather than losing your account or data."
+    "title": "If I start a plan and it's not for me, how easy is it to back out?",
+    "content": "Cancel anytime from your billing settings — a couple of clicks. If you cancel during the 14-day trial you aren't charged. After that, you keep access until the end of the period you've paid for. Your account and data aren't deleted, but you'll need an active plan to use your dashboard again."
   },
   {
     "source_doc": "chatbot_kb",
     "title": "What exactly does Resume Advice do?",
-    "content": "It reviews your resume against the roles you're targeting and gives feedback to improve alignment. Free gives a teaser of this; Core unlocks full Resume Advice. There are also separate one-time paid add-ons — a full resume upgrade and per-job resume tailoring — available on any plan."
+    "content": "It reviews your resume against the roles you're targeting and gives feedback to improve alignment. Full Resume Advice is included in Core and Premium. There are also two one-time extras for a specific job: Per-Job Resume Advice and Per-Job Resume Tailoring, $4.49 each."
   },
   {
     "source_doc": "chatbot_kb",
     "title": "Is the application tracker just a list, or does it do more?",
-    "content": "It tracks status per job — saved, applied, interviewing, and so on — so your search stays organized in one place instead of scattered across email and spreadsheets. It's included in Core; on Free it's not available, though your data isn't deleted if you're on Free after having Core — it's just not visible until you upgrade again."
+    "content": "It tracks status per job — saved, applied, interviewing, and so on — so your search stays organized in one place instead of scattered across email and spreadsheets. It's included in Core and Premium. If your plan ends, your tracked jobs aren't deleted — they're there again when you restart a plan."
   },
   {
     "source_doc": "chatbot_kb",
@@ -261,8 +266,8 @@
   },
   {
     "source_doc": "chatbot_kb",
-    "title": "Why was I charged and I thought I was on Free?",
-    "content": "This sounds like an account/billing-specific question — I can't look up your account details, but support can check your subscription status directly. Reach out at support@job-hopper.io and they'll sort it out."
+    "title": "Why was I charged? I thought I was on a free trial.",
+    "content": "The 14-day free trial turns into a paid plan automatically when it ends unless you cancel before then. Beyond that, this is an account/billing-specific question — I can't look up your account details, but support can check your subscription status directly. Reach out at support@job-hopper.io and they'll sort it out."
   },
   {
     "source_doc": "chatbot_kb",
@@ -321,7 +326,7 @@
   {
     "source_doc": "kb_master",
     "title": "KB-0008 Plans and Pricing Overview",
-    "content": "This article explains Job-Hopper's plans, pricing, and subscription tiers.\nFree ($0, no card) gives you 3 manual searches and teaser insights. Core ($29/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.\n\nJob-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be verified on the official pricing page or live checkout before quoting.\n\nFree is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Core is $29/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Premium is $49/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type. Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.",
+    "content": "Job-Hopper plans and pricing: there are two plans and no Free plan. Core is $29.99/month and Premium is $49.99/month, and both start with a 14-day free trial (card required, no charge if you cancel before it ends). You can pay monthly, quarterly (10% off), or yearly (20% off). Core gives you unlimited automated daily matching with an email digest, full insights, hiring manager contact, Resume Advice, the application tracker, and interview practice. Premium adds Real Sponsorship Score, Sponsor Watch, and more hiring contacts per job.\n\nJob-Hopper has two plans, Core ($29.99/month) and Premium ($49.99/month). There is no Free plan. Both plans start with a 14-day free trial (card required) and can be billed monthly, quarterly (10% off), or yearly (20% off).\n\nJob-Hopper plans and pricing: Core is $29.99/month and Premium is $49.99/month. There is no Free plan and no cheaper tier. Both plans start with a 14-day free trial. You add a card when you start; you are not charged until the trial ends, and cancelling before it ends means you pay nothing. Billing can be monthly, quarterly (10% off), or yearly (20% off), and you can cancel anytime from your billing settings. Core unlocks unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic, not a guarantee), full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice for specific jobs. Premium includes everything in Core plus Real Sponsorship Score (built on actual DOL/USCIS filing data), Sponsor Watch alerts when an employer's H-1B filing activity changes, and more hiring contacts per job. Two one-time extras are available on any plan: Per-Job Resume Advice and Per-Job Resume Tailoring, $4.49 each. Students whose university has a Job-Hopper license get access through their school and do not pick or pay for a plan (see KB-0058). Plans are priced by depth, not seniority. The pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
@@ -496,7 +501,7 @@
   {
     "source_doc": "kb_master",
     "title": "KB-0033 Understanding Sponsorship-Likelihood Signals",
-    "content": "Use the signal to prioritize research, not as a promise. Confirm sponsorship directly with the employer and get legal advice for your personal eligibility.\n\nA sponsorship-likelihood signal is built by extracting and scoring real evidence, not by guessing: job posting language, employer size, and industry (Free/Core), or actual DOL and USCIS H-1B filing records for that employer (Premium). It helps a user prioritize an employer or role.\n\nFree and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees. Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.",
+    "content": "Use the signal to prioritize research, not as a promise. Confirm sponsorship directly with the employer and get legal advice for your personal eligibility.\n\nA sponsorship-likelihood signal is built by extracting and scoring real evidence, not by guessing: job posting language, employer size, and industry (Core), or actual DOL and USCIS H-1B filing records for that employer (Premium). It helps a user prioritize an employer or role.\n\nCore users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees. Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
@@ -516,29 +521,29 @@
   },
   {
     "source_doc": "kb_master",
-    "title": "KB-0036 Free Plan",
-    "content": "This article explains the Free plan. Free is $0 with no card required. It includes 3 manual job searches, a teaser of the sponsorship badge, a few visible Hiring Intel fields, and a teaser of Resume Advice.\n\nThe current pricing page describes Free as $0 with no card required, capped searches, and teaser insights.\n\nFree is designed for users who want to experience Job-Hopper before paying. It includes 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Once the 3 searches are used, upgrading to Core removes the cap entirely and switches to unlimited automated daily search. If this number ever changes on the live product, the current interface is the source of truth over this article.",
+    "title": "KB-0036 Free Trial (No Free Plan)",
+    "content": "Is there a free plan? No, Job-Hopper doesn't have a Free plan anymore. Core ($29.99/month) and Premium ($49.99/month) both start with a 14-day free trial: you add a card, you aren't charged during the trial, and if you cancel before the 14 days end you pay nothing.\n\nThere is no Free plan. Core and Premium both start with a 14-day free trial; a card is required, and you are not charged until the trial ends.\n\nJob-Hopper no longer has a Free plan. Instead, both Core ($29.99/month) and Premium ($49.99/month) start with a 14-day free trial of the full plan. You add a card when you start the trial. You are not charged during the 14 days. When the trial ends, the plan you chose continues and your card is charged for your billing period (monthly, quarterly, or yearly) unless you cancelled before the trial ended. To avoid any charge, cancel from your billing settings before the 14 days are up. Accounts created when Job-Hopper had a Free plan now need to choose Core or Premium to keep using the dashboard; their profile and data are kept. University students whose school has a Job-Hopper license don't need a trial or a card; their access comes from the university (see KB-0058).",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
     "title": "KB-0037 Core Plan",
-    "content": "This article explains the Core plan.\nCore is $29/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.\n\nThe current pricing page lists Core at $29 per month with automated daily job search or matching, the Job Tracker, and full insights.\n\nCore is $29/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel, full Resume Advice, and the Job Tracker. Core is designed for users who want Job-Hopper to work continuously rather than relying on Free's capped manual searches. Verify the current price and billing interval before a definitive quote; recommend Core based on stated needs, not urgency.",
+    "content": "The Core plan is $29.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice.\n\nCore is $29.99 per month (or 10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It runs your job search automatically every day and includes full insights, the application tracker, and interview practice.\n\nCore is $29.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off). Core includes unlimited automated daily job search with an email digest, unlimited manual searches, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel including hiring manager contact, full Resume Advice, the application tracker, and interview practice with mock questions and feedback for a specific job. Core is designed for users who want Job-Hopper working in the background every day. Recommend Core based on stated needs, not urgency.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
     "title": "KB-0038 Premium Plan",
-    "content": "This article explains the Premium plan.\nPremium is $49/month and is purchasable today. It includes everything in Core plus Real Sponsorship Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing Detector was investigated but is not being built - do not present either as available.\n\nPremium is Job-Hopper's top plan, $49 per month, built around deeper sponsorship intelligence. It is purchasable today, not a waitlist.\n\nPremium is $49/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Hiring Intel surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes. Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming. Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.",
+    "content": "The Premium plan is $49.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It includes everything in Core plus Real Sponsorship Score (real DOL/USCIS filing data, not the heuristic badge), Sponsor Watch alerts when an employer's H-1B filing volume changes, and more hiring manager contacts per job.\n\nPremium is Job-Hopper's top plan, $49.99 per month (10% off quarterly, 20% off yearly), with a 14-day free trial. It adds deeper sponsorship intelligence on top of everything in Core.\n\nPremium is $49.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off). Premium includes everything in Core, plus: - Real Sponsorship Score, built on actual DOL/USCIS government filing data instead of Core's heuristic badge. It shows on a growing share of postings as more employers are matched to their filing records, so not every job has it. - Sponsor Watch: email alerts when an employer's H-1B filing volume changes meaningfully, based on real DOL/USCIS data checked quarterly (not real-time). You turn it on for an employer from a job card and manage your watched employers on the Sponsor Watch page. - More hiring manager contacts per job than Core. If a user asks about Apply Intelligence: today that is the \"Recently posted\" flag on listings under 7 days old, which every user sees. If a user asks about the Ghost Listing Detector: it is not available; do not describe it as a feature. Premium should be recommended when sponsorship intelligence materially affects the user's search.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
     "title": "KB-0039 Upgrading, Downgrading, and Cancelling a Subscription",
-    "content": "Use the subscription controls in your account if available. Because timing and credits depend on the current billing policy, contact support if the option is missing or you need confirmation.\n\nUsers should manage plan changes through the current account or billing interface; billing effects depend on the live checkout and subscription policy.\n\nThe chatbot may direct a user to visible subscription or billing controls, but it must not promise proration, immediate credits, refunds, retained access, or a specific cancellation effective date unless the current billing policy confirms it. Cancellation should be handled clearly and without retention pressure. Users should receive the practical next step and a support path when self-service controls are unavailable.",
+    "content": "To cancel or change your subscription, use the billing settings in your account. If you cancel during the 14-day free trial you aren't charged; otherwise you keep access until the end of the period you've paid for. Your account and data aren't deleted, but you'll need an active plan to use the dashboard again. For refunds or proration, contact support@job-hopper.io.\n\nUsers change or cancel their plan from the billing settings in their account. Cancelling during the 14-day free trial means no charge; after that, access continues to the end of the paid period.\n\nPlan changes and cancellation are self-service from the billing settings in the account. Cancelling during the 14-day free trial means the user is not charged. Cancelling after the trial stops renewal; access continues until the end of the period already paid for (monthly, quarterly, or yearly). When the plan ends, the account, profile, and saved data are kept, but the dashboard requires an active plan again. There is no Free plan to fall back to. The chatbot must not promise proration, credits, or refunds; those depend on billing review. Cancellation should be handled clearly and without retention pressure.",
     "ai_approved": "Yes",
     "live_state": "Live"
   },
@@ -622,30 +627,30 @@
   {
     "source_doc": "kb_master",
     "title": "KB-0051 University Campus Partnership Overview",
-    "content": "[NOT YET LIVE - do not present as available]\n\nJob-Hopper has a draft concept for university partnerships that would give career-services teams bulk student access and coaching, but it isn't a live program yet. I can connect you with our partnerships team for a discovery conversation.\n\nJob-Hopper has drafted a Campus Partnership Program concept that would give university career-services teams bulk student access, recurring coaching, and engagement/outcome analytics. The program is a proposed commercial concept, not a live offering, and has no confirmed pricing, launch date, or signed institution.\n\nThe concept positions Job-Hopper as a student-success and graduate-employability platform rather than a bulk software purchase, combining campus access, career technology, live coaching, and a future analytics/employer-connectivity layer. Proposed components include a campus license for defined student cohorts, monthly or quarterly coaching sessions, an institution-branded landing page, a career-services dashboard, and a longer-term employer-partnership layer. None of these components are built, priced, or contractually available today. Any inbound interest must go through discovery with the partnerships/product owner before any commitment is made.",
-    "ai_approved": "No",
-    "live_state": "Planned"
+    "content": "University partnerships: universities can buy a Job-Hopper campus license covering a number of students. Students who sign up with their university email get a seat automatically, and career-services staff get a dashboard showing how students are using it. Pricing depends on how many students you want covered; request it with the form on our Universities page and the team will follow up.\n\nUniversities can buy a Job-Hopper campus license that covers a set number of students. Students with a university email get a seat automatically, and career-services staff get a dashboard showing how their students are using it.\n\nUniversity partnerships are live. A university (usually career services or an international student office) buys a campus license for a number of student seats. Students sign up with their university email address. Once they verify that email, they get a seat automatically and full access to Job-Hopper; they don't pick a plan or enter a card. Career-services staff get their own partner dashboard showing seat usage and student engagement (see KB-0054). Licenses are paid; Job-Hopper does not run free pilots (see KB-0052). Pricing depends on the number of students covered, so it is quoted per institution: universities request it with the form on the Universities page, and the team follows up. Coaching sessions are not part of the license today (see KB-0053).",
+    "ai_approved": "Yes",
+    "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
-    "title": "KB-0052 Campus Pilot Program",
-    "content": "[NOT YET LIVE - do not present as available]\n\nA campus pilot is proposed as roughly 100 students over 30 to 60 days with agreed success metrics, but nothing is scheduled yet. I can connect you with our partnerships team to scope one.\n\nA campus pilot would run for roughly 100 students over 30 to 60 days with mutually agreed success metrics. Nothing is scheduled, contracted, or currently running.\n\nThe draft pilot concept proposes a defined cohort size and time window so an institution can evaluate fit before any larger commitment. Proposed metrics include activation rate, profile completion, monthly active users, jobs viewed/saved, applications (definition still required — manual vs system-tracked), resume-workflow completion, workshop attendance, and student satisfaction. Placement outcomes may only ever be reported where verified and directly attributable — never estimated or implied.",
-    "ai_approved": "No",
-    "live_state": "Planned"
+    "title": "KB-0052 University License Billing and Seats",
+    "content": "University license billing: a campus license is paid by invoice (card or bank transfer, due in 30 days), billed monthly or yearly for a set number of student seats. Students can claim seats as soon as the first invoice is paid. If seats run out, new students are waitlisted and you can request more from your dashboard. We don't run free pilots.\n\nA university license is paid up front by invoice, billed monthly or yearly for a set number of seats. Seats go live for students as soon as the first invoice is paid. There are no free pilots.\n\nWhen a university agrees terms, Job-Hopper sets up the license and Stripe emails the invoice to the university's billing contact. It can be paid by card or bank transfer and is due in 30 days. Students can't claim seats until the first invoice is paid; seats switch on automatically once it is. Licenses renew monthly or yearly, and each renewal is invoiced automatically. The license covers a fixed number of seats. Staff can see seat usage on their dashboard and request more seats there; extra seats are invoiced for the rest of the current period. If every seat is taken, a new student is placed on a waitlist and staff are emailed. Staff can release a seat (for example, when a student graduates). That student keeps their account but loses university-provided access and isn't re-added automatically. If a renewal invoice is overdue, students keep access for a 30-day grace period before it pauses; it's restored as soon as the invoice is paid. Job-Hopper does not run free pilots.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
     "title": "KB-0053 Career Coaching Sessions (University)",
-    "content": "[NOT YET LIVE - do not present as available]\n\nCareer coaching is part of the proposed university partnership concept, covering things like resume, LinkedIn, interview prep, and international job search — but cadence and delivery aren't finalized yet.\n\nThe draft partnership concept includes monthly or quarterly coaching sessions covering resume, LinkedIn, networking, interviews, salary, and international/sponsorship-aware search. This is proposed, not a confirmed deliverable.\n\nCoaching is envisioned as a recurring, structured complement to the core product rather than a one-off session. Cadence, facilitator model (internal staff vs. contracted coaches), and exact topic list are not yet finalized. Any institution asking about coaching should be told the concept exists but specifics are pending product-owner approval.",
-    "ai_approved": "No",
-    "live_state": "Planned"
+    "content": "Job-Hopper doesn't offer live career coaching sessions, including as part of a university license. Students can use self-serve tools instead: Resume Advice, per-job resume tailoring, and AI interview practice with mock questions and feedback for a specific job.\n\nJob-Hopper does not offer live career coaching sessions, for universities or individuals. The product includes self-serve tools such as Resume Advice and interview practice instead.\n\nLive coaching sessions (workshops or one-to-one coaching on resumes, LinkedIn, interviews, or salary) are not included in a university license or any plan. What students do get is self-serve: Resume Advice, per-job resume tailoring, and AI interview practice with mock questions and feedback for a specific job (see KB-0057). If an institution specifically wants coaching, note the interest and route it to the partnerships team; do not commit to anything.",
+    "ai_approved": "Yes",
+    "live_state": "Not offered"
   },
   {
     "source_doc": "kb_master",
-    "title": "KB-0054 University Career Services Dashboard",
-    "content": "[NOT YET LIVE - do not present as available]\n\nA university dashboard is planned to give career-services staff visibility into student engagement and outcomes, but it isn't built yet, and the data-privacy framework around it is still being defined.\n\nA planned/proposed dashboard would give career-services staff visibility into activation, engagement, applications, workshop attendance, and outcomes for their student cohort. It is not built, and the data governance around it (education-data roles, permissions, exports, retention) is not yet defined.\n\nBefore any dashboard work begins, Job-Hopper must define whether it is a school official/service provider for education-data purposes, what data the institution actually shares, data controller/processor roles, breach-notification duties, and export/retention rules. No FERPA, SOC 2, GDPR, CCPA, or similar compliance status may be claimed unless formally established and documented.",
-    "ai_approved": "No",
-    "live_state": "Planned"
+    "title": "KB-0054 University Partner Dashboard",
+    "content": "University partner dashboard: staff get access by invitation. Job-Hopper adds your work email and sends you an invite; you create an account with that same email (or sign in), and you land on your dashboard. It shows your license and invoices, seat usage, a student roster with status and activity counts, and cohort-level engagement reports. It never shows which jobs an individual student applied to.\n\nCareer-services staff at a partner university get a partner dashboard showing seat usage and how their students are using Job-Hopper. Staff are invited by email and sign in with their own account.\n\nHow staff get access: Job-Hopper adds a staff member's work email to the university's partner account and sends them an invitation email. They create a Job-Hopper account with that same email (or sign in if they already have one), verify it, and land on their partner dashboard. Job-Hopper never sends passwords; staff choose their own. Staff don't use up student seats. To add or remove staff, the university contacts Job-Hopper. What the dashboard shows: the license and billing status (including the latest invoice and pay link), seats used and available, any waitlist, and a roster of students with their status, sign-up date, last activity, and counts of matches, applications, interviews, and practice interviews. It also shows cohort-level views: an engagement funnel, weekly activity, the share of international students, and the most common employers students applied to across the whole cohort. What it doesn't show: which companies or jobs an individual student applied to. Individual job searches and applications stay private to each student. Staff can filter the roster, export it as CSV, print a summary report without student names, release seats, and request more seats.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
   },
   {
     "source_doc": "kb_master",
@@ -663,8 +668,22 @@
   },
   {
     "source_doc": "kb_master",
+    "title": "KB-0057 Interview Practice",
+    "content": "Interview practice: open any matched job and choose \"Practice interview for this job\". You get mock interview questions tailored to that role and feedback on each answer you give. It's unlimited on Core and Premium. The feedback is AI-generated to help you prepare; it isn't a prediction of how the real interview will go.\n\nInterview practice gives you AI-generated mock interview questions tailored to a specific job you've been matched with, and feedback on your answers. It is included in Core and Premium.\n\nOpen any matched job and choose \"Practice interview for this job\". Job-Hopper generates mock interview questions based on that role, you type your answers, and you get feedback on each one to help you prepare. Practice is unlimited on Core and Premium, and is also available to students covered by a university license. Feedback is AI-generated coaching for preparation only. It does not predict whether you will get an interview or an offer, and it is not a human coach.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
+    "title": "KB-0058 Job-Hopper Through Your University (Students)",
+    "content": "Getting Job-Hopper through your university: sign up with your university email address and verify it. If your school has a license with a free seat, you get access automatically, with no plan to pick and nothing to pay. If you're asked to choose a plan, check you used and verified your university email; if seats are full you'll be waitlisted. Your career-services office sees your activity counts, but not which jobs you applied to.\n\nIf your university has a Job-Hopper license, sign up with your university email and verify it; you get a seat automatically and don't pick a plan or pay.\n\nSign up with your university email address (for example you@university.edu) and verify it from the email we send. If your university has a license with a free seat, you get it automatically. Covered students skip the plan step in onboarding, and the dashboard shows that access is provided by the university. There is no card and no charge. If you signed up with a personal email, your university seat can't be matched to it; sign up with your university email instead. If you're asked to choose a plan, your university either doesn't have a license, your email domain isn't covered, or your email isn't verified yet. If all of your university's seats are taken, you're placed on a waitlist and your career-services office is told. You'll get a seat automatically the next time you sign in after one frees up. University access lasts while your school's license is active and you hold a seat. If your school releases your seat (for example after graduation), your account and data stay, but you'd need your own plan to keep using Job-Hopper. Career-services staff can see your name, email, sign-up date, last activity, and counts of your matches, applications, and practice interviews. They can't see which jobs or companies you applied to.",
+    "ai_approved": "Yes",
+    "live_state": "Live"
+  },
+  {
+    "source_doc": "kb_master",
     "title": "Plans Overview (short)",
-    "content": "Job-Hopper has three plans: Free, Core, and Premium, all purchasable today. Free is $0 with no card required. Core is $29 per month. Premium is $49 per month and adds Real Sponsorship Score and deeper hiring contacts. Ask about any specific plan for full details on what's included.",
+    "content": "Job-Hopper has two plans, Core and Premium, and no Free plan. Core is $29.99 per month and Premium is $49.99 per month; both start with a 14-day free trial (card required) and can be billed monthly, quarterly (10% off), or yearly (20% off). Premium adds Real Sponsorship Score, Sponsor Watch, and more hiring contacts. Students covered by their university don't pick a plan. Ask about any specific plan for full details on what's included.",
     "ai_approved": "Yes",
     "live_state": "Live"
   }

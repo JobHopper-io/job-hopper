@@ -36,7 +36,7 @@ export const chatbotKnowledge = [
   // ---------- VISA / SPONSORSHIP NUANCE ----------
   {
     q: "Is the sponsorship badge based on real government data or a guess?",
-    a: "Today's badge (on Free and Core) is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
+    a: "The sponsorship badge on Core is a heuristic — built from employer size, industry, and role signals, not actual visa filing records. It's a useful filter, not a certified fact. Premium's Real Sponsorship Score is the version built on actual DOL/USCIS filing data — that's the real difference between the two. It's live today, though it's still rolling out across postings as we match more employers to their filing records, so not every Premium job shows it yet."
   },
   {
     q: "Can you tell me if [a specific company] sponsors visas?",
@@ -48,43 +48,43 @@ export const chatbotKnowledge = [
   },
   {
     q: "Does upgrading to Core or Premium improve my actual chances of getting sponsored?",
-    a: "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge instead of a teaser, and Premium adds real filing-data-backed scoring instead of the heuristic. Better information, not better odds."
+    a: "No plan changes an employer's willingness to sponsor — that's outside anyone's control but the employer. What upgrading changes is how much information and filtering you have: Core gives you the full sponsorship badge, and Premium adds real filing-data-backed scoring instead of the heuristic, plus Sponsor Watch alerts. Better information, not better odds."
   },
   {
     q: "Why can't you just guarantee sponsorship-friendly jobs only?",
-    a: "Because sponsorship willingness isn't fully knowable in advance — even employers who've sponsored before don't always do so for every role or every year. Instead we extract and score real signal: on Free/Core that's the job posting text, employer size, and industry; on Premium it's actual DOL and USCIS H-1B filing records for that employer (petitions filed, approved, denied). Neither is a promise, but it's real extracted data, not a guess — use it to prioritize where you apply."
+    a: "Because sponsorship willingness isn't fully knowable in advance — even employers who've sponsored before don't always do so for every role or every year. Instead we extract and score real signal: on Core that's the job posting text, employer size, and industry; on Premium it's actual DOL and USCIS H-1B filing records for that employer (petitions filed, approved, denied). Neither is a promise, but it's real extracted data, not a guess — use it to prioritize where you apply."
   },
 
-  // ---------- FREE TO PAID / CONVERSION ----------
+  // ---------- PLANS / TRIAL / BILLING ----------
   {
-    q: "I've been on Free for a while — what am I actually missing?",
-    a: "The biggest gap is automation: on Free you're manually re-running a capped number of searches, while Core runs your search automatically every day and emails you a digest. You're also seeing teaser versions of the sponsorship badge, Hiring Intel, and Resume Advice on Free — Core unlocks all three fully, plus the application tracker."
+    q: "Is there a free plan?",
+    a: "No — there's no Free plan. Job-Hopper has two plans, Core ($29.99/month) and Premium ($49.99/month), and both start with a 14-day free trial. You add a card when you start, you aren't charged until the trial ends, and if you cancel before then you pay nothing. If your university provides Job-Hopper, you don't need to pick a plan at all."
   },
   {
-    q: "Is it worth upgrading if I'm only casually looking?",
-    a: "If you're not actively searching, Free is genuinely fine — no card required, no pressure, and you can see match quality without committing. Core makes the most sense once you're actively applying and want the process running in the background instead of manually checking in."
+    q: "Is it worth paying if I'm only casually looking?",
+    a: "Use the 14-day free trial to decide. It's the full product, so you can see how relevant your matches are before you pay anything, and you can cancel before the trial ends without being charged. Core makes the most sense once you're actively applying and want your search running every day in the background."
   },
   {
-    q: "What's the single biggest reason to upgrade to Core?",
-    a: "Automation. Free requires you to manually trigger a limited number of searches; Core runs unlimited automated daily search and emails you when something good shows up, so you're not the one doing the searching anymore."
+    q: "What's the difference between Core and Premium?",
+    a: "Core ($29.99/month) runs your job search automatically every day with an email digest, and includes the full sponsorship badge, full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice. Premium ($49.99/month) adds the sponsorship layer: Real Sponsorship Score built on actual DOL/USCIS filing data, Sponsor Watch alerts when an employer's H-1B filing activity changes, and more hiring contacts per job."
   },
   {
     q: "Do you offer discounts, annual plans, or a cheaper tier?",
-    a: "Today Core is a flat $29.99/month, billed monthly, with no long-term commitment — cancel anytime. There's no annual plan currently offered."
+    a: "Yes — you can pay monthly, quarterly (10% off), or yearly (20% off) on both Core and Premium. There's no cheaper tier below Core, but both plans start with a 14-day free trial. We don't offer coupon codes through the chat."
   },
   {
-    q: "If I upgrade and it's not for me, how easy is it to back out?",
-    a: "Cancel anytime from your account settings — a couple of clicks. You keep access through the end of your current billing period, then drop back to Free rather than losing your account or data."
+    q: "If I start a plan and it's not for me, how easy is it to back out?",
+    a: "Cancel anytime from your billing settings — a couple of clicks. If you cancel during the 14-day trial you aren't charged. After that, you keep access until the end of the period you've paid for. Your account and data aren't deleted, but you'll need an active plan to use your dashboard again."
   },
 
   // ---------- RESUME ADVICE / APPLICATION TRACKER ----------
   {
     q: "What exactly does Resume Advice do?",
-    a: "It reviews your resume against the roles you're targeting and gives feedback to improve alignment. Free gives a teaser of this; Core unlocks full Resume Advice. There are also separate one-time paid add-ons — a full resume upgrade and per-job resume tailoring — available on any plan."
+    a: "It reviews your resume against the roles you're targeting and gives feedback to improve alignment. Full Resume Advice is included in Core and Premium. There are also two one-time extras for a specific job: Per-Job Resume Advice and Per-Job Resume Tailoring, $4.49 each."
   },
   {
     q: "Is the application tracker just a list, or does it do more?",
-    a: "It tracks status per job — saved, applied, interviewing, and so on — so your search stays organized in one place instead of scattered across email and spreadsheets. It's included in Core; on Free it's not available, though your data isn't deleted if you're on Free after having Core — it's just not visible until you upgrade again."
+    a: "It tracks status per job — saved, applied, interviewing, and so on — so your search stays organized in one place instead of scattered across email and spreadsheets. It's included in Core and Premium. If your plan ends, your tracked jobs aren't deleted — they're there again when you restart a plan."
   },
   {
     q: "Why did my resume advice take so long / seem to hang?",
@@ -97,8 +97,8 @@ export const chatbotKnowledge = [
     a: "This is usually about profile scope — very narrow location, salary, or role settings will naturally produce fewer matches. Broadening any of those in your profile settings often helps. If matches are still not appearing after adjusting, that's worth reaching out to support about directly, since it could be an account-specific issue."
   },
   {
-    q: "Why was I charged and I thought I was on Free?",
-    a: "This sounds like an account/billing-specific question — I can't look up your account details, but support can check your subscription status directly. Reach out at support@job-hopper.io and they'll sort it out."
+    q: "Why was I charged? I thought I was on a free trial.",
+    a: "The 14-day free trial turns into a paid plan automatically when it ends unless you cancel before then. Beyond that, this is an account/billing-specific question — I can't look up your account details, but support can check your subscription status directly. Reach out at support@job-hopper.io and they'll sort it out."
   },
   {
     q: "How do I delete my account entirely?",

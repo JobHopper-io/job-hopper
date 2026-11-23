@@ -1,7 +1,21 @@
-Job-Hopper Chatbot Knowledge Base — Master v1.4
+Job-Hopper Chatbot Knowledge Base — Master v1.5
 Consolidated from JHIL v1.0 (KB-0001–KB-0050) + University/Partnership & Internal Ops extension (KB-0051–KB-0055)
-+ Recruiter-Visible Mode (KB-0056)
++ Recruiter-Visible Mode (KB-0056) + Interview Practice (KB-0057) + University students (KB-0058)
 Compiled July 16, 2026. Corrected July 16, 2026. Updated July 28, 2026. Updated August 7, 2026.
+Updated November 10, 2026.
+
+v1.5 CHANGE NOTE
+Brought in line with the product as of 2026-11-10. The Free plan was removed on 2026-09-10: Core
+($29.99) and Premium ($49.99) each start with a 14-day free trial (card required), and quarterly (10%
+off) and yearly (20% off) billing shipped 2026-09-11. Rewritten: KB-0008, KB-0036 (now "Free Trial (No
+Free Plan)"), KB-0037, KB-0038 (Sponsor Watch is now live; Ghost Listing Detector and Apply
+Intelligence handled explicitly), KB-0039. University partnerships shipped 2026-10-16/20, so KB-0051
+to KB-0054 now describe the live program: paid campus licenses (no free pilots; KB-0052 replaces the
+Campus Pilot article), automatic seats by university email, and the partner dashboard. Coaching is not
+offered (KB-0053). Added KB-0057 (Interview Practice) and KB-0058 (students getting access through their
+university). Free-plan wording removed from other articles' sales guidance. Open product questions:
+the pricing/FAQ pages still list the Ghost Listing Detector, and Recruiter-Visible Mode's status
+(KB-0056) needs confirming now that employer login is hidden from the navigation.
 
 v1.4 CHANGE NOTE
 Added KB-0056 (Recruiter-Visible Mode) covering the opt-in employer-search and reveal-request
@@ -42,7 +56,7 @@ any corrected fact and the live product ever disagree going forward, the live pr
 this file, not the other way around.
 
 WHAT THIS FILE IS
-This is the single, complete knowledge base for the Job-Hopper chatbot: 56 articles, one format,
+This is the single, complete knowledge base for the Job-Hopper chatbot: 58 articles, one format,
 one numbering scheme. It merges:
   - KB-0001 to KB-0050: the already-completed JHIL v1.0 core library (public product, account,
     search, matching, sponsorship, plans/billing, devices, privacy, support, and chatbot policy).
@@ -55,11 +69,10 @@ one numbering scheme. It merges:
 HOW TO USE
 Load every article below as one retrieval chunk per KB ID. Only articles with AI Approved: Yes
 (or Conditional, with its stated conditions honored) may answer public users — see each article's
-metadata block. KB-0051 to KB-0055 are AI Approved: No/Conditional and Live State: Planned — the
-chatbot should not present their content as available offerings, only as accurate "not yet live"
-answers per each article's Canonical Response and Do/Don't rules.
+metadata block. KB-0051, KB-0052, KB-0054 and KB-0058 describe the live university program. KB-0053 (coaching)
+describes something that is not offered. KB-0055 is internal only.
 
-GOVERNANCE (applies to all 55 articles, from JHIL v1.0 Documentation Standard)
+GOVERNANCE (applies to all 58 articles, from JHIL v1.0 Documentation Standard)
 Mandatory metadata: Article ID; Title; Category; Department; Audience; Owner; Status; Version;
 AI Approved; Last Updated; Review Cycle; Risk Level; Live State; Keywords; Related Articles;
 Source of Truth.
@@ -139,7 +152,7 @@ Do not guarantee interviews, offers, or sponsorship.
 Do not claim a feature is live unless its article says Live.
 
 Sales Opportunity
-Answer first. Recommend Free for a first look, Core for automated matching and full insights, or
+Answer first. Suggest the 14-day free trial for a first look, Core for automated matching and full insights, or
 Premium only when sponsorship intelligence is relevant and currently available.
 
 Escalation Rules
@@ -344,7 +357,7 @@ Do not attack named job boards.
 Do not claim every filtered listing is fraudulent.
 
 Sales Opportunity
-Recommend Free for users testing curation and Core for users seeking ongoing automated matching and
+Suggest the 14-day free trial for users testing curation and Core for users seeking ongoing automated matching and
 full insights.
 
 Escalation Rules
@@ -484,7 +497,7 @@ Do not disparage competitors.
 Do not publish unsupported rankings.
 
 Sales Opportunity
-Recommend Free for evaluation, Core for automated daily matching and full insights, and Premium only
+Suggest the 14-day free trial for evaluation, Core for automated daily matching and full insights, and Premium only
 for relevant sponsorship needs when available.
 
 Escalation Rules
@@ -557,7 +570,7 @@ Do not add auto-apply claims unless confirmed live.
 Do not promise a fixed number of matches.
 
 Sales Opportunity
-After explaining the flow, suggest Free to try the experience or Core for automated daily matching and
+After explaining the flow, suggest the 14-day free trial to try the experience or Core for automated daily matching and
 full insights.
 
 Escalation Rules
@@ -575,64 +588,79 @@ Purpose
 Provide one controlled explanation of current plans and pricing.
 
 Summary
-Job-Hopper currently presents Free, Core, and Premium plan concepts. Pricing and availability must be
-verified on the official pricing page or live checkout before quoting.
+Job-Hopper has two plans, Core ($29.99/month) and Premium ($49.99/month). There is no Free plan. Both
+plans start with a 14-day free trial (card required) and can be billed monthly, quarterly (10% off), or
+yearly (20% off).
 
 Detailed Explanation
-Free is $0/month with no card required: 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice. Core is $29.99/month and unlocks unlimited automated daily job search with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Premium is $49.99/month and is purchasable today, not a waitlist - it adds Real Sponsorship Score (built on real government filing data) and the deepest Hiring Manager Contact tier on top of everything in Core, plus early Apply Intelligence nudges. Plans differ by depth of automation and sponsorship intelligence, not by seniority or job type.
-Exact prices, the search cap, and feature availability can still change - the pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
+Job-Hopper plans and pricing: Core is $29.99/month and Premium is $49.99/month. There is no Free plan and no cheaper tier.
+Both plans start with a 14-day free trial. You add a card when you start; you are not charged until the trial ends, and cancelling before it ends means you pay nothing.
+Billing can be monthly, quarterly (10% off), or yearly (20% off), and you can cancel anytime from your billing settings.
+Core unlocks unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic, not a guarantee), full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice for specific jobs.
+Premium includes everything in Core plus Real Sponsorship Score (built on actual DOL/USCIS filing data), Sponsor Watch alerts when an employer's H-1B filing activity changes, and more hiring contacts per job.
+Two one-time extras are available on any plan: Per-Job Resume Advice and Per-Job Resume Tailoring, $4.49 each.
+Students whose university has a Job-Hopper license get access through their school and do not pick or pay for a plan (see KB-0058).
+Plans are priced by depth, not seniority. The pricing page and live checkout remain the operational source of truth if this article and the live product ever disagree.
 
 Key Benefits
-No-cost starting point
-Clear paid path for deeper use
+A full-product free trial before paying
+Clear choice between two plans
+Discounts for quarterly and yearly billing
 Plan choice based on depth rather than seniority
 
 Examples
-User wants to test: recommend Free.
+User wants to test: explain the 14-day free trial on either plan.
 User wants daily automated matching and full insights: explain Core.
-User needs deeper sponsorship intelligence: explain Premium, which is available to purchase today.
+User needs deeper sponsorship intelligence: explain Premium.
+User asks for a free plan: explain there isn't one, and offer the free trial.
 
 FAQs
+Is there a free plan?
+No. Both plans start with a 14-day free trial instead.
+
+Do I need a card for the trial?
+Yes. You are not charged until the trial ends, and you can cancel before then.
+
+Is there an annual plan?
+Yes. Yearly billing is 20% off and quarterly is 10% off.
+
 Which plan should I choose?
 Choose by search depth and sponsorship needs, not seniority.
-
-Is Premium live?
-Yes, it is purchasable today at $49.99/month; verify exact price on the current pricing page.
 
 Can prices change?
 Yes; always use the current official page.
 
 Related Articles
-KB-0036; KB-0037; KB-0038; KB-0039
+KB-0036; KB-0037; KB-0038; KB-0039; KB-0058
 
 Training AI
 Canonical Response
-This article explains Job-Hopper's plans, pricing, and subscription tiers.
-
-Free ($0, no card) gives you 3 manual searches and teaser insights. Core ($29.99/month) unlocks unlimited automated daily matching, the full sponsorship badge, full insights, full Resume Advice, and the Job Tracker. Premium ($49.99/month, purchasable today) adds Real Sponsorship Score and the deepest Hiring Manager Contact tier on top of Core, plus early Apply Intelligence nudges.
+Job-Hopper plans and pricing: there are two plans and no Free plan. Core is $29.99/month and Premium is $49.99/month, and both start with a 14-day free trial (card required, no charge if you cancel before it ends). You can pay monthly, quarterly (10% off), or yearly (20% off). Core gives you unlimited automated daily matching with an email digest, full insights, hiring manager contact, Resume Advice, the application tracker, and interview practice. Premium adds Real Sponsorship Score, Sponsor Watch, and more hiring contacts per job.
 
 Related Intents
 pricing
 plans
-free vs core
-premium price
+price
+cost
+free plan
+free trial
+annual plan
+core vs premium
 which plan
-is premium available
 
 AI Do Rules
-State when the price was verified.
+Say plainly that there is no Free plan, and mention the 14-day free trial.
+Mention the quarterly and yearly discounts when asked about cost or annual billing.
 Link to the pricing page.
-Confirm Premium is purchasable today when asked.
 
-AI Don’t Rules
-Do not invent discounts.
-Do not describe Premium as waitlist-only or not yet available.
+AI Don't Rules
+Do not describe a Free plan, a $0 tier, or "no card required".
+Do not invent coupons or discounts beyond the quarterly and yearly ones.
 Do not sell by seniority.
 
 Sales Opportunity
 Core is appropriate for ongoing automated matching and full insights. Premium is relevant when
-sponsorship depth matters to the user - it's a normal purchase now, not something to gate on
-availability.
+sponsorship depth matters to the user. The free trial is the natural answer to "is it worth it?".
 
 Escalation Rules
 Escalate billing discrepancies, checkout errors, legacy-plan questions, coupon requests, or conflicts
@@ -643,7 +671,8 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Review monthly and after every checkout or pricing change.
+Updated 2026-11-10: Free tier removed 2026-09-10 (14-day card trial on both plans); quarterly/yearly
+billing shipped 2026-09-11. Review monthly and after every checkout or pricing change.
 
 KB-0009 - H-1B Jobs and Sponsorship Intelligence
 Purpose
@@ -814,8 +843,8 @@ Examples
 A user registers with an accessible email, verifies it if required, and continues to profile setup.
 
 FAQs
-Do I need a card for Free?
-The current pricing page states no card is required for Free.
+Do I need a card to sign up?
+A card is needed to start the 14-day free trial on Core or Premium; students covered by their university don't need one.
 
 Can I create multiple accounts?
 Users should normally maintain one accurate personal account unless support approves otherwise.
@@ -844,7 +873,7 @@ Never request a password or one-time code.
 Do not create accounts on behalf of users.
 
 Sales Opportunity
-Free is the natural recommendation for someone who wants to test the product.
+The 14-day free trial is the natural recommendation for someone who wants to test the product.
 
 Escalation Rules
 Escalate duplicate-account, verification, blocked-registration, or suspicious-access issues.
@@ -1434,7 +1463,7 @@ Do not translate score into hiring probability.
 Do not call it an eligibility decision.
 
 Sales Opportunity
-Core’s full insights may be relevant when a Free user wants deeper explanations.
+Premium's Real Sponsorship Score may be relevant when a Core user wants deeper sponsorship context.
 
 Escalation Rules
 Escalate clearly inconsistent scores, discriminatory-impact concerns, or reproducible calculation bugs.
@@ -2251,11 +2280,11 @@ Define the sponsorship signal in operational terms.
 
 Summary
 A sponsorship-likelihood signal is built by extracting and scoring real evidence, not by guessing:
-job posting language, employer size, and industry (Free/Core), or actual DOL and USCIS H-1B filing
+job posting language, employer size, and industry (Core), or actual DOL and USCIS H-1B filing
 records for that employer (Premium). It helps a user prioritize an employer or role.
 
 Detailed Explanation
-Free and Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.
+Core users see a heuristic estimate built from posting language, employer size, industry, and role signals - not actual government filing data; describe that version strictly as a heuristic, never as filing-history-backed. Premium users see Real Sponsorship Score instead, built on real DOL/USCIS filing data, which is live but still expanding: it only appears once a posting's employer has been matched to a scored filing record, so not every Premium job shows it yet. Where Real Sponsorship Score isn't available for a posting, Premium still falls back to the same heuristic everyone else sees.
 Positive, neutral, or low signals, heuristic or filing-based, are not definitive decisions. A role can change, an employer can make exceptions, and a candidate’s circumstances can affect the result. The employer must confirm actual sponsorship policy.
 
 Key Benefits
@@ -2448,120 +2477,134 @@ URL, screenshot if available, steps already tried.
 Internal Notes
 Legal review is required before expanding allowed immigration content.
 
-KB-0036 - Free Plan
+KB-0036 - Free Trial (No Free Plan)
 Purpose
-Explain the Free plan without overstating limits or features.
+Explain the 14-day free trial, and answer "is there a Free plan?" accurately.
 
 Summary
-The current pricing page describes Free as $0 with no card required, capped searches, and teaser
-insights.
+There is no Free plan. Core and Premium both start with a 14-day free trial; a card is required, and you
+are not charged until the trial ends.
 
 Detailed Explanation
-Free is designed for users who want to experience Job-Hopper before paying. It includes 3 manual job searches, a teaser view of the sponsorship badge, a few visible Hiring Intel fields with the rest blurred, and a teaser of Resume Advice.
-Once the 3 searches are used, upgrading to Core removes the cap entirely and switches to unlimited automated daily search. If this number ever changes on the live product, the current interface is the source of truth over this article.
+Job-Hopper no longer has a Free plan. Instead, both Core ($29.99/month) and Premium ($49.99/month) start with a 14-day free trial of the full plan.
+You add a card when you start the trial. You are not charged during the 14 days. When the trial ends, the plan you chose continues and your card is charged for your billing period (monthly, quarterly, or yearly) unless you cancelled before the trial ended.
+To avoid any charge, cancel from your billing settings before the 14 days are up.
+Accounts created when Job-Hopper had a Free plan now need to choose Core or Premium to keep using the dashboard; their profile and data are kept.
+University students whose school has a Job-Hopper license don't need a trial or a card; their access comes from the university (see KB-0058).
 
 Key Benefits
-No-cost entry
-No card required according to current pricing
-Ability to evaluate match quality
+Try the full product before paying
+No charge if you cancel within 14 days
+Same trial on both plans
 
 Examples
-A new user creates a Free account, completes a profile, and reviews the available capped results.
+A user asks for the free plan: explain there isn't one and describe the 14-day trial.
+A user was charged on day 15: explain the trial converts automatically, then route billing questions to support.
 
 FAQs
-Is Free really free?
-The current pricing page says $0 and no card required.
+Is there a free plan?
+No. There is a 14-day free trial on Core and Premium instead.
 
-What is the exact cap?
-3 manual job searches.
+Do I need a card for the free trial?
+Yes. You aren't charged until the trial ends.
+
+What happens when the trial ends?
+Your plan continues and you're charged, unless you cancelled before the end of the trial.
+
+I used to be on Free. What now?
+Choose Core or Premium to keep using your dashboard; your profile and data are kept.
 
 Related Articles
-KB-0008; KB-0037; KB-0039
+KB-0008; KB-0037; KB-0038; KB-0039
 
 Training AI
-
 Canonical Response
-This article explains the Free plan.
-Free is $0 with no card required. It includes 3 manual job searches, a teaser of the sponsorship badge, a few visible Hiring Intel fields, and a teaser of Resume Advice.
+Is there a free plan? No, Job-Hopper doesn't have a Free plan anymore. Core ($29.99/month) and Premium ($49.99/month) both start with a 14-day free trial: you add a card, you aren't charged during the trial, and if you cancel before the 14 days end you pay nothing.
 
 Related Intents
 free plan
 free trial
+is it free
 no card
-
-free limits
+free tier
+trial length
 
 AI Do Rules
-Verify current terms.
-Be transparent about limits.
+Say clearly there is no Free plan.
+Explain that the trial needs a card and converts to paid unless cancelled.
+Explain how to cancel during the trial.
 
-AI Don’t Rules
-Do not call Free a trial unless the product does.
-Do not invent search caps.
+AI Don't Rules
+Do not describe a Free plan, $0 tier, search caps, or "no card required".
+Do not imply the trial can be extended unless support confirms it.
 
 Sales Opportunity
-Recommend Core only when the user wants automated daily matching, tracker access, or full insights.
+The free trial answers "is it worth it?"; suggest Core or Premium by stated need.
 
 Escalation Rules
-Escalate inconsistent caps, unexpected payment requests, or a Free account that cannot access promised
-features.
+Escalate charges the user believes happened during the trial, trial-length disputes, or accounts that
+can't start a trial.
 
 Required Ticket Payload
 Article ID, user email if voluntarily provided, account plan, exact error or question, timestamp, page
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Review after every pricing-page change.
+Rewritten 2026-11-10: the Free plan was removed 2026-09-10 (router sends plan-less users to
+/choose-plan). This article replaces the old Free Plan article; keep the "no Free plan" phrasing so
+pricing queries still retrieve it.
 
 KB-0037 - Core Plan
 Purpose
 Explain Core and its value proposition.
 
 Summary
-The current pricing page lists Core at $29.99 per month with automated daily job search or matching, the
-Job Tracker, and full insights.
+Core is $29.99 per month (or 10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It
+runs your job search automatically every day and includes full insights, the application tracker, and
+interview practice.
 
 Detailed Explanation
-Core is $29.99/month and includes unlimited automated daily job search with an email digest, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel, full Resume Advice, and the Job Tracker.
-Core is designed for users who want Job-Hopper to work continuously rather than relying on Free's capped manual searches. Verify the current price and billing interval before a definitive quote; recommend Core based on stated needs, not urgency.
+Core is $29.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off).
+Core includes unlimited automated daily job search with an email digest, unlimited manual searches, the full sponsorship badge (a heuristic estimate, not a guarantee), full Hiring Intel including hiring manager contact, full Resume Advice, the application tracker, and interview practice with mock questions and feedback for a specific job.
+Core is designed for users who want Job-Hopper working in the background every day. Recommend Core based on stated needs, not urgency.
 
 Key Benefits
 Automated daily matching
-Job Tracker access
-Full insights
-Ongoing search workflow
+Application tracker
+Full insights and hiring manager contact
+Interview practice for specific jobs
 
 Examples
 A user who logs in daily and wants complete match explanations is a reasonable Core candidate.
 
 FAQs
 How much is Core?
-The current public price is $29.99 per month; verify checkout.
+$29.99 per month, or 10% off quarterly and 20% off yearly; verify checkout.
+
+Is there a trial?
+Yes, 14 days free with a card on file.
 
 Is it based on seniority?
-No. The pricing page says plans are priced by depth, not seniority.
+No. Plans are priced by depth, not seniority.
 
 Related Articles
-KB-0008; KB-0036; KB-0039
+KB-0008; KB-0036; KB-0038; KB-0039; KB-0057
 
 Training AI
 Canonical Response
-This article explains the Core plan.
-
-Core is $29.99/month and unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel, full Resume Advice, and the Job Tracker. Confirm the current checkout before purchase.
+The Core plan is $29.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It unlocks unlimited automated daily matching with an email digest, the full sponsorship badge, full Hiring Intel with hiring manager contact, full Resume Advice, the application tracker, and interview practice.
 
 Related Intents
 core plan
-
 $29.99 plan
 automated matching
 full insights
 
 AI Do Rules
 Map the recommendation to stated needs.
-Verify price and checkout.
+Mention the 14-day free trial.
 
-AI Don’t Rules
+AI Don't Rules
 Do not pressure the user.
 Do not promise outcomes from subscribing.
 
@@ -2576,105 +2619,99 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Price-sensitive; review monthly.
+Updated 2026-11-10 for the trial, billing cycles, and interview practice. Price-sensitive; review monthly.
 
 KB-0038 - Premium Plan
 Purpose
-Explain Premium and what it actually includes now that it is live.
+Explain Premium and what it actually includes.
 
 Summary
-Premium is Job-Hopper's top plan, $49.99 per month, built around deeper sponsorship intelligence. It is
-purchasable today, not a waitlist.
+Premium is Job-Hopper's top plan, $49.99 per month (10% off quarterly, 20% off yearly), with a 14-day
+free trial. It adds deeper sponsorship intelligence on top of everything in Core.
 
 Detailed Explanation
-Premium is $49.99/month and includes everything in Core, plus: Real Sponsorship Score (built on actual DOL/USCIS government filing data instead of today's heuristic badge, so far shown on a growing but still partial share of postings as employer matching expands) and the deepest tier of Hiring Manager Contact (Hiring Intel surfaces more contacts per job than Free or Core). It also includes an early version of Apply Intelligence: a note when a posting was recently listed, since early applicants tend to get noticed first, and a nudge to reach out to a hiring contact directly in addition to applying online. Neither of these makes any claim about interview odds or outcomes.
-Sponsor Watch (email alerts when an employer's sponsorship activity changes meaningfully) is built but not yet turned on for customers - do not describe it as available. The Ghost Listing Detector was investigated and is not being built; do not mention it as a Premium feature, current or upcoming.
-Premium should be recommended when sponsorship intelligence materially affects the user's search. Verify current price and checkout on the live pricing page before a definitive quote.
+Premium is $49.99/month and starts with a 14-day free trial (card required). It can also be billed quarterly (10% off) or yearly (20% off).
+Premium includes everything in Core, plus:
+- Real Sponsorship Score, built on actual DOL/USCIS government filing data instead of Core's heuristic badge. It shows on a growing share of postings as more employers are matched to their filing records, so not every job has it.
+- Sponsor Watch: email alerts when an employer's H-1B filing volume changes meaningfully, based on real DOL/USCIS data checked quarterly (not real-time). You turn it on for an employer from a job card and manage your watched employers on the Sponsor Watch page.
+- More hiring manager contacts per job than Core.
+If a user asks about Apply Intelligence: today that is the "Recently posted" flag on listings under 7 days old, which every user sees. If a user asks about the Ghost Listing Detector: it is not available; do not describe it as a feature.
+Premium should be recommended when sponsorship intelligence materially affects the user's search.
 
 Key Benefits
-Deeper sponsorship context backed by real filing data
+Sponsorship context backed by real filing data
+Alerts when watched employers' sponsorship activity changes
 More hiring contacts per job
-Small, honest nudges on when and how to apply
-A specialized path for sponsorship-aware users
 
 Examples
-A user repeatedly asks which employers have relevant sponsorship history; explain Premium's Real
-Sponsorship Score and recommend upgrading.
+A user repeatedly asks which employers have relevant sponsorship history; explain Real Sponsorship
+Score and Sponsor Watch.
 
 FAQs
 How much does Premium cost?
-$49.99 per month; verify the live pricing page before quoting.
-
-Can I buy Premium today?
-Yes, it is a purchasable plan, not a waitlist.
+$49.99 per month, or 10% off quarterly and 20% off yearly.
 
 Does Premium guarantee sponsorship?
 No. Real Sponsorship Score is built on real filing data, but it is still a likelihood signal, not a
-guarantee, and coverage is still expanding across postings.
+guarantee.
+
+How often does Sponsor Watch update?
+Quarterly, when new DOL/USCIS filing data is published.
 
 Related Articles
-KB-0008; KB-0009; KB-0033
+KB-0008; KB-0009; KB-0033; KB-0037
 
 Training AI
 Canonical Response
-This article explains the Premium plan.
-
-Premium is $49.99/month and is purchasable today. It includes everything in Core plus Real Sponsorship
-Score (real government filing data, not the heuristic badge) and the deepest Hiring Manager Contact
-tier, plus early Apply Intelligence nudges. Sponsor Watch is not live yet, and the Ghost Listing
-Detector was investigated but is not being built - do not present either as available.
+The Premium plan is $49.99/month (10% off quarterly, 20% off yearly) and starts with a 14-day free trial. It includes everything in Core plus Real Sponsorship Score (real DOL/USCIS filing data, not the heuristic badge), Sponsor Watch alerts when an employer's H-1B filing volume changes, and more hiring manager contacts per job.
 
 Related Intents
 premium plan
 premium price
 sponsorship plan
+sponsor watch
 $49.99 plan
-is premium available
 
 AI Do Rules
-Confirm Premium is purchasable today when asked.
-Use sponsorship need as the trigger for recommending it.
-Verify current price and checkout before a definitive quote.
+Use sponsorship need as the trigger for recommending Premium.
+Say Sponsor Watch data updates quarterly.
 
-AI Don’t Rules
-Do not describe Sponsor Watch as available.
-Do not mention the Ghost Listing Detector as a current or upcoming feature.
+AI Don't Rules
+Do not present the Ghost Listing Detector as a feature.
+Do not present Apply Intelligence as more than the "Recently posted" flag.
 Do not imply sponsorship is guaranteed.
 
 Sales Opportunity
-Recommend Premium when deeper sponsorship context is relevant to the user's search; it is now a
-straightforward purchase, not something requiring a waitlist explanation.
+Recommend Premium when deeper sponsorship context is relevant to the user's search.
 
 Escalation Rules
-Escalate checkout errors, billing discrepancies, or a user who was told Sponsor Watch or the Ghost
-Listing Detector are available.
+Escalate checkout errors, billing discrepancies, Sponsor Watch alerts that never arrive, or a user who
+was promised the Ghost Listing Detector.
 
 Required Ticket Payload
 Article ID, user email if voluntarily provided, account plan, exact error or question, timestamp, page
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Updated 2026-07-28 to reflect Premium's launch (available_for_purchase flipped true on 2026-07-22,
-migration 20260722130000_premium_sellable.sql). Real Sponsorship Score and Hiring Manager Contact are
-live; Apply Intelligence v1 (recency badge + reach-out nudge) shipped 2026-07-21. Sponsor Watch is
-built but not deployed - re-check before this article is next reviewed. Ghost Listing Detector was
-closed as not viable with current data and should be dropped from all plan-comparison copy, not just
-this article.
+Updated 2026-11-10: Sponsor Watch is deployed (sponsor-watch-check function, scheduled). The
+pricing, FAQ, and choose-plan pages still list the Ghost Listing Detector and Apply Intelligence as
+Premium features; Ghost Listing Detector is not built and the recency flag is shown on all plans.
+Product decision pending on that copy.
 
 KB-0039 - Upgrading, Downgrading, and Cancelling a Subscription
 Purpose
-Provide safe subscription-management guidance while exact controls are validated.
+Provide clear subscription-management guidance.
 
 Summary
-Users should manage plan changes through the current account or billing interface; billing effects
-depend on the live checkout and subscription policy.
+Users change or cancel their plan from the billing settings in their account. Cancelling during the
+14-day free trial means no charge; after that, access continues to the end of the paid period.
 
 Detailed Explanation
-The chatbot may direct a user to visible subscription or billing controls, but it must not promise
-proration, immediate credits, refunds, retained access, or a specific cancellation effective date unless the
-current billing policy confirms it.
-Cancellation should be handled clearly and without retention pressure. Users should receive the
-practical next step and a support path when self-service controls are unavailable.
+Plan changes and cancellation are self-service from the billing settings in the account.
+Cancelling during the 14-day free trial means the user is not charged. Cancelling after the trial stops renewal; access continues until the end of the period already paid for (monthly, quarterly, or yearly).
+When the plan ends, the account, profile, and saved data are kept, but the dashboard requires an active plan again. There is no Free plan to fall back to.
+The chatbot must not promise proration, credits, or refunds; those depend on billing review.
+Cancellation should be handled clearly and without retention pressure.
 
 Key Benefits
 User control
@@ -2682,42 +2719,47 @@ Clear plan management
 Reduced billing confusion
 
 Examples
-A user asks to cancel. The AI explains where to look for billing controls and offers support if the option is
-missing, without trying to block cancellation.
+A user asks to cancel. The AI explains where the billing settings are and what happens to access,
+without trying to block cancellation.
 
 FAQs
 Will I keep access until the end of the period?
-Verify the current billing policy.
+Yes, until the end of the period already paid for.
+
+Will I be charged if I cancel during the trial?
+No.
 
 Will I receive a prorated refund?
-Do not promise; billing must review the current terms.
+Do not promise; billing must review.
+
+What happens to my data?
+It is kept; you need an active plan to use the dashboard again.
 
 Related Articles
-KB-0008; KB-0040; KB-0049
+KB-0008; KB-0036; KB-0040; KB-0049
 
 Training AI
 Canonical Response
-Use the subscription controls in your account if available. Because timing and credits depend on the
-current billing policy, contact support if the option is missing or you need confirmation.
+To cancel or change your subscription, use the billing settings in your account. If you cancel during the 14-day free trial you aren't charged; otherwise you keep access until the end of the period you've paid for. Your account and data aren't deleted, but you'll need an active plan to use the dashboard again. For refunds or proration, contact support@job-hopper.io.
 
 Related Intents
 cancel subscription
-
 upgrade plan
 downgrade plan
 change plan
+cancel trial
 
 AI Do Rules
 Help the user complete the requested action.
 Use neutral language.
 
-AI Don’t Rules
+AI Don't Rules
 Do not hide cancellation instructions.
 Do not promise proration or refunds.
+Do not say the user will drop to a Free plan.
 
 Sales Opportunity
-Do not upsell during a cancellation request. A retention offer is allowed only if a documented, non-
-obstructive policy exists and the user already received cancellation instructions.
+Do not upsell during a cancellation request.
 
 Escalation Rules
 Escalate any plan change that cannot be completed, duplicate subscription, or disputed effective date.
@@ -2727,7 +2769,8 @@ Article ID, user email if voluntarily provided, account plan, exact error or que
 URL, screenshot if available, steps already tried.
 
 Internal Notes
-Product and Billing must validate the exact self-service path and policy before full approval.
+Updated 2026-11-10 after the Free plan was removed. Billing must still publish refund and proration
+policy.
 
 KB-0040 - Billing, Charges, Receipts, and Refund Requests
 Purpose
@@ -3506,7 +3549,7 @@ Do not act as a lawyer, recruiter, employer, or billing approver.
 
 Sales Opportunity
 Sales is permitted only after the direct answer, only for a genuine current need, and only using verified
-plan facts. Free = evaluate; Core = automated daily matching, tracker, full insights; Premium = deeper
+plan facts. Free trial = evaluate; Core = automated daily matching, tracker, full insights; Premium = deeper
 sponsorship intelligence when available.
 ================================================================================
 
@@ -3518,67 +3561,60 @@ Category: University & Enterprise Partnerships
 Department: Sales, Product
 Audience: Enterprise, Student, Internal
 Owner: GTM/business lead
-Status: Draft
-Version: 1.0
-AI Approved: No
-Last Updated: 2026-07-16
+Status: Approved
+Version: 2.0
+AI Approved: Yes
+Last Updated: 2026-11-10
 Review Cycle: Quarterly
 Risk Level: Medium
-Live State: Planned
-Keywords: university partnership, campus program, career services, bulk student access
-Related Articles: KB-0005; KB-0008; KB-0038
-Source of Truth: Job-Hopper Campus Partnership Program materials (internal); requires product-owner
-confirmation before external use
+Live State: Live
+Keywords: university partnership, campus license, career services, bulk student access, student seats
+Related Articles: KB-0052; KB-0054; KB-0058
+Source of Truth: partner-portal and admin-org-accounts edge functions; /universities page
 
 Purpose
-Give sales, support, and the chatbot one accurate description of the proposed Campus Partnership
-Program so it is never presented as an active offering before approval.
+Give sales, support, and the chatbot one accurate description of the university partnership program.
 
 Summary
-Job-Hopper has drafted a Campus Partnership Program concept that would give university career-services
-teams bulk student access, recurring coaching, and engagement/outcome analytics. The program is a
-proposed commercial concept, not a live offering, and has no confirmed pricing, launch date, or signed
-institution.
+Universities can buy a Job-Hopper campus license that covers a set number of students. Students with a
+university email get a seat automatically, and career-services staff get a dashboard showing how their
+students are using it.
 
 Detailed Explanation
-The concept positions Job-Hopper as a student-success and graduate-employability platform rather than a
-bulk software purchase, combining campus access, career technology, live coaching, and a future
-analytics/employer-connectivity layer. Proposed components include a campus license for defined student
-cohorts, monthly or quarterly coaching sessions, an institution-branded landing page, a career-services
-dashboard, and a longer-term employer-partnership layer. None of these components are built, priced, or
-contractually available today. Any inbound interest must go through discovery with the partnerships/product
-owner before any commitment is made.
+University partnerships are live. A university (usually career services or an international student office) buys a campus license for a number of student seats.
+Students sign up with their university email address. Once they verify that email, they get a seat automatically and full access to Job-Hopper; they don't pick a plan or enter a card.
+Career-services staff get their own partner dashboard showing seat usage and student engagement (see KB-0054).
+Licenses are paid; Job-Hopper does not run free pilots (see KB-0052). Pricing depends on the number of students covered, so it is quoted per institution: universities request it with the form on the Universities page, and the team follows up.
+Coaching sessions are not part of the license today (see KB-0053).
 
 Key Benefits
-Centralized access for defined student cohorts once live
-A structured coaching option for career-services teams
-Planned visibility into student engagement and outcomes
-A single point of contact for institution-specific requirements
+Access for a whole student cohort under one license
+Automatic seats by university email, no codes to hand out
+A dashboard for career-services staff
+Real sponsorship data for international students
 
 Examples
-A university career-services director emails asking about bulk licenses for graduating seniors — response
-should describe the concept as proposed and route to discovery, not quote terms.
-A student asks whether their school already has a Job-Hopper partnership — response should say no
-confirmed partnerships exist unless the specific institution is documented as approved.
+A career-services director asks about bulk access for graduating seniors: explain the campus license and
+point them to the Universities page form to request pricing.
+A student asks whether their school has Job-Hopper: tell them to sign up with their university email; if
+their school has a license, they get access automatically.
 
 FAQs
-Is the university program available now?
-No. It is a proposed concept awaiting product-owner approval.
+Can our university buy licenses?
+Yes. Request campus pricing with the form on the Universities page.
 
-Can our university buy licenses today?
-Not yet. A discovery conversation with the partnerships team is the first step.
+How do students get access?
+By signing up with, and verifying, their university email address.
 
-Does having this conversation commit either side to anything?
-No. Discovery is non-binding; pricing, pilot terms, and scope require separate approval.
+Is there a free pilot?
+No. Licenses are paid, but you choose how many students to cover and can add seats later.
 
 Related Articles
-KB-0005; KB-0008; KB-0038
+KB-0052; KB-0053; KB-0054; KB-0058
 
 Training AI
 Canonical Response
-Job-Hopper has a draft concept for university partnerships that would give career-services teams bulk
-student access and coaching, but it isn't a live program yet. I can connect you with our partnerships team
-for a discovery conversation.
+University partnerships: universities can buy a Job-Hopper campus license covering a number of students. Students who sign up with their university email get a seat automatically, and career-services staff get a dashboard showing how students are using it. Pricing depends on how many students you want covered; request it with the form on our Universities page and the team will follow up.
 
 Related Intents
 university partnership
@@ -3588,126 +3624,126 @@ career services partnership
 does my school have job hopper
 
 AI Do Rules
-State clearly that the program is proposed and not yet live.
-Use "proposed," "concept," "pilot" language, never "our partner university" language.
-Offer to route the person to a human contact for discovery.
+Point institutions to the Universities page form for pricing.
+Tell students to sign up with their university email to check whether they're covered.
 
 AI Don't Rules
-Do not quote pricing, discounts, timelines, or availability.
-Do not claim any specific university is currently using Job-Hopper.
-Do not describe the career-services dashboard or coaching cadence as live.
+Do not quote university prices or discounts.
+Do not name specific partner universities.
+Do not offer a free pilot or coaching sessions.
 
 Sales Opportunity
-Use the discovery questions from the Operating Manual (cohort size, current tools, pain points, data/
-security/procurement needs) to scope interest. Escalate to the product owner before quoting any
-commercial terms.
+Route every institutional inquiry to the Universities page form or the partnerships team.
 
 Escalation Rules
-Escalate every university or partnership inquiry to the designated partnerships owner. No support agent
-or chatbot response may commit to pricing, timeline, or availability.
+Escalate contract, procurement, security-review, and data-privacy questions to the partnerships owner.
 
 Required Ticket Payload
-Institution name, contact name and email, approximate student cohort size, current career-services tools
-in use, desired timeline, specific ask.
+Institution name, contact name and email, number of students to cover, current career-services tools,
+desired start date, specific ask.
 
 Internal Notes
-Sourced from Job-Hopper Campus Partnership Program materials and Operating Manual Section 11.
-Pricing, pilot terms, and dashboard scope require product-owner and Legal/Privacy sign-off before any
-public commitment.
+Rewritten 2026-11-10: the partner program shipped 2026-10-16/20 (partner-portal, email-domain seat
+claiming, pay-first licenses). Per-seat price = base plan price, discount set per deal by an admin.
 
 ---
 
-KB-0052 - Campus Pilot Program
+KB-0052 - University License Billing and Seats
 
 Article ID: KB-0052
-Title: Campus Pilot Program
+Title: University License Billing and Seats
 Category: University & Enterprise Partnerships
 Department: Sales, Product
 Audience: Enterprise, Internal
 Owner: GTM/business lead
-Status: Draft
-Version: 1.0
-AI Approved: No
-Last Updated: 2026-07-16
+Status: Approved
+Version: 2.0
+AI Approved: Yes
+Last Updated: 2026-11-10
 Review Cycle: Quarterly
 Risk Level: Medium
-Live State: Planned
-Keywords: campus pilot, university pilot program, pilot metrics
-Related Articles: KB-0051; KB-0020; KB-0038
-Source of Truth: Job-Hopper Campus Partnership Program materials (internal); requires product-owner
-confirmation before external use
+Live State: Live
+Keywords: campus license billing, invoice, student seats, add seats, seat limit, waitlist
+Related Articles: KB-0051; KB-0054; KB-0058
+Source of Truth: partner-portal and admin-org-accounts edge functions; /universities page
 
 Purpose
-Define the proposed pilot structure consistently so any pilot conversation doesn't over-promise scope,
-duration, or results.
+Explain how a university license is billed and how seats work.
 
 Summary
-A campus pilot would run for roughly 100 students over 30 to 60 days with mutually agreed success
-metrics. Nothing is scheduled, contracted, or currently running.
+A university license is paid up front by invoice, billed monthly or yearly for a set number of seats.
+Seats go live for students as soon as the first invoice is paid. There are no free pilots.
 
 Detailed Explanation
-The draft pilot concept proposes a defined cohort size and time window so an institution can evaluate fit
-before any larger commitment. Proposed metrics include activation rate, profile completion, monthly
-active users, jobs viewed/saved, applications (definition still required — manual vs system-tracked),
-resume-workflow completion, workshop attendance, and student satisfaction. Placement outcomes may
-only ever be reported where verified and directly attributable — never estimated or implied.
+When a university agrees terms, Job-Hopper sets up the license and Stripe emails the invoice to the university's billing contact. It can be paid by card or bank transfer and is due in 30 days.
+Students can't claim seats until the first invoice is paid; seats switch on automatically once it is.
+Licenses renew monthly or yearly, and each renewal is invoiced automatically.
+The license covers a fixed number of seats. Staff can see seat usage on their dashboard and request more seats there; extra seats are invoiced for the rest of the current period.
+If every seat is taken, a new student is placed on a waitlist and staff are emailed.
+Staff can release a seat (for example, when a student graduates). That student keeps their account but loses university-provided access and isn't re-added automatically.
+If a renewal invoice is overdue, students keep access for a 30-day grace period before it pauses; it's restored as soon as the invoice is paid.
+Job-Hopper does not run free pilots.
 
 Key Benefits
-A measurable, time-boxed trial before any larger commitment
-Defined, agreed-upon metrics so both sides evaluate the same thing
-A structured way to surface data, security, and accessibility requirements early
+Simple invoice billing that fits purchase-order processes
+Seats activate automatically on payment
+Room to grow with added seats
 
 Examples
-A career-services director asks what a pilot would look like — describe the proposed ~100-student,
-30–60 day structure and route to the partnerships/product owner to scope specifics.
+A director asks for a free trial for their students: explain licenses are paid, they can start with the
+number of students they want and add seats later.
+Staff ask why students can't get in yet: check whether the first invoice has been paid.
 
 FAQs
-How long does a pilot run?
-Proposed at 30 to 60 days; not finalized.
+Is there a free pilot?
+No. Licenses are paid.
 
-How many students are included?
-Proposed at roughly 100; negotiable pending approval.
+When do students get access?
+As soon as the first invoice is paid.
 
-What metrics are tracked?
-Activation, profile completion, monthly active users, jobs viewed/saved, resume completion, workshop
-attendance, and satisfaction. Placement outcomes only when verified and attributable.
+What if we run out of seats?
+New students are waitlisted and you're emailed; request more seats from your dashboard.
+
+What if our invoice is late?
+Students keep access for 30 days past the due date.
 
 Related Articles
-KB-0051; KB-0020; KB-0038
+KB-0051; KB-0054; KB-0058
 
 Training AI
 Canonical Response
-A campus pilot is proposed as roughly 100 students over 30 to 60 days with agreed success metrics, but
-nothing is scheduled yet. I can connect you with our partnerships team to scope one.
+University license billing: a campus license is paid by invoice (card or bank transfer, due in 30 days), billed monthly or yearly for a set number of student seats. Students can claim seats as soon as the first invoice is paid. If seats run out, new students are waitlisted and you can request more from your dashboard. We don't run free pilots.
 
 Related Intents
 campus pilot
-university pilot program
-pilot metrics
-student cohort trial
+free pilot university
+university invoice
+add seats
+seats full
+license renewal
 
 AI Do Rules
-Describe the proposed scope and metric categories accurately.
-Route actual scheduling and metric commitments to the partnerships/product owner.
+Explain seats activate when the first invoice is paid.
+Route invoice, payment, and seat-change requests to the partnerships team.
 
 AI Don't Rules
-Do not claim any pilot is currently running.
-Do not promise placement-rate outcomes or guarantee results.
+Do not offer a free pilot or trial for institutions.
+Do not quote prices or discounts.
+Do not promise payment terms beyond the 30-day due date.
 
 Sales Opportunity
-Use the proposed metrics list to shape a discovery conversation. Get product-owner sign-off before
-agreeing to any specific metric or timeline.
+Suggest starting with the number of students the university wants to cover now and adding seats later.
 
 Escalation Rules
-Escalate scheduling, metric commitments, and data-sharing questions to the product/partnerships owner
-and to Legal/Privacy for education-data review.
+Escalate invoice disputes, payment problems, procurement paperwork, and seat-count changes to the
+partnerships owner.
 
 Required Ticket Payload
-Institution, contact, proposed cohort size, desired start date, specific metrics of interest.
+Institution, contact, invoice number if any, current seat count, requested change.
 
 Internal Notes
-Placement-outcome metrics must never be marketed without verified, attributable data (Operating Manual
-Section 11.4).
+Replaces the old Campus Pilot Program article (free pilots were dropped 2026-10-20; licenses start as
+pending_payment until the first invoice is paid). Grace period: org_account_is_live(), 30 days.
 
 ---
 
@@ -3719,177 +3755,167 @@ Category: University & Enterprise Partnerships
 Department: Sales, Product
 Audience: Enterprise, Student, Internal
 Owner: GTM/business lead
-Status: Draft
-Version: 1.0
-AI Approved: No
-Last Updated: 2026-07-16
+Status: Approved
+Version: 2.0
+AI Approved: Yes
+Last Updated: 2026-11-10
 Review Cycle: Quarterly
 Risk Level: Medium
-Live State: Planned
+Live State: Not offered
 Keywords: career coaching, university coaching, resume workshops, interview prep sessions
-Related Articles: KB-0051; KB-0031; KB-0033
-Source of Truth: Job-Hopper Campus Partnership Program materials (internal); requires product-owner
-confirmation before external use
+Related Articles: KB-0051; KB-0057
+Source of Truth: partner-portal edge function; /partner dashboard
 
 Purpose
-Describe the proposed coaching component of the campus program accurately, without implying a
-scheduled or staffed service.
+Answer questions about live career coaching accurately: it is not part of what Job-Hopper offers today.
 
 Summary
-The draft partnership concept includes monthly or quarterly coaching sessions covering resume,
-LinkedIn, networking, interviews, salary, and international/sponsorship-aware search. This is proposed,
-not a confirmed deliverable.
+Job-Hopper does not offer live career coaching sessions, for universities or individuals. The product
+includes self-serve tools such as Resume Advice and interview practice instead.
 
 Detailed Explanation
-Coaching is envisioned as a recurring, structured complement to the core product rather than a one-off
-session. Cadence, facilitator model (internal staff vs. contracted coaches), and exact topic list are not yet
-finalized. Any institution asking about coaching should be told the concept exists but specifics are
-pending product-owner approval.
+Live coaching sessions (workshops or one-to-one coaching on resumes, LinkedIn, interviews, or salary) are not included in a university license or any plan.
+What students do get is self-serve: Resume Advice, per-job resume tailoring, and AI interview practice with mock questions and feedback for a specific job (see KB-0057).
+If an institution specifically wants coaching, note the interest and route it to the partnerships team; do not commit to anything.
 
 Key Benefits
-A structured, recurring skill-building offering once approved
-Topics aligned with common student and international-candidate needs
+Clear expectations for institutions
+Points students to the self-serve tools that exist
 
 Examples
-Career-services staff ask if coaching is included in a campus license — explain the proposed scope and
-confirm nothing is scheduled until approved.
+Career-services staff ask if coaching is included in a campus license: say it isn't, describe Resume
+Advice and interview practice, and offer to pass the interest on.
 
 FAQs
-What topics would coaching cover?
-Resume, LinkedIn, networking, interview preparation, salary negotiation, and international/sponsorshipaware search.
+Is coaching included in a university license?
+No.
 
-How often would sessions happen?
-Proposed as monthly or quarterly; not finalized.
-
-Who delivers the sessions?
-Not yet defined; escalate to the partnerships/product owner.
+Can students practice interviews?
+Yes, with AI interview practice for a specific job.
 
 Related Articles
-KB-0051; KB-0031; KB-0033
+KB-0051; KB-0057
 
 Training AI
 Canonical Response
-Career coaching is part of the proposed university partnership concept, covering things like resume,
-LinkedIn, interview prep, and international job search — but cadence and delivery aren't finalized yet.
+Job-Hopper doesn't offer live career coaching sessions, including as part of a university license. Students can use self-serve tools instead: Resume Advice, per-job resume tailoring, and AI interview practice with mock questions and feedback for a specific job.
 
 Related Intents
 career coaching university
 resume workshop university
 interview prep sessions
-sponsorship aware coaching
+coaching sessions
 
 AI Do Rules
-Describe the proposed topic list accurately.
-Note that cadence and facilitator model are undecided.
+Say clearly that live coaching isn't offered.
+Mention interview practice and Resume Advice.
 
 AI Don't Rules
-Do not commit to a specific cadence, facilitator, or start date.
-Do not imply coaching is currently being delivered anywhere.
+Do not imply coaching is included, scheduled, or coming.
+Do not commit to a cadence, facilitator, or start date.
 
 Sales Opportunity
-Mention coaching as a differentiator once the partnership is approved; do not commit cadence or
-facilitator model without product-owner sign-off.
+Note institutional coaching interest and route it to the partnerships team.
 
 Escalation Rules
-Escalate all coaching-scope and staffing questions to the partnerships/product owner.
+Escalate institutional coaching requests to the partnerships owner.
 
 Required Ticket Payload
-Institution, contact, preferred topics, preferred cadence.
+Institution, contact, preferred topics.
 
 Internal Notes
-Facilitator model (internal staff vs. contracted coaches) is unresolved and must be decided before any
-public marketing of this component.
+Rewritten 2026-11-10. Coaching was part of an early partnership concept and was never built.
 
 ---
 
-KB-0054 - University Career Services Dashboard
+KB-0054 - University Partner Dashboard
 
 Article ID: KB-0054
-Title: University Career Services Dashboard
+Title: University Partner Dashboard
 Category: University & Enterprise Partnerships
 Department: Product, Legal/Privacy
 Audience: Enterprise, Internal
 Owner: Product owner
-Status: Draft
-Version: 1.0
-AI Approved: No
-Last Updated: 2026-07-16
-Review Cycle: Monthly
+Status: Approved
+Version: 2.0
+AI Approved: Yes
+Last Updated: 2026-11-10
+Review Cycle: Quarterly
 Risk Level: High
-Live State: Planned
-Keywords: university dashboard, career services analytics, student data, FERPA
-Related Articles: KB-0047; KB-0051
-Source of Truth: Job-Hopper Campus Partnership Program materials (internal); requires Legal/Privacy
-review before any external use
+Live State: Live
+Keywords: university dashboard, partner dashboard, career services analytics, staff access, student data
+Related Articles: KB-0047; KB-0051; KB-0052; KB-0058
+Source of Truth: partner-portal edge function; /partner dashboard
 
 Purpose
-Describe the proposed career-services dashboard accurately and flag that student-data governance is
-unresolved.
+Explain what the university partner dashboard shows, who can see it, and how staff get access.
 
 Summary
-A planned/proposed dashboard would give career-services staff visibility into activation, engagement,
-applications, workshop attendance, and outcomes for their student cohort. It is not built, and the data
-governance around it (education-data roles, permissions, exports, retention) is not yet defined.
+Career-services staff at a partner university get a partner dashboard showing seat usage and how their
+students are using Job-Hopper. Staff are invited by email and sign in with their own account.
 
 Detailed Explanation
-Before any dashboard work begins, Job-Hopper must define whether it is a school official/service
-provider for education-data purposes, what data the institution actually shares, data controller/processor
-roles, breach-notification duties, and export/retention rules. No FERPA, SOC 2, GDPR, CCPA, or similar
-compliance status may be claimed unless formally established and documented.
+How staff get access: Job-Hopper adds a staff member's work email to the university's partner account and sends them an invitation email. They create a Job-Hopper account with that same email (or sign in if they already have one), verify it, and land on their partner dashboard. Job-Hopper never sends passwords; staff choose their own. Staff don't use up student seats. To add or remove staff, the university contacts Job-Hopper.
+What the dashboard shows: the license and billing status (including the latest invoice and pay link), seats used and available, any waitlist, and a roster of students with their status, sign-up date, last activity, and counts of matches, applications, interviews, and practice interviews. It also shows cohort-level views: an engagement funnel, weekly activity, the share of international students, and the most common employers students applied to across the whole cohort.
+What it doesn't show: which companies or jobs an individual student applied to. Individual job searches and applications stay private to each student.
+Staff can filter the roster, export it as CSV, print a summary report without student names, release seats, and request more seats.
 
 Key Benefits
-Planned cohort-level visibility for career-services staff once built and governed appropriately
+Visibility into student engagement for career services
+Self-serve seat management
+A shareable summary report
 
 Examples
-A career-services director asks what student data they would be able to see — explain the proposed
-metric categories and note that data governance must be finalized first.
+A director asks what they will see about students: explain the roster with counts and status, and that
+individual applications stay private.
+New staff can't access the dashboard: check they signed up with exactly the invited email and verified
+it.
 
 FAQs
-Is the dashboard live?
-No.
+How do I get access to my university's dashboard?
+Ask Job-Hopper to add your work email, then create an account with that email from the invitation.
 
-What would it show?
-Activation, engagement, applications, workshop attendance, and outcomes, once defined.
+Can we see which jobs a student applied to?
+No. Only counts and cohort-level summaries.
 
 Is student data protected under FERPA?
-Not yet established. Any specific compliance question must go to Legal/Privacy — do not answer this
-from the chatbot.
+Route any specific compliance question to Legal/Privacy; do not answer it from the chatbot.
 
 Related Articles
-KB-0047; KB-0051
+KB-0047; KB-0051; KB-0052; KB-0058
 
 Training AI
 Canonical Response
-A university dashboard is planned to give career-services staff visibility into student engagement and
-outcomes, but it isn't built yet, and the data-privacy framework around it is still being defined.
+University partner dashboard: staff get access by invitation. Job-Hopper adds your work email and sends you an invite; you create an account with that same email (or sign in), and you land on your dashboard. It shows your license and invoices, seat usage, a student roster with status and activity counts, and cohort-level engagement reports. It never shows which jobs an individual student applied to.
 
 Related Intents
 university dashboard
+partner dashboard login
 career services analytics
 student data privacy
-FERPA job hopper
+staff access
 
 AI Do Rules
-State clearly that the dashboard is planned, not live.
-Route any specific data-privacy or compliance question to Legal/Privacy.
+Explain the invitation-based access clearly.
+Say individual applications stay private.
+Route compliance questions to Legal/Privacy.
 
 AI Don't Rules
 Never claim FERPA, SOC 2, GDPR, or CCPA compliance unless formally confirmed.
-Never claim the dashboard is live or describe specific screens as if they exist.
+Never say staff can see individual students' applications or employers.
 
 Sales Opportunity
-May be mentioned as a future differentiator; do not commit to specific metrics, screens, or a timeline.
+Mention the dashboard and summary report as a reason universities choose Job-Hopper.
 
 Escalation Rules
-Escalate any data-privacy, compliance, or education-data question immediately to Legal/Privacy.
-Escalate build-scope questions to the product owner.
+Escalate access problems, staff changes, and any data-privacy or compliance question.
 
 Required Ticket Payload
-Institution, contact, specific data or compliance question, desired metrics.
+Institution, staff email, specific data or compliance question.
 
 Internal Notes
-Data controller/processor roles and breach-notification duties must be defined before any dashboard
-work begins (Operating Manual Section 13.3).
+Rewritten 2026-11-10: dashboard is live at /partner (partner_insights RPC). Privacy.vue does not yet
+describe the data shared with partner universities; Legal/Privacy to update.
 
 ---
 
@@ -4107,3 +4133,163 @@ Internal Notes
 Source: docs/recruiter-visible-mode-build-plan.md, Phases 1-6. Admin review, daily rate caps, and
 exclusion-event logging (Phase 6) shipped 2026-08-07. Re-verify this article if reveal-request
 mechanics, anonymized fields, or verification requirements change.
+
+KB-0057 - Interview Practice
+Purpose
+Explain interview practice: what it is, where to find it, and who has it.
+
+Summary
+Interview practice gives you AI-generated mock interview questions tailored to a specific job you've
+been matched with, and feedback on your answers. It is included in Core and Premium.
+
+Detailed Explanation
+Open any matched job and choose "Practice interview for this job". Job-Hopper generates mock interview questions based on that role, you type your answers, and you get feedback on each one to help you prepare.
+Practice is unlimited on Core and Premium, and is also available to students covered by a university license.
+Feedback is AI-generated coaching for preparation only. It does not predict whether you will get an interview or an offer, and it is not a human coach.
+
+Key Benefits
+Preparation tailored to a real job
+Practice as often as you like
+Immediate feedback on your answers
+
+Examples
+A user has an interview next week for a matched role: suggest opening the job and starting interview
+practice.
+
+FAQs
+Where do I find interview practice?
+On the job's page: "Practice interview for this job".
+
+Is there a limit?
+No limit on Core or Premium.
+
+Is it a real person?
+No. Questions and feedback are AI-generated.
+
+Related Articles
+KB-0021; KB-0037; KB-0053
+
+Training AI
+Canonical Response
+Interview practice: open any matched job and choose "Practice interview for this job". You get mock interview questions tailored to that role and feedback on each answer you give. It's unlimited on Core and Premium. The feedback is AI-generated to help you prepare; it isn't a prediction of how the real interview will go.
+
+Related Intents
+interview practice
+mock interview
+interview prep
+practice questions
+
+AI Do Rules
+Tell the user exactly where to start it.
+Describe the feedback as preparation, not a prediction.
+
+AI Don't Rules
+Do not promise interview or offer outcomes.
+Do not describe it as a human coach.
+
+Sales Opportunity
+Interview practice is a reason to choose Core for users who are already getting interviews.
+
+Escalation Rules
+Escalate practice sessions that fail to load or return no feedback.
+
+Required Ticket Payload
+Article ID, user email if voluntarily provided, account plan, job link, exact error, timestamp,
+screenshot if available.
+
+Internal Notes
+Added 2026-11-10. interview-practice edge function; unlimited for core/premium base tier.
+
+KB-0058 - Job-Hopper Through Your University (Students)
+
+Article ID: KB-0058
+Title: Job-Hopper Through Your University (Students)
+Category: University & Enterprise Partnerships
+Department: Support, Product
+Audience: Student
+Owner: Product owner
+Status: Approved
+Version: 1.0
+AI Approved: Yes
+Last Updated: 2026-11-10
+Review Cycle: Quarterly
+Risk Level: Medium
+Live State: Live
+Keywords: university access, student seat, school email, provided by university, waitlist, graduated
+Related Articles: KB-0011; KB-0051; KB-0052; KB-0054
+Source of Truth: claim_partner_seat database function; onboarding and dashboard
+
+Purpose
+Answer students' questions about getting Job-Hopper through their university.
+
+Summary
+If your university has a Job-Hopper license, sign up with your university email and verify it; you get a
+seat automatically and don't pick a plan or pay.
+
+Detailed Explanation
+Sign up with your university email address (for example you@university.edu) and verify it from the email we send. If your university has a license with a free seat, you get it automatically.
+Covered students skip the plan step in onboarding, and the dashboard shows that access is provided by the university. There is no card and no charge.
+If you signed up with a personal email, your university seat can't be matched to it; sign up with your university email instead.
+If you're asked to choose a plan, your university either doesn't have a license, your email domain isn't covered, or your email isn't verified yet.
+If all of your university's seats are taken, you're placed on a waitlist and your career-services office is told. You'll get a seat automatically the next time you sign in after one frees up.
+University access lasts while your school's license is active and you hold a seat. If your school releases your seat (for example after graduation), your account and data stay, but you'd need your own plan to keep using Job-Hopper.
+Career-services staff can see your name, email, sign-up date, last activity, and counts of your matches, applications, and practice interviews. They can't see which jobs or companies you applied to.
+
+Key Benefits
+Full access at no cost to the student
+No codes; your university email is enough
+Your individual applications stay private
+
+Examples
+A student is asked to pick a plan: check they signed up with, and verified, their university email.
+A student says seats are full: explain the waitlist.
+
+FAQs
+How do I get Job-Hopper through my university?
+Sign up with your university email and verify it.
+
+Do I need to pay or add a card?
+No, if your university covers you.
+
+Can my university see my applications?
+They see counts and activity, not which jobs or companies you applied to.
+
+What happens when I graduate?
+If your school releases your seat, you keep your account but need your own plan to continue.
+
+Related Articles
+KB-0011; KB-0051; KB-0052; KB-0054
+
+Training AI
+Canonical Response
+Getting Job-Hopper through your university: sign up with your university email address and verify it. If your school has a license with a free seat, you get access automatically, with no plan to pick and nothing to pay. If you're asked to choose a plan, check you used and verified your university email; if seats are full you'll be waitlisted. Your career-services office sees your activity counts, but not which jobs you applied to.
+
+Related Intents
+university access
+my school pays
+student seat
+school email
+asked to pay as a student
+seats full waitlist
+graduated lost access
+
+AI Do Rules
+Tell students to use and verify their university email.
+Explain what staff can and can't see.
+
+AI Don't Rules
+Do not confirm whether a specific university has a license.
+Do not promise a seat when seats are full.
+
+Sales Opportunity
+None for covered students. A student whose seat was released can be pointed to Core's 14-day trial.
+
+Escalation Rules
+Escalate students who used their university email, verified it, and still weren't given a seat.
+
+Required Ticket Payload
+Student email, university name, screenshot of what they see, timestamp.
+
+Internal Notes
+Added 2026-11-10. Seats are claimed by claim_partner_seat() on sign-in after email verification;
+partner staff emails never take a student seat.

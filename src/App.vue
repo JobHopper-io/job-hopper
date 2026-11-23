@@ -130,34 +130,42 @@ onUnmounted(() => {
 
 onMounted(async () => {
   try {
-    // First-touch paid/campaign attribution for signups that land directly on the
-    // SPA (e.g. an ad link), mirroring landing_path's capture on static SEO pages
-    // (scripts/generate-seo-pages.mjs). Read once per app load; never overwritten.
-    try {
-      const params = new URLSearchParams(window.location.search)
-      const utmSource = params.get('utm_source')
-      const utmCampaign = params.get('utm_campaign')
-      const utmMedium = params.get('utm_medium')
-      if (utmSource) sessionStorage.setItem('utm_source', utmSource)
-      if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign)
-      if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium)
-    } catch {
-      // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
-    }
+    // An unsubscribe visit is never acquisition: skip attribution entirely there, so its
+    // query string (the token) and a webmail referrer (e.g. google.com via Gmail's link
+    // redirect) can't be recorded as first touch. landing_path is only ever set by the
+    // static SEO pages' beacon, never on SPA routes like /unsubscribe.
+    const captureAttribution = !window.location.pathname.startsWith('/unsubscribe')
 
-    // Organic-referral fallback (no utm tag needed) for the same first-touch moment -
-    // only meaningful on this initial load (App.vue mounts once per full page load,
-    // not per in-app route change) and only when it's an external site, not our own
-    // client-side navigation re-entering via a full reload.
-    try {
-      if (document.referrer) {
-        const referrerHost = new URL(document.referrer).hostname
-        if (referrerHost && referrerHost !== window.location.hostname) {
-          sessionStorage.setItem('referrer_host', referrerHost)
-        }
+    if (captureAttribution) {
+      // First-touch paid/campaign attribution for signups that land directly on the
+      // SPA (e.g. an ad link), mirroring landing_path's capture on static SEO pages
+      // (scripts/generate-seo-pages.mjs). Read once per app load; never overwritten.
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const utmSource = params.get('utm_source')
+        const utmCampaign = params.get('utm_campaign')
+        const utmMedium = params.get('utm_medium')
+        if (utmSource) sessionStorage.setItem('utm_source', utmSource)
+        if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign)
+        if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium)
+      } catch {
+        // sessionStorage unavailable (privacy mode, etc.) - attribution is best-effort.
       }
-    } catch {
-      // Malformed/opaque referrer - attribution is best-effort.
+
+      // Organic-referral fallback (no utm tag needed) for the same first-touch moment -
+      // only meaningful on this initial load (App.vue mounts once per full page load,
+      // not per in-app route change) and only when it's an external site, not our own
+      // client-side navigation re-entering via a full reload.
+      try {
+        if (document.referrer) {
+          const referrerHost = new URL(document.referrer).hostname
+          if (referrerHost && referrerHost !== window.location.hostname) {
+            sessionStorage.setItem('referrer_host', referrerHost)
+          }
+        }
+      } catch {
+        // Malformed/opaque referrer - attribution is best-effort.
+      }
     }
 
     const user = await authAPI.getSessionUser()

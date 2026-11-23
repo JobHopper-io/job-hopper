@@ -20,7 +20,7 @@ import {
   renderJobMatchDigest,
   type JobSummary,
 } from '../_shared/email-templates.ts'
-import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import { getTransactionalFooterLinks } from '../_shared/unsubscribe-token.ts'
 import { configRowToOverride } from '../_shared/matching-algorithm-config-row.ts'
 import { mergeConfigOverrides } from '../_shared/merge-match-config.ts'
 
@@ -331,7 +331,7 @@ serve(async (req) => {
             aiBriefing: j.aiBriefing,
             applyLink: j.applyLink,
           }))
-          const footer = await getFooterLinksForProfile(payload.profile_id)
+          const footer = await getTransactionalFooterLinks(payload.profile_id, profile.email)
           const { html, text } = renderJobMatchDigest({
             recipientName: profile.first_name?.trim() || 'there',
             jobs: jobSummaries,
@@ -342,6 +342,7 @@ serve(async (req) => {
             },
           })
           const result = await sendEmail({
+            kind: 'transactional',
             to: profile.email,
             subject: 'Your new Job-Hopper matches',
             html,

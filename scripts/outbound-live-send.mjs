@@ -14,7 +14,15 @@
 //   when multiple leads share a contact (see outbound-dry-run.mjs's buildDedupedSends).
 // - exclusion_lists is checked once up front (to keep dedup groups clean) AND re-checked
 //   fresh immediately before each individual send, so a suppression added mid-run still
-//   takes effect for sends later in the batch.
+//   takes effect for sends later in the batch. suppressed_emails (per address, via the
+//   is_email_suppressed RPC) is checked at the same two points; an RPC error stops the run.
+// - Every email ends with the postal address (OUTBOUND_POSTAL_ADDRESS) and a signed
+//   per-recipient unsubscribe link, and carries List-Unsubscribe / List-Unsubscribe-Post
+//   one-click headers (outbound-unsubscribe.mjs). A real send refuses to start if
+//   OUTBOUND_POSTAL_ADDRESS or UNSUBSCRIBE_EMAIL_SECRET is missing.
+// - Every attempt (sent, failed, or blocked by suppression) writes one email_events row
+//   (type 'outbound', campaign, institutional_lead_id, provider_message_id), the send log;
+//   institutional_leads' last-send columns stay as a cache. Preview writes nothing.
 // - institutional_leads.status -> 'contacted' and campaign -> the given tag are written
 //   ONLY after a confirmed-successful send, for every lead folded into that send (not
 //   just the primary one whose template was used). A failed send leaves status
@@ -29,6 +37,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, requireEnv } from './outbound-dry-run.mjs';
+import { listUnsubscribeHeaders, makeFooterFor, normalizeEmail, readFooterConfig } from './outbound-unsubscribe.mjs';
 
 const DEFAULT_DELAY_MS = 2000;
 const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
@@ -50,7 +59,7 @@ function parseFromAddress(raw, fallbackName) {
   return { email: raw.trim(), name: fallbackName };
 }
 
-async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo }) {
+async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo, headers }) {
   // The display name is set per lead category by fromNameForCategory (Job-Hopper
   // University Partnerships / Job-Hopper Partnerships) -- it always wins over whatever
   // name MAILTRAP_FROM might embed. Only the *address* is extracted from `from`; the
@@ -65,6 +74,11 @@ async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, tex
   // anyway so a caller passing null still produces a valid payload.
   if (replyTo) {
     payload.reply_to = { email: replyTo.trim() };
+  }
+  // Mailtrap's `headers` field (Record<string, string>, per the mailtrap-nodejs SDK types):
+  // List-Unsubscribe + List-Unsubscribe-Post for one-click unsubscribe.
+  if (headers && Object.keys(headers).length > 0) {
+    payload.headers = headers;
   }
   const res = await fetch(MAILTRAP_BASE, {
     method: 'POST',
@@ -91,6 +105,90 @@ async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, tex
   return { success: true, messageId };
 }
 
+// Per-address suppression (suppressed_emails via the is_email_suppressed RPC, same check
+// sendEmail runs). Cold outbound is always kind 'marketing'. An RPC error throws and stops
+// the run -- fail closed, same as an exclusion_lists query error.
+export async function isEmailSuppressed(supabase, email) {
+  const { data, error } = await supabase.rpc('is_email_suppressed', { p_email: email, p_kind: 'marketing' });
+  if (error) throw new Error(`Failed to check suppressed_emails for ${email.split('@')[1] ?? 'address'}: ${error.message}`);
+  if (typeof data !== 'boolean') throw new Error(`is_email_suppressed returned ${JSON.stringify(data)}`);
+  return data;
+}
+
+// email_events is the send log (growth step 3): one row per send attempt -- sent, failed,
+// or blocked by suppression -- with type 'outbound'. A merged send (one email for several
+// leads sharing a contact) is one row: institutional_lead_id is the primary lead and the
+// payload lists all of them. The webhook later moves status to delivered/bounced/complained
+// by provider_message_id.
+export function outboundEventRow({ toEmail, leadIds, orgNames, category, merged = false, subject = null, campaign, status, messageId = null, error = null, blockedReason = null }) {
+  return {
+    type: 'outbound',
+    profile_id: null,
+    institutional_lead_id: leadIds[0] ?? null,
+    to_email_normalized: normalizeEmail(toEmail),
+    campaign,
+    subject,
+    template_key: category ? `outbound_${category}${merged ? '_generic' : ''}` : null,
+    provider_message_id: messageId,
+    status,
+    error_message: error,
+    payload: {
+      institutional_lead_ids: leadIds,
+      organization_names: orgNames,
+      category,
+      merged,
+      ...(blockedReason ? { blocked_reason: blockedReason } : {}),
+    },
+  };
+}
+
+// Why a lead wasn't sent to. Stored as payload.blocked_reason, which is what the dashboard
+// counts as emailsBlocked (kept apart from real send failures).
+export const BLOCK_REASONS = {
+  exclusion_lists: 'company is on exclusion_lists',
+  suppressed_emails: 'address is in suppressed_emails',
+};
+
+export function blockedEventRow({ reason, atSendTime = false, ...fields }) {
+  return outboundEventRow({
+    ...fields,
+    status: 'failed',
+    error: `blocked${atSendTime ? ' at send time' : ''}: ${BLOCK_REASONS[reason]}`,
+    blockedReason: reason,
+  });
+}
+
+// A suppressed lead stays status 'new', so every run would block it again. Write its
+// blocked row only once per (institutional_lead_id, reason). If the check itself fails,
+// write the row anyway -- a duplicate is better than a missing record.
+export async function logBlockedOnce(supabase, row) {
+  const reason = row.payload.blocked_reason;
+  const { data, error } = await supabase
+    .from('email_events')
+    .select('id')
+    .eq('type', 'outbound')
+    .eq('institutional_lead_id', row.institutional_lead_id)
+    .eq('payload->>blocked_reason', reason)
+    .limit(1);
+  if (error) {
+    console.log(`  -> WARNING: couldn't check for an earlier blocked row (${error.message}); writing one anyway`);
+  } else if (data.length > 0) {
+    return true;
+  }
+  return logOutboundEvent(supabase, row);
+}
+
+// A failed log write is reported, never thrown: by the time it runs for a real send the
+// email is already out, and stopping the batch here could leave leads looking unsent.
+export async function logOutboundEvent(supabase, row) {
+  const { error } = await supabase.from('email_events').insert(row);
+  if (error) {
+    console.log(`  -> WARNING: failed to write email_events row (${row.status}): ${error.message}`);
+    return false;
+  }
+  return true;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -106,6 +204,17 @@ async function main() {
   const campaign = campaignArg ? campaignArg.slice('--campaign='.length) : null;
   if (!preview && !campaign) {
     throw new Error('--campaign=<tag> is required for a real send (e.g. --campaign=first-batch-2026-08-14)');
+  }
+
+  // Every email carries the postal address and a signed per-recipient unsubscribe link
+  // (outbound-unsubscribe.mjs). A real send refuses to start without them; the preview
+  // still renders, with a visible placeholder footer.
+  const { config: footerConfig, missing: footerMissing } = readFooterConfig();
+  if (!footerConfig) {
+    if (!preview) {
+      throw new Error(`Refusing to send: missing ${footerMissing.join(', ')} (needed for the unsubscribe footer and headers)`);
+    }
+    console.warn(`WARNING: footer not configured (${footerMissing.join(', ')}); preview shows a placeholder footer.`);
   }
 
   const delayArg = process.argv.find((a) => a.startsWith('--delay-ms='));
@@ -167,16 +276,33 @@ async function main() {
 
   const candidateRenders = [];
   let suppressedCount = 0;
+  let logFailures = 0;
+  // Preview writes nothing, including the send log.
+  const logEvent = async (row) => {
+    if (!preview && !(await logOutboundEvent(supabase, row))) logFailures += 1;
+  };
+  const logBlocked = async (row) => {
+    if (!preview && !(await logBlockedOnce(supabase, row))) logFailures += 1;
+  };
+  const blockedLeadRow = (lead, reason) =>
+    blockedEventRow({ reason, toEmail: lead.contact_email, leadIds: [lead.id], orgNames: [lead.organization_name], category: lead.category, campaign });
   for (const lead of scopedLeads) {
     if (suppressedNames.has(lead.organization_name)) {
       suppressedCount += 1;
       console.log(`SKIPPED (suppressed): ${lead.organization_name}`);
+      await logBlocked(blockedLeadRow(lead, 'exclusion_lists'));
+      continue;
+    }
+    if (await isEmailSuppressed(supabase, lead.contact_email)) {
+      suppressedCount += 1;
+      console.log(`SKIPPED (suppressed email): ${lead.organization_name}`);
+      await logBlocked(blockedLeadRow(lead, 'suppressed_emails'));
       continue;
     }
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends } = buildDedupedSends(candidateRenders, campaign);
+  const { sends } = buildDedupedSends(candidateRenders, campaign, makeFooterFor(footerConfig, footerMissing));
 
   let sentCount = 0;
   let failedCount = 0;
@@ -184,6 +310,10 @@ async function main() {
   const rendered = [];
 
   for (const s of sends) {
+    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
+    const sendFields = { toEmail: s.contact_email, leadIds, orgNames: s.orgNames, category: s.category, merged: s.merged, subject: s.subject, campaign };
+    const sendRow = (fields) => outboundEventRow({ ...sendFields, ...fields });
+
     // Immediate pre-send re-check: the batch can take minutes, so re-fetch
     // exclusion_lists fresh for THIS send rather than trusting the top-of-run snapshot.
     const { data: freshExclusions, error: freshExclusionsError } = await supabase
@@ -194,6 +324,13 @@ async function main() {
     if (s.orgNames.some((name) => freshSuppressed.has(name))) {
       reSuppressedCount += 1;
       console.log(`SKIPPED (suppressed at send time): ${s.orgNames.join(', ')}`);
+      await logBlocked(blockedEventRow({ ...sendFields, reason: 'exclusion_lists', atSendTime: true }));
+      continue;
+    }
+    if (await isEmailSuppressed(supabase, s.contact_email)) {
+      reSuppressedCount += 1;
+      console.log(`SKIPPED (email suppressed at send time): ${s.orgNames.join(', ')}`);
+      await logBlocked(blockedEventRow({ ...sendFields, reason: 'suppressed_emails', atSendTime: true }));
       continue;
     }
 
@@ -216,13 +353,13 @@ async function main() {
       text: s.body,
       html: s.html,
       replyTo: s.replyTo,
+      headers: listUnsubscribeHeaders(s.unsubscribeUrl),
     });
-
-    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
 
     if (!result.success) {
       failedCount += 1;
       console.log(`  -> FAILED (${s.contact_email}): ${result.error}`);
+      await logEvent(sendRow({ status: 'failed', error: result.error }));
       // Failure reason is durable on the lead row, not just this run's console output --
       // status stays 'new' so the lead is naturally retried on a future run, but the
       // reason for last time doesn't just vanish when the terminal session ends.
@@ -240,6 +377,9 @@ async function main() {
     sentCount += 1;
     rendered.push(s);
     console.log(`  -> sent (${s.contact_email}, messageId=${result.messageId ?? 'null'})`);
+    // Logged before the lead update below, which throws on failure: the send log must
+    // record every email that actually went out.
+    await logEvent(sendRow({ status: 'sent', messageId: result.messageId }));
 
     const { error: updateError } = await supabase
       .from('institutional_leads')
@@ -263,7 +403,8 @@ async function main() {
   console.log(
     preview
       ? `\nPreview complete: ${sends.length} would-be sends (${suppressedCount} pre-filtered suppressed), covering ${candidateRenders.length} leads.`
-      : `\nLive send complete: ${sentCount} sent, ${suppressedCount + reSuppressedCount} suppressed (${suppressedCount} upfront, ${reSuppressedCount} at send time), ${failedCount} failed.`,
+      : `\nLive send complete: ${sentCount} sent, ${suppressedCount + reSuppressedCount} suppressed (${suppressedCount} upfront, ${reSuppressedCount} at send time), ${failedCount} failed.` +
+          (logFailures ? ` WARNING: ${logFailures} email_events row(s) failed to write -- see above.` : ''),
   );
 
   console.log(`\n--- Rendered output (${rendered.length}) ---`);
@@ -271,6 +412,7 @@ async function main() {
     console.log(`\n[${r.category}] ${r.orgNames.join('; ')}  (contact_email: ${r.contact_email})`);
     console.log(`From: "${r.fromName}" <${mailtrapFromEmail}>`);
     console.log(`Reply-To: ${r.replyTo}`);
+    console.log(`List-Unsubscribe: ${r.unsubscribeUrl ? `<${r.unsubscribeUrl}>` : '(not configured)'}`);
     console.log(`Subject: ${r.subject}`);
     console.log(r.body);
     if (r.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${r.unfilled.join(', ')}`);

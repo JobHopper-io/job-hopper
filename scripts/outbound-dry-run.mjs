@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 import { Agent, setGlobalDispatcher } from 'undici';
+import { makeFooterFor, readFooterConfig } from './outbound-unsubscribe.mjs';
 
 // Node's built-in fetch doesn't correctly implement Happy Eyeballs (RFC 6555): when a
 // host resolves to both IPv4 and IPv6, it tries IPv6 first and doesn't fall back
@@ -815,7 +816,11 @@ function unfilledPlaceholders(subject, body) {
 // numbers/location are true of the whole group. Input order is assumed to already be
 // priority order (highest opportunity_score first) — the first lead in a group becomes
 // "primary" and its category picks the template when a group spans categories.
-export function buildDedupedSends(candidateRenders, campaign) {
+// footerFor(contact_email) -> { text, html, unsubscribeUrl } (outbound-unsubscribe.mjs's
+// makeFooterFor): every send gets the postal address + its own unsubscribe link appended,
+// in both the text and HTML bodies. Required -- there is no footer-less send.
+export function buildDedupedSends(candidateRenders, campaign, footerFor) {
+  if (typeof footerFor !== 'function') throw new Error('buildDedupedSends: footerFor is required');
   const groupsByEmail = new Map();
   for (const c of candidateRenders) {
     if (!groupsByEmail.has(c.contact_email)) groupsByEmail.set(c.contact_email, []);
@@ -830,6 +835,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
 
     if (group.length === 1) {
       const { subject, body, html, unfilled } = renderTemplate(primary.category, primary, campaign);
+      const footer = footerFor(group[0].contact_email);
       sends.push({
         merged: false,
         category: primary.category,
@@ -838,8 +844,9 @@ export function buildDedupedSends(candidateRenders, campaign) {
         contact_email: group[0].contact_email,
         orgNames,
         subject,
-        body,
-        html,
+        body: body + footer.text,
+        html: html + footer.html,
+        unsubscribeUrl: footer.unsubscribeUrl,
         unfilled,
       });
       continue;
@@ -856,6 +863,7 @@ export function buildDedupedSends(candidateRenders, campaign) {
     };
     const subject = fill(template.subject, nameReplacement);
     const body = fill(template.body, nameReplacement);
+    const footer = footerFor(group[0].contact_email);
     sends.push({
       merged: true,
       mixedCategories: categories.length > 1 ? categories : null,
@@ -865,8 +873,9 @@ export function buildDedupedSends(candidateRenders, campaign) {
       contact_email: group[0].contact_email,
       orgNames,
       subject,
-      body,
-      html: renderHtmlBody(body, link),
+      body: body + footer.text,
+      html: renderHtmlBody(body, link) + footer.html,
+      unsubscribeUrl: footer.unsubscribeUrl,
       unfilled: unfilledPlaceholders(subject, body),
     });
   }
@@ -1061,7 +1070,13 @@ async function main() {
     candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
   }
 
-  const { sends, dedupedGroupCount } = buildDedupedSends(candidateRenders, campaign);
+  // Dry run never sends, so a missing footer config renders a visible placeholder
+  // instead of stopping the run (outbound-live-send.mjs refuses to start without it).
+  const { config: footerConfig, missing: footerMissing } = readFooterConfig();
+  if (!footerConfig) {
+    console.warn(`WARNING: footer not configured (${footerMissing.join(', ')}); rendering a placeholder footer.`);
+  }
+  const { sends, dedupedGroupCount } = buildDedupedSends(candidateRenders, campaign, makeFooterFor(footerConfig, footerMissing));
   for (const s of sends) {
     if (s.merged) {
       if (s.mixedCategories) {
@@ -1149,6 +1164,11 @@ async function main() {
 }
 
 const TEST_CAMPAIGN = 'self-test-campaign';
+const testFooterFor = (email) => ({
+  text: `\n\n--\nTEST FOOTER unsubscribe=${email}`,
+  html: `\n<p>TEST FOOTER unsubscribe=${email}</p>`,
+  unsubscribeUrl: `https://x.test/functions/v1/unsubscribe-email?token=${email}`,
+});
 
 function selfTestDedup() {
   const uniLead = (name, email, dmName) => ({ organization_name: name, category: 'university', student_size: 1000, recommended_package: '25 seats', contact_email: email, decision_maker_name: dmName });
@@ -1192,7 +1212,7 @@ function selfTestDedup() {
     { lead: a, category: 'university', contact_email: 'shared@asu.edu' },
     { lead: b, category: 'university', contact_email: 'shared@asu.edu' },
     { lead: c, category: 'university', contact_email: 'solo@solo.edu' },
-  ], TEST_CAMPAIGN);
+  ], TEST_CAMPAIGN, testFooterFor);
   console.assert(r1.dedupedGroupCount === 1, 'expected exactly one deduped group');
   console.assert(r1.sends.length === 2, 'expected 2 sends total (1 merged + 1 solo)');
   const merged1 = r1.sends.find((s) => s.contact_email === 'shared@asu.edu');
@@ -1202,6 +1222,16 @@ function selfTestDedup() {
   console.assert(merged1.body.includes('https://job-hopper.io/universities?'), 'merged (generic) send should still get the real link');
   const solo1 = r1.sends.find((s) => s.contact_email === 'solo@solo.edu');
   console.assert(solo1.merged === false && solo1.body.includes('Solo U'), 'non-duplicate lead keeps its specific template');
+
+  // Footer: every send (solo and merged) ends with its own recipient's footer, text and html.
+  for (const s of r1.sends) {
+    console.assert(s.body.endsWith(`TEST FOOTER unsubscribe=${s.contact_email}`), `text footer missing for ${s.contact_email}`);
+    console.assert(s.html.endsWith(`<p>TEST FOOTER unsubscribe=${s.contact_email}</p>`), `html footer missing for ${s.contact_email}`);
+    console.assert(s.unsubscribeUrl.endsWith(s.contact_email), `unsubscribeUrl not per-recipient for ${s.contact_email}`);
+  }
+  let threw = false;
+  try { buildDedupedSends([{ lead: c, category: 'university', contact_email: 'solo@solo.edu' }], TEST_CAMPAIGN); } catch { threw = true; }
+  console.assert(threw, 'buildDedupedSends must refuse to render without a footer');
 
   // Reply-To routing: university -> university-partnerships inbox, everything else -> partnerships.
   console.assert(replyToForCategory('university') === 'university-partnerships@job-hopper.co', 'university category routes to university-partnerships inbox');
@@ -1221,7 +1251,7 @@ function selfTestDedup() {
   const r2 = buildDedupedSends([
     { lead: d, category: 'employer', contact_email: 'shared2@x.com' },
     { lead: e, category: 'university', contact_email: 'shared2@x.com' },
-  ], TEST_CAMPAIGN);
+  ], TEST_CAMPAIGN, testFooterFor);
   console.assert(r2.sends.length === 1 && r2.sends[0].mixedCategories?.length === 2, 'mixed-category group should be flagged');
   console.assert(r2.sends[0].category === 'employer', 'mixed group uses first/highest-scored lead\'s category');
   console.assert(r2.sends[0].replyTo === 'partnerships@job-hopper.co', 'mixed group resolving to a non-university primary routes to the partnerships inbox');

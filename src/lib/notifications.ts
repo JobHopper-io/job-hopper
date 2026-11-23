@@ -1,4 +1,5 @@
 import { supabase, getSessionUser } from '@/lib/supabase'
+import { MARKETING_EMAIL_WORDING_VERSION } from '@/lib/consent'
 import type {
   NotificationSettings,
   NotificationSettingsInsert,
@@ -79,18 +80,52 @@ export const notificationsAPI = {
     return { data, error: null }
   },
 
-  async unsubscribeFromAll(): Promise<{ error: Error | null }> {
-    return this.updateNotificationSettings({
-      email_unsubscribed_at: new Date().toISOString(),
-    }).then((r) => ({ error: r.error }))
+  /** Effective marketing consent (latest marketing row is a grant of an accepted wording). */
+  async getMarketingConsent(): Promise<{ data: boolean | null; error: Error | null }> {
+    const profileId = await getProfileId()
+    if (!profileId) return { data: null, error: new Error('Not authenticated') }
+    const { data, error } = await pendingRpc('current_marketing_consent', { p_profile_id: profileId })
+    if (error) return { data: null, error }
+    return { data: data === true, error: null }
   },
 
-  async resubscribe(): Promise<{ error: Error | null }> {
-    return this.updateNotificationSettings({
-      email_unsubscribed_at: null,
-    }).then((r) => ({ error: r.error }))
+  /** Marketing emails toggle: appends a consent_records row (never edits one). */
+  async setMarketingConsent(granted: boolean): Promise<{ error: Error | null }> {
+    const { error } = await pendingRpc('set_own_marketing_consent', {
+      p_granted: granted,
+      p_wording_version: granted ? MARKETING_EMAIL_WORDING_VERSION : null,
+    })
+    return { error }
+  },
+
+  /**
+   * "Unsubscribe from all" / "Re-enable emails". One RPC sets
+   * notification_settings.email_unsubscribed_at and a scope 'all' suppressed_emails row;
+   * re-enabling removes the user's scope 'all' unsubscribe rows (from any source), never
+   * bounce, complaint or marketing-scope rows. Returns the refreshed settings.
+   */
+  async setUnsubscribedFromAll(
+    unsubscribed: boolean
+  ): Promise<{ data: NotificationSettings | null; error: Error | null }> {
+    const { error } = await pendingRpc('set_own_email_unsubscribed', { p_unsubscribed: unsubscribed })
+    if (error) return { data: null, error }
+    return this.getNotificationSettings()
   },
 }
+
+// ponytail: these RPCs (migrations 20261120130000 and 20261121120000) aren't in the
+// generated src/types/supabase.ts until the migrations are pushed and `npm run db:types`
+// re-runs (regenerating from the local DB would drop remote-only tables). Delete this
+// cast then and call supabase.rpc directly.
+interface PendingRpcs {
+  set_own_email_unsubscribed: { args: { p_unsubscribed: boolean }; returns: null }
+  set_own_marketing_consent: { args: { p_granted: boolean; p_wording_version: string | null }; returns: null }
+  current_marketing_consent: { args: { p_profile_id: string }; returns: boolean }
+}
+const pendingRpc = supabase.rpc.bind(supabase) as unknown as <K extends keyof PendingRpcs>(
+  fn: K,
+  args: PendingRpcs[K]['args']
+) => PromiseLike<{ data: PendingRpcs[K]['returns'] | null; error: Error | null }>
 
 export const JOB_MATCH_FREQUENCY_OPTIONS: { value: JobMatchEmailFrequency; label: string }[] = [
   { value: 'immediate', label: 'Immediate (when we find matches)' },

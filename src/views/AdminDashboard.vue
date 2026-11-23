@@ -313,6 +313,18 @@
       </router-link>
 
       <router-link
+        to="/admin/prospects"
+        class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
+      >
+        <h2 class="text-base font-heading font-semibold text-brand-charcoal mb-1">
+          Prospect Review
+        </h2>
+        <p class="text-sm text-neutral-body">
+          Review classified job-seeker prospects: approve, reject or mark do-not-contact.
+        </p>
+      </router-link>
+
+      <router-link
         to="/admin/institutional-leads"
         class="group rounded-2xl border border-neutral-border bg-white/40 hover:bg-white shadow-sm hover:shadow-md transition-all duration-150 px-6 py-5 block"
       >

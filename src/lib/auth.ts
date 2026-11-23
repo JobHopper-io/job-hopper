@@ -5,6 +5,7 @@ import {
 } from 'libphonenumber-js'
 import type { CountryCode } from 'libphonenumber-js'
 import { supabase, getSessionUser } from '@/lib/supabase'
+import { MARKETING_EMAIL_WORDING_VERSION, SMS_WORDING_VERSION } from '@/lib/consent'
 
 /** Normalize phone to digits only for storage and uniqueness checks. */
 export function normalizePhoneToDigits(phone: string): string {
@@ -98,6 +99,8 @@ export const authAPI = {
     utmCampaign?: string,
     utmMedium?: string,
     trialInviteCode?: string,
+    /** Signup checkboxes. Recorded in consent_records by the record_signup_consent trigger. */
+    consent?: { marketingEmail: boolean; sms: boolean },
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -114,6 +117,14 @@ export const authAPI = {
           utm_campaign: utmCampaign || null,
           utm_medium: utmMedium || null,
           trial_invite_code: trialInviteCode || null,
+          ...(consent
+            ? {
+                marketing_email_consent: consent.marketingEmail,
+                consent_wording_version: MARKETING_EMAIL_WORDING_VERSION,
+                sms_consent: consent.sms,
+                sms_consent_wording_version: SMS_WORDING_VERSION,
+              }
+            : {}),
         },
       },
     })

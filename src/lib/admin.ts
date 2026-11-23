@@ -51,7 +51,7 @@ export function b2cFunnelChartRows(report: GrowthDashboardReport): { label: stri
   return [
     { label: 'Registrations', value: total, colorHex: B2C_FUNNEL_RAMP[0] },
     { label: 'Activated', value: report.b2c.activatedUsers, colorHex: B2C_FUNNEL_RAMP[1], subtext: pctOfTotal(report.b2c.activatedUsers) },
-    { label: 'Paid', value: report.b2c.paidSubscribers, colorHex: B2C_FUNNEL_RAMP[2], subtext: pctOfTotal(report.b2c.paidSubscribers) },
+    { label: 'Paid (active)', value: report.b2c.paidSubscribers, colorHex: B2C_FUNNEL_RAMP[2], subtext: pctOfTotal(report.b2c.paidSubscribers) },
   ]
 }
 
@@ -59,10 +59,45 @@ export interface GrowthDashboardReport {
   b2c: {
     totalSignups: number
     activatedUsers: number
+    /** Active subscriptions only (segments base population). */
     paidSubscribers: number
+    /** Stripe trials, not yet paid. */
+    trialSubscribers: number
+    /** paidSubscribers / confirmed registrations. */
     conversionRate: number
     /** New registrations only (profiles.created_at). New paid/activated by date is not tracked. */
     newSignups: { last24h: number; last7d: number }
+  }
+  /** Day 1 baseline segments (growth_dashboard_counts; same definitions as docs/growth/day1-audit.md). They overlap. */
+  segments: {
+    registered: number
+    confirmed: number
+    unconfirmed: number
+    confirmedNotOnboarded: number
+    resumeUploaded: number
+    onboardedNoResume: number
+    inactive30d: number
+    abandonedCheckoutProxy: number
+    activePaid: number
+    trialing: number
+    pastDue: number
+    cancelled: number
+    sponsoredSeats: number
+  }
+  /** Outbound funnel. Each step is counted independently, not as a cohort. */
+  funnel: {
+    leadsDiscovered: number
+    institutionalLeads: number
+    prospects: number
+    /** Prospects reviewed in /admin/prospects (approved or rejected). */
+    prospectsReviewed: number
+    prospectsApproved: number
+    outboundSent: number
+    outboundDelivered: number
+    replies: number
+    positiveReplies: number
+    outboundSignups: number
+    outboundPaid: number
   }
   institutional: {
     activeOpportunities: number
@@ -76,7 +111,22 @@ export interface GrowthDashboardReport {
     totalLeads: number
     leadsBySource: { source: string; count: number }[]
     qualifiedOrganizations: number
+    /** Outbound emails handed to the provider (email_events type outbound, status not failed). */
     emailsSent: number
+    /** Each of these is a subset of emailsSent. */
+    emailsDelivered: number
+    emailsBounced: number
+    emailsComplained: number
+    /** Leads the outbound script skipped because of suppression (not send failures). */
+    emailsBlocked: number
+    emailsByCampaign: {
+      campaign: string | null
+      sent: number
+      delivered: number
+      bounced: number
+      complained: number
+      blocked: number
+    }[]
   }
   revenue: {
     mrrCents: number
@@ -284,6 +334,9 @@ export interface SendRevenueRecoverySegmentResult {
   messageId?: string | null
   segment?: RevenueRecoverySegmentKey
   totalEligible?: number
+  /** Real sends only: members skipped for lack of current marketing consent. */
+  skippedNoConsent?: number
+  consentCheckErrors?: number
   sent?: number
   suppressed?: number
   failed?: number

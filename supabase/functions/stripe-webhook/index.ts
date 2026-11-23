@@ -10,7 +10,7 @@ import {
   renderSubscriptionCancelScheduled,
   renderSubscriptionCanceled,
 } from '../_shared/email-templates.ts'
-import { getFooterLinksForProfile } from '../_shared/unsubscribe-token.ts'
+import { getTransactionalFooterLinks } from '../_shared/unsubscribe-token.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -361,12 +361,13 @@ serve(async (req) => {
           const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, profileId)
           if (recipient) {
             try {
-              const footer = await getFooterLinksForProfile(profileId)
+              const footer = await getTransactionalFooterLinks(profileId, recipient.email)
               const { html, text } = renderSubscriptionStarted({
                 recipientName: recipient.firstName,
                 footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
               })
               await sendEmail({
+                kind: 'transactional',
                 to: recipient.email,
                 subject: 'Welcome to Job-Hopper',
                 html,
@@ -556,7 +557,7 @@ serve(async (req) => {
                 const { data: products } = await supabaseAdmin.from('products').select('display_name').in('id', productIdsInStripe.slice(0, 3))
                 planName = (products ?? []).map((p) => p.display_name).join(', ')
               }
-              const footer = await getFooterLinksForProfile(profileIdUpdated)
+              const footer = await getTransactionalFooterLinks(profileIdUpdated, recipient.email)
               if (subscriptionStatus === 'past_due') {
                 // Payment failed (e.g. trial ended and the card was declined). Do
                 // NOT send the "subscription updated" email — the customer has not
@@ -566,6 +567,7 @@ serve(async (req) => {
                   footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
                 })
                 await sendEmail({
+                  kind: 'transactional',
                   to: recipient.email,
                   subject: 'Your Job-Hopper payment failed',
                   html,
@@ -587,6 +589,7 @@ serve(async (req) => {
                   footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
                 })
                 await sendEmail({
+                  kind: 'transactional',
                   to: recipient.email,
                   subject: 'Your Job-Hopper subscription will be canceled',
                   html,
@@ -609,6 +612,7 @@ serve(async (req) => {
                   footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
                 })
                 await sendEmail({
+                  kind: 'transactional',
                   to: recipient.email,
                   subject: 'Your Job-Hopper subscription was updated',
                   html,
@@ -674,12 +678,13 @@ serve(async (req) => {
           const recipient = await loadProfileAndCheckSubscriptionEmailAllowed(supabaseAdmin, deletedSub.profile_id)
           if (recipient) {
             try {
-              const footer = await getFooterLinksForProfile(deletedSub.profile_id)
+              const footer = await getTransactionalFooterLinks(deletedSub.profile_id, recipient.email)
               const { html, text } = renderSubscriptionCanceled({
                 recipientName: recipient.firstName,
                 footer: { preferencesUrl: footer.preferencesUrl, unsubscribeUrl: footer.unsubscribeUrl },
               })
               await sendEmail({
+                kind: 'transactional',
                 to: recipient.email,
                 subject: 'Your Job-Hopper subscription was canceled',
                 html,

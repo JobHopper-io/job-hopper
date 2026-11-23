@@ -116,22 +116,31 @@ output has been spot-checked.
 
 ### WARN layoff-notice connector (run manually)
 
-`scripts/warn-connector.mjs` pulls WARN Act mass-layoff notices from warnfirehose.com
-(a third-party aggregator of the 50-state public filings) and upserts each employer into
-`institutional_leads` (source='warn', category='employer'), keyed on
-`organization_name, source`. Also prints a notices-by-state+industry count to the
-console as the B2C geo-targeting signal — not written to a table yet.
+`scripts/warn-connector.mjs` pulls WARN Act mass-layoff notices from the states' own
+public WARN files and upserts each employer into `institutional_leads` (source='warn',
+category='employer'), keyed on `organization_name, source`. Also prints a
+notices-by-state+industry count to the console as the B2C geo-targeting signal — not
+written to a table yet.
 
 ```bash
-WARN_FIREHOSE_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
-  node scripts/warn-connector.mjs TX
+set -a; . ./.env.local; set +a   # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+node scripts/warn-connector.mjs CA --days=60 --min-workers=25 --dry-run
 ```
 
-- `WARN_FIREHOSE_API_KEY`: free key from warnfirehose.com/account.
-- Free tier is 25 calls/day, 25 records/call — this script makes one call, no
-  pagination, by design. Revisit if/when the $49/mo Starter tier is approved.
-- State argument defaults to `TX`; an optional second argument sets `date_from`
-  (`YYYY-MM-DD`).
+- Supported states: `CA` (EDD's xlsx, updated Tue/Thu, fiscal year to date). No API key.
+  TX's site blocks non-US traffic; NY publishes one HTML page per notice; neither is
+  supported yet. The warnfirehose.com API used before needs a paid plan; not used.
+- States: comma-separated (default `CA`). A state that fails is reported and skipped.
+- `--days=N` (or a second positional `YYYY-MM-DD`) keeps notices whose notice date is on
+  or after it.
+- `--min-workers=N` (default 25) skips employers below N workers after merging notices
+  (counted as `below_min_workers`; unknown size is skipped too).
+- `--dry-run` fetches and prints counts and the top 5 by score, never writes. With Supabase env
+  set it also reads `exclusion_lists` and existing rows.
+- Companies on `exclusion_lists` (case-insensitive, trimmed) are skipped. Stored warn rows
+  already on the list are reported by name and left unchanged.
+- Re-runs merge new notices into `signals.merged_notices` (deduped by `notice_id`), sum
+  `workers_affected` across unique notices and recompute the score.
 
 ### Outbound dry-run + contact enrichment (run manually)
 

@@ -37,6 +37,45 @@
     </p>
 
     <div v-else-if="report" class="space-y-8">
+      <!-- Day 1 baseline: segments + outbound funnel -->
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          User segments
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          Signed-up users, excluding partner staff, license billing contacts and admins. Segments
+          overlap. Same definitions as the Day 1 audit (docs/growth/day1-audit.md).
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in segmentRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Outbound funnel
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          Each step is an all-time count of its own, not a cohort followed through, so steps
+          don't have to shrink in order.
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in funnelRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- Acquisition (institutional outbound) -->
       <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
@@ -62,12 +101,12 @@
           <StatTile
             label="Emails sent"
             :value="report.acquisition.emailsSent"
-            hint="status = contacted"
+            hint="outbound send log, not failed or blocked"
           />
           <StatTile
-            label="Reply rate"
-            not-tracked
-            hint="reply classification not built yet"
+            label="Replies"
+            :value="report.funnel.replies"
+            :hint="`${report.funnel.positiveReplies} positive`"
           />
         </dl>
 
@@ -116,7 +155,7 @@
           <StatTile
             label="Conversion rate"
             :value="formatPct(report.b2c.conversionRate)"
-            hint="paid ÷ registrations"
+            hint="active paid ÷ confirmed registrations"
           />
           <StatTile
             label="New paid (by date)"
@@ -239,6 +278,42 @@ const report = ref<GrowthDashboardReport | null>(null)
 const emailSendRate = computed(() => {
   if (!report.value || report.value.acquisition.totalLeads === 0) return 0
   return report.value.acquisition.emailsSent / report.value.acquisition.totalLeads
+})
+
+const segmentRows = computed(() => {
+  const s = report.value?.segments
+  if (!s) return []
+  return [
+    { label: 'Registered', value: s.registered, hint: 'signed-up users' },
+    { label: 'Email confirmed', value: s.confirmed, hint: '' },
+    { label: 'Email not confirmed', value: s.unconfirmed, hint: '' },
+    { label: 'Confirmed, not onboarded', value: s.confirmedNotOnboarded, hint: '' },
+    { label: 'Resume uploaded', value: s.resumeUploaded, hint: '' },
+    { label: 'Onboarded, no resume', value: s.onboardedNoResume, hint: '' },
+    { label: 'Inactive 30 days', value: s.inactive30d, hint: 'onboarded; overstated before 2026-10-16 (no activity data)' },
+    { label: 'Abandoned checkout', value: s.abandonedCheckoutProxy, hint: 'proxy: started checkout, no subscription; no date' },
+    { label: 'Active paid', value: s.activePaid, hint: '' },
+    { label: 'Trialing', value: s.trialing, hint: 'not yet paid' },
+    { label: 'Past due', value: s.pastDue, hint: '' },
+    { label: 'Cancelled', value: s.cancelled, hint: 'no active or trial subscription left' },
+    { label: 'Sponsored seats', value: s.sponsoredSeats, hint: 'trial grant or university license' },
+  ]
+})
+
+const funnelRows = computed(() => {
+  const f = report.value?.funnel
+  if (!f) return []
+  return [
+    { label: 'Leads discovered', value: f.leadsDiscovered, hint: `${f.institutionalLeads} organizations + ${f.prospects} people` },
+    { label: 'Prospects reviewed', value: f.prospectsReviewed, hint: 'approved or rejected in /admin/prospects' },
+    { label: 'Prospects approved', value: f.prospectsApproved, hint: '' },
+    { label: 'Outbound sent', value: f.outboundSent, hint: 'handed to Mailtrap' },
+    { label: 'Delivered', value: f.outboundDelivered, hint: 'Mailtrap delivery event' },
+    { label: 'Replies', value: f.replies, hint: 'all inbound replies' },
+    { label: 'Positive replies', value: f.positiveReplies, hint: 'Interested, Meeting requested, More information' },
+    { label: 'Signups from outbound', value: f.outboundSignups, hint: 'utm_source email_outbound, or matched to a lead' },
+    { label: 'Paid from outbound', value: f.outboundPaid, hint: 'active subscription' },
+  ]
 })
 
 const leadsBySourceRows = computed(() => (report.value ? leadsBySourceChartRows(report.value) : []))

@@ -112,3 +112,29 @@ export function isHighMatchUser(matchCount: number, threshold: number, flags: Su
 export function isVisaFocusedNoConversion(requiresUsSponsorship: boolean | null, flags: SubscriptionFlags): boolean {
   return requiresUsSponsorship === true && isNonPayer(flags)
 }
+
+/**
+ * Real revenue-recovery sends are marketing: only members whose current_marketing_consent
+ * is true are sent to. A failed consent check skips the member too (fail closed) and is
+ * counted separately so it isn't mistaken for "no consent".
+ */
+export async function partitionByMarketingConsent<T extends { profileId: string }>(
+  members: T[],
+  hasMarketingConsent: (profileId: string) => Promise<boolean>,
+): Promise<{ consented: T[]; skippedNoConsent: number; consentCheckErrors: number }> {
+  const consented: T[] = []
+  let skippedNoConsent = 0
+  let consentCheckErrors = 0
+  for (const member of members) {
+    try {
+      if (await hasMarketingConsent(member.profileId)) consented.push(member)
+      else skippedNoConsent += 1
+    } catch (err) {
+      consentCheckErrors += 1
+      console.error('revenue-recovery: marketing consent check failed; skipping member', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+  return { consented, skippedNoConsent, consentCheckErrors }
+}

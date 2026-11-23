@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { categorizeUserLifecycle, subscriptionFlagsFromStatuses } from '../_shared/user-lifecycle-category.ts'
 import { callChatCompletion } from '../_shared/llm.ts'
+import { type OutboundEventRow, summarizeOutboundEmails } from '../_shared/outbound-email-stats.ts'
 import { GROWTH_SUMMARY_SYSTEM, growthSummaryUserMessage } from '../_shared/growth-summary-prompt.ts'
 
 const corsHeaders = {
@@ -20,6 +21,32 @@ const MAX_ROWS = 20000
 
 // Same threshold judgment call the plan left open ("or whatever threshold is meaningful").
 const QUALIFIED_OPPORTUNITY_SCORE = 50
+
+/** public.growth_dashboard_counts() (migration 20261121140000). */
+interface GrowthDashboardCounts {
+  segments: {
+    registered: number
+    registered_confirmed: number
+    incomplete_unconfirmed_email: number
+    incomplete_not_onboarded: number
+    resume_uploaded: number
+    onboarded_no_resume: number
+    inactive_30d: number
+    abandoned_checkout_proxy: number
+    active_paid: number
+    trialing_unpaid: number
+    past_due: number
+    cancelled: number
+    sponsored_seat_holders: number
+  }
+  funnel: {
+    prospects: number
+    replies: number
+    positive_replies: number
+    outbound_signups: number
+    outbound_paid: number
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -180,7 +207,6 @@ serve(async (req) => {
     }
 
     let activatedUsers = 0
-    let paidSubscribers = 0
     let churnedCount = 0
     let closedInstitutionalAccounts = 0
 
@@ -201,9 +227,8 @@ serve(async (req) => {
       const category = categorizeUserLifecycle(flags)
 
       if (category !== 'incomplete_onboarding') activatedUsers += 1
-      if (category === 'active_subscription' || category === 'stripe_free_trial') {
-        paidSubscribers += 1
-        if (profile.referred_by_institutional_lead_id) closedInstitutionalAccounts += 1
+      if (category === 'active_subscription' && profile.referred_by_institutional_lead_id) {
+        closedInstitutionalAccounts += 1
       }
       if (category === 'churned') churnedCount += 1
 
@@ -227,7 +252,6 @@ serve(async (req) => {
     const leadsBySourceMap = new Map<string, number>()
     let activeOpportunities = 0
     let qualifiedOrganizations = 0
-    let emailsSent = 0
     const seatPackageMap = new Map<string, number>()
 
     // "Active" excludes both a manually-closed-out lead (dead) and one whose contact
@@ -242,7 +266,32 @@ serve(async (req) => {
         }
       }
       if ((lead.opportunity_score ?? 0) >= QUALIFIED_OPPORTUNITY_SCORE) qualifiedOrganizations += 1
-      if (lead.status === 'contacted') emailsSent += 1
+    }
+
+    // Outbound sends come from the email_events send log (growth step 3), not from
+    // institutional_leads.status = 'contacted', which only remembers the latest attempt.
+    const outbound = summarizeOutboundEmails(
+      await fetchAll<OutboundEventRow>('email_events', 'campaign, status, delivered_at, bounced_at, complained_at, blocked_reason:payload->>blocked_reason', {
+        column: 'type',
+        op: 'eq',
+        value: 'outbound',
+      }),
+    )
+
+    // Segments + funnel counts: one SQL function on the docs/growth/day1-audit.md base
+    // population (excludes partner staff, license billing contacts, admins and
+    // university-license subscriptions). It reads auth.users, hence an RPC.
+    const { data: countsData, error: countsError } = await supabaseAdminClient.rpc('growth_dashboard_counts')
+    if (countsError) throw new Error(`Failed to load growth_dashboard_counts: ${countsError.message}`)
+    const counts = countsData as GrowthDashboardCounts
+
+    // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
+    const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
+      supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
+      supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).eq('review_status', 'approved'),
+    ])
+    if (reviewedError || approvedError) {
+      throw new Error(`Failed to count reviewed prospects: ${(reviewedError ?? approvedError)!.message}`)
     }
 
     const nowIso = new Date().toISOString()
@@ -285,9 +334,41 @@ serve(async (req) => {
         b2c: {
           totalSignups,
           activatedUsers,
-          paidSubscribers,
-          conversionRate: totalSignups > 0 ? paidSubscribers / totalSignups : 0,
+          // Active subscriptions only; trials are separate (no payment yet).
+          paidSubscribers: counts.segments.active_paid,
+          trialSubscribers: counts.segments.trialing_unpaid,
+          conversionRate: counts.segments.registered_confirmed > 0
+            ? counts.segments.active_paid / counts.segments.registered_confirmed
+            : 0,
           newSignups: { last24h: newSignups24h, last7d: newSignups7d },
+        },
+        segments: {
+          registered: counts.segments.registered,
+          confirmed: counts.segments.registered_confirmed,
+          unconfirmed: counts.segments.incomplete_unconfirmed_email,
+          confirmedNotOnboarded: counts.segments.incomplete_not_onboarded,
+          resumeUploaded: counts.segments.resume_uploaded,
+          onboardedNoResume: counts.segments.onboarded_no_resume,
+          inactive30d: counts.segments.inactive_30d,
+          abandonedCheckoutProxy: counts.segments.abandoned_checkout_proxy,
+          activePaid: counts.segments.active_paid,
+          trialing: counts.segments.trialing_unpaid,
+          pastDue: counts.segments.past_due,
+          cancelled: counts.segments.cancelled,
+          sponsoredSeats: counts.segments.sponsored_seat_holders,
+        },
+        funnel: {
+          leadsDiscovered: leads.length + counts.funnel.prospects,
+          institutionalLeads: leads.length,
+          prospects: counts.funnel.prospects,
+          prospectsReviewed: prospectsReviewed ?? 0,
+          prospectsApproved: prospectsApproved ?? 0,
+          outboundSent: outbound.totals.sent,
+          outboundDelivered: outbound.totals.delivered,
+          replies: counts.funnel.replies,
+          positiveReplies: counts.funnel.positive_replies,
+          outboundSignups: counts.funnel.outbound_signups,
+          outboundPaid: counts.funnel.outbound_paid,
         },
         institutional: {
           activeOpportunities,
@@ -303,7 +384,12 @@ serve(async (req) => {
             .map(([source, count]) => ({ source, count }))
             .sort((a, b) => b.count - a.count),
           qualifiedOrganizations,
-          emailsSent,
+          emailsSent: outbound.totals.sent,
+          emailsDelivered: outbound.totals.delivered,
+          emailsBounced: outbound.totals.bounced,
+          emailsComplained: outbound.totals.complained,
+          emailsBlocked: outbound.totals.blocked,
+          emailsByCampaign: outbound.byCampaign,
         },
         revenue: {
           mrrCents,

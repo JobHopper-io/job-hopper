@@ -357,6 +357,7 @@ serve(async (req) => {
       const org = lead?.organization_name ?? "A partner"
       const adminUrl = `${siteUrl()}/admin/partner-dashboard/${leadId}`
       await sendEmail({
+        kind: "transactional",
         to: TEAM_EMAIL,
         subject: `Seat request: ${org} wants ${seats} more seats`,
         text: `${callerEmail} at ${org} requested ${seats} more seats.${note ? `\n\nNote: ${note}` : ""}\n\nAdd seats: ${adminUrl}`,
@@ -402,6 +403,7 @@ serve(async (req) => {
       const url = `${siteUrl}/partner`
       // Best-effort, like the seat invite emails: the staff row grants access either way.
       const sent = await sendEmail({
+        kind: "transactional",
         to: email,
         subject: `Your ${org} partner dashboard on Job-Hopper`,
         text: `You've been given access to the ${org} partner dashboard on Job-Hopper, where you can see how your students are using their seats.\n\nSign in (or create an account with this email, ${email}): ${url}\n\nJob-Hopper`,
@@ -497,6 +499,7 @@ async function notifySeatsFull(db: SupabaseClient, leadId: string): Promise<Resp
   const sends = [
     ...(staff ?? []).map((s) =>
       sendEmail({
+        kind: "transactional",
         to: s.email,
         subject: `${org}: all Job-Hopper seats are in use`,
         text: `Every seat in your Job-Hopper program is taken, and ${students} waiting for access. Waiting students get a seat automatically as soon as one is available.\n\nRequest more seats or free up seats from graduated students: ${portalUrl}`,
@@ -505,6 +508,7 @@ async function notifySeatsFull(db: SupabaseClient, leadId: string): Promise<Resp
       })
     ),
     sendEmail({
+      kind: "transactional",
       to: TEAM_EMAIL,
       subject: `Upsell: ${org} is out of seats (${n} waiting)`,
       text: `${org} has no free seats and ${students} waiting.\n\n${adminUrl}`,

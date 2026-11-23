@@ -369,7 +369,7 @@ async function sendOpsAlert(subject: string, text: string): Promise<void> {
   console.error('ops alert', { subject, text })
   const recipients = (Deno.env.get('OPS_ALERT_EMAIL') ?? '').split(',').map((a) => a.trim()).filter(Boolean)
   try {
-    await Promise.all(recipients.map((to) => sendEmail({ to, subject, text, category: 'ops_alert' })))
+    await Promise.all(recipients.map((to) => sendEmail({ kind: 'transactional', to, subject, text, category: 'ops_alert' })))
   } catch (err) {
     console.error('ops alert email failed', err)
   }

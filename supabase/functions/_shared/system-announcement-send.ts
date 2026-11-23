@@ -59,12 +59,14 @@ export async function sendSystemAnnouncement(
   let failed = 0
   for (const profile of recipients) {
     try {
-      const footer = await getFooterLinksForProfile(profile.id)
+      const footer = await getFooterLinksForProfile(profile.id, profile.email, "marketing")
       const fullHtml = wrapAnnouncementWithFooter(announcement.email_body_html, {
         preferencesUrl: footer.preferencesUrl,
         unsubscribeUrl: footer.unsubscribeUrl,
       })
       const result = await sendEmail({
+        kind: "marketing",
+        unsubscribeUrl: footer.unsubscribeUrl,
         to: profile.email,
         subject: announcement.email_subject,
         html: fullHtml,
