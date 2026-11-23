@@ -32,4 +32,7 @@ jobs:
           # _shared/location-normalization.ts and took the whole suite down before a single
           # test ran. deno.lock pins integrity hashes but does not prevent the fetch.
           cache: true
-      - run: deno test supabase/functions/_shared/__tests__/
+      # --node-modules-dir=none: the root package.json makes Deno expect an npm-installed
+      # node_modules, which this job doesn't have (fails with 'Could not find "@types/node"').
+      # Tests need env (fake secrets) and read (source-wiring checks) only.
+      - run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/__tests__/
