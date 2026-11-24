@@ -1,4 +1,4 @@
-// Reverse-recruiting shortlist: verified-open jobs only, with "why this fits" bullets built
+// Reverse-recruiting shortlist: open (and recent likely-open) jobs, with "why this fits" bullets built
 // from facts we hold. No AI, no sponsorship claims, nothing inferred beyond the two records.
 import type { RankedJob } from './job-matching-algorithm.ts'
 import type { ProspectMatchingFields } from './prospect-matching.ts'
@@ -77,21 +77,43 @@ export interface ShortlistItem {
 }
 
 export interface Shortlist {
-  /** 'ready' when at least SHORTLIST_MIN verified-open jobs were found. */
+  /** 'ready' when at least SHORTLIST_MIN jobs made the list (open, plus recent likely_open). */
   status: 'ready' | 'too_few'
   items: ShortlistItem[]
 }
 
+/** A likely_open job (page data only) is shortlisted only if it was posted this recently. */
+export const LIKELY_OPEN_MAX_AGE_DAYS = 21
+
+function isIndeed(job: RankedJob, vacancy: VacancyResult): boolean {
+  if (vacancy.host === 'indeed') return true
+  try {
+    return /(^|\.)indeed\.com$/i.test(new URL(job.applyLink ?? '').hostname)
+  } catch {
+    return false
+  }
+}
+
+function postedWithin(job: RankedJob, days: number, nowMs: number): boolean {
+  const ms = job.postedDate ? Date.parse(job.postedDate) : NaN
+  return !Number.isNaN(ms) && nowMs - ms <= days * 86_400_000
+}
+
 /**
- * Verified-open jobs only, in candidate (score) order, capped at SHORTLIST_MAX.
- * Closed and unverified jobs never make it in.
+ * Open jobs first (score order), then likely_open jobs posted within LIKELY_OPEN_MAX_AGE_DAYS
+ * (score order), capped at SHORTLIST_MAX. Closed, unverified and Indeed jobs never make it in.
  */
 export function assembleShortlist(
   prospect: ProspectMatchingFields,
   checked: { job: RankedJob; vacancy: VacancyResult }[],
+  nowMs: number = Date.now(),
 ): Shortlist {
-  const items = checked
-    .filter((c) => c.vacancy.status === 'open')
+  const eligible = checked.filter((c) => !isIndeed(c.job, c.vacancy))
+  const open = eligible.filter((c) => c.vacancy.status === 'open')
+  const likely = eligible.filter(
+    (c) => c.vacancy.status === 'likely_open' && postedWithin(c.job, LIKELY_OPEN_MAX_AGE_DAYS, nowMs),
+  )
+  const items = [...open, ...likely]
     .slice(0, SHORTLIST_MAX)
     .map(({ job, vacancy }) => ({
       jobId: job.id,

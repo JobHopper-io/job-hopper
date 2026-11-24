@@ -136,3 +136,43 @@ Deno.test('verifyUntilEnough: runs out of candidates gracefully', async () => {
   assertEquals(checked.length, 2)
   assertEquals(assembleShortlist(prospect(), checked).items.length, 0)
 })
+
+// ---- likely_open policy ------------------------------------------------------
+
+const NOW = Date.parse('2026-11-25T00:00:00Z')
+const ago = (d: number) => new Date(NOW - d * 86_400_000).toISOString()
+
+Deno.test('assembleShortlist: open first, then likely_open posted within 21 days', () => {
+  const checked = [
+    { job: job({ score: 95, postedDate: ago(5) }), vacancy: v('likely_open') },
+    { job: job({ score: 90, postedDate: ago(40) }), vacancy: v('open') },
+    { job: job({ score: 85, postedDate: ago(25) }), vacancy: v('likely_open') }, // too old for likely_open
+    { job: job({ score: 80, postedDate: ago(10) }), vacancy: v('open') },
+    { job: job({ score: 75, postedDate: ago(21) }), vacancy: v('likely_open') }, // exactly 21 days: in
+  ]
+  const s = assembleShortlist(prospect(), checked, NOW)
+  assertEquals(s.items.map((i) => [i.score, i.vacancy.status]), [[90, 'open'], [80, 'open'], [95, 'likely_open'], [75, 'likely_open']])
+  assertEquals(s.status, 'ready')
+})
+
+Deno.test('assembleShortlist: likely_open without a posted date is excluded', () => {
+  const s = assembleShortlist(prospect(), [{ job: job({ postedDate: null }), vacancy: v('likely_open') }], NOW)
+  assertEquals(s.items.length, 0)
+})
+
+Deno.test('assembleShortlist: Indeed is always excluded, whatever the status says', () => {
+  const indeed = job({ applyLink: 'https://www.indeed.com/viewjob?jk=1', postedDate: ago(1) })
+  const s = assembleShortlist(prospect(), [
+    { job: indeed, vacancy: v('open') },
+    { job: indeed, vacancy: { ...v('likely_open'), host: 'indeed' } },
+  ], NOW)
+  assertEquals(s.items.length, 0)
+})
+
+Deno.test('assembleShortlist: never more than 5, never closed or unverified (mixed statuses)', () => {
+  const statuses: VacancyStatus[] = ['likely_open', 'closed', 'open', 'unverified', 'likely_open', 'open', 'likely_open', 'open', 'likely_open', 'closed']
+  const s = assembleShortlist(prospect(), statuses.map((st, i) => ({ job: job({ score: 100 - i, postedDate: ago(3) }), vacancy: v(st) })), NOW)
+  assertEquals(s.items.length, 5)
+  assert(s.items.every((i) => i.vacancy.status === 'open' || i.vacancy.status === 'likely_open'))
+  assertEquals(s.items.slice(0, 3).map((i) => i.vacancy.status), ['open', 'open', 'open'])
+})
