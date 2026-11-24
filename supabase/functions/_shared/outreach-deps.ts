@@ -35,7 +35,22 @@ export function outreachFooter(unsubscribeUrl: string, postalAddress: string): {
   }
 }
 
-const LEAD_FIELDS = 'id, organization_name, category, contact_email, decision_maker_name, student_size, recommended_package, signals, city, state'
+/** A prospect's newest shortlist that can be sent: status ready and not expired. */
+export async function readyShortlistFor(db: SupabaseClient, prospectId: string, now: Date): Promise<{ token: string; jobs: unknown[] } | null> {
+  const { data, error } = await db
+    .from('prospect_shortlists')
+    .select('token, jobs')
+    .eq('prospect_id', prospectId)
+    .eq('status', 'ready')
+    .gt('expires_at', now.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(`prospect_shortlists: ${error.message}`)
+  return (data as { token: string; jobs: unknown[] } | null) ?? null
+}
+
+const LEAD_FIELDS ='id, organization_name, category, contact_email, decision_maker_name, student_size, recommended_package, signals, city, state'
 const PROSPECT_FIELDS = 'id, email_normalized, first_name, target_job_title'
 
 type Joined = OutreachRow & {
@@ -128,7 +143,14 @@ export function createOutreachDeps(db: SupabaseClient, env: { get(name: string):
       if (!postalAddress) return { success: false, emailEventId: null, error: 'OUTBOUND_POSTAL_ADDRESS is not set' }
       const { unsubscribeUrl } = await getFooterLinksForProfile(null, to, 'marketing') // throws without the secret
       const footer = outreachFooter(unsubscribeUrl, postalAddress)
-      const email = renderOutreach({ subject, stage, campaign, senderName: env.get('SENDER_NAME') || 'Job-Hopper Team' })
+      // Prospect stage 1 is the shortlist email: it needs their latest ready, unexpired
+      // shortlist (scripts/build-shortlists.mjs), and nothing is sent without one.
+      let shortlist: { token: string; jobs: unknown[] } | null = null
+      if (subject.kind === 'prospect' && stage === 1) {
+        shortlist = await readyShortlistFor(db, subject.id, new Date())
+        if (!shortlist) return { success: false, emailEventId: null, error: 'no ready, unexpired shortlist' }
+      }
+      const email = renderOutreach({ subject: { ...subject, shortlist }, stage, campaign, senderName: env.get('SENDER_NAME') || 'Job-Hopper Team' })
       if (email.unfilled.length) return { success: false, emailEventId: null, error: `unfilled placeholders: ${email.unfilled.join(', ')}` }
       const tag = outreachCampaign(campaign, stage)
       const result = await sendEmail({

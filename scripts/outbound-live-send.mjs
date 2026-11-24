@@ -13,7 +13,9 @@
 //   share one inbox only the highest-scored one is enrolled, so one person doesn't get
 //   several sequences.
 // - --prospects: job seekers with review_status='approved' that pass
-//   prospect_send_eligibility and aren't already in an open outreach sequence.
+//   prospect_send_eligibility, aren't already in an open outreach sequence, and have a
+//   ready, unexpired shortlist (scripts/build-shortlists.mjs): their stage 1 is the
+//   shortlist email, so a prospect without one is skipped (no_ready_shortlist).
 // - --only="Name1,Name2" limits leads to those exact organization names (and prospects
 //   to those exact emails); --limit / --exclude work as before.
 //
@@ -140,6 +142,28 @@ export function pickLeadsToEnroll(leads, { exclusionNames, enrolledLeadIds }) {
 }
 
 /** followup_sequences stage-1 rows, due now. */
+/**
+ * Prospects that can get the shortlist email: each paired with their newest ready,
+ * unexpired shortlist. shortlists: prospect_shortlists rows (any status/expiry).
+ * Returns { enroll: [{ prospect, shortlist }], skipped: [{ prospect, reason }] }.
+ */
+export function pickProspectsWithShortlist(prospects, shortlists, now = new Date()) {
+  const best = new Map();
+  for (const s of shortlists) {
+    if (s.status !== 'ready' || !(new Date(s.expires_at) > now)) continue;
+    const cur = best.get(s.prospect_id);
+    if (!cur || s.created_at > cur.created_at) best.set(s.prospect_id, s);
+  }
+  const enroll = [];
+  const skipped = [];
+  for (const prospect of prospects) {
+    const shortlist = best.get(prospect.id);
+    if (shortlist) enroll.push({ prospect, shortlist });
+    else skipped.push({ prospect, reason: 'no_ready_shortlist' });
+  }
+  return { enroll, skipped };
+}
+
 export function enrollmentRows({ leadIds = [], prospectIds = [] }, campaign, now = new Date()) {
   const base = { sequence_key: outreachSequenceKey(campaign), sequence_stage: 1, scheduled_date: now.toISOString() };
   return [
@@ -232,7 +256,8 @@ async function main() {
     leadsToEnroll.push(lead);
   }
 
-  let prospects = [];
+  let prospects = []; // [{ prospect, shortlist }]
+  let prospectsSkipped = [];
   if (withProspects) {
     let q = supabase
       .from('prospect_send_eligibility')
@@ -251,7 +276,16 @@ async function main() {
         .eq('review_status', 'approved')
         .eq('status', 'new');
       if (error) throw new Error(`Failed to query prospects: ${error.message}`);
-      prospects = data;
+      const { data: shortlists, error: shortlistError } = await supabase
+        .from('prospect_shortlists')
+        .select('prospect_id, token, jobs, status, expires_at, created_at')
+        .in('prospect_id', data.map((p) => p.id))
+        .eq('status', 'ready')
+        .gt('expires_at', new Date().toISOString());
+      if (shortlistError) throw new Error(`Failed to query prospect_shortlists: ${shortlistError.message}`);
+      const picked = pickProspectsWithShortlist(data, shortlists);
+      prospects = picked.enroll;
+      prospectsSkipped = picked.skipped;
     }
   }
 
@@ -259,16 +293,17 @@ async function main() {
     const email = renderOutreach({ subject: { kind: 'lead', lead }, stage: 1, campaign, senderName: SENDER_NAME });
     printStage1(`[${lead.category}] ${lead.organization_name} <${lead.contact_email}>`, email, footerFor(lead.contact_email));
   }
-  for (const prospect of prospects) {
-    const email = renderOutreach({ subject: { kind: 'prospect', prospect }, stage: 1, campaign, senderName: SENDER_NAME });
+  for (const { prospect, shortlist } of prospects) {
+    const email = renderOutreach({ subject: { kind: 'prospect', prospect, shortlist }, stage: 1, campaign, senderName: SENDER_NAME });
     printStage1(`[prospect] ${prospect.email_normalized}`, email, footerFor(prospect.email_normalized));
   }
+  if (prospectsSkipped.length) console.log(`\n${prospectsSkipped.length} approved prospect(s) skipped: no ready, unexpired shortlist (run scripts/build-shortlists.mjs).`);
 
   if (preview) {
     console.log(`\nPreview complete: would enroll ${leadsToEnroll.length} lead(s) and ${prospects.length} prospect(s); ${skipped.length} lead(s) skipped.`);
     return;
   }
-  const rows = enrollmentRows({ leadIds: leadsToEnroll.map((l) => l.id), prospectIds: prospects.map((p) => p.id) }, campaign);
+  const rows = enrollmentRows({ leadIds: leadsToEnroll.map((l) => l.id), prospectIds: prospects.map(({ prospect }) => prospect.id) }, campaign);
   for (const [column, subset] of [['institutional_lead_id', rows.filter((r) => r.institutional_lead_id)], ['prospect_id', rows.filter((r) => r.prospect_id)]]) {
     if (!subset.length) continue;
     const { error } = await supabase

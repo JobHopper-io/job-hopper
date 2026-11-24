@@ -373,18 +373,24 @@ Job-Hopper`,
   },
 };
 
-// DRAFT, pending approval: job-seeker prospects, all four stages. Stage 1 will be
-// replaced by the Day 3 shortlist email. [Role] falls back to "your next role".
+// DRAFT, pending approval: job-seeker prospects, all four stages. Stage 1 is the Day 3
+// shortlist email: 3-5 verified jobs inline plus the /s/:token page link ([Jobs] and
+// [Shortlist] are filled by renderOutreach from the prospect's ready shortlist). It names
+// only jobs on that shortlist, makes no sponsorship claim and quotes no prices.
+// [Role] falls back to "your next role".
 export const PROSPECT_STAGES = {
   1: {
-    subject: 'Your [Role] search',
+    subject: 'A shortlist of [Role] jobs for you',
     body: `Hi [Name],
 
-I saw you're looking for [Role] work. Job-Hopper matches roles to your profile and
-shows each employer's visa sponsorship history from public DOL and USCIS filing records,
-so you can spend your time on the applications most likely to fit.
+I put together a short list of [Role] jobs that match what you're looking for:
 
-Setting up a profile takes a couple of minutes: [Link]
+[Jobs]
+
+We checked that each one still looked open when we made the list, but jobs can close at
+any time. See why each one fits, and apply, here: [Shortlist]
+
+The list stays up for 14 days.
 
 [Your Name]
 Job-Hopper`,
@@ -428,6 +434,29 @@ Job-Hopper`,
 
 const PROSPECT_FROM_NAME = 'Job-Hopper';
 
+/** The public shortlist page for a token, UTM-tagged with the outreach campaign. */
+export function shortlistPageUrl(token, campaign) {
+  return `${PARTNER_PAGE_BASE}/s/${encodeURIComponent(token)}?${utmQuery(campaign)}`;
+}
+
+export const SHORTLIST_EMAIL_MIN_JOBS = 3;
+export const SHORTLIST_EMAIL_MAX_JOBS = 5;
+
+// Square brackets in job text would read as unfilled [Placeholders] and block the send.
+const plain = (v) => String(v ?? '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\s+/g, ' ').trim();
+
+/** "- Title, Company (Location)" lines for 3-5 shortlist jobs. Throws outside that range. */
+export function shortlistJobLines(jobs) {
+  if (!Array.isArray(jobs) || jobs.length < SHORTLIST_EMAIL_MIN_JOBS) {
+    throw new Error(`Shortlist email needs at least ${SHORTLIST_EMAIL_MIN_JOBS} jobs`);
+  }
+  return jobs.slice(0, SHORTLIST_EMAIL_MAX_JOBS).map((j) => {
+    const where = plain(j.location);
+    const company = plain(j.company);
+    return `- ${plain(j.title) || 'Untitled role'}${company ? `, ${company}` : ''}${where ? ` (${where})` : ''}`;
+  }).join('\n');
+}
+
 /** Signup link for a job-seeker prospect, UTM-tagged with the outreach campaign. */
 export function prospectSignupUrl(campaign) {
   return `${PARTNER_PAGE_BASE}/register?${utmQuery(campaign)}`;
@@ -458,21 +487,30 @@ export function renderOutreach({ subject: who, stage, campaign, senderName }) {
   const role = typeof who.prospect.target_job_title === 'string' && who.prospect.target_job_title.trim()
     ? who.prospect.target_job_title.trim()
     : null;
+  const link = stage === 1 ? null : prospectSignupUrl(tag);
   const replacements = {
     '[Name]': firstName(who.prospect.first_name) || 'there',
     '[Your Name]': senderName,
-    '[Link]': prospectSignupUrl(tag),
+    '[Link]': link ?? '[Link]',
   };
+  if (stage === 1) {
+    // The shortlist email: never sent without a ready shortlist of 3-5 jobs.
+    if (!who.shortlist?.token) throw new Error('Prospect stage 1 needs a ready shortlist');
+    replacements['[Jobs]'] = shortlistJobLines(who.shortlist.jobs);
+    replacements['[Shortlist]'] = shortlistPageUrl(who.shortlist.token, tag);
+  }
   const filled = renderWith(
     {
-      subject: role ? template.subject.replace('[Role]', role) : template.subject.replace('Your [Role] search', 'Your job search'),
-      body: template.body.replace('[Role] work', role ? `${role} work` : 'your next role'),
+      subject: role ? template.subject.replace('[Role]', role) : template.subject.replace('[Role] jobs', 'jobs').replace('Your [Role] search', 'Your job search'),
+      body: template.body.replace('[Role] jobs', role ? `${role} jobs` : 'jobs').replace('[Role] work', role ? `${role} work` : 'your next role'),
     },
     replacements,
   );
+  const url = stage === 1 ? replacements['[Shortlist]'] : link;
+  const anchor = stage === 1 ? 'See your shortlist' : url;
   return {
     ...filled,
-    html: filled.html.replace(escapeHtml(replacements['[Link]']), `<a href="${escapeHtml(replacements['[Link]'])}">${escapeHtml(replacements['[Link]'])}</a>`),
+    html: filled.html.replace(escapeHtml(url), `<a href="${escapeHtml(url)}">${escapeHtml(anchor)}</a>`),
     fromName: PROSPECT_FROM_NAME,
     // ponytail: job seekers reply to the general partnerships inbox (routed into
     // reply-ingest) until a job-seeker inbox exists.

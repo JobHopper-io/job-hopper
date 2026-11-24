@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { blockedEventRow, enrollmentRows, isEmailSuppressed, logBlockedOnce, logOutboundEvent, outboundEventRow, pickLeadsToEnroll } from './outbound-live-send.mjs';
+import { blockedEventRow, enrollmentRows, isEmailSuppressed, pickProspectsWithShortlist, logBlockedOnce, logOutboundEvent, outboundEventRow, pickLeadsToEnroll } from './outbound-live-send.mjs';
 
 function fakeSupabase(response) {
   const calls = [];
@@ -169,4 +169,22 @@ test('logOutboundEvent writes to email_events and reports (never throws) on fail
   assert.deepEqual(writes, [['email_events', { status: 'sent' }]]);
   const failing = { from: () => ({ insert: () => Promise.resolve({ error: { message: 'boom' } }) }) };
   assert.equal(await logOutboundEvent(failing, { status: 'sent' }), false);
+});
+
+test('pickProspectsWithShortlist: only prospects with a ready, unexpired shortlist are enrolled', () => {
+  const now = new Date('2026-11-25T09:00:00Z');
+  const prospects = [{ id: 'ready' }, { id: 'too_few' }, { id: 'expired' }, { id: 'none' }, { id: 'two' }];
+  const row = (prospect_id, status, expires_at, created_at = '2026-11-20T00:00:00Z', token = `${prospect_id}-tok`) =>
+    ({ prospect_id, status, expires_at, created_at, token, jobs: [] });
+  const { enroll, skipped } = pickProspectsWithShortlist(prospects, [
+    row('ready', 'ready', '2026-12-01T00:00:00Z'),
+    row('too_few', 'too_few', '2026-12-01T00:00:00Z'),
+    row('expired', 'ready', '2026-11-25T09:00:00Z'), // expires exactly now: not enrolled
+    row('two', 'ready', '2026-12-01T00:00:00Z', '2026-11-20T00:00:00Z', 'older'),
+    row('two', 'ready', '2026-12-02T00:00:00Z', '2026-11-22T00:00:00Z', 'newer'),
+  ], now);
+  assert.deepEqual(enroll.map((e) => [e.prospect.id, e.shortlist.token]), [['ready', 'ready-tok'], ['two', 'newer']]);
+  assert.deepEqual(skipped.map((s) => [s.prospect.id, s.reason]), [
+    ['too_few', 'no_ready_shortlist'], ['expired', 'no_ready_shortlist'], ['none', 'no_ready_shortlist'],
+  ]);
 });
