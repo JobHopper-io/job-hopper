@@ -61,11 +61,17 @@ export interface SendEmailOptions {
     | "sponsor_watch_alert"
     | "reveal_request_received"
     | "recovery"
+    | "outbound"
   templateKey?: string | null
   /** Campaign tag stored on the email_events row (growth sends). */
   campaign?: string | null
-  /** Stage within a sequence (recovery sequences), stored on email_events.sequence_stage. */
+  /** Stage within a sequence (recovery/outreach), stored on email_events.sequence_stage. */
   sequenceStage?: number | null
+  /** Outreach recipients that aren't users: logged on email_events instead of profile_id. */
+  institutionalLeadId?: string | null
+  prospectId?: string | null
+  fromName?: string | null
+  replyTo?: string | null
   payload?: Record<string, unknown> | null
   /** Supabase client (service_role) to insert into email_events. If omitted, no DB log. */
   supabase?: { from: (table: string) => { insert: (row: unknown) => PromiseLike<{ error: unknown }> } }
@@ -128,10 +134,13 @@ export async function sendEmail(
       metadata: options.metadata,
       headers: options.kind === "marketing" ? listUnsubscribeHeaders(options.unsubscribeUrl!) : undefined,
       campaign: options.campaign ?? null,
+      fromName: options.fromName ?? null,
+      replyTo: options.replyTo ?? null,
     })
 
   let emailEventId: string | null = null
-  if (options.supabase && options.profileId != null && options.eventType) {
+  const loggedSubject = options.profileId != null || options.institutionalLeadId != null || options.prospectId != null
+  if (options.supabase && loggedSubject && options.eventType) {
     const status = result.success ? "sent" : "failed"
     // Id generated here so callers can link the row (followup_sequences.email_event_id)
     // without changing the insert call's shape.
@@ -139,7 +148,9 @@ export async function sendEmail(
     try {
       const { error } = await options.supabase.from("email_events").insert({
         id,
-        profile_id: options.profileId,
+        profile_id: options.profileId ?? null,
+        institutional_lead_id: options.institutionalLeadId ?? null,
+        prospect_id: options.prospectId ?? null,
         type: options.eventType,
         subject: options.subject,
         template_key: options.templateKey ?? null,

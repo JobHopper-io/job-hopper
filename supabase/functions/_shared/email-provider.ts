@@ -19,6 +19,10 @@ export interface SendEmailParams {
   headers?: Record<string, string>
   /** email_events.campaign, shown by the log provider. */
   campaign?: string | null
+  /** Display name; overrides any name in MAILTRAP_FROM (the address never changes). */
+  fromName?: string | null
+  /** Reply-To address, e.g. a monitored job-hopper.co inbox routed into reply-ingest. */
+  replyTo?: string | null
 }
 
 export interface SendEmailResult {
@@ -48,7 +52,7 @@ export function parseFromAddress(raw: string, fallbackName: string): { email: st
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
   if (Deno.env.get('EMAIL_PROVIDER') === 'log') {
     // Full address on purpose: this mode exists to see who would have been emailed.
-    console.log('[email-provider:log] not sent', { to: params.to, subject: params.subject, campaign: params.campaign ?? null, category: params.category ?? null })
+    console.log('[email-provider:log] not sent', { to: params.to, subject: params.subject, campaign: params.campaign ?? null, category: params.category ?? null, replyTo: params.replyTo ?? null })
     return { messageId: `log-${crypto.randomUUID()}`, success: true }
   }
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN')
@@ -67,7 +71,8 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
+  const parsedFrom = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
+  const fromAddress = params.fromName?.trim() ? { email: parsedFrom.email, name: params.fromName.trim() } : parsedFrom
 
   // Log the recipient's domain only (spots provider-specific rejections) — never the address.
   const toDomain = params.to.split('@')[1] ?? null
@@ -89,6 +94,10 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
   if (params.category) {
     payload.category = params.category
+  }
+
+  if (params.replyTo?.trim()) {
+    payload.reply_to = { email: params.replyTo.trim() }
   }
 
   if (params.metadata && Object.keys(params.metadata).length > 0) {

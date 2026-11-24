@@ -69,3 +69,22 @@ Deno.test('EMAIL_PROVIDER=log never calls Mailtrap and reports a log- message id
     console.log = realLog
   }
 })
+
+Deno.test('sendEmailViaProvider: fromName overrides the display name, replyTo becomes reply_to', async () => {
+  const bodies: Record<string, unknown>[] = []
+  const savedFetch = globalThis.fetch
+  const savedToken = Deno.env.get('MAILTRAP_API_TOKEN')
+  globalThis.fetch = ((_url: string, init: RequestInit) => (bodies.push(JSON.parse(String(init.body))), Promise.resolve(new Response('{"message_ids":["m1"]}', { status: 200 })))) as typeof fetch
+  Deno.env.set('MAILTRAP_API_TOKEN', 'test-token')
+  try {
+    await sendEmailViaProvider({ to: 'a@example.com', subject: 's', text: 't', fromName: 'Job-Hopper Partnerships', replyTo: ' partnerships@job-hopper.co ' })
+    await sendEmailViaProvider({ to: 'a@example.com', subject: 's', text: 't' })
+  } finally {
+    globalThis.fetch = savedFetch
+    if (savedToken === undefined) Deno.env.delete('MAILTRAP_API_TOKEN')
+    else Deno.env.set('MAILTRAP_API_TOKEN', savedToken)
+  }
+  assertEquals((bodies[0].from as { name: string }).name, 'Job-Hopper Partnerships')
+  assertEquals(bodies[0].reply_to, { email: 'partnerships@job-hopper.co' })
+  assertEquals('reply_to' in bodies[1], false)
+})
