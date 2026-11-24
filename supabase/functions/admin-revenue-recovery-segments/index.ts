@@ -6,12 +6,16 @@
 //   send       one run in send mode; requires confirmRealSend: true
 //   test_send  one segment/stage's copy to testEmailOverride only; no member touched,
 //              nothing logged to email_events or followup_sequences
+//   outreach   outreach sequences (leads and prospects): stage, next due, stopped and
+//              why; reads only
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import { sendEmail } from "../_shared/email.ts"
 import { getFooterLinksForProfile } from "../_shared/unsubscribe-token.ts"
 import { createRecoveryDeps, loadGrowthSettings } from "../_shared/recovery-deps.ts"
 import { recoverySendOptions, runRecovery } from "../_shared/recovery-sequences.ts"
+import { createOutreachDeps, loadOutreachSettings } from "../_shared/outreach-deps.ts"
+import { summarizeOutreach } from "../_shared/outreach-sequences.ts"
 import {
   RECOVERY_SEGMENT_PRIORITY,
   type RecoveryCandidate,
@@ -25,7 +29,7 @@ const corsHeaders = {
 }
 
 interface RequestBody {
-  action?: "preview" | "send" | "test_send"
+  action?: "preview" | "send" | "test_send" | "outreach"
   segment?: string
   stage?: number
   testEmailOverride?: string
@@ -92,6 +96,17 @@ serve(async (req) => {
     if (!isAdmin && !isSuperAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403,
+      })
+    }
+
+    if (body.action === "outreach") {
+      const [outreachSettings, sequences] = await Promise.all([
+        loadOutreachSettings(serviceClient),
+        createOutreachDeps(serviceClient, Deno.env).loadSequences(),
+      ])
+      return json({
+        settings: { autoSend: outreachSettings.outreach_auto_send, maxPerRun: outreachSettings.outreach_max_per_run },
+        sequences: summarizeOutreach(sequences),
       })
     }
 

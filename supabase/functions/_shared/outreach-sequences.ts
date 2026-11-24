@@ -240,3 +240,41 @@ export async function runOutreach(opts: { mode: 'preview' | 'send'; maxSends: nu
 export function outreachRunMode(settings: { outreach_auto_send: boolean }): 'preview' | 'send' {
   return settings.outreach_auto_send === true ? 'send' : 'preview'
 }
+
+export interface OutreachSequenceSummary {
+  sequenceKey: string
+  campaign: string
+  kind: OutreachSubject['kind']
+  name: string
+  emailMasked: string | null
+  stagesSent: number
+  status: 'active' | 'stopped' | 'complete'
+  stopReason: string | null
+  /** Next stage and when it's due (active only). */
+  nextStage: number | null
+  nextDue: string | null
+  lastSentAt: string | null
+}
+
+/** One line per sequence for the admin page: stage, next due, or stopped and why. */
+export function summarizeOutreach(sequences: OutreachSequence[]): OutreachSequenceSummary[] {
+  return sequences.map((seq) => {
+    const sent = seq.rows.filter((r) => r.sent_date)
+    const stop = seq.rows.find((r) => r.stop_reason)?.stop_reason ?? null
+    const pending = seq.rows.filter((r) => !r.sent_date).sort((a, b) => a.sequence_stage - b.sequence_stage)[0]
+    const status: OutreachSequenceSummary['status'] = stop ? 'stopped' : pending ? 'active' : 'complete'
+    return {
+      sequenceKey: seq.sequenceKey,
+      campaign: campaignOf(seq.sequenceKey),
+      kind: seq.subject.kind,
+      name: nameOf(seq.subject),
+      emailMasked: maskEmail(subjectEmail(seq.subject)),
+      stagesSent: sent.length,
+      status,
+      stopReason: stop,
+      nextStage: status === 'active' ? pending!.sequence_stage : null,
+      nextDue: status === 'active' ? pending!.scheduled_date : null,
+      lastSentAt: sent.map((r) => r.sent_date!).sort().at(-1) ?? null,
+    }
+  }).sort((a, b) => (a.nextDue ?? '9999').localeCompare(b.nextDue ?? '9999'))
+}

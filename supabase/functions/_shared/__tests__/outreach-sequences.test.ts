@@ -12,6 +12,7 @@ import {
   type OutreachSubject,
   planOutreach,
   runOutreach,
+  summarizeOutreach,
 } from '../outreach-sequences.ts'
 
 const DAY = 86_400_000
@@ -233,4 +234,18 @@ Deno.test('groupSequences: one sequence per subject and key; rows without a subj
 Deno.test('the edge-function footer matches the Node outbound footer exactly', () => {
   const url = 'https://x.supabase.co/functions/v1/unsubscribe-email?token=a.b'
   assertEquals(outreachFooter(url, '1 Main St, Austin, TX'), renderFooter({ unsubscribeUrl: url, postalAddress: '1 Main St, Austin, TX' }))
+})
+
+Deno.test('summarizeOutreach: stage, next due, stopped and why, complete', () => {
+  const seq = (subject: OutreachSubject, rows: OutreachRow[]): OutreachSequence => ({ subject, sequenceKey: 'outreach_nov', rows })
+  const out = summarizeOutreach([
+    seq(LEAD, [row({ sent_date: at(0).toISOString() }), row({ sequence_stage: 2, scheduled_date: at(2).toISOString() })]),
+    seq(PROSPECT, [row({ sent_date: at(0).toISOString(), stop_reason: 'unsubscribed' })]),
+    seq({ ...LEAD, id: 'l2' }, [1, 2, 3, 4].map((st) => row({ sequence_stage: st, sent_date: at(st).toISOString() }))),
+  ])
+  assertEquals(out.map((s) => [s.kind, s.emailMasked, s.status, s.stagesSent, s.nextStage, s.nextDue, s.stopReason]), [
+    ['lead', 'd***@state.edu', 'active', 1, 2, at(2).toISOString(), null],
+    ['prospect', 'm***@example.com', 'stopped', 1, null, null, 'unsubscribed'],
+    ['lead', 'd***@state.edu', 'complete', 4, null, null, null],
+  ])
 })

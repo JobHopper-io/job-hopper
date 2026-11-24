@@ -376,6 +376,26 @@ export interface RecoveryAdminResult {
   result: RecoveryRunResult
 }
 
+/** Mirrors _shared/outreach-sequences.ts OutreachSequenceSummary. */
+export interface OutreachSequenceRow {
+  sequenceKey: string
+  campaign: string
+  kind: 'lead' | 'prospect'
+  name: string
+  emailMasked: string | null
+  stagesSent: number
+  status: 'active' | 'stopped' | 'complete'
+  stopReason: string | null
+  nextStage: number | null
+  nextDue: string | null
+  lastSentAt: string | null
+}
+
+export interface OutreachAdminResult {
+  settings: { autoSend: boolean; maxPerRun: number }
+  sequences: OutreachSequenceRow[]
+}
+
 export interface RecoveryTestSendResult {
   mode: 'test'
   success: boolean
@@ -735,6 +755,13 @@ export const adminAPI = {
     })
     if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
     return { data: data as RecoveryAdminResult, error: null }
+  },
+
+  /** Outreach sequences: who's in which stage, next due, stopped and why. Reads only. */
+  async listOutreachSequences(): Promise<{ data: OutreachAdminResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', { body: { action: 'outreach' } })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as OutreachAdminResult, error: null }
   },
 
   /** One segment/stage's copy to a single test address; no member is touched. */

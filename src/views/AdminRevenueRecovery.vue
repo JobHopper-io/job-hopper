@@ -125,6 +125,53 @@
       </div>
     </section>
 
+    <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6 mb-8">
+      <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+        Outreach sequences
+      </h2>
+      <p class="text-sm text-neutral-body mb-4">
+        Cold outreach to institutional leads and job-seeker prospects: 4 emails on day 0, 2, 4 and 6,
+        enrolled by scripts/outbound-live-send.mjs.
+        <template v-if="outreach">
+          Daily automatic send: {{ outreach.settings.autoSend ? 'on' : 'off (preview only)' }}, up to
+          {{ outreach.settings.maxPerRun }} per run.
+        </template>
+      </p>
+      <p v-if="outreachError" class="mb-3 text-sm text-red-600">{{ outreachError }}</p>
+      <div class="-mx-4 sm:-mx-6 overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="min-w-full divide-y divide-neutral-border text-sm">
+          <thead class="bg-neutral-bg sticky top-0">
+            <tr>
+              <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium text-neutral-muted">Who</th>
+              <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium text-neutral-muted">Campaign</th>
+              <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium text-neutral-muted">Emails sent</th>
+              <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium text-neutral-muted">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-border">
+            <tr v-for="o in outreach?.sequences ?? []" :key="`${o.sequenceKey}:${o.kind}:${o.name}:${o.emailMasked}`">
+              <td class="px-4 sm:px-6 py-2 text-neutral-body">
+                <div class="text-brand-charcoal">{{ o.name }}</div>
+                <div class="text-xs text-neutral-muted">{{ o.kind === 'lead' ? 'Institutional lead' : 'Job seeker' }} · {{ o.emailMasked }}</div>
+              </td>
+              <td class="px-4 sm:px-6 py-2 text-neutral-body">{{ o.campaign }}</td>
+              <td class="px-4 sm:px-6 py-2 text-neutral-body tabular-nums">{{ o.stagesSent }} of 4</td>
+              <td class="px-4 sm:px-6 py-2">
+                <span v-if="o.status === 'stopped'" class="text-red-700">Stopped: {{ (o.stopReason ?? '').replace(/_/g, ' ') }}</span>
+                <span v-else-if="o.status === 'complete'" class="text-neutral-muted">Finished</span>
+                <span v-else class="text-neutral-body">
+                  Email {{ o.nextStage }} due {{ o.nextDue ? new Date(o.nextDue).toLocaleString() : '' }}
+                </span>
+              </td>
+            </tr>
+            <tr v-if="outreach && outreach.sequences.length === 0">
+              <td colspan="4" class="px-4 sm:px-6 py-6 text-center text-neutral-body">Nobody is enrolled in an outreach sequence.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section v-if="data" class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6 mb-8">
       <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
         Test an email
@@ -164,7 +211,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { adminAPI, type RecoveryAdminResult, type RevenueRecoverySegmentKey } from '@/lib/admin'
+import { adminAPI, type OutreachAdminResult, type RecoveryAdminResult, type RevenueRecoverySegmentKey } from '@/lib/admin'
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -176,6 +223,15 @@ const testStage = ref<1 | 2>(1)
 const testEmail = ref('')
 const sendingTest = ref(false)
 const testMessage = ref<string | null>(null)
+
+const outreach = ref<OutreachAdminResult | null>(null)
+const outreachError = ref<string | null>(null)
+
+async function loadOutreach() {
+  const { data: result, error } = await adminAPI.listOutreachSequences()
+  outreachError.value = error ? error.message : null
+  outreach.value = result
+}
 
 const preview = computed(() => data.value?.result.planned ?? [])
 const labelFor = (key: RevenueRecoverySegmentKey) => data.value?.segments.find((s) => s.key === key)?.label ?? key
@@ -224,5 +280,8 @@ async function submitTestSend() {
     : `Sent (messageId=${result.messageId})`
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadOutreach()
+})
 </script>
