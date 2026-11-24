@@ -5,6 +5,8 @@ import {
   atsHost,
   createVacancyVerifier,
   isBambooCareersIndex,
+  isFreshCheck,
+  latestCheckByJob,
   jobPostingsFromJsonLd,
   judgeGenericPage,
   parseGreenhouse,
@@ -335,4 +337,25 @@ Deno.test('throttle: one request per second per host, other hosts not delayed', 
 Deno.test('result carries checked_at from the injected clock', async () => {
   const { verifier } = mock({})
   assertEquals((await verifier.verify('https://www.indeed.com/viewjob?jk=1')).checkedAt, '2026-11-25T12:00:00.000Z')
+})
+
+// ---- cache helpers (job_vacancy_checks) ----------------------------------------
+
+Deno.test('isFreshCheck: reused for 24h, then rechecked', () => {
+  const now = Date.parse('2026-11-25T12:00:00Z')
+  assertEquals(isFreshCheck({ checked_at: '2026-11-24T12:00:01Z' }, now), true)
+  assertEquals(isFreshCheck({ checked_at: '2026-11-24T12:00:00Z' }, now), false)
+  assertEquals(isFreshCheck({ checked_at: 'not a date' }, now), false)
+})
+
+Deno.test('latestCheckByJob: newest row per job, any input order', () => {
+  const rows = [
+    { job_id: 'a', checked_at: '2026-11-20T00:00:00Z', status: 'open' },
+    { job_id: 'a', checked_at: '2026-11-24T00:00:00Z', status: 'closed' },
+    { job_id: 'b', checked_at: '2026-11-22T00:00:00Z', status: 'open' },
+    { job_id: 'a', checked_at: '2026-11-21T00:00:00Z', status: 'open' },
+  ]
+  const latest = latestCheckByJob(rows)
+  assertEquals(latest.get('a')?.status, 'closed')
+  assertEquals(latest.get('b')?.status, 'open')
 })

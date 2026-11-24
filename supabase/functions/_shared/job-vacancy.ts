@@ -379,3 +379,29 @@ export function createVacancyVerifier(overrides: Partial<VacancyDeps> = {}): Vac
     },
   }
 }
+
+/** A stored check (job_vacancy_checks row) is reused for this long before rechecking. */
+export const VACANCY_CACHE_HOURS = 24
+
+export interface StoredVacancyCheck {
+  job_id: string
+  status: VacancyStatus
+  method: string
+  http_status: number | null
+  checked_at: string
+}
+
+export function isFreshCheck(check: Pick<StoredVacancyCheck, 'checked_at'>, nowMs: number): boolean {
+  const at = Date.parse(check.checked_at)
+  return !Number.isNaN(at) && nowMs - at < VACANCY_CACHE_HOURS * 3_600_000
+}
+
+/** Latest check per job from any number of rows (any order). */
+export function latestCheckByJob<T extends Pick<StoredVacancyCheck, 'job_id' | 'checked_at'>>(rows: T[]): Map<string, T> {
+  const latest = new Map<string, T>()
+  for (const r of rows) {
+    const cur = latest.get(r.job_id)
+    if (!cur || Date.parse(r.checked_at) > Date.parse(cur.checked_at)) latest.set(r.job_id, r)
+  }
+  return latest
+}

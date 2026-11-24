@@ -217,6 +217,12 @@ verify_jwt = false
 [functions.unsubscribe-email]
 verify_jwt = false
 
+# Public reverse-recruiting shortlist page data and tracked apply clicks (/s/:token).
+# The 32-byte random token is the credential; unknown/expired tokens get a bare 404, and
+# /click only redirects to apply links stored in that token's own shortlist.
+[functions.shortlist]
+verify_jwt = false
+
 # Invoked by pg_cron monthly; secured with x-cron-secret (CRON_SECRET) or service role bearer.
 [functions.reset-apollo-limits]
 verify_jwt = false

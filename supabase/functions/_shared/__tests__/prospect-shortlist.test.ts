@@ -6,6 +6,7 @@ import {
   SHORTLIST_MAX,
   assembleShortlist,
   fallbackWhyFit,
+  shortlistSnapshot,
   sharedTitleWords,
   verifyUntilEnough,
 } from '../prospect-shortlist.ts'
@@ -175,4 +176,18 @@ Deno.test('assembleShortlist: never more than 5, never closed or unverified (mix
   assertEquals(s.items.length, 5)
   assert(s.items.every((i) => i.vacancy.status === 'open' || i.vacancy.status === 'likely_open'))
   assertEquals(s.items.slice(0, 3).map((i) => i.vacancy.status), ['open', 'open', 'open'])
+})
+
+Deno.test('shortlistSnapshot: the stored jobs shape, vacancy status included', () => {
+  const s = assembleShortlist(prospect(), [{ job: job({ id: 'j1', isRemote: true, location: null }), vacancy: v('open') }], NOW)
+  assertEquals(shortlistSnapshot(s.items), [{
+    job_id: 'j1',
+    title: 'Senior Backend Engineer',
+    company: 'Acme',
+    location: 'Remote',
+    apply_link: 'https://jobs.lever.co/acme/x',
+    posted_date: '2026-11-01T00:00:00Z',
+    bullets: s.items[0].bullets,
+    vacancy_status: 'open',
+  }])
 })

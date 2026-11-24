@@ -147,3 +147,38 @@ export async function verifyUntilEnough(
   }
   return checked
 }
+
+export const SHORTLIST_TTL_DAYS = 14
+
+/** 32 random bytes, base64url without padding (43 chars): the /s/:token secret. */
+export function newShortlistToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export const SHORTLIST_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/
+
+/** prospect_shortlists.jobs element: what the page and the email show, frozen at build time. */
+export interface ShortlistJobSnapshot {
+  job_id: string
+  title: string | null
+  company: string | null
+  location: string | null
+  apply_link: string | null
+  posted_date: string | null
+  bullets: string[]
+  vacancy_status: VacancyResult['status']
+}
+
+export function shortlistSnapshot(items: ShortlistItem[]): ShortlistJobSnapshot[] {
+  return items.map((i) => ({
+    job_id: i.jobId,
+    title: i.title,
+    company: i.company,
+    location: i.location,
+    apply_link: i.applyLink,
+    posted_date: i.postedDate,
+    bullets: i.bullets,
+    vacancy_status: i.vacancy.status,
+  }))
+}
