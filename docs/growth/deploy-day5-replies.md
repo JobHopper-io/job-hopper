@@ -32,3 +32,19 @@ Branch `growth/day5-replies` (from `growth/day7-recovery`). Nothing here is depl
   instead of one.
 - Existing processed replies keep their B2B class and get no extraction, draft or next
   action (no backfill).
+
+## Outreach sequences (5b)
+
+1. **Migration** `20261124140000_outreach_sequences.sql`, after `20261124130000`.
+2. **Edge function secrets**: `OUTBOUND_POSTAL_ADDRESS` (same value the Node scripts use;
+   without it every outreach send fails and is retried) and optionally `SENDER_NAME`.
+   `UNSUBSCRIBE_EMAIL_SECRET` is already set.
+3. **Edge functions**, after the migration: `outreach-sequences` (new),
+   `recovery-sequences` (skips people emailed by outreach in the last 2 days),
+   `admin-revenue-recovery-segments` (outreach view), then `run-scheduled-jobs` **last**:
+   its watchdog starts the `outreach-sequences` daily chain.
+4. `growth_settings.outreach_auto_send` stays **false**: the daily run only logs a
+   preview. Stages 2-4 for leads and all prospect stages are DRAFT copy
+   (`_shared/outbound-templates.mjs`); approve them before turning it on.
+5. Enrolling replaces the old one-off send: `node scripts/outbound-live-send.mjs --preview`
+   then `--campaign=<tag>` (add `--prospects` for approved, eligible job seekers).
