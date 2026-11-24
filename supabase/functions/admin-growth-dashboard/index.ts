@@ -312,6 +312,11 @@ serve(async (req) => {
       }
     })
 
+    // Reverse recruiting shortlists (migration 20261125120000): all-time counts per step.
+    const { data: rrData, error: rrError } = await supabaseAdminClient.rpc('reverse_recruiting_funnel')
+    if (rrError) throw new Error(`Failed to load reverse_recruiting_funnel: ${rrError.message}`)
+    const rr = (rrData ?? {}) as Partial<Record<'built' | 'ready' | 'too_few' | 'viewed' | 'clicked' | 'clicks' | 'signups', number>>
+
     // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
     const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
       supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
@@ -398,6 +403,15 @@ serve(async (req) => {
           outboundPaid: counts.funnel.outbound_paid,
         },
         recoveryFunnel,
+        reverseRecruiting: {
+          built: rr.built ?? 0,
+          ready: rr.ready ?? 0,
+          tooFew: rr.too_few ?? 0,
+          viewed: rr.viewed ?? 0,
+          clicked: rr.clicked ?? 0,
+          clicks: rr.clicks ?? 0,
+          signups: rr.signups ?? 0,
+        },
         cancellations: {
           // Portal feedback per canceled / scheduled-to-cancel B2C subscription; 'none' = no feedback.
           byFeedback: Object.entries(cancellation.by_feedback)

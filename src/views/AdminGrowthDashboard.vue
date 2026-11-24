@@ -110,6 +110,25 @@
 
       <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Reverse recruiting
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          Job shortlists sent to approved job seekers. Each step is its own all-time count, not a
+          cohort. Only ready shortlists (3-5 open jobs) are sent.
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in reverseRecruitingRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
           Cancellations
         </h2>
         <p class="text-sm text-neutral-body mb-5">
@@ -364,6 +383,17 @@ const funnelRows = computed(() => {
     { label: 'Positive replies', value: f.positiveReplies, hint: 'Interested, Meeting requested, More information' },
     { label: 'Signups from outbound', value: f.outboundSignups, hint: 'utm_source email_outbound, or matched to a lead' },
     { label: 'Paid from outbound', value: f.outboundPaid, hint: 'active subscription' },
+  ]
+})
+
+const reverseRecruitingRows = computed(() => {
+  const r = report.value?.reverseRecruiting
+  if (!r) return []
+  return [
+    { label: 'Shortlists built', value: r.built, hint: `${r.ready} ready, ${r.tooFew} too few jobs` },
+    { label: 'Viewed', value: r.viewed, hint: 'shortlists opened at least once' },
+    { label: 'Clicked', value: r.clicked, hint: `shortlists with an Apply click (${r.clicks} clicks)` },
+    { label: 'Signups', value: r.signups, hint: 'utm_campaign reverse_recruiting' },
   ]
 })
 

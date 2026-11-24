@@ -110,6 +110,20 @@ export interface GrowthDashboardReport {
     /** Completed checkout within 30 days of their first send. */
     paid30d: number
   }[]
+  /** Reverse-recruiting shortlists (/s/:token). Each step is its own all-time count, not a cohort. */
+  reverseRecruiting: {
+    built: number
+    ready: number
+    tooFew: number
+    /** Shortlists opened at least once. */
+    viewed: number
+    /** Shortlists with at least one Apply click. */
+    clicked: number
+    /** All Apply clicks. */
+    clicks: number
+    /** Profiles first-touched by the shortlist page (utm_campaign reverse_recruiting). */
+    signups: number
+  }
   /** B2C subscriptions only (university licenses excluded). */
   cancellations: {
     /** Canceled or scheduled-to-cancel subscriptions by Stripe portal feedback; 'none' = no feedback given. */
