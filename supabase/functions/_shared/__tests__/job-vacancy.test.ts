@@ -5,7 +5,10 @@ import {
   atsHost,
   createVacancyVerifier,
   isBambooCareersIndex,
+  jobPostingsFromJsonLd,
+  judgeGenericPage,
   parseGreenhouse,
+  workdayApiUrl,
 } from '../job-vacancy.ts'
 
 type Route = { status: number; location?: string; body?: string }
@@ -44,6 +47,7 @@ Deno.test('atsHost: maps hostnames to ATS families', () => {
   assertEquals(atsHost('jobs.lever.co'), 'lever')
   assertEquals(atsHost('careers-acme.icims.com'), 'icims')
   assertEquals(atsHost('acme.wd5.myworkdayjobs.com'), 'workday')
+  assertEquals(atsHost('apply.workable.com'), 'workable')
   assertEquals(atsHost('www.indeed.com'), 'indeed')
   assertEquals(atsHost('www.example.org'), 'example.org')
 })
@@ -148,18 +152,138 @@ Deno.test('bamboohr: redirect to /careers = closed, 200 = open', async () => {
   assertEquals((await verifier.verify('https://acme.bamboohr.com/careers/13')).status, 'open')
 })
 
-Deno.test('unsupported hosts are unverified without any request', async () => {
+Deno.test('indeed is never requested', async () => {
   const { verifier, calls } = mock({})
-  for (const url of [
-    'https://www.indeed.com/viewjob?jk=1',
-    'https://acme.wd5.myworkdayjobs.com/en-US/careers/job/1',
-    'https://recruiting.adp.com/srccar/public/RTI.home?c=1',
-    'https://careers.example.org/job/1',
-  ]) {
+  for (const url of ['https://www.indeed.com/viewjob?jk=1', 'https://indeed.com/job/x-1']) {
     const r = await verifier.verify(url)
-    assertEquals([r.status, r.method, r.httpStatus], ['unverified', 'unsupported_host', null])
+    assertEquals([r.status, r.method, r.httpStatus, r.host], ['unverified', 'unsupported_host', null, 'indeed'])
   }
   assertEquals(calls.length, 0)
+})
+
+// ---- Workday ----------------------------------------------------------------
+
+Deno.test('workdayApiUrl: derives the cxs endpoint, with or without a locale', () => {
+  assertEquals(
+    workdayApiUrl(new URL('https://lseg.wd3.myworkdayjobs.com/en-US/Careers/job/USA-Buffalo/Manager_R0124009')),
+    'https://lseg.wd3.myworkdayjobs.com/wday/cxs/lseg/Careers/job/USA-Buffalo/Manager_R0124009',
+  )
+  assertEquals(
+    workdayApiUrl(new URL('https://aes.wd1.myworkdayjobs.com/aes_clean_energy/job/US-Louisville-CO/Engineer_R1064842')),
+    'https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_clean_energy/job/US-Louisville-CO/Engineer_R1064842',
+  )
+  assertEquals(workdayApiUrl(new URL('https://aes.wd1.myworkdayjobs.com/aes_clean_energy')), null)
+})
+
+const WD = 'https://aes.wd1.myworkdayjobs.com/aes_clean_energy/job/US-CO/Engineer_R1'
+const WD_API = 'https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_clean_energy/job/US-CO/Engineer_R1'
+
+Deno.test('workday: posting payload = open', async () => {
+  const { verifier } = mock({ [WD_API]: { status: 200, body: JSON.stringify({ jobPostingInfo: { id: 'x', title: 'Engineer' } }) } })
+  const r = await verifier.verify(WD)
+  assertEquals([r.status, r.method, r.httpStatus, r.host], ['open', 'workday_api', 200, 'workday'])
+})
+
+Deno.test('workday: 404 = closed; 4xx error payload (unlisted posting) = closed', async () => {
+  const notFound = mock({ [WD_API]: { status: 404, body: '{"errorCode":"S21","message":"not found"}' } })
+  assertEquals((await notFound.verifier.verify(WD)).status, 'closed')
+  const denied = mock({ [WD_API]: { status: 403, body: '{"errorCode":"S22","httpStatus":403,"message":"permission denied"}' } })
+  const r = await denied.verifier.verify(WD)
+  assertEquals([r.status, r.httpStatus, r.detail], ['closed', 403, 'error S22'])
+})
+
+Deno.test('workday: 5xx or a 200 without a posting is unverified', async () => {
+  const down = mock({ [WD_API]: { status: 503, body: '{"errorCode":"X"}' } })
+  assertEquals((await down.verifier.verify(WD)).status, 'unverified')
+  const odd = mock({ [WD_API]: { status: 200, body: '<html></html>' } })
+  assertEquals((await odd.verifier.verify(WD)).status, 'unverified')
+})
+
+// ---- Workable ---------------------------------------------------------------
+
+Deno.test('workable: /j/ short link resolves the account, then the API decides', async () => {
+  const { verifier, calls } = mock({
+    'https://apply.workable.com/j/7873B7FC2D': { status: 301, location: '/scitec/j/7873B7FC2D' },
+    'https://apply.workable.com/api/v2/accounts/scitec/jobs/7873B7FC2D': { status: 200, body: '{}' },
+  })
+  const r = await verifier.verify('https://apply.workable.com/j/7873B7FC2D')
+  assertEquals([r.status, r.method, r.host], ['open', 'workable_api', 'workable'])
+  assertEquals(calls.length, 2)
+})
+
+Deno.test('workable: 404 = closed', async () => {
+  const { verifier } = mock({ 'https://apply.workable.com/api/v2/accounts/acme/jobs/ABC123': { status: 404, body: 'Job not found' } })
+  const r = await verifier.verify('https://apply.workable.com/acme/j/ABC123/')
+  assertEquals([r.status, r.httpStatus], ['closed', 404])
+})
+
+// ---- Generic page (JSON-LD + closed phrases) -----------------------------------
+
+const ld = (o: unknown) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`
+const page = (head: string, body: string) => `<html><head>${head}</head><body>${body}</body></html>`
+const NOW = Date.parse('2026-11-25T12:00:00Z')
+
+Deno.test('judgeGenericPage: valid JobPosting JSON-LD = likely_open', () => {
+  const html = page(ld({ '@context': 'https://schema.org', '@type': 'JobPosting', title: 'Engineer', validThrough: '2026-12-31' }), '<h1>Engineer</h1>')
+  assertEquals(judgeGenericPage(200, html, NOW).status, 'likely_open')
+  // no validThrough at all still counts as not expired
+  assertEquals(judgeGenericPage(200, page(ld({ '@type': 'JobPosting' }), ''), NOW).status, 'likely_open')
+})
+
+Deno.test('judgeGenericPage: page with closed text = closed, even with JSON-LD', () => {
+  const html = page(ld({ '@type': 'JobPosting', validThrough: '2027-01-01' }), '<p>We are <b>no longer accepting applications</b> for this role.</p>')
+  const r = judgeGenericPage(200, html, NOW)
+  assertEquals(r.status, 'closed')
+  assert(r.detail?.includes('no longer accepting applications'))
+  assertEquals(judgeGenericPage(200, page('', 'Sorry, this position has been filled.'), NOW).status, 'closed')
+})
+
+Deno.test('judgeGenericPage: expired validThrough = closed', () => {
+  const html = page(ld({ '@type': 'JobPosting', validThrough: '2026-10-01T00:00:00Z' }), '<h1>Engineer</h1>')
+  assertEquals(judgeGenericPage(200, html, NOW), { status: 'closed', detail: 'JobPosting validThrough is in the past' })
+})
+
+Deno.test('judgeGenericPage: no JSON-LD and no closed text = unverified', () => {
+  assertEquals(judgeGenericPage(200, page('', '<h1>Engineer</h1><p>Apply now</p>'), NOW).status, 'unverified')
+  // JSON-LD of another type is not a JobPosting
+  assertEquals(judgeGenericPage(200, page(ld({ '@type': 'Organization' }), ''), NOW).status, 'unverified')
+  // malformed JSON-LD is ignored
+  assertEquals(judgeGenericPage(200, page('<script type="application/ld+json">{oops</script>', ''), NOW).status, 'unverified')
+})
+
+Deno.test('judgeGenericPage: phrases inside scripts or styles are not page text', () => {
+  const html = page(`<script>var i18n={notFound:"Job not found"}</script>` + ld({ '@type': 'JobPosting' }), '<h1>Engineer</h1>')
+  assertEquals(judgeGenericPage(200, html, NOW).status, 'likely_open')
+})
+
+Deno.test('judgeGenericPage: @graph and @type arrays are understood', () => {
+  const graph = ld({ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebPage' }, { '@type': ['JobPosting'], validThrough: '2027-01-01' }] })
+  assertEquals(judgeGenericPage(200, page(graph, ''), NOW).status, 'likely_open')
+  assertEquals(jobPostingsFromJsonLd(graph).length, 1)
+})
+
+Deno.test('judgeGenericPage: non-2xx is closed only with closed text, else unverified', () => {
+  assertEquals(judgeGenericPage(404, page('', '<h1>Job not found</h1>'), NOW).status, 'closed')
+  assertEquals(judgeGenericPage(404, page('', '<h1>Oops</h1>'), NOW).status, 'unverified')
+  assertEquals(judgeGenericPage(500, page(ld({ '@type': 'JobPosting' }), ''), NOW).status, 'unverified')
+})
+
+Deno.test('generic: any other host is fetched (redirects followed) and judged', async () => {
+  const { verifier, calls } = mock({
+    'https://careers.example.org/job/1': { status: 302, location: '/jobs/1' },
+    'https://careers.example.org/jobs/1': { status: 200, body: page(ld({ '@type': 'JobPosting', validThrough: '2099-01-01' }), '') },
+    'https://recruiting.adp.com/x': { status: 200, body: page('', 'This job has expired') },
+  })
+  const r = await verifier.verify('https://careers.example.org/job/1')
+  assertEquals([r.status, r.method, r.httpStatus, r.host], ['likely_open', 'generic_page', 200, 'careers.example.org'])
+  assertEquals(calls.length, 2)
+  assertEquals((await verifier.verify('https://recruiting.adp.com/x')).status, 'closed')
+})
+
+Deno.test('generic: fetch errors are unverified', async () => {
+  const { verifier } = mock({})
+  const r = await verifier.verify('https://careers.example.org/missing')
+  assertEquals([r.status, r.method], ['unverified', 'error'])
 })
 
 Deno.test('missing or non-http apply links are unverified', async () => {

@@ -8,18 +8,24 @@
 //   SmartRecruiters  api.smartrecruiters.com/v1/companies/{co}/postings/{id} 200 open, 404 closed
 //   iCIMS            the apply page itself                                 404/410 closed, 2xx open
 //   BambooHR         the apply page itself                                 redirect to /careers closed, 2xx open
-//   anything else (Indeed, Workday, ADP, unknown) -> 'unverified', no request made.
-// grnh.se short links are resolved first (they redirect to the board or the company site).
+//   Workday          {host}/wday/cxs/{tenant}/{site}/job/{path}            jobPostingInfo open, 404 or 4xx error payload closed
+//   Workable         apply.workable.com/api/v2/accounts/{acct}/jobs/{code} 200 open, 404 closed
+//   any other host   the page itself (generic_page): closed phrases or an expired JobPosting
+//                    validThrough = closed; JobPosting JSON-LD still valid = 'likely_open';
+//                    anything else = unverified
+//   Indeed           never checked -> 'unverified', no request made.
+// grnh.se and apply.workable.com/j/ short links are resolved by their first redirect.
 //
 // Polite by construction: one request per second per host, 10s timeout, an identifying
 // User-Agent, and redirects followed manually (at most 3). Any error, timeout or unexpected
 // status is 'unverified' -- never 'open'.
 
-export type VacancyStatus = 'open' | 'closed' | 'unverified'
+/** likely_open: only a page's own structured data says it's live; weaker than an ATS answer. */
+export type VacancyStatus = 'open' | 'likely_open' | 'closed' | 'unverified'
 
 export interface VacancyResult {
   status: VacancyStatus
-  /** Which rule decided: greenhouse_api, lever_api, ashby_api, smartrecruiters_api, icims_page, bamboohr_page, unsupported_host, unparsed_url, error. */
+  /** Which rule decided: greenhouse_api, lever_api, ashby_api, smartrecruiters_api, workday_api, workable_api, icims_page, bamboohr_page, generic_page, unsupported_host, unparsed_url, error. */
   method: string
   /** Status of the deciding response; null when no request was made or it failed. */
   httpStatus: number | null
@@ -71,6 +77,7 @@ export function atsHost(hostname: string): string {
     ['icims.com', 'icims'],
     ['bamboohr.com', 'bamboohr'],
     ['myworkdayjobs.com', 'workday'],
+    ['workable.com', 'workable'],
     ['indeed.com', 'indeed'],
     ['adp.com', 'adp'],
   ]
@@ -199,6 +206,132 @@ const checkBamboo: Check = async (http, url) => {
   return { status: 'unverified', method: 'bamboohr_page', httpStatus: res.status, detail: `unexpected status ${res.status}` }
 }
 
+/** Workday's public JSON endpoint for an apply link, or null if the link isn't a job page. */
+export function workdayApiUrl(url: URL): string | null {
+  const tenant = url.hostname.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/i)?.[1]
+  if (!tenant) return null
+  const segs = url.pathname.split('/').filter(Boolean)
+  if (/^[a-z]{2}-[a-z]{2}$/i.test(segs[0] ?? '')) segs.shift() // optional locale, e.g. en-US
+  const [site, kind, ...rest] = segs
+  if (!site || kind !== 'job' || rest.length === 0) return null
+  return `https://${url.host}/wday/cxs/${tenant}/${site}/job/${rest.join('/')}`
+}
+
+const checkWorkday: Check = async (http, url) => {
+  const api = workdayApiUrl(url)
+  if (!api) return unparsed('no tenant/site/job path in Workday URL')
+  const res = await http(api)
+  let payload: { jobPostingInfo?: unknown; errorCode?: string } | null = null
+  try {
+    payload = JSON.parse(await res.body())
+  } catch {
+    payload = null
+  }
+  if (res.status === 200 && payload?.jobPostingInfo) return { status: 'open', method: 'workday_api', httpStatus: 200 }
+  if (res.status === 404) return { status: 'closed', method: 'workday_api', httpStatus: 404 }
+  // A 4xx with Workday's error payload (e.g. S22 "permission denied") is what an unlisted
+  // posting returns; a 5xx is Workday having trouble and says nothing about the job.
+  if (res.status >= 400 && res.status < 500 && payload?.errorCode) {
+    return { status: 'closed', method: 'workday_api', httpStatus: res.status, detail: `error ${payload.errorCode}` }
+  }
+  return { status: 'unverified', method: 'workday_api', httpStatus: res.status, detail: `unexpected status ${res.status}` }
+}
+
+const checkWorkable: Check = async (http, url) => {
+  let target = url
+  if (/^\/j\/[^/]+/.test(url.pathname)) {
+    const res = await http(url.toString()) // /j/{code} redirects to /{account}/j/{code}
+    if (!isRedirect(res.status) || !res.location) {
+      return { status: 'unverified', method: 'workable_api', httpStatus: res.status, detail: 'short link did not redirect' }
+    }
+    target = new URL(res.location, url)
+  }
+  const m = target.pathname.match(/^\/([^/]+)\/j\/([A-Za-z0-9]+)/)
+  if (!m) return unparsed('no account/shortcode in Workable URL')
+  const res = await http(`https://apply.workable.com/api/v2/accounts/${encodeURIComponent(m[1])}/jobs/${m[2]}`)
+  return byStatus('workable_api', res.status)
+}
+
+export const CLOSED_PHRASES = [
+  'no longer accepting applications',
+  'no longer accepting applicants',
+  'position has been filled',
+  'this position is filled',
+  'job not found',
+  'this job has expired',
+  'job posting has expired',
+  'this posting has expired',
+  'this job is no longer available',
+  'this position is no longer available',
+  'job is no longer available',
+  'position is no longer open',
+  'this job is closed',
+  'this position has been closed',
+  'job has been closed',
+]
+
+/** Visible text only: script/style content (e.g. i18n bundles) never counts as page copy. */
+export function visibleText(html: string): string {
+  return html
+    .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&#39;|&rsquo;|&#8217;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+/** Every schema.org JobPosting object in the page's JSON-LD blocks (top level, arrays, @graph). */
+export function jobPostingsFromJsonLd(html: string): Record<string, unknown>[] {
+  const found: Record<string, unknown>[] = []
+  const visit = (node: unknown) => {
+    if (Array.isArray(node)) return node.forEach(visit)
+    if (!node || typeof node !== 'object') return
+    const o = node as Record<string, unknown>
+    const type = o['@type']
+    if (type === 'JobPosting' || (Array.isArray(type) && type.includes('JobPosting'))) found.push(o)
+    if (o['@graph']) visit(o['@graph'])
+  }
+  const re = /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  for (const m of html.matchAll(re)) {
+    try {
+      visit(JSON.parse(m[1].trim()))
+    } catch {
+      // malformed JSON-LD is just ignored
+    }
+  }
+  return found
+}
+
+/** Pure decision for the generic page rule. */
+export function judgeGenericPage(
+  status: number,
+  html: string,
+  nowMs: number,
+): { status: VacancyStatus; detail?: string } {
+  const text = visibleText(html)
+  const phrase = CLOSED_PHRASES.find((p) => text.includes(p))
+  if (phrase) return { status: 'closed', detail: `page says "${phrase}"` }
+  if (status < 200 || status >= 300) return { status: 'unverified', detail: `status ${status}, no closed text` }
+  const postings = jobPostingsFromJsonLd(html)
+  if (postings.length === 0) return { status: 'unverified', detail: 'no JobPosting JSON-LD' }
+  const expired = (p: Record<string, unknown>) => {
+    const ms = typeof p.validThrough === 'string' ? Date.parse(p.validThrough) : NaN
+    return !Number.isNaN(ms) && ms < nowMs
+  }
+  if (postings.every(expired)) return { status: 'closed', detail: 'JobPosting validThrough is in the past' }
+  return { status: 'likely_open', detail: 'JobPosting JSON-LD present and not expired' }
+}
+
+function makeGenericCheck(now: () => number): Check {
+  return async (http, url) => {
+    const { res, tooMany } = await follow(http, url.toString())
+    if (tooMany) return { status: 'unverified', method: 'generic_page', httpStatus: res.status, detail: 'too many redirects' }
+    const verdict = judgeGenericPage(res.status, await res.body(), now())
+    return { ...verdict, method: 'generic_page', httpStatus: res.status }
+  }
+}
+
 const CHECKS: Record<string, Check> = {
   greenhouse: checkGreenhouse,
   lever: checkLever,
@@ -206,7 +339,12 @@ const CHECKS: Record<string, Check> = {
   smartrecruiters: checkSmartRecruiters,
   icims: checkIcims,
   bamboohr: checkBamboo,
+  workday: checkWorkday,
+  workable: checkWorkable,
 }
+
+/** Hosts we never request (job boards that block or forbid automated checks). */
+export const NEVER_CHECK_HOSTS = new Set(['indeed'])
 
 export interface VacancyVerifier {
   verify(applyLink: string | null): Promise<VacancyResult>
@@ -216,6 +354,7 @@ export interface VacancyVerifier {
 export function createVacancyVerifier(overrides: Partial<VacancyDeps> = {}): VacancyVerifier {
   const deps = { ...defaultDeps, ...overrides }
   const http = makeHttp(deps, new HostThrottle(deps))
+  const generic = makeGenericCheck(deps.now)
   return {
     async verify(applyLink) {
       const checkedAt = () => new Date(deps.now()).toISOString()
@@ -227,8 +366,10 @@ export function createVacancyVerifier(overrides: Partial<VacancyDeps> = {}): Vac
         return { status: 'unverified', method: 'unparsed_url', httpStatus: null, checkedAt: checkedAt(), host: 'none', detail: 'missing or invalid apply link' }
       }
       const host = atsHost(url.hostname)
-      const check = CHECKS[host]
-      if (!check) return { status: 'unverified', method: 'unsupported_host', httpStatus: null, checkedAt: checkedAt(), host }
+      if (NEVER_CHECK_HOSTS.has(host)) {
+        return { status: 'unverified', method: 'unsupported_host', httpStatus: null, checkedAt: checkedAt(), host }
+      }
+      const check = CHECKS[host] ?? generic
       try {
         return { ...(await check(http, url)), checkedAt: checkedAt(), host }
       } catch (e) {
