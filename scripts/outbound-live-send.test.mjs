@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { blockedEventRow, isEmailSuppressed, logBlockedOnce, logOutboundEvent, outboundEventRow } from './outbound-live-send.mjs';
+import { blockedEventRow, enrollmentRows, isEmailSuppressed, logBlockedOnce, logOutboundEvent, outboundEventRow, pickLeadsToEnroll } from './outbound-live-send.mjs';
 
 function fakeSupabase(response) {
   const calls = [];
@@ -43,22 +43,44 @@ function runLive(extraEnv, args) {
   return spawnSync(process.execPath, [SCRIPT, ...args], { env: { ...BASE_ENV, ...extraEnv }, encoding: 'utf8', timeout: 20000 });
 }
 
-test('live send refuses to start without OUTBOUND_POSTAL_ADDRESS', () => {
-  const r = runLive({ UNSUBSCRIBE_EMAIL_SECRET: 's', MAILTRAP_API_TOKEN: 't' }, ['--campaign=test']);
+test('enrolling requires --campaign; preview does not', () => {
+  const r = runLive({}, []);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /Refusing to send: missing OUTBOUND_POSTAL_ADDRESS/);
+  assert.match(r.stderr, /--campaign=<tag> is required to enroll/);
+  assert.match(runLive({}, ['--campaign=bad tag!']).stderr, /--campaign must be letters, digits and dashes/);
 });
 
-test('live send refuses to start without UNSUBSCRIBE_EMAIL_SECRET', () => {
-  const r = runLive({ OUTBOUND_POSTAL_ADDRESS: '1 Main St', MAILTRAP_API_TOKEN: 't' }, ['--campaign=test']);
-  assert.equal(r.status, 1);
-  assert.match(r.stderr, /Refusing to send: missing UNSUBSCRIBE_EMAIL_SECRET/);
-});
-
-test('preview without footer config gets past the gate (warns, then tries to query)', () => {
+test('preview without footer config warns that the runner will refuse, then tries to query', () => {
   const r = runLive({}, ['--preview']);
   assert.match(r.stderr, /WARNING: footer not configured/);
-  assert.doesNotMatch(r.stderr, /Refusing to send/);
+  assert.match(r.stderr, /runner will refuse to send/);
+  assert.doesNotMatch(r.stderr, /--campaign=<tag> is required/);
+});
+
+// --- enrollment (outreach sequences) ---
+
+const lead = (id, name, email, score = 80) => ({ id, organization_name: name, contact_email: email, opportunity_score: score, category: 'university' });
+
+test('pickLeadsToEnroll: exclusion (case-insensitive), already enrolled, one lead per shared inbox', () => {
+  const leads = [
+    lead('l1', 'State University', 'dean@state.edu'),
+    lead('l2', 'State University - Satellite', 'DEAN@state.edu '),
+    lead('l3', 'Excluded College', 'x@excluded.edu'),
+    lead('l4', 'Enrolled U', 'a@enrolled.edu'),
+    lead('l5', 'Other U', 'b@other.edu'),
+  ];
+  const { enroll, skipped } = pickLeadsToEnroll(leads, { exclusionNames: ['  excluded college '], enrolledLeadIds: new Set(['l4']) });
+  assert.deepEqual(enroll.map((l) => l.id), ['l1', 'l5']);
+  assert.deepEqual(skipped.map((s) => [s.lead.id, s.reason]), [['l2', 'shared_inbox'], ['l3', 'exclusion_lists'], ['l4', 'already_enrolled']]);
+  assert.equal(skipped[0].with, 'State University');
+});
+
+test('enrollmentRows: one stage-1 row per lead/prospect, due now, keyed by campaign', () => {
+  const now = new Date('2026-11-25T09:00:00Z');
+  assert.deepEqual(enrollmentRows({ leadIds: ['l1'], prospectIds: ['p1'] }, 'nov-2026', now), [
+    { sequence_key: 'outreach_nov-2026', sequence_stage: 1, scheduled_date: '2026-11-25T09:00:00.000Z', institutional_lead_id: 'l1' },
+    { sequence_key: 'outreach_nov-2026', sequence_stage: 1, scheduled_date: '2026-11-25T09:00:00.000Z', prospect_id: 'p1' },
+  ]);
 });
 
 // --- send log rows (step 3) ---
