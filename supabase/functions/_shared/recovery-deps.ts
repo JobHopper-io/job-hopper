@@ -8,6 +8,7 @@ import { sendEmail } from './email.ts'
 import { getFooterLinksForProfile } from './unsubscribe-token.ts'
 import type { RecoveryCandidate } from './revenue-recovery-segments.ts'
 import { type RecoveryDeps, recoverySendOptions, type SendState, type SequenceRow } from './recovery-sequences.ts'
+import { deleteUnsentRow, markSent, stopSequence } from './sequence-store.ts'
 
 export interface GrowthSettings {
   recovery_auto_send: boolean
@@ -70,28 +71,9 @@ export function createRecoveryDeps(db: SupabaseClient, settings: GrowthSettings)
       return (data as { id: string }).id
     },
 
-    async release(rowId) {
-      const { error } = await db.from('followup_sequences').delete().eq('id', rowId).is('sent_date', null)
-      if (error) throw new Error(`followup_sequences release: ${error.message}`)
-    },
-
-    async markSent(rowId, now, emailEventId) {
-      const { error } = await db
-        .from('followup_sequences')
-        .update({ sent_date: now.toISOString(), email_event_id: emailEventId })
-        .eq('id', rowId)
-      if (error) throw new Error(`followup_sequences mark sent: ${error.message}`)
-    },
-
-    async stopSequence(profileId, sequenceKey, reason) {
-      const { error } = await db
-        .from('followup_sequences')
-        .update({ stop_reason: reason })
-        .eq('profile_id', profileId)
-        .eq('sequence_key', sequenceKey)
-        .is('stop_reason', null)
-      if (error) throw new Error(`followup_sequences stop: ${error.message}`)
-    },
+    release: (rowId) => deleteUnsentRow(db, rowId),
+    markSent: (rowId, now, emailEventId) => markSent(db, rowId, now, emailEventId),
+    stopSequence: (profileId, sequenceKey, reason) => stopSequence(db, { column: 'profile_id', id: profileId }, sequenceKey, reason),
 
     async send(candidate, segment, stage) {
       // Throws if the unsubscribe secret is missing: a marketing email never goes out

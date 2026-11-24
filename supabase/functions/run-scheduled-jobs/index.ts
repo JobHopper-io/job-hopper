@@ -20,7 +20,7 @@ const RESUME_STALE_MINUTES = 10
 
 // Self-rescheduling chains that must always have a pending or running row. If one is
 // missing the chain died silently (the 2026-07 six-day outage); re-seed it and alert.
-const RECURRING_CHAINS = ['daily-job-matching', 'reconcile-subscriptions', 'recovery-sequences']
+const RECURRING_CHAINS = ['daily-job-matching', 'reconcile-subscriptions', 'recovery-sequences', 'outreach-sequences']
 
 function isAuthorized(req: Request): boolean {
   const cronSecret = Deno.env.get('CRON_SECRET')
