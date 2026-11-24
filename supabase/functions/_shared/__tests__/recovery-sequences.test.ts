@@ -177,6 +177,14 @@ Deno.test('every stop reason stops a started sequence right before stage 2', asy
   }
 })
 
+Deno.test('a recent outreach email to the same address skips recovery without stopping it', async () => {
+  assertEquals(blockReason({ ...OK, recent_outreach: true }), 'recent_outreach')
+  const h = harness({ candidates: [cancelled('a')], rows: [row({ profile_id: 'a', sent_date: daysAgo(8) })], state: () => ({ ...OK, recent_outreach: true }) })
+  const result = await runRecovery({ mode: 'send', maxSends: 25, now: NOW }, h.deps)
+  assertEquals(result.skipped.recent_outreach, 1)
+  assertEquals(h.sent.length + h.stops.length, 0)
+})
+
 Deno.test('a block before stage 1 skips without starting (or stopping) a sequence', async () => {
   const h = harness({ candidates: [cancelled('a')], state: () => ({ ...OK, marketing_consent: false }) })
   const result = await runRecovery({ mode: 'send', maxSends: 25, now: NOW }, h.deps)

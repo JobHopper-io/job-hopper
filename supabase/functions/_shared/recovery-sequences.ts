@@ -15,6 +15,8 @@
  *     marketing consent, bounced or complained stops a started sequence with that
  *     reason (a sequence that hasn't started is just skipped)
  *   - at most maxSends per run (growth_settings.recovery_max_sends_per_run)
+ *   - skipped (not stopped) while an outreach email went to the same address in the
+ *     last 2 days (recovery_send_state.recent_outreach)
  */
 import { maskEmail } from './admin-prospects.ts'
 import type { SendEmailOptions } from './email.ts'
@@ -32,7 +34,7 @@ export const RATE_LIMIT_DAYS = 7
 export const STAGE_2_DELAY_DAYS = 5
 
 export type StopReason = 'paid' | 'unsubscribed' | 'no_consent' | 'bounced' | 'complained' | 'manual_pause'
-export type SkipReason = 'rate_limited_7d' | 'stopped' | 'in_flight' | 'complete' | 'waiting_stage_2' | 'past_due' | 'profile_missing' | 'already_claimed' | 'run_limit' | StopReason
+export type SkipReason = 'rate_limited_7d' | 'stopped' | 'in_flight' | 'complete' | 'waiting_stage_2' | 'past_due' | 'profile_missing' | 'already_claimed' | 'run_limit' | 'recent_outreach' | StopReason
 
 /** A followup_sequences row (recovery sequences only). */
 export interface SequenceRow {
@@ -54,6 +56,8 @@ export interface SendState {
   complained: boolean
   manual: boolean
   marketing_consent: boolean
+  /** An outreach email went to this address in the last 2 days (skip, don't stop). */
+  recent_outreach?: boolean
 }
 
 export const sequenceKey = (segment: RevenueRecoverySegmentKey) => `recovery_${segment}`
@@ -79,7 +83,7 @@ export function planNext(segment: RevenueRecoverySegmentKey, rows: SequenceRow[]
 }
 
 /** Why this profile must not get a recovery email right now (null = OK to send). */
-export function blockReason(state: SendState): StopReason | 'past_due' | 'profile_missing' | null {
+export function blockReason(state: SendState): StopReason | 'past_due' | 'profile_missing' | 'recent_outreach' | null {
   if (!state.exists) return 'profile_missing'
   if (state.live_access) return 'paid'
   if (state.past_due) return 'past_due'
@@ -88,6 +92,7 @@ export function blockReason(state: SendState): StopReason | 'past_due' | 'profil
   if (state.unsubscribed) return 'unsubscribed'
   if (state.manual) return 'manual_pause'
   if (!state.marketing_consent) return 'no_consent'
+  if (state.recent_outreach) return 'recent_outreach'
   return null
 }
 
