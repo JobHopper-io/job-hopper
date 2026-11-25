@@ -3,7 +3,6 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import Stripe from 'npm:stripe@14.21.0'
 import { getStripeProductId } from '../_shared/stripe-products.ts'
 import { checkCustomerOwnership } from '../_shared/stripe-customer-ownership.ts'
-import { recordCheckoutStarted } from '../_shared/checkout-attempts.ts'
 import {
   cyclePeriodAmountCents,
   CYCLE_CONFIG,

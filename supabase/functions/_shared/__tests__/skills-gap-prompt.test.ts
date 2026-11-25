@@ -53,3 +53,14 @@ Deno.test('extractSkillsGap: returns null when a required field is missing or wr
     null,
   )
 })
+
+Deno.test('extractSkillsGap: unwraps an answer nested under matchingSkills', () => {
+  const raw = '```json\n' + JSON.stringify({
+    matchingSkills: { matchingSkills: ['CAD'], missingSkills: ['Airworthiness'], learningTopics: ['FAA Part 25'] },
+  }) + '\n```'
+  assertEquals(extractSkillsGap(raw), {
+    matchingSkills: ['CAD'],
+    missingSkills: ['Airworthiness'],
+    learningTopics: ['FAA Part 25'],
+  })
+})

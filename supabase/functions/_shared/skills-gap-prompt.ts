@@ -90,7 +90,10 @@ export function extractSkillsGap(raw: string | null | undefined): SkillsGapResul
     return null
   }
   if (!parsed || typeof parsed !== 'object') return null
-  const p = parsed as Record<string, unknown>
+  let p = parsed as Record<string, unknown>
+  // Some models wrap the whole answer one level deep, e.g. {"matchingSkills": {"matchingSkills": [...], ...}}.
+  const inner = p.matchingSkills
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) p = inner as Record<string, unknown>
 
   const toStringArray = (v: unknown): string[] | null => {
     if (!Array.isArray(v)) return null
