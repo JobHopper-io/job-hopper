@@ -15,6 +15,18 @@ import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
 import { Agent, setGlobalDispatcher } from 'undici';
 import { makeFooterFor, readFooterConfig } from './outbound-unsubscribe.mjs';
+import {
+  fill,
+  firstName,
+  fromNameForCategory,
+  GENERIC_TEMPLATES,
+  partnerLeadUrl,
+  renderHtmlBody,
+  renderTemplate as renderSharedTemplate,
+  replyToForCategory,
+  TEMPLATES,
+  unfilledPlaceholders,
+} from '../supabase/functions/_shared/outbound-templates.mjs';
 
 // Node's built-in fetch doesn't correctly implement Happy Eyeballs (RFC 6555): when a
 // host resolves to both IPv4 and IPv6, it tries IPv6 first and doesn't fall back
@@ -32,168 +44,19 @@ export const MIN_OPPORTUNITY_SCORE = 50;
 // batch can swap it without a code change.
 export const SENDER_NAME = process.env.SENDER_NAME || 'Job-Hopper Team';
 
-// Where each outbound category's CTA link lands — the partner landing pages (see
-// src/views/*.vue), UTM-tagged so App.vue's existing capture attributes the resulting
-// signup back to this exact campaign. immigration_professional/workforce_org have no
-// outbound template (no connector produces those leads), so no path is needed for them.
-const PARTNER_PAGE_BASE = 'https://job-hopper.io';
-const PARTNER_PAGE_PATHS = {
-  university: '/universities',
-  employer: '/outplacement',
-  career_partner: '/career-coaches',
-};
+const renderTemplate = (category, lead, campaign) => renderSharedTemplate(category, lead, campaign, SENDER_NAME);
 
-function partnerLeadUrl(category, campaign) {
-  const path = PARTNER_PAGE_PATHS[category];
-  if (!path) return null;
-  const params = new URLSearchParams({
-    utm_source: 'email_outbound',
-    utm_campaign: campaign,
-    utm_medium: 'email',
-  });
-  return `${PARTNER_PAGE_BASE}${path}?${params}`;
-}
-
-// Real copy from persona-campaign-copy.md, plus a career_partner template (new — the
-// doc's original note said that persona had no real leads yet; the career-partner
-// connector has since discovered real ones, see docs/apollo-limits.md). Grounded in the
-// same real, reviewed copy as src/views/CareerCoaches.vue, not invented separately.
-// immigration_professional/workforce_center still have no real leads or template.
-const TEMPLATES = {
-  university: {
-    subject: 'Job-Hopper for [School Name] career services',
-    body: `Hi [Name],
-
-I run product at Job-Hopper. We help international students and visa-seeking grads find
-employers that actually sponsor, backed by real DOL and USCIS filing data instead of
-guesswork.
-
-[School Name] has [X,XXX] students, which puts you in range for a campus license we'd
-size around [seat range]. Happy to send over what that'd look like, no pitch
-attached, just numbers.
-
-What's the best way to get this in front of whoever handles vendor decisions for career
-services?
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-  employer: {
-    subject: 'Career transition support for the [Company] team',
-    body: `Hi [Name],
-
-Saw [Company]'s WARN notice for [X] affected employees in [location]. Job-Hopper helps
-laid-off professionals find their next role faster, particularly useful for anyone on a
-visa who's also racing a clock most people don't have to think about.
-
-We put together transition packages for situations like this, [seat range], no cost to
-the affected employees. Can send specifics if useful.
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-  career_partner: {
-    subject: 'Job-Hopper partnership for [Organization]',
-    body: `Hi [Name],
-
-I run product at Job-Hopper. We match visa-seeking job seekers to employers verified
-against real DOL and USCIS filing history, not a guessed "sponsors visas" tag — plus
-resume advice and interview prep built in.
-
-Thought this could be useful alongside what you already do at [Organization]. Happy to
-set up a trial so you can see the match quality yourself.
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-};
-
-// Used instead of TEMPLATES when the same contact_email resolves for more than one lead
-// this run (e.g. one person listed as the decision-maker for several satellite campuses,
-// or the same HR contact across multiple WARN filings for one employer). Sending the
-// per-lead template once per duplicate would either spam the same inbox or pick one
-// lead's specific numbers/location arbitrarily — instead this drops every claim that's
-// true of only one of the merged leads (student count, worker count, single campus name)
-// and keeps only what's true of the group as a whole.
-const GENERIC_TEMPLATES = {
-  university: {
-    subject: 'Job-Hopper for your campus career services team',
-    body: `Hi [Name],
-
-I run product at Job-Hopper. We help international students and visa-seeking grads find
-employers that actually sponsor, backed by real DOL and USCIS filing data instead of
-guesswork.
-
-Given the size of your student population, you'd likely be in range for a campus license.
-Happy to send over what that could look like, no pitch attached, just numbers.
-
-What's the best way to get this in front of whoever handles vendor decisions for career
-services?
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-  employer: {
-    subject: 'Career transition support for your team',
-    body: `Hi [Name],
-
-Saw your organization's recent WARN notice. Job-Hopper helps laid-off professionals find
-their next role faster, particularly useful for anyone on a visa who's also racing a clock
-most people don't have to think about.
-
-We put together transition packages for situations like this, custom-sized to the group
-affected, no cost to the affected employees. Can send specifics if useful.
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-  career_partner: {
-    subject: 'Job-Hopper partnership opportunity',
-    body: `Hi [Name],
-
-I run product at Job-Hopper. We match visa-seeking job seekers to employers verified
-against real DOL and USCIS filing history, not a guessed "sponsors visas" tag — plus
-resume advice and interview prep built in.
-
-Happy to set up a trial so you can see the match quality yourself.
-
-More info: [Link]
-
-[Your Name]
-Job-Hopper`,
-  },
-};
-
-// Reply-To routing by lead category. Both are real monitored mailboxes on
-// job-hopper.co (Cloudflare Email Routing -> reply-ingest), so a Reply-To is always
-// set now -- this replaces the old INSTITUTIONAL_REPLY_TO env toggle, which existed
-// only because no monitored inbox had been stood up yet.
-export const REPLY_TO_UNIVERSITY = 'university-partnerships@job-hopper.co';
-export const REPLY_TO_DEFAULT = 'partnerships@job-hopper.co';
-
-export function replyToForCategory(category) {
-  return category === 'university' ? REPLY_TO_UNIVERSITY : REPLY_TO_DEFAULT;
-}
-
-// From-name routing, same split as Reply-To. The underlying from *address* never
-// changes (no-reply@job-hopper.io, or whatever MAILTRAP_FROM resolves to) -- this only
-// picks the display name shown in the recipient's inbox.
-export const FROM_NAME_UNIVERSITY = 'Job-Hopper University Partnerships';
-export const FROM_NAME_DEFAULT = 'Job-Hopper Partnerships';
-
-export function fromNameForCategory(category) {
-  return category === 'university' ? FROM_NAME_UNIVERSITY : FROM_NAME_DEFAULT;
-}
+// Templates, links, from-name and Reply-To routing live in
+// supabase/functions/_shared/outbound-templates.mjs (shared with the outreach-sequences
+// edge function); re-exported here for existing importers.
+export {
+  FROM_NAME_DEFAULT,
+  FROM_NAME_UNIVERSITY,
+  fromNameForCategory,
+  REPLY_TO_DEFAULT,
+  REPLY_TO_UNIVERSITY,
+  replyToForCategory,
+} from '../supabase/functions/_shared/outbound-templates.mjs';
 
 export function requireEnv(name) {
   const value = process.env[name];
@@ -714,99 +577,6 @@ async function enrichLead(supabase, apolloKey, lead, orgCache) {
 
   if (cacheKey) orgCache.set(cacheKey, { name, title, email });
   return { outcome: 'success', name, title, email, orgId: org.id, orgDomain: org.primary_domain ?? null };
-}
-
-function fill(text, replacements) {
-  let out = text;
-  for (const [token, value] of Object.entries(replacements)) {
-    out = out.split(token).join(value);
-  }
-  return out;
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// Plain-text emails paste the raw tracked URL into the "More info: <url>" line, which
-// is exactly what looks unclickable and messy in a client that doesn't auto-linkify
-// (or shows the full UTM-laden URL even when it does). The HTML companion body swaps
-// that one occurrence for a real <a> tag with clean anchor text instead; everything
-// else just gets paragraph/line-break formatting. `link` is the same value already
-// substituted into `body` for [Link] — when it's still the unfilled '[Link]'
-// placeholder (no page for this category), nothing matches and the text renders as-is.
-function renderHtmlBody(body, link) {
-  const paragraphs = escapeHtml(body)
-    .split('\n\n')
-    .map((para) => `<p style="margin:0 0 1em;">${para.replace(/\n/g, '<br>')}</p>`)
-    .join('\n');
-  if (!link) return paragraphs;
-  const escapedLink = escapeHtml(link);
-  return paragraphs.replace(
-    `More info: ${escapedLink}`,
-    `More info: <a href="${escapedLink}">Learn more</a>`,
-  );
-}
-
-// [Name] is the recipient's greeting name, filled from decision_maker_name (first name
-// only — "Hi John," not "Hi John Smith,"). It's a distinct token from [Your Name] in the
-// signature: the template originally reused the same [Name] token for both the recipient
-// greeting and the sender sign-off, which meant filling it from decision_maker_name would
-// have signed the email with the recipient's own name. Split into two tokens instead;
-// [Your Name] is filled from SENDER_NAME (env-overridable, defaults to "Job Hopper Team").
-// [seat range] is mapped straight from recommended_package, which already carries its
-// own unit ("25 seats", "500+ seat custom cohort") — the templates don't append a
-// trailing "seats" or a separate duration placeholder, so the field's wording stands as-is.
-function firstName(fullName) {
-  return typeof fullName === 'string' && fullName.trim() ? fullName.trim().split(/\s+/)[0] : null;
-}
-
-function renderTemplate(category, lead, campaign) {
-  const template = TEMPLATES[category];
-  const common = {
-    '[Name]': firstName(lead.decision_maker_name) || '[Name]',
-    '[Your Name]': SENDER_NAME,
-    '[Link]': partnerLeadUrl(category, campaign) || '[Link]',
-  };
-  let replacements;
-  if (category === 'university') {
-    replacements = {
-      ...common,
-      '[School Name]': lead.organization_name,
-      '[X,XXX]': lead.student_size != null ? lead.student_size.toLocaleString('en-US') : '[X,XXX]',
-      '[seat range]': lead.recommended_package || '[seat range]',
-    };
-  } else if (category === 'employer') {
-    replacements = {
-      ...common,
-      '[Company]': lead.organization_name,
-      '[X]':
-        lead.signals?.workers_affected != null
-          ? lead.signals.workers_affected.toLocaleString('en-US')
-          : '[X]',
-      '[location]': [lead.city, lead.state].filter(Boolean).join(', ') || '[location]',
-      '[seat range]': lead.recommended_package || '[seat range]',
-    };
-  } else {
-    replacements = {
-      ...common,
-      '[Organization]': lead.organization_name,
-    };
-  }
-
-  const subject = fill(template.subject, replacements);
-  const body = fill(template.body, replacements);
-  const link = replacements['[Link]'] !== '[Link]' ? replacements['[Link]'] : null;
-  return { subject, body, html: renderHtmlBody(body, link), unfilled: unfilledPlaceholders(subject, body) };
-}
-
-function unfilledPlaceholders(subject, body) {
-  return [...new Set([...subject.matchAll(/\[[^\]]+\]/g), ...body.matchAll(/\[[^\]]+\]/g)].map((m) => m[0]))];
 }
 
 // Groups candidates (each { lead, category, contact_email }) by contact_email and

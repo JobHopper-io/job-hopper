@@ -171,6 +171,11 @@ const router = createRouter({
       component: () => import('../views/TrialInvite.vue'),
     },
     {
+      path: '/s/:token',
+      name: 'shortlist',
+      component: () => import('../views/Shortlist.vue'),
+    },
+    {
       path: '/employer/register',
       name: 'employer-register',
       component: () => import('../views/EmployerRegister.vue'),
@@ -446,9 +451,10 @@ router.beforeEach(async (to) => {
   }
 
   const targetPath = to.path
-  // /trial/:code is the one public route with a dynamic segment, so it can't live in the
-  // flat publicPaths string list above; matched by prefix instead.
-  const isPublicPath = publicPaths.includes(targetPath) || targetPath.startsWith('/trial/')
+  // /trial/:code and /s/:token (reverse-recruiting shortlists) are the public routes with a
+  // dynamic segment, so they can't live in the flat publicPaths list; matched by prefix.
+  const isPublicPath =
+    publicPaths.includes(targetPath) || targetPath.startsWith('/trial/') || targetPath.startsWith('/s/')
   // Public routes that authenticated users should be redirected away from
   const publicRedirectPaths = ['/', '/login', '/register']
 

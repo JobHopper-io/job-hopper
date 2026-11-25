@@ -10,6 +10,7 @@ import { categorizeUserLifecycle, subscriptionFlagsFromStatuses } from '../_shar
 import { callChatCompletion } from '../_shared/llm.ts'
 import { type OutboundEventRow, summarizeOutboundEmails } from '../_shared/outbound-email-stats.ts'
 import { GROWTH_SUMMARY_SYSTEM, growthSummaryUserMessage } from '../_shared/growth-summary-prompt.ts'
+import { RECOVERY_SEGMENT_PRIORITY, SEGMENT_LABELS } from '../_shared/revenue-recovery-segments.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +47,12 @@ interface GrowthDashboardCounts {
     outbound_signups: number
     outbound_paid: number
   }
+}
+
+/** public.cancellation_dashboard_counts() (migration 20261123120000). */
+interface CancellationDashboardCounts {
+  by_feedback: Record<string, number>
+  churn_30d: { canceled: number; ended: number; pending_period_end: number; canceled_no_date: number }
 }
 
 serve(async (req) => {
@@ -285,6 +292,31 @@ serve(async (req) => {
     if (countsError) throw new Error(`Failed to load growth_dashboard_counts: ${countsError.message}`)
     const counts = countsData as GrowthDashboardCounts
 
+    const { data: cancellationData, error: cancellationError } = await supabaseAdminClient.rpc('cancellation_dashboard_counts')
+    if (cancellationError) throw new Error(`Failed to load cancellation_dashboard_counts: ${cancellationError.message}`)
+    const cancellation = cancellationData as CancellationDashboardCounts
+
+    // Recovery sequences, people per segment from their first send (migration 20261124120100).
+    const { data: recoveryData, error: recoveryError } = await supabaseAdminClient.rpc('recovery_funnel_counts')
+    if (recoveryError) throw new Error(`Failed to load recovery_funnel_counts: ${recoveryError.message}`)
+    const recoveryCounts = (recoveryData ?? {}) as Record<string, { sent: number; delivered: number; came_back: number; paid_30d: number }>
+    const recoveryFunnel = RECOVERY_SEGMENT_PRIORITY.map((segment) => {
+      const c = recoveryCounts[segment]
+      return {
+        segment,
+        label: SEGMENT_LABELS[segment],
+        sent: c?.sent ?? 0,
+        delivered: c?.delivered ?? 0,
+        cameBack: c?.came_back ?? 0,
+        paid30d: c?.paid_30d ?? 0,
+      }
+    })
+
+    // Reverse recruiting shortlists (migration 20261125120000): all-time counts per step.
+    const { data: rrData, error: rrError } = await supabaseAdminClient.rpc('reverse_recruiting_funnel')
+    if (rrError) throw new Error(`Failed to load reverse_recruiting_funnel: ${rrError.message}`)
+    const rr = (rrData ?? {}) as Partial<Record<'built' | 'ready' | 'too_few' | 'viewed' | 'clicked' | 'clicks' | 'signups', number>>
+
     // Prospect review queue (/admin/prospects): reviewed = approved or rejected.
     const [{ count: prospectsReviewed, error: reviewedError }, { count: prospectsApproved, error: approvedError }] = await Promise.all([
       supabaseAdminClient.from('prospects').select('id', { count: 'exact', head: true }).neq('review_status', 'pending'),
@@ -369,6 +401,28 @@ serve(async (req) => {
           positiveReplies: counts.funnel.positive_replies,
           outboundSignups: counts.funnel.outbound_signups,
           outboundPaid: counts.funnel.outbound_paid,
+        },
+        recoveryFunnel,
+        reverseRecruiting: {
+          built: rr.built ?? 0,
+          ready: rr.ready ?? 0,
+          tooFew: rr.too_few ?? 0,
+          viewed: rr.viewed ?? 0,
+          clicked: rr.clicked ?? 0,
+          clicks: rr.clicks ?? 0,
+          signups: rr.signups ?? 0,
+        },
+        cancellations: {
+          // Portal feedback per canceled / scheduled-to-cancel B2C subscription; 'none' = no feedback.
+          byFeedback: Object.entries(cancellation.by_feedback)
+            .map(([feedback, count]) => ({ feedback, count }))
+            .sort((a, b) => b.count - a.count),
+          churn30d: {
+            canceled: cancellation.churn_30d.canceled,
+            ended: cancellation.churn_30d.ended,
+            pendingPeriodEnd: cancellation.churn_30d.pending_period_end,
+            canceledNoDate: cancellation.churn_30d.canceled_no_date,
+          },
         },
         institutional: {
           activeOpportunities,

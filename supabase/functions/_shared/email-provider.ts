@@ -1,6 +1,10 @@
 /**
  * Email provider abstraction: stable interface for sending email.
  * This implementation uses the Mailtrap Email Sending HTTP API.
+ *
+ * EMAIL_PROVIDER=log (local demos/tests only): never calls Mailtrap; logs the recipient,
+ * subject and campaign and reports success with a "log-" message id. Unset or
+ * "mailtrap": real sends.
  */
 
 export interface SendEmailParams {
@@ -13,6 +17,12 @@ export interface SendEmailParams {
   /** Extra MIME headers, e.g. List-Unsubscribe. Sent as Mailtrap's `headers` object
    * (Record<string, string>, per the official mailtrap-nodejs SDK types). */
   headers?: Record<string, string>
+  /** email_events.campaign, shown by the log provider. */
+  campaign?: string | null
+  /** Display name; overrides any name in MAILTRAP_FROM (the address never changes). */
+  fromName?: string | null
+  /** Reply-To address, e.g. a monitored job-hopper.co inbox routed into reply-ingest. */
+  replyTo?: string | null
 }
 
 export interface SendEmailResult {
@@ -40,6 +50,11 @@ export function parseFromAddress(raw: string, fallbackName: string): { email: st
 }
 
 export async function sendEmailViaProvider(params: SendEmailParams): Promise<SendEmailResult> {
+  if (Deno.env.get('EMAIL_PROVIDER') === 'log') {
+    // Full address on purpose: this mode exists to see who would have been emailed.
+    console.log('[email-provider:log] not sent', { to: params.to, subject: params.subject, campaign: params.campaign ?? null, category: params.category ?? null, replyTo: params.replyTo ?? null })
+    return { messageId: `log-${crypto.randomUUID()}`, success: true }
+  }
   const apiToken = Deno.env.get('MAILTRAP_API_TOKEN')
   const url = (Deno.env.get('MAILTRAP_URL') ?? DEFAULT_MAILTRAP_URL).replace(/\/+$/, '')
   const fromEnv = Deno.env.get('MAILTRAP_FROM') ?? 'no-reply@job-hopper.io'
@@ -56,7 +71,8 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
     }
   }
 
-  const fromAddress = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
+  const parsedFrom = parseFromAddress(fromEnv, DEFAULT_FROM_NAME)
+  const fromAddress = params.fromName?.trim() ? { email: parsedFrom.email, name: params.fromName.trim() } : parsedFrom
 
   // Log the recipient's domain only (spots provider-specific rejections) — never the address.
   const toDomain = params.to.split('@')[1] ?? null
@@ -78,6 +94,10 @@ export async function sendEmailViaProvider(params: SendEmailParams): Promise<Sen
 
   if (params.category) {
     payload.category = params.category
+  }
+
+  if (params.replyTo?.trim()) {
+    payload.reply_to = { email: params.replyTo.trim() }
   }
 
   if (params.metadata && Object.keys(params.metadata).length > 0) {

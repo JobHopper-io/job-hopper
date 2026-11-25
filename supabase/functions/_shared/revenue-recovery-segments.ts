@@ -1,140 +1,116 @@
 /**
- * B2C Revenue-Recovery Segments (Build 14). Pure membership functions, unit-testable
- * without a DB — the admin-revenue-recovery-segments Edge Function does the actual
- * fetching/orchestration and calls these.
+ * B2C recovery segments. Pure functions over one public.recovery_candidates() row, so
+ * they're unit-testable without a DB.
  *
- * Only segments with a real, already-captured signal are here. Two of the plan's 9 are
- * deliberately absent, not approximated:
- *   - "Trial expired" (distinct from real churn): subscriptions stores only current
- *     status, not a status-transition history or a trial-converted flag, so a trial
- *     that ended without converting is indistinguishable from a subscription that was
- *     briefly active then canceled. Needs new instrumentation (e.g. an audit trail of
- *     every real transition, not just reconciliation drift corrections).
- *   - "Checkout abandoned": stripe-webhook only subscribes to checkout.session.completed
- *     / customer.subscription.updated / customer.subscription.deleted -- no
- *     checkout.session.expired handler and no client-side "began checkout" event
- *     anywhere, so an abandoned Stripe Checkout session is invisible to this app today.
+ * Population (in SQL, migration 20261124120100): the growth_dashboard_counts() base (an
+ * auth user; no partner staff, university billing profiles or admins), minus anyone with
+ * live access (active/trial subscription, live org seat, active trial grant) and anyone
+ * past_due (they get the transactional payment-failed email instead).
+ *
+ * A user in several segments gets only the first one in RECOVERY_SEGMENT_PRIORITY. Every
+ * segment can fire with this order: subscription status is only trial/active (live
+ * access), past_due (excluded) or canceled, so any onboarded candidate outside
+ * "cancelled" has no subscription row; activated_never_paid is limited to people active
+ * in the last 30 days, so the inactive ones reach no_login_30d.
+ *
+ * Not built:
+ *   - "Trial expired" (distinct from real churn): subscriptions keeps no transition
+ *     history, so a trial that ended unconverted looks like any other cancellation.
+ *   - high_match_users: disabled while the job feed is stale (job_hopper_live has had no
+ *     new jobs since 2026-11-12, so most matches point at old jobs). See
+ *     isHighMatchUser below to re-enable once the feed is fresh again.
  */
 
-export type RevenueRecoverySegmentKey =
-  | 'never_activated'
-  | 'activated_never_paid'
-  | 'cancelled'
-  | 'no_login_30d'
-  | 'heavy_free_usage'
-  | 'high_match_users'
-  | 'visa_focused_no_conversion'
+export const RECOVERY_SEGMENT_PRIORITY = [
+  'abandoned_checkout',
+  'cancelled',
+  'heavy_free_usage',
+  'visa_focused_no_conversion',
+  'onboarded_no_resume',
+  'activated_never_paid',
+  'no_login_30d',
+  'never_activated',
+] as const
 
-export interface SubscriptionFlags {
-  hasActiveSub: boolean
-  hasTrialSub: boolean
-  hasCanceledSub: boolean
-  hasAnySub: boolean
+export type RevenueRecoverySegmentKey = (typeof RECOVERY_SEGMENT_PRIORITY)[number]
+
+export const SEGMENT_LABELS: Record<RevenueRecoverySegmentKey, string> = {
+  abandoned_checkout: 'Abandoned checkout',
+  cancelled: 'Cancelled',
+  heavy_free_usage: 'Heavy free usage',
+  visa_focused_no_conversion: 'Visa/sponsorship-focused, not converted',
+  onboarded_no_resume: 'Onboarded, no resume',
+  activated_never_paid: 'Activated, never paid (active in 30 days)',
+  no_login_30d: 'Not seen in 30+ days',
+  never_activated: 'Signed up, never activated',
 }
 
-export function subscriptionFlagsFromStatuses(statuses: Iterable<string>): SubscriptionFlags {
-  let hasActiveSub = false
-  let hasTrialSub = false
-  let hasCanceledSub = false
-  let hasAnySub = false
-  for (const status of statuses) {
-    hasAnySub = true
-    if (status === 'active') hasActiveSub = true
-    else if (status === 'trial') hasTrialSub = true
-    else if (status === 'canceled') hasCanceledSub = true
-  }
-  return { hasActiveSub, hasTrialSub, hasCanceledSub, hasAnySub }
+/** One row of public.recovery_candidates(). */
+export interface RecoveryCandidate {
+  profile_id: string
+  email: string
+  first_name: string | null
+  target_job_title: string | null
+  created_at: string
+  email_confirmed: boolean
+  onboarding_completed: boolean
+  has_resume: boolean
+  requires_us_sponsorship: boolean | null
+  /** Later of profiles.last_active_at and auth last_sign_in_at. */
+  last_seen_at: string | null
+  has_any_sub: boolean
+  has_canceled_sub: boolean
+  job_searches_used: number
+  max_job_searches: number
+  abandoned_checkout_at: string | null
+  abandoned_checkout_proxy: boolean
 }
 
-/** Not currently entitled -- the shared "hasn't converted" gate every segment but the
- * plain onboarding/churn ones uses, so a currently-paying user is never targeted by an
- * upsell-flavored re-engagement send. */
-export function isNonPayer(flags: SubscriptionFlags): boolean {
-  return !flags.hasActiveSub && !flags.hasTrialSub
-}
-
+const DAY_MS = 86_400_000
 const MIN_NEVER_ACTIVATED_AGE_DAYS = 3
-
-export function isNeverActivated(
-  profile: { onboardingCompleted: boolean | null; createdAt: string; hasAuthUser: boolean },
-  nowMs: number,
-): boolean {
-  if (!profile.hasAuthUser) return false
-  if (profile.onboardingCompleted === true) return false
-  const ageDays = (nowMs - new Date(profile.createdAt).getTime()) / 86400000
-  return ageDays >= MIN_NEVER_ACTIVATED_AGE_DAYS
-}
-
-export function isActivatedNeverPaid(onboardingCompleted: boolean | null, flags: SubscriptionFlags): boolean {
-  return onboardingCompleted === true && !flags.hasAnySub
-}
-
-/** Same definition as the existing lifecycle report's "churned" category. */
-export function isCancelled(flags: SubscriptionFlags): boolean {
-  return flags.hasCanceledSub && !flags.hasActiveSub && !flags.hasTrialSub
-}
-
 const NO_LOGIN_DAYS = 30
 
-// Scoped to non-payers, consistent with every other segment here -- this build is
-// about the pre-conversion funnel, not retention nudges for people already paying.
-export function isNoLogin30d(lastSignInAt: string | null, nowMs: number, flags: SubscriptionFlags): boolean {
-  if (!isNonPayer(flags)) return false
-  if (!lastSignInAt) return false // no real sign-in on record is a data gap, not a signal -- excluded rather than guessed
-  const days = (nowMs - new Date(lastSignInAt).getTime()) / 86400000
-  return days >= NO_LOGIN_DAYS
+type Rule = (c: RecoveryCandidate, nowMs: number) => boolean
+
+/** last_seen_at (later of last_active_at and last sign-in) within the last `days`. */
+const seenWithin = (c: RecoveryCandidate, nowMs: number, days: number) =>
+  c.last_seen_at !== null && (nowMs - new Date(c.last_seen_at).getTime()) / DAY_MS < days
+
+/** Every candidate already has no live access and isn't past_due (SQL). */
+export const SEGMENT_RULES: Record<RevenueRecoverySegmentKey, Rule> = {
+  // A started/expired checkout over an hour old with nothing completed after it; the
+  // stripe_customer_id proxy only for users with no checkout_attempts rows at all.
+  abandoned_checkout: (c) => c.abandoned_checkout_at !== null || c.abandoned_checkout_proxy,
+  cancelled: (c) => c.has_canceled_sub,
+  // Used every free search the admin-tunable freemium cap allows.
+  heavy_free_usage: (c) => c.job_searches_used >= c.max_job_searches,
+  visa_focused_no_conversion: (c) => c.requires_us_sponsorship === true,
+  onboarded_no_resume: (c) => c.onboarding_completed && !c.has_resume,
+  // Onboarded, never paid, and seen in the last 30 days.
+  activated_never_paid: (c, now) => c.onboarding_completed && !c.has_any_sub && seenWithin(c, now, NO_LOGIN_DAYS),
+  // Never seen at all is a data gap, not a signal: excluded.
+  no_login_30d: (c, now) => c.last_seen_at !== null && !seenWithin(c, now, NO_LOGIN_DAYS),
+  never_activated: (c, now) =>
+    !c.onboarding_completed && (now - new Date(c.created_at).getTime()) / DAY_MS >= MIN_NEVER_ACTIVATED_AGE_DAYS,
 }
 
-// "Heavy" is hitting the real, already-admin-tunable freemium cap (freemium_settings.
-// max_job_searches) -- not an invented number. Someone who's used every free search
-// they're allowed and hasn't converted is the clearest possible upsell signal this app
-// already tracks.
-export function isHeavyFreeUsage(jobSearchesUsed: number, maxJobSearches: number, flags: SubscriptionFlags): boolean {
-  return isNonPayer(flags) && jobSearchesUsed >= maxJobSearches
+/** Every segment the candidate matches, in priority order. */
+export function matchingSegments(c: RecoveryCandidate, nowMs: number): RevenueRecoverySegmentKey[] {
+  return RECOVERY_SEGMENT_PRIORITY.filter((key) => SEGMENT_RULES[key](c, nowMs))
 }
 
-/** 80th percentile of the real live job_matches-per-profile distribution (among users
- * with at least one match) -- "high" is defined relative to actual usage, not a
- * fabricated absolute count, and adapts automatically as the user base grows. */
+/** The one segment a candidate is targeted with, or null. */
+export function assignSegment(c: RecoveryCandidate, nowMs: number): RevenueRecoverySegmentKey | null {
+  return matchingSegments(c, nowMs)[0] ?? null
+}
+
+/** Disabled (not in RECOVERY_SEGMENT_PRIORITY) while the job feed is stale; see header. */
 export function highMatchCountThreshold(matchCounts: number[]): number {
   if (matchCounts.length === 0) return Infinity
   const sorted = [...matchCounts].sort((a, b) => a - b)
-  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.8))
-  return sorted[idx]
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.8))]
 }
 
-export function isHighMatchUser(matchCount: number, threshold: number, flags: SubscriptionFlags): boolean {
-  return isNonPayer(flags) && matchCount > 0 && matchCount >= threshold
-}
-
-// requires_us_sponsorship is a real, populated onboarding field (56.8% of real profiles
-// have a non-null value; not the "genuinely untracked" gap the plan assumed).
-export function isVisaFocusedNoConversion(requiresUsSponsorship: boolean | null, flags: SubscriptionFlags): boolean {
-  return requiresUsSponsorship === true && isNonPayer(flags)
-}
-
-/**
- * Real revenue-recovery sends are marketing: only members whose current_marketing_consent
- * is true are sent to. A failed consent check skips the member too (fail closed) and is
- * counted separately so it isn't mistaken for "no consent".
- */
-export async function partitionByMarketingConsent<T extends { profileId: string }>(
-  members: T[],
-  hasMarketingConsent: (profileId: string) => Promise<boolean>,
-): Promise<{ consented: T[]; skippedNoConsent: number; consentCheckErrors: number }> {
-  const consented: T[] = []
-  let skippedNoConsent = 0
-  let consentCheckErrors = 0
-  for (const member of members) {
-    try {
-      if (await hasMarketingConsent(member.profileId)) consented.push(member)
-      else skippedNoConsent += 1
-    } catch (err) {
-      consentCheckErrors += 1
-      console.error('revenue-recovery: marketing consent check failed; skipping member', {
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-  return { consented, skippedNoConsent, consentCheckErrors }
+export function isHighMatchUser(matchCount: number, threshold: number): boolean {
+  return matchCount > 0 && matchCount >= threshold
 }

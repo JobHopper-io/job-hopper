@@ -76,6 +76,76 @@
         </table>
       </section>
 
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Recovery emails
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          People per segment, counted from their first recovery email. Came back: active in the app after
+          it. Paid: completed a checkout within 30 days of it.
+        </p>
+        <div class="-mx-4 sm:-mx-6 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-xs text-neutral-muted">
+                <th scope="col" class="px-4 sm:px-6 py-2 text-left font-medium">Segment</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Sent</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Delivered</th>
+                <th scope="col" class="px-2 py-2 text-right font-medium">Came back</th>
+                <th scope="col" class="px-4 sm:px-6 py-2 text-right font-medium">Paid in 30 days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in report.recoveryFunnel" :key="row.segment" class="border-t border-neutral-border">
+                <th scope="row" class="px-4 sm:px-6 py-2 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.sent.toLocaleString() }}</td>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.delivered.toLocaleString() }}</td>
+                <td class="px-2 py-2 text-right tabular-nums">{{ row.cameBack.toLocaleString() }}</td>
+                <td class="px-4 sm:px-6 py-2 text-right tabular-nums">{{ row.paid30d.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Reverse recruiting
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          Job shortlists sent to approved job seekers. Each step is its own all-time count, not a
+          cohort. Only ready shortlists (3-5 open jobs) are sent.
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in reverseRecruitingRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
+        <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
+          Cancellations
+        </h2>
+        <p class="text-sm text-neutral-body mb-5">
+          From Stripe, recorded since 2026-11-23. {{ report.cancellations.churn30d.canceledNoDate.toLocaleString() }}
+          earlier cancellations have no date or reason.
+        </p>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr v-for="row in cancellationRows" :key="row.label" class="border-t border-neutral-border first:border-t-0">
+              <th scope="row" class="py-2 pr-4 text-left font-normal text-brand-charcoal">{{ row.label }}</th>
+              <td class="py-2 pr-4 text-right tabular-nums font-medium text-brand-charcoal">{{ row.value.toLocaleString() }}</td>
+              <td class="py-2 text-xs text-neutral-muted">{{ row.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- Acquisition (institutional outbound) -->
       <section class="rounded-2xl border border-neutral-border bg-white/60 shadow-sm px-6 py-6">
         <h2 class="text-lg font-heading font-semibold text-brand-charcoal mb-1">
@@ -233,7 +303,7 @@
           <StatTile
             label="Recovered revenue"
             not-tracked
-            hint="no revenue-recovery segments built yet"
+            hint="no revenue amounts; see Recovery emails for paid within 30 days"
           />
         </dl>
         <p class="text-xs text-neutral-muted pt-4 border-t border-neutral-border">
@@ -313,6 +383,32 @@ const funnelRows = computed(() => {
     { label: 'Positive replies', value: f.positiveReplies, hint: 'Interested, Meeting requested, More information' },
     { label: 'Signups from outbound', value: f.outboundSignups, hint: 'utm_source email_outbound, or matched to a lead' },
     { label: 'Paid from outbound', value: f.outboundPaid, hint: 'active subscription' },
+  ]
+})
+
+const reverseRecruitingRows = computed(() => {
+  const r = report.value?.reverseRecruiting
+  if (!r) return []
+  return [
+    { label: 'Shortlists built', value: r.built, hint: `${r.ready} ready, ${r.tooFew} too few jobs` },
+    { label: 'Viewed', value: r.viewed, hint: 'shortlists opened at least once' },
+    { label: 'Clicked', value: r.clicked, hint: `shortlists with an Apply click (${r.clicks} clicks)` },
+    { label: 'Signups', value: r.signups, hint: 'utm_campaign reverse_recruiting' },
+  ]
+})
+
+const cancellationRows = computed(() => {
+  const c = report.value?.cancellations
+  if (!c) return []
+  return [
+    { label: 'Canceled, last 30 days', value: c.churn30d.canceled, hint: 'cancellation requested in the last 30 days' },
+    { label: 'Ended', value: c.churn30d.ended, hint: 'of those, subscription already ended' },
+    { label: 'Ending at period end', value: c.churn30d.pendingPeriodEnd, hint: 'of those, still running until period end' },
+    ...c.byFeedback.map((f) => ({
+      label: `Reason: ${f.feedback === 'none' ? 'no feedback' : f.feedback.replace(/_/g, ' ')}`,
+      value: f.count,
+      hint: 'all time, Stripe portal feedback',
+    })),
   ]
 })
 

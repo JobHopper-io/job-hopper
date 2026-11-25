@@ -1,109 +1,37 @@
 #!/usr/bin/env node
-// Live send: fires real emails via Mailtrap's Email Sending API (send.api.mailtrap.io —
-// this is Mailtrap's real send endpoint, not a sandbox) to institutional_leads that
-// already have a real contact_email. Imports template/dedup logic from
-// outbound-dry-run.mjs so the dry-run preview and the live send always render the same
-// content from the same code path — no separate copy to drift.
+// Enrolls institutional leads (and, with --prospects, approved job-seeker prospects) into
+// a 4-stage outreach sequence: one followup_sequences row per person, stage 1 due now,
+// sequence_key 'outreach_<campaign>'. It sends nothing itself: the outreach-sequences
+// edge function (_shared/outreach-sequences.ts) does the sending, with the claim,
+// no-repeat, 2-day spacing and stop rules, and re-checks exclusion_lists / prospect
+// eligibility and suppression right before every send.
 //
-// Query: status='new', category in (university, employer), opportunity_score >= 50,
-// contact_email is not null. Same shape as the dry run's default query, restricted to
-// leads that already have a contact (no enrichment happens here).
+// Who gets enrolled:
+// - leads: status='new', category in (university, employer), opportunity_score >= 50,
+//   contact_email set (same query as before); not on exclusion_lists (case-insensitive),
+//   address not suppressed, not already in an open outreach sequence. When several leads
+//   share one inbox only the highest-scored one is enrolled, so one person doesn't get
+//   several sequences.
+// - --prospects: job seekers with review_status='approved' that pass
+//   prospect_send_eligibility, aren't already in an open outreach sequence, and have a
+//   ready, unexpired shortlist (scripts/build-shortlists.mjs): their stage 1 is the
+//   shortlist email, so a prospect without one is skipped (no_ready_shortlist).
+// - --only="Name1,Name2" limits leads to those exact organization names (and prospects
+//   to those exact emails); --limit / --exclude work as before.
 //
-// Safety:
-// - Same contact_email dedup as the dry run — one email per real inbox, generic wording
-//   when multiple leads share a contact (see outbound-dry-run.mjs's buildDedupedSends).
-// - exclusion_lists is checked once up front (to keep dedup groups clean) AND re-checked
-//   fresh immediately before each individual send, so a suppression added mid-run still
-//   takes effect for sends later in the batch. suppressed_emails (per address, via the
-//   is_email_suppressed RPC) is checked at the same two points; an RPC error stops the run.
-// - Every email ends with the postal address (OUTBOUND_POSTAL_ADDRESS) and a signed
-//   per-recipient unsubscribe link, and carries List-Unsubscribe / List-Unsubscribe-Post
-//   one-click headers (outbound-unsubscribe.mjs). A real send refuses to start if
-//   OUTBOUND_POSTAL_ADDRESS or UNSUBSCRIBE_EMAIL_SECRET is missing.
-// - Every attempt (sent, failed, or blocked by suppression) writes one email_events row
-//   (type 'outbound', campaign, institutional_lead_id, provider_message_id), the send log;
-//   institutional_leads' last-send columns stay as a cache. Preview writes nothing.
-// - institutional_leads.status -> 'contacted' and campaign -> the given tag are written
-//   ONLY after a confirmed-successful send, for every lead folded into that send (not
-//   just the primary one whose template was used). A failed send leaves status
-//   untouched, so it's naturally retried on a future run (query only pulls status=new).
-// - --preview runs the full query + suppression + dedup + render pipeline and prints
-//   exactly what would be sent, without calling Mailtrap and without writing anything.
+// Blocked leads still get one email_events row per (lead, reason), as before.
+// --preview prints who would be enrolled and renders their stage-1 email with the
+// footer (placeholder footer if UNSUBSCRIBE_EMAIL_SECRET / OUTBOUND_POSTAL_ADDRESS are
+// missing). It writes nothing.
 //
-// Usage: node scripts/outbound-live-send.mjs --preview
-//        node scripts/outbound-live-send.mjs --campaign=first-batch-2026-08-14
-//        node scripts/outbound-live-send.mjs --campaign=... --delay-ms=3000
+// Usage: node scripts/outbound-live-send.mjs --preview [--prospects]
+//        node scripts/outbound-live-send.mjs --campaign=nov-2026 [--prospects] [--limit=20]
 
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
-import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, buildDedupedSends, requireEnv } from './outbound-dry-run.mjs';
-import { listUnsubscribeHeaders, makeFooterFor, normalizeEmail, readFooterConfig } from './outbound-unsubscribe.mjs';
-
-const DEFAULT_DELAY_MS = 2000;
-const MAILTRAP_BASE = 'https://send.api.mailtrap.io/api/send';
-const DEFAULT_FROM_NAME = 'Job-Hopper';
-
-// Duplicated from _shared/email-provider.ts's parseFromAddress -- that file is Deno-only
-// and this script runs under plain Node (see outbound-dry-run.mjs's own note on why its
-// enrichment logic is duplicated rather than imported). MAILTRAP_FROM may be a bare
-// address or an RFC 5322-style "Display Name <email>"; Mailtrap's API wants those as
-// separate from.email/from.name fields, not one combined string -- feeding the raw
-// combined string into from.email 400s with "'from' address is invalid" (confirmed
-// against a real send).
-function parseFromAddress(raw, fallbackName) {
-  const match = raw.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
-  if (match) {
-    const name = match[1].replace(/^"(.*)"$/, '$1').trim();
-    return { email: match[2].trim(), name: name || fallbackName };
-  }
-  return { email: raw.trim(), name: fallbackName };
-}
-
-async function sendEmailViaMailtrap({ apiToken, from, fromName, to, subject, text, html, replyTo, headers }) {
-  // The display name is set per lead category by fromNameForCategory (Job-Hopper
-  // University Partnerships / Job-Hopper Partnerships) -- it always wins over whatever
-  // name MAILTRAP_FROM might embed. Only the *address* is extracted from `from`; the
-  // fallback name passed to parseFromAddress here is unused in practice since
-  // fromName is never empty, but keeping it non-null avoids a stray "undefined" name
-  // on a bare address with no embedded name.
-  const { email: fromEmail } = parseFromAddress(from, fromName || DEFAULT_FROM_NAME);
-  const fromAddress = { email: fromEmail, name: fromName || DEFAULT_FROM_NAME };
-  const payload = { from: fromAddress, to: [{ email: to.trim() }], subject, text, html };
-  // reply_to is set per lead category by replyToForCategory (partnerships@ /
-  // university-partnerships@ job-hopper.co, both routed into reply-ingest). Guarded
-  // anyway so a caller passing null still produces a valid payload.
-  if (replyTo) {
-    payload.reply_to = { email: replyTo.trim() };
-  }
-  // Mailtrap's `headers` field (Record<string, string>, per the mailtrap-nodejs SDK types):
-  // List-Unsubscribe + List-Unsubscribe-Post for one-click unsubscribe.
-  if (headers && Object.keys(headers).length > 0) {
-    payload.headers = headers;
-  }
-  const res = await fetch(MAILTRAP_BASE, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const bodyText = await res.text();
-  if (!res.ok) {
-    const truncated = bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
-    return { success: false, error: `Mailtrap error ${res.status}: ${truncated || res.statusText}` };
-  }
-  let messageId = null;
-  try {
-    // Mailtrap's real response shape is { success, message_ids: [...] } (plural,
-    // array) -- confirmed against a live send; a singular `message_id` field never
-    // matches, which is why this was always coming back null before.
-    const parsed = bodyText ? JSON.parse(bodyText) : null;
-    if (parsed && Array.isArray(parsed.message_ids) && typeof parsed.message_ids[0] === 'string') {
-      messageId = parsed.message_ids[0];
-    }
-  } catch {
-    // non-JSON response body; leave messageId null
-  }
-  return { success: true, messageId };
-}
+import { CANDIDATE_CATEGORIES, MIN_OPPORTUNITY_SCORE, SENDER_NAME, requireEnv } from './outbound-dry-run.mjs';
+import { makeFooterFor, normalizeEmail, readFooterConfig } from './outbound-unsubscribe.mjs';
+import { outreachSequenceKey, renderOutreach } from '../supabase/functions/_shared/outbound-templates.mjs';
 
 // Per-address suppression (suppressed_emails via the is_email_suppressed RPC, same check
 // sendEmail runs). Cold outbound is always kind 'marketing'. An RPC error throws and stops
@@ -189,234 +117,209 @@ export async function logOutboundEvent(supabase, row) {
   return true;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+const normName = (s) => (s ?? '').trim().toLowerCase();
+
+/**
+ * Which leads to enroll. leads must be in priority order (highest opportunity_score first).
+ * Returns { enroll, skipped: [{ lead, reason }] } with reason exclusion_lists |
+ * already_enrolled | shared_inbox. Suppressed addresses are checked separately (RPC).
+ */
+export function pickLeadsToEnroll(leads, { exclusionNames, enrolledLeadIds }) {
+  const excluded = new Set(exclusionNames.map(normName));
+  const seenInbox = new Map();
+  const enroll = [];
+  const skipped = [];
+  for (const lead of leads) {
+    if (excluded.has(normName(lead.organization_name))) skipped.push({ lead, reason: 'exclusion_lists' });
+    else if (enrolledLeadIds.has(lead.id)) skipped.push({ lead, reason: 'already_enrolled' });
+    else if (seenInbox.has(normalizeEmail(lead.contact_email))) skipped.push({ lead, reason: 'shared_inbox', with: seenInbox.get(normalizeEmail(lead.contact_email)) });
+    else {
+      seenInbox.set(normalizeEmail(lead.contact_email), lead.organization_name);
+      enroll.push(lead);
+    }
+  }
+  return { enroll, skipped };
 }
 
+/** followup_sequences stage-1 rows, due now. */
+/**
+ * Prospects that can get the shortlist email: each paired with their newest ready,
+ * unexpired shortlist. shortlists: prospect_shortlists rows (any status/expiry).
+ * Returns { enroll: [{ prospect, shortlist }], skipped: [{ prospect, reason }] }.
+ */
+export function pickProspectsWithShortlist(prospects, shortlists, now = new Date()) {
+  const best = new Map();
+  for (const s of shortlists) {
+    if (s.status !== 'ready' || !(new Date(s.expires_at) > now)) continue;
+    const cur = best.get(s.prospect_id);
+    if (!cur || s.created_at > cur.created_at) best.set(s.prospect_id, s);
+  }
+  const enroll = [];
+  const skipped = [];
+  for (const prospect of prospects) {
+    const shortlist = best.get(prospect.id);
+    if (shortlist) enroll.push({ prospect, shortlist });
+    else skipped.push({ prospect, reason: 'no_ready_shortlist' });
+  }
+  return { enroll, skipped };
+}
+
+export function enrollmentRows({ leadIds = [], prospectIds = [] }, campaign, now = new Date()) {
+  const base = { sequence_key: outreachSequenceKey(campaign), sequence_stage: 1, scheduled_date: now.toISOString() };
+  return [
+    ...leadIds.map((id) => ({ ...base, institutional_lead_id: id })),
+    ...prospectIds.map((id) => ({ ...base, prospect_id: id })),
+  ];
+}
+
+/** Subjects already in an outreach sequence that hasn't finished or stopped. */
+async function openOutreachSubjects(supabase) {
+  const { data, error } = await supabase
+    .from('followup_sequences')
+    .select('institutional_lead_id, prospect_id, sequence_key, sent_date, stop_reason, sequence_stage')
+    .like('sequence_key', 'outreach\\_%');
+  if (error) throw new Error(`Failed to read followup_sequences: ${error.message}`);
+  const bySeq = new Map();
+  for (const r of data) {
+    const k = `${r.institutional_lead_id ?? ''}|${r.prospect_id ?? ''}|${r.sequence_key}`;
+    bySeq.set(k, [...(bySeq.get(k) ?? []), r]);
+  }
+  const leads = new Set();
+  const prospects = new Set();
+  for (const rows of bySeq.values()) {
+    if (rows.some((r) => r.stop_reason) || rows.some((r) => r.sequence_stage === 4 && r.sent_date)) continue;
+    if (rows[0].institutional_lead_id) leads.add(rows[0].institutional_lead_id);
+    if (rows[0].prospect_id) prospects.add(rows[0].prospect_id);
+  }
+  return { leads, prospects };
+}
+
+const listArg = (name) => {
+  const a = process.argv.find((x) => x.startsWith(`--${name}=`));
+  return a ? a.slice(name.length + 3).split(',').map((x) => x.trim()).filter(Boolean) : null;
+};
+
 async function main() {
-  const supabaseUrl = requireEnv('SUPABASE_URL');
-  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-
+  const supabase = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });
   const preview = process.argv.includes('--preview');
+  const withProspects = process.argv.includes('--prospects');
+  const campaign = listArg('campaign')?.[0] ?? (preview ? 'preview' : null);
+  if (!campaign) throw new Error('--campaign=<tag> is required to enroll (e.g. --campaign=nov-2026)');
+  if (!/^[a-z0-9][a-z0-9-]{0,40}$/i.test(campaign)) throw new Error('--campaign must be letters, digits and dashes');
+  const only = listArg('only');
+  const excludeNames = listArg('exclude');
+  const limitArg = listArg('limit');
+  const limit = limitArg ? Number(limitArg[0]) : null;
 
-  const campaignArg = process.argv.find((a) => a.startsWith('--campaign='));
-  const campaign = campaignArg ? campaignArg.slice('--campaign='.length) : null;
-  if (!preview && !campaign) {
-    throw new Error('--campaign=<tag> is required for a real send (e.g. --campaign=first-batch-2026-08-14)');
-  }
-
-  // Every email carries the postal address and a signed per-recipient unsubscribe link
-  // (outbound-unsubscribe.mjs). A real send refuses to start without them; the preview
-  // still renders, with a visible placeholder footer.
   const { config: footerConfig, missing: footerMissing } = readFooterConfig();
-  if (!footerConfig) {
-    if (!preview) {
-      throw new Error(`Refusing to send: missing ${footerMissing.join(', ')} (needed for the unsubscribe footer and headers)`);
-    }
-    console.warn(`WARNING: footer not configured (${footerMissing.join(', ')}); preview shows a placeholder footer.`);
-  }
+  if (!footerConfig) console.warn(`WARNING: footer not configured (${footerMissing.join(', ')}); the preview shows a placeholder footer and the outreach runner will refuse to send until it is.`);
+  const footerFor = makeFooterFor(footerConfig, footerMissing);
 
-  const delayArg = process.argv.find((a) => a.startsWith('--delay-ms='));
-  const delayMs = delayArg ? Number(delayArg.slice('--delay-ms='.length)) : DEFAULT_DELAY_MS;
+  console.log(`${preview ? 'PREVIEW (no writes)' : 'ENROLL'}: campaign "${campaign}" (sequence ${outreachSequenceKey(campaign)})`);
 
-  // --limit=27 caps the batch to the top N leads (same opportunity_score-desc,
-  // organization_name-asc order already used everywhere else) -- lets a first real
-  // batch stay small on purpose. --exclude="Name1,Name2" drops specific orgs by exact
-  // organization_name before that cap is applied, so excluding one bad lead doesn't
-  // just shrink the batch by one -- the next-highest lead backfills its slot.
-  const limitArg = process.argv.find((a) => a.startsWith('--limit='));
-  const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : null;
-  const excludeArg = process.argv.find((a) => a.startsWith('--exclude='));
-  const excludeNames = excludeArg ? new Set(excludeArg.slice('--exclude='.length).split(',').map((s) => s.trim())) : null;
-
-  const mailtrapToken = preview ? null : requireEnv('MAILTRAP_API_TOKEN');
-  const mailtrapFrom = process.env.MAILTRAP_FROM || 'no-reply@job-hopper.io';
-  // Just the address, for printing "From:" in preview/rendered output -- the display
-  // name itself always comes from fromNameForCategory, per send, not from here.
-  const mailtrapFromEmail = parseFromAddress(mailtrapFrom, '').email;
-
-  console.log(
-    preview
-      ? `PREVIEW (no sends, no writes): querying leads (status=new, category in [${CANDIDATE_CATEGORIES.join(', ')}], opportunity_score >= ${MIN_OPPORTUNITY_SCORE}, contact_email not null)...`
-      : `LIVE SEND — campaign="${campaign}", ${delayMs}ms between sends. Querying leads...`,
-  );
-
-  const { data: leads, error: leadsError } = await supabase
+  let leadsQuery = supabase
     .from('institutional_leads')
-    .select(
-      'id, organization_name, category, contact_email, decision_maker_name, opportunity_score, signals, city, state, student_size, recommended_package',
-    )
+    .select('id, organization_name, category, contact_email, decision_maker_name, opportunity_score, signals, city, state, student_size, recommended_package')
     .eq('status', 'new')
     .in('category', CANDIDATE_CATEGORIES)
     .gte('opportunity_score', MIN_OPPORTUNITY_SCORE)
     .not('contact_email', 'is', null)
     .order('opportunity_score', { ascending: false })
     .order('organization_name', { ascending: true });
+  if (only) leadsQuery = leadsQuery.in('organization_name', only);
+  const { data: leadRows, error: leadsError } = await leadsQuery;
   if (leadsError) throw new Error(`Failed to query institutional_leads: ${leadsError.message}`);
-  console.log(`Found ${leads.length} candidate leads.`);
+  let leads = leadRows;
+  if (excludeNames) leads = leads.filter((l) => !excludeNames.includes(l.organization_name));
+  if (limit != null) leads = leads.slice(0, limit);
 
-  let scopedLeads = leads;
-  if (excludeNames) {
-    const before = scopedLeads.length;
-    scopedLeads = scopedLeads.filter((l) => !excludeNames.has(l.organization_name));
-    console.log(`Excluded ${before - scopedLeads.length} lead(s) by name: ${[...excludeNames].join(', ')}`);
-  }
-  if (limit != null) {
-    scopedLeads = scopedLeads.slice(0, limit);
-    console.log(`Capped to top ${scopedLeads.length} leads (--limit=${limit}).`);
-  }
-
-  // This pass filters obviously-suppressed leads out up front so dedup groups don't get
-  // built around a lead that won't send anyway. Each send still gets its own fresh check
-  // below immediately before it fires.
   const { data: exclusions, error: exclusionsError } = await supabase.from('exclusion_lists').select('company_name');
   if (exclusionsError) throw new Error(`Failed to query exclusion_lists: ${exclusionsError.message}`);
-  const suppressedNames = new Set(exclusions.map((r) => r.company_name));
+  const open = await openOutreachSubjects(supabase);
+  const { enroll, skipped } = pickLeadsToEnroll(leads, { exclusionNames: exclusions.map((r) => r.company_name), enrolledLeadIds: open.leads });
 
-  const candidateRenders = [];
-  let suppressedCount = 0;
-  let logFailures = 0;
-  // Preview writes nothing, including the send log.
-  const logEvent = async (row) => {
-    if (!preview && !(await logOutboundEvent(supabase, row))) logFailures += 1;
+  const logBlocked = async (lead, reason) => {
+    if (preview) return;
+    await logBlockedOnce(supabase, blockedEventRow({ reason, toEmail: lead.contact_email, leadIds: [lead.id], orgNames: [lead.organization_name], category: lead.category, campaign }));
   };
-  const logBlocked = async (row) => {
-    if (!preview && !(await logBlockedOnce(supabase, row))) logFailures += 1;
-  };
-  const blockedLeadRow = (lead, reason) =>
-    blockedEventRow({ reason, toEmail: lead.contact_email, leadIds: [lead.id], orgNames: [lead.organization_name], category: lead.category, campaign });
-  for (const lead of scopedLeads) {
-    if (suppressedNames.has(lead.organization_name)) {
-      suppressedCount += 1;
-      console.log(`SKIPPED (suppressed): ${lead.organization_name}`);
-      await logBlocked(blockedLeadRow(lead, 'exclusion_lists'));
-      continue;
-    }
+  for (const s of skipped) {
+    console.log(`SKIPPED (${s.reason}${s.with ? ` with ${s.with}` : ''}): ${s.lead.organization_name}`);
+    if (s.reason === 'exclusion_lists') await logBlocked(s.lead, 'exclusion_lists');
+  }
+  const leadsToEnroll = [];
+  for (const lead of enroll) {
     if (await isEmailSuppressed(supabase, lead.contact_email)) {
-      suppressedCount += 1;
       console.log(`SKIPPED (suppressed email): ${lead.organization_name}`);
-      await logBlocked(blockedLeadRow(lead, 'suppressed_emails'));
+      await logBlocked(lead, 'suppressed_emails');
       continue;
     }
-    candidateRenders.push({ lead, category: lead.category, contact_email: lead.contact_email.toLowerCase().trim() });
+    leadsToEnroll.push(lead);
   }
 
-  const { sends } = buildDedupedSends(candidateRenders, campaign, makeFooterFor(footerConfig, footerMissing));
-
-  let sentCount = 0;
-  let failedCount = 0;
-  let reSuppressedCount = 0;
-  const rendered = [];
-
-  for (const s of sends) {
-    const leadIds = candidateRenders.filter((c) => c.contact_email === s.contact_email).map((c) => c.lead.id);
-    const sendFields = { toEmail: s.contact_email, leadIds, orgNames: s.orgNames, category: s.category, merged: s.merged, subject: s.subject, campaign };
-    const sendRow = (fields) => outboundEventRow({ ...sendFields, ...fields });
-
-    // Immediate pre-send re-check: the batch can take minutes, so re-fetch
-    // exclusion_lists fresh for THIS send rather than trusting the top-of-run snapshot.
-    const { data: freshExclusions, error: freshExclusionsError } = await supabase
-      .from('exclusion_lists')
-      .select('company_name');
-    if (freshExclusionsError) throw new Error(`Failed to re-check exclusion_lists: ${freshExclusionsError.message}`);
-    const freshSuppressed = new Set(freshExclusions.map((r) => r.company_name));
-    if (s.orgNames.some((name) => freshSuppressed.has(name))) {
-      reSuppressedCount += 1;
-      console.log(`SKIPPED (suppressed at send time): ${s.orgNames.join(', ')}`);
-      await logBlocked(blockedEventRow({ ...sendFields, reason: 'exclusion_lists', atSendTime: true }));
-      continue;
+  let prospects = []; // [{ prospect, shortlist }]
+  let prospectsSkipped = [];
+  if (withProspects) {
+    let q = supabase
+      .from('prospect_send_eligibility')
+      .select('prospect_id, email_normalized, eligible, ineligible_reason')
+      .eq('kind', 'job_seeker')
+      .eq('eligible', true);
+    if (only) q = q.in('email_normalized', only.map(normalizeEmail));
+    const { data: eligible, error: eligibleError } = await q;
+    if (eligibleError) throw new Error(`Failed to query prospect_send_eligibility: ${eligibleError.message}`);
+    const ids = eligible.map((r) => r.prospect_id).filter((id) => !open.prospects.has(id));
+    if (ids.length) {
+      const { data, error } = await supabase
+        .from('prospects')
+        .select('id, email_normalized, first_name, target_job_title')
+        .in('id', ids)
+        .eq('review_status', 'approved')
+        .eq('status', 'new');
+      if (error) throw new Error(`Failed to query prospects: ${error.message}`);
+      const { data: shortlists, error: shortlistError } = await supabase
+        .from('prospect_shortlists')
+        .select('prospect_id, token, jobs, status, expires_at, created_at')
+        .in('prospect_id', data.map((p) => p.id))
+        .eq('status', 'ready')
+        .gt('expires_at', new Date().toISOString());
+      if (shortlistError) throw new Error(`Failed to query prospect_shortlists: ${shortlistError.message}`);
+      const picked = pickProspectsWithShortlist(data, shortlists);
+      prospects = picked.enroll;
+      prospectsSkipped = picked.skipped;
     }
-    if (await isEmailSuppressed(supabase, s.contact_email)) {
-      reSuppressedCount += 1;
-      console.log(`SKIPPED (email suppressed at send time): ${s.orgNames.join(', ')}`);
-      await logBlocked(blockedEventRow({ ...sendFields, reason: 'suppressed_emails', atSendTime: true }));
-      continue;
-    }
-
-    if (s.merged) {
-      console.log(`Deduped send (${s.orgNames.length} leads -> one email, ${s.contact_email}): ${s.orgNames.join(', ')}`);
-    }
-
-    if (preview) {
-      console.log(`[PREVIEW] Would send to ${s.contact_email}: "${s.subject}"`);
-      rendered.push(s);
-      continue;
-    }
-
-    const result = await sendEmailViaMailtrap({
-      apiToken: mailtrapToken,
-      from: mailtrapFrom,
-      fromName: s.fromName,
-      to: s.contact_email,
-      subject: s.subject,
-      text: s.body,
-      html: s.html,
-      replyTo: s.replyTo,
-      headers: listUnsubscribeHeaders(s.unsubscribeUrl),
-    });
-
-    if (!result.success) {
-      failedCount += 1;
-      console.log(`  -> FAILED (${s.contact_email}): ${result.error}`);
-      await logEvent(sendRow({ status: 'failed', error: result.error }));
-      // Failure reason is durable on the lead row, not just this run's console output --
-      // status stays 'new' so the lead is naturally retried on a future run, but the
-      // reason for last time doesn't just vanish when the terminal session ends.
-      const { error: failUpdateError } = await supabase
-        .from('institutional_leads')
-        .update({ last_send_error: result.error, last_send_attempted_at: new Date().toISOString() })
-        .in('id', leadIds);
-      if (failUpdateError) {
-        console.log(`  -> also failed to record the failure reason on institutional_leads: ${failUpdateError.message}`);
-      }
-      await sleep(delayMs);
-      continue;
-    }
-
-    sentCount += 1;
-    rendered.push(s);
-    console.log(`  -> sent (${s.contact_email}, messageId=${result.messageId ?? 'null'})`);
-    // Logged before the lead update below, which throws on failure: the send log must
-    // record every email that actually went out.
-    await logEvent(sendRow({ status: 'sent', messageId: result.messageId }));
-
-    const { error: updateError } = await supabase
-      .from('institutional_leads')
-      .update({
-        status: 'contacted',
-        campaign,
-        provider_message_id: result.messageId,
-        last_send_error: null,
-        last_send_attempted_at: new Date().toISOString(),
-      })
-      .in('id', leadIds);
-    if (updateError) {
-      throw new Error(
-        `Sent to ${s.contact_email} but failed to update institutional_leads (${leadIds.join(',')}): ${updateError.message}`,
-      );
-    }
-
-    await sleep(delayMs);
   }
 
-  console.log(
-    preview
-      ? `\nPreview complete: ${sends.length} would-be sends (${suppressedCount} pre-filtered suppressed), covering ${candidateRenders.length} leads.`
-      : `\nLive send complete: ${sentCount} sent, ${suppressedCount + reSuppressedCount} suppressed (${suppressedCount} upfront, ${reSuppressedCount} at send time), ${failedCount} failed.` +
-          (logFailures ? ` WARNING: ${logFailures} email_events row(s) failed to write -- see above.` : ''),
-  );
-
-  console.log(`\n--- Rendered output (${rendered.length}) ---`);
-  for (const r of rendered) {
-    console.log(`\n[${r.category}] ${r.orgNames.join('; ')}  (contact_email: ${r.contact_email})`);
-    console.log(`From: "${r.fromName}" <${mailtrapFromEmail}>`);
-    console.log(`Reply-To: ${r.replyTo}`);
-    console.log(`List-Unsubscribe: ${r.unsubscribeUrl ? `<${r.unsubscribeUrl}>` : '(not configured)'}`);
-    console.log(`Subject: ${r.subject}`);
-    console.log(r.body);
-    if (r.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${r.unfilled.join(', ')}`);
+  for (const lead of leadsToEnroll) {
+    const email = renderOutreach({ subject: { kind: 'lead', lead }, stage: 1, campaign, senderName: SENDER_NAME });
+    printStage1(`[${lead.category}] ${lead.organization_name} <${lead.contact_email}>`, email, footerFor(lead.contact_email));
   }
+  for (const { prospect, shortlist } of prospects) {
+    const email = renderOutreach({ subject: { kind: 'prospect', prospect, shortlist }, stage: 1, campaign, senderName: SENDER_NAME });
+    printStage1(`[prospect] ${prospect.email_normalized}`, email, footerFor(prospect.email_normalized));
+  }
+  if (prospectsSkipped.length) console.log(`\n${prospectsSkipped.length} approved prospect(s) skipped: no ready, unexpired shortlist (run scripts/build-shortlists.mjs).`);
+
+  if (preview) {
+    console.log(`\nPreview complete: would enroll ${leadsToEnroll.length} lead(s) and ${prospects.length} prospect(s); ${skipped.length} lead(s) skipped.`);
+    return;
+  }
+  const rows = enrollmentRows({ leadIds: leadsToEnroll.map((l) => l.id), prospectIds: prospects.map(({ prospect }) => prospect.id) }, campaign);
+  for (const [column, subset] of [['institutional_lead_id', rows.filter((r) => r.institutional_lead_id)], ['prospect_id', rows.filter((r) => r.prospect_id)]]) {
+    if (!subset.length) continue;
+    const { error } = await supabase
+      .from('followup_sequences')
+      .upsert(subset, { onConflict: `${column},sequence_key,sequence_stage`, ignoreDuplicates: true });
+    if (error) throw new Error(`Failed to enroll (${column}): ${error.message}`);
+  }
+  console.log(`\nEnrolled ${leadsToEnroll.length} lead(s) and ${prospects.length} prospect(s) in ${outreachSequenceKey(campaign)}; stage 1 is due now. The outreach-sequences run sends it.`);
+}
+
+function printStage1(label, email, footer) {
+  console.log(`\n${label}${email.draft ? '  (DRAFT copy)' : ''}`);
+  console.log(`From: ${email.fromName}  Reply-To: ${email.replyTo}`);
+  console.log(`Subject: ${email.subject}`);
+  console.log(email.body + footer.text);
+  if (email.unfilled.length) console.log(`\n⚠ unfilled placeholders: ${email.unfilled.join(', ')}`);
 }
 
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

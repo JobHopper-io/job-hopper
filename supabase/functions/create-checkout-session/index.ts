@@ -221,6 +221,9 @@ serve(async (req) => {
       subscription_data: subscriptionData,
     })
 
+    // Abandoned-checkout tracking; best effort, never blocks returning the checkout URL.
+    await recordCheckoutStarted(supabaseAdmin, profile.id, session.id)
+
     return new Response(
       JSON.stringify({ sessionId: session.id, url: session.url }),
       {

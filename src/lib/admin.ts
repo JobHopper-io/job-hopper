@@ -99,6 +99,38 @@ export interface GrowthDashboardReport {
     outboundSignups: number
     outboundPaid: number
   }
+  /** Recovery sequences, people per segment counted from their first send. */
+  recoveryFunnel: {
+    segment: string
+    label: string
+    sent: number
+    delivered: number
+    /** last_active_at after their first send. */
+    cameBack: number
+    /** Completed checkout within 30 days of their first send. */
+    paid30d: number
+  }[]
+  /** Reverse-recruiting shortlists (/s/:token). Each step is its own all-time count, not a cohort. */
+  reverseRecruiting: {
+    built: number
+    ready: number
+    tooFew: number
+    /** Shortlists opened at least once. */
+    viewed: number
+    /** Shortlists with at least one Apply click. */
+    clicked: number
+    /** All Apply clicks. */
+    clicks: number
+    /** Profiles first-touched by the shortlist page (utm_campaign reverse_recruiting). */
+    signups: number
+  }
+  /** B2C subscriptions only (university licenses excluded). */
+  cancellations: {
+    /** Canceled or scheduled-to-cancel subscriptions by Stripe portal feedback; 'none' = no feedback given. */
+    byFeedback: { feedback: string; count: number }[]
+    /** By canceled_at (when cancellation was requested). canceledNoDate: canceled before the field existed. */
+    churn30d: { canceled: number; ended: number; pendingPeriodEnd: number; canceledNoDate: number }
+  }
   institutional: {
     activeOpportunities: number
     trialOrganizations: number
@@ -258,12 +290,41 @@ interface ListInstitutionalLeadsResult {
   total: number
 }
 
+/** _shared/reply-assist.ts ReplyExtraction. */
+export interface ReplyExtraction {
+  need: string | null
+  roles: string[]
+  locations: string[]
+  timeline: string | null
+  question: string | null
+  sentiment: 'positive' | 'neutral' | 'negative'
+}
+
+// prospect_id (20261121130000) and the reply-handling columns (20261124130000) are typed by hand until
+// src/types/supabase.ts is regenerated against a DB that has them.
 export type AdminReplyEventRow = Pick<
   ReplyEvent,
   'id' | 'from_email' | 'raw_subject' | 'raw_body' | 'received_at' | 'reply_class' | 'processed' | 'institutional_lead_id'
 > & {
+  prospect_id: string | null
+  profile_id: string | null
+  audience: 'b2b' | 'b2c' | null
+  extracted: ReplyExtraction | null
+  /** Suggested reply for a person to review and send by hand; never sent automatically. */
+  draft_response: string | null
+  draft_generated_at: string | null
+  next_action: string | null
+  next_action_due: string | null
+  handled_at: string | null
+  classify_attempts: number
+  last_classify_error: string | null
+  needs_manual_review: boolean
+  assigned_to: string | null
+  owner: { first_name: string | null; last_name: string | null; email: string } | null
   institutional_leads: Pick<InstitutionalLead, 'organization_name' | 'category' | 'campaign'> | null
 }
+
+export type ReplyEventsView = 'all' | 'open' | 'overdue' | 'manual_review'
 
 interface ListReplyEventsResult {
   replies: AdminReplyEventRow[]
@@ -300,46 +361,60 @@ export interface PartnerDashboardResult {
 }
 
 export type RevenueRecoverySegmentKey =
-  | 'never_activated'
-  | 'activated_never_paid'
+  | 'abandoned_checkout'
   | 'cancelled'
-  | 'no_login_30d'
   | 'heavy_free_usage'
-  | 'high_match_users'
   | 'visa_focused_no_conversion'
+  | 'activated_never_paid'
+  | 'onboarded_no_resume'
+  | 'never_activated'
+  | 'no_login_30d'
 
-export interface RevenueRecoverySegmentMember {
-  profileId: string
-  email: string
-  firstName: string
-  detail: string
+/** Mirrors _shared/recovery-sequences.ts RecoveryRunResult. */
+export interface RecoveryRunResult {
+  mode: 'preview' | 'send'
+  candidates: number
+  bySegment: Partial<Record<RevenueRecoverySegmentKey, { members: number; due: number }>>
+  /** preview: everyone due now who'd pass the pre-send check (before the per-run cap); send: everyone attempted. */
+  planned: { profileId: string; emailMasked: string | null; segment: RevenueRecoverySegmentKey; stage: 1 | 2; campaign: string }[]
+  sent: number
+  failed: number
+  skipped: Record<string, number>
+  stopped: Record<string, number>
 }
 
-export interface RevenueRecoverySegmentSummaryRow {
-  key: RevenueRecoverySegmentKey
-  label: string
-  count: number
+export interface RecoveryAdminResult {
+  settings: { autoSend: boolean; maxSendsPerRun: number; offerSegments: string[] }
+  /** In priority order: a user in several segments gets only the first. */
+  segments: { key: RevenueRecoverySegmentKey; label: string }[]
+  result: RecoveryRunResult
 }
 
-export interface RevenueRecoverySegmentsResult {
-  summary: RevenueRecoverySegmentSummaryRow[]
-  segments: Record<RevenueRecoverySegmentKey, RevenueRecoverySegmentMember[]>
-  totalProfiles: number
+/** Mirrors _shared/outreach-sequences.ts OutreachSequenceSummary. */
+export interface OutreachSequenceRow {
+  sequenceKey: string
+  campaign: string
+  kind: 'lead' | 'prospect'
+  name: string
+  emailMasked: string | null
+  stagesSent: number
+  status: 'active' | 'stopped' | 'complete'
+  stopReason: string | null
+  nextStage: number | null
+  nextDue: string | null
+  lastSentAt: string | null
 }
 
-export interface SendRevenueRecoverySegmentResult {
-  mode: 'test' | 'real'
-  success?: boolean
+export interface OutreachAdminResult {
+  settings: { autoSend: boolean; maxPerRun: number }
+  sequences: OutreachSequenceRow[]
+}
+
+export interface RecoveryTestSendResult {
+  mode: 'test'
+  success: boolean
   error?: string | null
   messageId?: string | null
-  segment?: RevenueRecoverySegmentKey
-  totalEligible?: number
-  /** Real sends only: members skipped for lack of current marketing consent. */
-  skippedNoConsent?: number
-  consentCheckErrors?: number
-  sent?: number
-  suppressed?: number
-  failed?: number
 }
 
 export const adminAPI = {
@@ -572,7 +647,15 @@ export const adminAPI = {
     return { data: (data as { lead: AdminInstitutionalLeadRow }).lead, error: null }
   },
 
+  /** Sets handled_at on a reply (no-op if it's already handled). */
+  async markReplyHandled(replyId: string): Promise<{ data: { id: string; handled_at: string } | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-reply-events', { body: { action: 'mark_handled', replyId } })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: (data as { handled: { id: string; handled_at: string } | null }).handled, error: null }
+  },
+
   async listReplyEvents(params: {
+    view?: ReplyEventsView
     replyClass?: string
     search?: string
     limit?: number
@@ -672,32 +755,40 @@ export const adminAPI = {
     return { data: data as { revoked: string; seatCount: number; seatsUsed: number }, error: null }
   },
 
-  async listRevenueRecoverySegments(): Promise<{ data: RevenueRecoverySegmentsResult | null; error: Error | null }> {
-    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', {
-      body: { action: 'list_segments' },
-    })
-
-    if (error) {
-      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
-    }
-
-    return { data: data as RevenueRecoverySegmentsResult, error: null }
+  /** Who would get which recovery email next (masked emails). Reads only. */
+  async previewRecovery(): Promise<{ data: RecoveryAdminResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', { body: { action: 'preview' } })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as RecoveryAdminResult, error: null }
   },
 
-  /** Pass exactly one of testEmailOverride or confirmRealSend. */
-  async sendRevenueRecoverySegmentEmail(
-    segment: RevenueRecoverySegmentKey,
-    opts: { testEmailOverride?: string; confirmRealSend?: boolean },
-  ): Promise<{ data: SendRevenueRecoverySegmentResult | null; error: Error | null }> {
+  /** One real run, same rules and per-run cap as the daily job. */
+  async sendRecoveryBatch(): Promise<{ data: RecoveryAdminResult | null; error: Error | null }> {
     const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', {
-      body: { action: 'send_segment_email', segment, ...opts },
+      body: { action: 'send', confirmRealSend: true },
     })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as RecoveryAdminResult, error: null }
+  },
 
-    if (error) {
-      return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
-    }
+  /** Outreach sequences: who's in which stage, next due, stopped and why. Reads only. */
+  async listOutreachSequences(): Promise<{ data: OutreachAdminResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', { body: { action: 'outreach' } })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as OutreachAdminResult, error: null }
+  },
 
-    return { data: data as SendRevenueRecoverySegmentResult, error: null }
+  /** One segment/stage's copy to a single test address; no member is touched. */
+  async sendRecoveryTest(
+    segment: RevenueRecoverySegmentKey,
+    stage: 1 | 2,
+    testEmailOverride: string,
+  ): Promise<{ data: RecoveryTestSendResult | null; error: Error | null }> {
+    const { data, error } = await supabase.functions.invoke('admin-revenue-recovery-segments', {
+      body: { action: 'test_send', segment, stage, testEmailOverride },
+    })
+    if (error) return { data: null, error: new Error(await parseFunctionsInvokeError(error)) }
+    return { data: data as RecoveryTestSendResult, error: null }
   },
 }
 

@@ -1,5 +1,6 @@
 // Ingests one parsed inbound reply email into reply_events, matching the sender against
-// institutional_leads.contact_email and prospects.email_normalized. The Cloudflare Email
+// institutional_leads.contact_email, prospects.email_normalized and profiles.email, and
+// ignoring a re-delivered email (same Message-ID). The Cloudflare Email
 // Worker (email-router-worker/) POSTs here for replies to the job-hopper.co inboxes;
 // anything else that watches an inbox can POST the same JSON. Classification
 // (reply_events.reply_class) is done separately by classify-replies.
@@ -50,9 +51,33 @@ serve(createReplyIngestHandler({
     if (error) throw new Error(error.message)
     return data?.id ?? null
   },
+  findProfileIdByEmail: async (emailNormalized) => {
+    // profiles.email isn't normalized on write; exact case-insensitive match.
+    if (emailNormalized.includes("*")) return null
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id")
+      .ilike("email", ilikeExact(emailNormalized))
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    return data?.id ?? null
+  },
   insertReply: async (row) => {
+    if (row.message_id) {
+      // ON CONFLICT (message_id) DO NOTHING: a re-delivery inserts nothing.
+      const { data, error } = await admin
+        .from("reply_events")
+        .upsert(row, { onConflict: "message_id", ignoreDuplicates: true })
+        .select("id")
+      if (error) throw new Error(error.message)
+      if (data && data.length) return { id: data[0].id as string, duplicate: false }
+      const { data: existing, error: findError } = await admin.from("reply_events").select("id").eq("message_id", row.message_id).single()
+      if (findError) throw new Error(findError.message)
+      return { id: existing.id as string, duplicate: true }
+    }
     const { data, error } = await admin.from("reply_events").insert(row).select("id").single()
     if (error) throw new Error(error.message)
-    return data.id as string
+    return { id: data.id as string, duplicate: false }
   },
 }))
